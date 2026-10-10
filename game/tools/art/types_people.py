@@ -690,8 +690,9 @@ def crater_roof(sp: Sprite, v: int):
     sp.lamp(at(12.8, -1.7, 1.0), AMBER, 10)
     # 모서리 장비
     if v == 1:
-        for (x, y) in ((-11.6, 9.0), (9.0, -11.6)):
-            sp.quad((x, y, 0.4), (2.6, 0, 0.0), (0, 0.0, 1.6), SOLAR, back=STEEL)
+        for (x, y) in ((-11.8, 8.4), (8.4, -11.8)):
+            sp.quad((x, y + 1.3, 0.35), (0, -1.3, 0.9), (2.6, 0, 0), SOLAR, back=STEEL)
+            sp.panel_grid((x, y + 1.3, 0.35), (0, -1.3, 0.9), (2.6, 0, 0), 2, 4, "#6f86b0", 0.45, 0.6)
     elif v == 2:
         _dish(sp, (-10.4, -10.4, 3.0), norm((0.3, 1.0, 0.5)), 1.4)
         sp.line((-10.4, -10.4, 0), (-10.4, -10.4, 2.6), 0.12, "#9aa1aa")
@@ -722,7 +723,7 @@ def dome_cluster(sp: Sprite, v: int):
     Rh, Hh = 3.5, 4.5
     Rs, Hs = 2.35, 3.0
     angs, dist, ent = [((0, 125, 235), 6.5, 62), ((60, 180, 300), 6.3, 0), ((0, 125, 235), 6.5, 62),
-                       ((45, 165, 285), 6.0, 345), ((0, 125, 235), 6.5, 62)][v]
+                       ((45, 165, 285), 5.75, 345), ((0, 125, 235), 6.5, 62)][v]
     mat = (SINTER, SINTER, Mat("#A89A84"), SINTER, Mat("#958670"))[v]
     sp.contact_shadow(0, 0, 8.6, 7.6, 0.45)
     items = []
@@ -1123,3 +1124,1028 @@ def magnetic_shelter(sp: Sprite, v: int):
     elif v == 1:
         sp.box(-4.6, 2.2, 0, 1.4, 1.2, 1.1, Mat("#5b6470", 0.2), top=SILVER)
         sp.lamp((-3.9, 3.45, 0.8), CYAN_LIGHT, 6)
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 의료 (medical_bay 계열)
+# ═════════════════════════════════════════════════════════════════════
+
+def _awning(sp, o, e1, e2, n, colors, valance=0.22):
+    """줄무늬 차양: o에서 e1(벽에서 바깥)·e2(옆) 방향으로 펼친 판, 앞 가장자리에 늘어진 천."""
+    for i in range(n):
+        q = add(o, mul(e2, i / n))
+        sp.quad(q, e1, mul(e2, 1 / n), colors[i % len(colors)], back=colors[i % len(colors)])
+        f0 = add(q, e1)
+        sp.quad(f0, mul(e2, 1 / n), (0, 0, -valance), colors[i % len(colors)], back=colors[i % len(colors)])
+
+
+def _gurney(sp, c, along=(1, 0, 0)):
+    """바퀴 달린 들것."""
+    a = norm(along)
+    s_ = (-a[1], a[0], 0.0)
+    for du in (-0.55, 0.55):
+        for dv in (-0.22, 0.22):
+            p = add(add(c, mul(a, du)), mul(s_, dv))
+            sp.line(p, add(p, (0, 0, 0.72)), 0.04, "#9aa1aa")
+    o = add(add(c, mul(a, -0.65)), add(mul(s_, -0.27), (0, 0, 0.72)))
+    sp.quad(o, mul(a, 1.3), mul(s_, 0.54), WHITE, back=STEEL)
+    sp.quad(add(add(c, mul(a, 0.28)), add(mul(s_, -0.2), (0, 0, 0.75))), mul(a, 0.3), mul(s_, 0.4), Mat("#cfe6f5"),
+            back=WHITE)
+
+
+@typed("clinic", 6, 4, 3.2, "진료소", heights=[3.2, 3.6, 3.4, 3.0, 3.2])
+def clinic(sp: Sprite, v: int):
+    h = (2.55, 2.55, 2.8, 2.35, 2.55)[v]
+    x1 = (1.15, 1.15, 1.15, 0.95, 1.15)[v]
+    awn = ((RED, WHITE), (TEAL, WHITE), (ORANGE, WHITE), (WHITE,), (BLUE, WHITE))[v]
+    sp.contact_shadow(-0.2, 0, 3.4, 2.4, 0.5)
+    sp.box(-2.95, -1.85, 0, x1 + 3.05, 3.7, 0.3, STEEL)
+    sp.box(-2.85, -1.75, 0.3, x1 + 2.85, 3.5, h, WHITE, top=SILVER)
+    f = Sprite.box_faces(-2.85, -1.75, 0.3, x1 + 2.85, 3.5, h)
+    band_on(sp, f["left"], 0.86, 0.95, RED if v != 1 else TEAL)
+    o, e1, e2 = f["left"]
+    for u in ((0.42, 0.68), (0.42, 0.68), (0.42, 0.68), (0.5,), (0.42, 0.68))[v]:
+        sp.window(sp.on_face(o, e1, e2, u, 0.42, u + 0.2, 0.72))
+    # 붉은 십자 표지판 (밤에 빛난다)
+    o, e1, e2 = f["left"]
+    sp.face(sp.on_face(o, e1, e2, 0.08, 0.3, 0.32, 0.8), WHITE, normal=(0, 1, 0), ao=0)
+    _cross_sign(sp, f["left"], 0.2, 0.55, 0.38, RED, "#ff6a5a")
+    if v == 1:          # 지붕 가장자리의 빛나는 간판
+        zt = 0.3 + h
+        sp.box(-1.2, 1.35, zt, 1.0, 0.2, 0.75, WHITE)
+        bf = Sprite.box_faces(-1.2, 1.35, zt, 1.0, 0.2, 0.75)
+        _cross_sign(sp, bf["left"], 0.5, 0.5, 0.7, RED, "#ff6a5a")
+        legs(sp, [(-1.1, 1.3, zt + 0.3), (-0.3, 1.3, zt + 0.3)], zt)
+    # 들것 출입구: 넓은 문, 경사로, 차양
+    door(sp, f["right"], 0.22, 0.78, 0.74, Mat("#cfd6dc", 0.3), light=False)
+    o, e1, e2 = f["right"]
+    sp.line(add(_face_pt(f["right"], 0.5, 0.0), (0.02, 0, 0.0)), add(_face_pt(f["right"], 0.5, 0.74), (0.02, 0, 0)),
+            0.04, "#8a9099")
+    ramp = _orient([(x1, -0.75, 0.3), (2.7, -0.75, 0.02), (2.7, 0.75, 0.02), (x1, 0.75, 0.3)], (0, 0, 1))
+    sp.face(ramp, CONCRETE, ao=0)
+    for y in (-0.8, 0.8):
+        sp.polyline3([(x1 + 0.1, y, 1.2), (2.6, y, 0.85), (2.6, y, 0.0)], "#c9ccd1", 0.05)
+    if v in (0, 2, 4):
+        _gurney(sp, (1.95, 1.2, 0.0))
+    for x, y in ((2.8, -1.5), (2.8, 1.5)):
+        sp.line((x, y, 0), (x, y, 0.3 + h - 0.35), 0.06, "#8a9099")
+    _awning(sp, (x1, -1.6, 0.3 + h - 0.05), (2.85 - x1, 0, -0.3), (0, 3.2, 0), 8 if v != 3 else 1, awn)
+    if v == 3:
+        sp.line((2.85, -1.6, 0.3 + h - 0.36), (2.85, 1.6, 0.3 + h - 0.36), 0.08, "#D9532C")
+    sp.lamp((x1 + 0.15, 0.0, 0.3 + h - 0.45), WARM_WINDOW, 9)
+    if v == 2:
+        sp.cyl((-2.2, -1.0, 0.3 + h), (-2.2, -1.0, 0.3 + h + 0.6), 0.45, WHITE, bands=[0.5], band_color="#3FB8AF")
+    elif v == 4:
+        sp.box(-2.3, -1.3, 0.3 + h, 1.2, 1.0, 0.4, STEEL, top=DARK)
+    else:
+        sp.box(-2.0, -1.2, 0.3 + h, 0.9, 0.9, 0.35, STEEL, top=DARK)
+
+
+@typed("surgery_center", 11, 8, 4.6, "수술 센터", heights=[4.6, 4.6, 4.8, 4.4, 4.6])
+def surgery_center(sp: Sprite, v: int):
+    hb, hs = (3.7, 3.7, 4.0, 3.5, 3.7)[v], (3.0, 3.0, 3.0, 2.8, 3.2)[v]
+    ys1 = 3.0
+    accent = (RED, RED, Mat("#3E6FB0", 0.2), RED, TEAL)[v]
+    sp.contact_shadow(0, 0, 6.0, 4.4, 0.5)
+    sp.box(-5.4, -3.9, 0, 10.8, 3.4, 0.3, STEEL)
+    sp.box(1.6, -0.5, 0, 3.8, ys1 + 0.7, 0.3, STEEL)
+    # 뒤 날개 (수술동)
+    sp.box(-5.2, -3.7, 0.3, 10.4, 3.0, hb, WHITE, top=SILVER)
+    fb = Sprite.box_faces(-5.2, -3.7, 0.3, 10.4, 3.0, hb)
+    band_on(sp, fb["left"], 0.88, 0.96, accent)
+    band_on(sp, fb["right"], 0.88, 0.96, accent)
+    # 밝은 수술실 창 (낮에도 푸르게 빛난다)
+    o, e1, e2 = fb["left"]
+    win = sp.on_face(o, e1, e2, 0.42, 0.28, 0.66, 0.78)
+    sp.window(win, COOL_WINDOW, glass=Mat("#9fd0ea", 0.6))
+    c = add(_face_pt(fb["left"], 0.54, 0.62), (0, 0.04, 0))
+    sp.face(_circle(c, (0, 1, 0), 0.45, 14), Mat("#5c6670", 0.3), normal=(0, 1, 0), edge=False, ao=0)
+    sp.face(_circle(add(c, (0, 0.01, 0)), (0, 1, 0), 0.28, 12), Mat("#ffffff", 0.6), normal=(0, 1, 0), edge=False, ao=0)
+    sp.line(add(c, (0, 0.02, 0.45)), add(c, (0, 0.02, 1.0)), 0.05, "#5c6670")
+    sp.glow(add(c, (0, 0.3, -0.2)), 26, COOL_WINDOW, 0.7)
+    windows_row(sp, (o, e1, e2), 2, 0.4, 0.66, 0.72, 0.04)
+    sp.face(sp.on_face(o, e1, e2, 0.68, 0.0, 0.84, 0.62), Mat("#2a3a4a", 0.7), normal=(0, 1, 0), ao=0)
+    sp.light_poly(sp.on_face(o, e1, e2, 0.68, 0.0, 0.84, 0.62), WARM_WINDOW, 0.7)
+    sp.lamp(_face_pt((add(o, (0, 0.15, 0)), e1, e2), 0.76, 0.72), AMBER, 8)
+    windows_row(sp, fb["right"], 2, 0.42, 0.68, 0.15, 0.1)
+    # 지붕 채광 상자 (수술실 위)
+    sx = (-1.6, -1.6, -2.4, -1.2, -1.6)[v]
+    sp.box(sx, -3.0, 0.3 + hb, 1.8, 1.6, 0.6, WHITE, top=SILVER)
+    sf = Sprite.box_faces(sx, -3.0, 0.3 + hb, 1.8, 1.6, 0.6)
+    sp.window(sp.on_face(*sf["left"], 0.08, 0.2, 0.92, 0.8), COOL_WINDOW, glass=Mat("#9fd0ea", 0.6))
+    sp.box(-4.6, -3.2, 0.3 + hb, 1.4, 1.2, 0.5, STEEL, top=DARK)
+    if v != 3:
+        sp.box(2.6, -3.3, 0.3 + hb, 1.1, 1.1, 0.45, STEEL, top=DARK)
+    # 옆 날개 (구급차 출입)
+    sp.box(1.8, -0.7, 0.3, 3.4, ys1 + 0.7, hs, WHITE, top=SILVER)
+    fs = Sprite.box_faces(1.8, -0.7, 0.3, 3.4, ys1 + 0.7, hs)
+    band_on(sp, fs["left"], 0.86, 0.95, accent)
+    band_on(sp, fs["right"], 0.86, 0.95, accent)
+    o, e1, e2 = fs["left"]
+    sp.face(sp.on_face(o, e1, e2, 0.12, 0.0, 0.88, 0.72), Mat("#9aa1aa", 0.35), normal=(0, 1, 0), ao=0.15)
+    for k in range(1, 7):
+        sp.line(add(_face_pt(fs["left"], 0.12, 0.72 * k / 7), (0, 0.02, 0)),
+                add(_face_pt(fs["left"], 0.88, 0.72 * k / 7), (0, 0.02, 0)), 0.03, "#7d848d")
+    sp.stripes(add(_face_pt(fs["left"], 0.0, 0.74), (0, 0.02, 0)), e1, mul(e2, 0.1), n=10,
+               colors=("#D9532C", "#F1F2F0"), normal=(0, 1, 0))
+    yc = ys1 + 0.02
+    for x in (2.0, 5.0):
+        sp.line((x, yc + 0.85, 0), (x, yc + 0.85, 0.3 + hs * 0.8), 0.06, "#8a9099")
+    sp.quad((1.8, yc, 0.3 + hs * 0.8), (3.4, 0, 0), (0, 0.95, -0.12), WHITE, back=STEEL)
+    sp.lamp((3.5, yc + 0.1, 0.3 + hs * 0.78), RED_LIGHT, 9)
+    windows_row(sp, fs["right"], 2, 0.42, 0.68, 0.14, 0.1)
+    _cross_sign(sp, fs["right"], 0.5, 0.82, 0.14, RED, "#ff6a5a")
+    sp.lamp((5.3, 1.3, 0.3 + hs - 0.3), AMBER, 8)
+    if v == 2:
+        antenna(sp, (4.6, 0.0, 0.3 + hs), 1.2)
+    elif v == 4:
+        sp.cyl((3.0, 1.2, 0.3 + hs), (3.0, 1.2, 0.3 + hs + 0.5), 0.5, WHITE, cap_mat=SILVER)
+
+
+@typed("telemedicine", 6, 5, 4.0, "원격 진료실", heights=[4.0, 4.2, 3.8, 4.0, 4.1])
+def telemedicine(sp: Sprite, v: int):
+    sp.contact_shadow(-0.2, 0, 3.4, 2.8, 0.5)
+    x0, x1, y0, y1, h = -2.7, 2.0, -2.1, 1.9, 2.5
+    sp.box(x0 - 0.15, y0 - 0.15, 0, x1 - x0 + 0.3, y1 - y0 + 0.3, 0.3, STEEL)
+    sp.box(x0, y0, 0.3, x1 - x0, y1 - y0, h, WHITE, top=SILVER)
+    f = Sprite.box_faces(x0, y0, 0.3, x1 - x0, y1 - y0, h)
+    band_on(sp, f["left"], 0.88, 0.96, BLUE)
+    band_on(sp, f["right"], 0.88, 0.96, BLUE)
+    # 화면 벽이 보이는 큰 창
+    o, e1, e2 = f["left"]
+    u0, u1 = ((0.12, 0.66), (0.1, 0.7), (0.14, 0.62), (0.12, 0.66), (0.3, 0.88))[v]
+    sp.window(sp.on_face(o, e1, e2, u0, 0.24, u1, 0.8), "#ffd9a0", light_alpha=0.5)
+    cols, rows = ((3, 2), (4, 2), (3, 2), (2, 2), (3, 2))[v]
+    du = (u1 - u0 - 0.04) / cols
+    for i in range(cols):
+        for j in range(rows):
+            a, b = u0 + 0.02 + i * du + 0.012, u0 + 0.02 + (i + 1) * du - 0.012
+            c, d = 0.4 + j * 0.19, 0.56 + j * 0.19
+            pts = [add(p, (0, 0.03, 0)) for p in sp.on_face(o, e1, e2, a, c, b, d)]
+            sp.face(pts, Mat(("#6fb6e8", "#8fd0f0", "#5aa0dc")[(i + j) % 3], 0.5), normal=(0, 1, 0), edge=False, ao=0)
+            sp.light_poly(pts, SCREEN_GLOW, 0.9)
+    sp.face([add(p, (0, 0.03, 0)) for p in sp.on_face(o, e1, e2, u0 + 0.02, 0.26, u1 - 0.02, 0.33)],
+            Mat("#3a3f47"), normal=(0, 1, 0), edge=False, ao=0)
+    _cross_sign(sp, f["left"], (0.84 if v != 4 else 0.15), 0.55, 0.3, TEAL, CYAN_LIGHT)
+    door(sp, f["right"], 0.35, 0.72, 0.74, Mat("#cfd6dc", 0.3))
+    # 지붕 접시 안테나
+    zt = 0.3 + h
+    dx, dy, dr = ((-1.0, -0.7, 0.95), (-0.6, -0.4, 1.15), (0.6, -0.8, 0.85), (-1.2, -0.9, 0.9), (-1.0, -0.6, 0.95))[v]
+    sp.cyl((dx, dy, zt), (dx, dy, zt + 0.45), 0.22, STEEL)
+    sp.box(dx - 0.35, dy - 0.35, zt, 0.7, 0.7, 0.18, DARK)
+    _dish(sp, (dx + 0.05, dy + 0.12, zt + 0.95), norm((0.25, 0.75, 0.62)), dr)
+    if v == 1:
+        sp.sphere((1.2, -1.2, zt + 0.5), 0.45, WHITE)
+        sp.cyl((1.2, -1.2, zt), (1.2, -1.2, zt + 0.2), 0.2, STEEL)
+    elif v == 3:
+        o2, e12, e22 = (0.4, -1.6, zt + 0.2), (1.4, 0, 0), (0, 1.6, 0.4)
+        sp.quad(o2, e12, e22, SOLAR, back=STEEL)
+        sp.panel_grid(o2, e12, e22, 2, 2, "#6f86b0", 0.45, 0.6)
+    elif v == 4:
+        antenna(sp, (1.5, 1.4, zt), 1.2)
+    sp.lamp((x1 + 0.1, y1 - 0.2, 2.4), CYAN_LIGHT, 7)
+
+
+@typed("rehab_center", 8, 6, 4.2, "재활 운동실", heights=[4.2, 4.0, 4.4, 4.2, 4.2])
+def rehab_center(sp: Sprite, v: int):
+    x0, x1, y0, y1, h = -3.7, 3.0, -2.7, 2.7, 2.2
+    rd, hd = (2.35, 2.2, 2.5, 2.35, 2.35)[v], (1.7, 1.5, 1.9, 1.7, 1.7)[v]
+    accent = (ORANGE, TEAL, ORANGE, YELLOW, Mat("#9B7AD6"))[v]
+    pod = (ORANGE, WHITE, Mat("#3E6FB0", 0.3), ORANGE, YELLOW)[v]
+    sp.contact_shadow(-0.2, 0, 4.4, 3.4, 0.5)
+    sp.box(x0 - 0.15, y0 - 0.15, 0, x1 - x0 + 0.3, y1 - y0 + 0.3, 0.3, STEEL)
+    sp.box(x0, y0, 0.3, x1 - x0, y1 - y0, h, WHITE, top=SILVER)
+    f = Sprite.box_faces(x0, y0, 0.3, x1 - x0, y1 - y0, h)
+    band_on(sp, f["left"], 0.84, 0.94, accent)
+    band_on(sp, f["right"], 0.84, 0.94, accent)
+    windows_row(sp, f["left"], 4 if v != 1 else 3, 0.4, 0.68, 0.08, 0.05)
+    door(sp, f["right"], 0.35, 0.68, 0.74, Mat("#cfd6dc", 0.3))
+    # 유리 돔 아래 짧은 팔 원심기 (팔 끝에 탈것 둘)
+    zt = 0.3 + h
+    cx = -0.4
+    sp.cyl((cx, 0, zt), (cx, 0, zt + 0.12), rd + 0.1, Mat("#cdd3da", 0.3), cap_mat=Mat("#8f969e", 0.2))
+    sp.ring3((cx, 0, zt + 0.13), rd * 0.82, "#6f767f", 0.08, front_only=False)
+    ang = math.radians((25, 60, 15, 40, 25)[v])
+    arm = (math.cos(ang), math.sin(ang), 0.0)
+    L = rd * 0.72
+    za = zt + 0.95
+    ends = sorted([mul(arm, L), mul(arm, -L)], key=lambda e: e[0] + e[1])
+
+    def pod_at(e):
+        c = (cx + e[0], e[1], za - 0.1)
+        sp.ellipsoid(c, 0.42, 0.42, 0.34, pod)
+        sp.window(_circle(add(c, mul(norm((1, 1, 0.6)), 0.4)), norm((1, 1, 0.6)), 0.13, 10))
+    pod_at(ends[0])
+    sp.cyl((cx, 0, zt + 0.12), (cx, 0, za + 0.15), 0.16, STEEL, cap_mat=DARK)
+    sp.line((cx + ends[0][0], ends[0][1], za + 0.05), (cx + ends[1][0], ends[1][1], za + 0.05), 0.14, "#8a9099")
+    sp.cyl((cx, 0, za - 0.05), (cx, 0, za + 0.2), 0.3, Mat("#5b6470", 0.3), cap_mat=STEEL)
+    pod_at(ends[1])
+    sp.glow((cx, 0, zt + 0.8), 26, WARM_WINDOW, 0.45)
+    _glass_cap(sp, (cx, 0), rd, rd, hd, zt + 0.12, rings=(0.45, 0.8), ribs=10, alpha=0.3)
+    if v == 2:
+        o2, e12, e22 = (1.4, -2.4, zt + 0.15), (1.4, 0, 0), (0, 1.5, 0.35)
+        sp.quad(o2, e12, e22, SOLAR, back=STEEL)
+    elif v == 3:
+        sp.box(1.5, 1.2, zt, 1.0, 1.0, 0.4, STEEL, top=DARK)
+    sp.lamp((x1 + 0.1, y1 - 0.3, 2.0), AMBER, 8)
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 연구 (research_lab 계열)
+# ═════════════════════════════════════════════════════════════════════
+
+def _sample_rack(sp, o, along, depth, n=5, h=0.9, colors=("#E07B39", "#ECE7DC", "#3E6FB0", "#6DAE57")):
+    """시료 선반: 두 단의 작은 통."""
+    a = norm(along)
+    L = length(along)
+    out = (-a[1], a[0], 0.0)
+    for k, z in enumerate((0.0, h * 0.5)):
+        base = add(o, (0, 0, z))
+        sp.quad(base, along, mul(out, depth), Mat("#9aa1aa", 0.3), back=STEEL)
+        for i in range(n):
+            c = add(add(base, mul(a, L * (i + 0.5) / n)), mul(out, depth * 0.5))
+            sp.cyl(c, add(c, (0, 0, h * 0.32)), min(0.09, L / n * 0.3), Mat(colors[(i + k) % len(colors)], 0.3))
+    for u in (0.0, 1.0):
+        p = add(o, mul(along, u))
+        sp.line(p, add(p, (0, 0, h)), 0.04, "#8a9099")
+
+
+@typed("field_lab", 6, 4, 3.2, "현장 실험실", heights=[3.2, 3.2, 3.0, 3.4, 3.2])
+def field_lab(sp: Sprite, v: int):
+    x0, x1, y0, y1, zb, zt = -2.7, 1.3, -1.15, 1.15, 0.75, 2.55
+    body = (WHITE, Mat("#E5DCC8", 0.05), WHITE, Mat("#D9DEE3", 0.1), WHITE)[v]
+    band = (VIOLET, VIOLET, ORANGE, VIOLET, TEAL)[v]
+    sp.contact_shadow(-0.4, 0, 3.2, 1.9, 0.5)
+    ax = (-1.55, -0.6)
+    for x in ax:
+        _wheel(sp, x, -1.22, 0.42, 0.42, 0.24, False)
+    sp.box(-2.5, -0.9, 0.42, 3.7, 1.8, 0.33, DARK)
+    for x, y in ((-2.55, -1.0), (-2.55, 1.0), (1.15, -1.0), (1.15, 1.0)):
+        sp.line((x, y, zb), (x + (0.2 if x > 0 else -0.2), y * 1.25, 0.05), 0.06, "#7d848d")
+    # 견인 막대와 받침 다리
+    sp.polyline3([(x1, -0.65, 0.6), (2.45, 0.0, 0.55), (x1, 0.65, 0.6)], "#7d848d", 0.09)
+    sp.line((2.1, 0.0, 0.58), (2.1, 0.0, 0.05), 0.08, "#9aa1aa")
+    sp.box(1.95, -0.15, 0, 0.3, 0.3, 0.06, DARK)
+    sp.box(x0, y0, zb, x1 - x0, y1 - y0, zt - zb, body, top=SILVER)
+    f = Sprite.box_faces(x0, y0, zb, x1 - x0, y1 - y0, zt - zb)
+    band_on(sp, f["left"], 0.82, 0.92, band)
+    band_on(sp, f["right"], 0.82, 0.92, band)
+    o, e1, e2 = f["left"]
+    door(sp, f["left"], 0.8, 0.95, 0.85, Mat("#9aa1aa", 0.3), light=False)
+    sp.box(-2.55, y1, 0.3, 0.55, 0.35, 0.45, STEEL)
+    sp.window(sp.on_face(o, e1, e2, 0.45, 0.45, 0.72, 0.72), CYAN_LIGHT)
+    windows_row(sp, f["right"], 1, 0.45, 0.72, 0.3)
+    # 접이식 작업대와 시료 선반 (옆으로 펼친다)
+    zbench = 1.35
+    sp.quad((1.15, y1, zbench), (-1.3, 0, 0), (0, 0.6, 0), Mat("#cfd3d8", 0.2), back=STEEL)
+    for x in (1.1, -0.1):
+        sp.line((x, y1 + 0.55, zbench), (x, y1 + 0.05, zbench - 0.5), 0.04, "#8a9099")
+    _sample_rack(sp, (1.05, y1 + 0.08, zbench + 0.01), (-1.1, 0, 0), 0.4, 5 if v != 2 else 4, 0.75)
+    sp.quad((1.2, y1, zt - 0.05), (-1.4, 0, 0), (0, 0.75, -0.25), band, back=STEEL)
+    for x in ax:
+        _wheel(sp, x, 1.22, 0.42, 0.42, 0.24, True)
+    # 펼치는 조명 기둥
+    mx, my = (-2.25, -0.6) if v != 4 else (0.9, -0.6)
+    tops = ((4.4, 3), (4.4, 3), (3.4, 2), (4.9, 3), (4.2, 3))[v]
+    zz = zt
+    for k in range(tops[1]):
+        z1 = zt + (tops[0] - zt) * (k + 1) / tops[1]
+        sp.cyl((mx, my, zz), (mx, my, z1), 0.13 - k * 0.03, Mat("#C9CCD1", 0.4), cap_mat=STEEL)
+        zz = z1
+    sp.box(mx - 0.08, my - 0.55, zz, 0.16, 1.1, 0.16, DARK)
+    for d in (-0.38, 0.0, 0.38):
+        sp.lamp((mx + 0.1, my + d, zz + 0.08), "#fff1c9", 12)
+    if v == 1:
+        sp.quad((-1.6, -0.9, zt + 0.25), (2.0, 0, 0), (0, 1.8, 0.0), SOLAR, back=STEEL)
+        sp.panel_grid((-1.6, -0.9, zt + 0.25), (2.0, 0, 0), (0, 1.8, 0.0), 3, 2, "#6f86b0", 0.45, 0.6)
+    elif v == 3:
+        antenna(sp, (0.8, 0.6, zt), 1.2)
+    else:
+        sp.box(-0.2, -0.7, zt, 0.9, 0.8, 0.35, STEEL, top=DARK)
+
+
+def _biohazard(sp, c, n, r):
+    """생물 위험 표지 (노란 마름모 위 검은 세 고리)."""
+    u, w = basis(n)
+    dia = [add(c, mul(u, r)), add(c, mul(w, r)), add(c, mul(u, -r)), add(c, mul(w, -r))]
+    sp.face(_orient([add(p, mul(n, 0.01)) for p in dia], n), BIO_YELLOW, normal=n, edge=False, ao=0)
+    c2 = add(c, mul(n, 0.02))
+    up = (0.0, 0.0, 1.0)
+    side = norm(cross(n, up)) if abs(n[2]) < 0.9 else u
+    for k in range(3):
+        t = math.radians(90 + 120 * k)
+        p = add(c2, add(mul(up, r * 0.26 * math.sin(t)), mul(side, r * 0.26 * math.cos(t))))
+        sp.face(_circle(p, n, r * 0.24, 12), CHAR, normal=n, edge=False, ao=0)
+        sp.face(_circle(add(add(p, mul(n, 0.005)), add(mul(up, r * 0.07 * math.sin(t)), mul(side, r * 0.07 * math.cos(t)))),
+                        n, r * 0.14, 10), BIO_YELLOW, normal=n, edge=False, ao=0)
+    sp.face(_circle(add(c2, mul(n, 0.008)), n, r * 0.09, 8), BIO_YELLOW, normal=n, edge=False, ao=0)
+
+
+def _plant_rows(sp, x0, x1, ys, z, h=0.5, grow=True):
+    for y in sorted(ys):
+        sp.box(x0, y - 0.3, z, x1 - x0, 0.6, 0.25, Mat("#8a8f96"))
+        n = max(2, int((x1 - x0) / 0.55))
+        for i in range(n):
+            x = x0 + (x1 - x0) * (i + 0.5) / n
+            sp.ellipsoid((x, y, z + 0.25), 0.3, 0.3, h * 0.6, (LEAF, GREEN)[(i + int(y * 3)) % 2], clip_z=z + 0.25)
+
+
+@typed("biology_lab", 10, 7, 4.4, "생명과학 연구소", heights=[4.4, 4.4, 4.6, 4.2, 4.4])
+def biology_lab(sp: Sprite, v: int):
+    xl = (0.8, 0.8, 0.4, 1.2, 0.8)[v]
+    hl = (3.4, 3.4, 3.6, 3.2, 3.4)[v]
+    sp.contact_shadow(0, 0, 5.4, 3.8, 0.5)
+    sp.box(-4.95, -3.35, 0, xl + 4.95, 6.7, 0.3, STEEL)
+    sp.box(-4.8, -3.2, 0.3, xl + 4.8, 6.4, hl, WHITE, top=SILVER)
+    f = Sprite.box_faces(-4.8, -3.2, 0.3, xl + 4.8, 6.4, hl)
+    band_on(sp, f["left"], 0.86, 0.95, BIO_YELLOW)
+    band_on(sp, f["right"], 0.86, 0.95, BIO_YELLOW)
+    o, e1, e2 = f["left"]
+    nwin = (3, 3, 4, 2, 3)[v]
+    for i in range(nwin):
+        u = 0.32 + i * 0.6 / nwin
+        sp.window(sp.on_face(o, e1, e2, u, 0.42, u + 0.6 / nwin - 0.05, 0.72), "#ffe9a8")
+    door(sp, f["left"], 0.07, 0.2, 0.7, Mat("#cfd6dc", 0.3))
+    sp.stripes(add(_face_pt(f["left"], 0.05, 0.72), (0, 0.01, 0)), mul(e1, 0.17), mul(e2, 0.06), n=6, normal=(0, 1, 0))
+    _biohazard(sp, add(_face_pt(f["left"], 0.25, 0.55), (0, 0.01, 0)), (0, 1, 0), 0.42)
+    # 지붕: 흄후드 배기구
+    zt = 0.3 + hl
+    for k, (x, y) in enumerate(((-3.6, -2.0), (-2.4, -2.0), (-3.0, 1.6))[: (3 if v != 3 else 2)]):
+        sp.cyl((x, y, zt), (x, y, zt + 0.7), 0.22, STEEL, bands=[0.7], band_color="#E9C24A")
+        sp.cyl((x, y, zt + 0.7), (x, y, zt + 0.82), 0.34, Mat("#9aa1aa", 0.3), cap_mat=DARK)
+    sp.box(-1.2, -2.4, zt, 1.4, 1.2, 0.5, STEEL, top=DARK)
+    # 온실 날개 (유리 볼트, 안에 작물 줄)
+    gx0, gx1 = xl, 4.85
+    gw = (2.3, 2.3, 2.5, 2.1, 2.3)[v]
+    gh = (2.6, 2.6, 2.8, 2.4, 2.7)[v]
+    sp.box(gx0, -gw, 0, gx1 - gx0, 2 * gw, 0.45, SINTER, top=Mat("#6f7a5e"))
+    _plant_rows(sp, gx0 + 0.3, gx1 - 0.3, (-gw * 0.55, 0.0, gw * 0.55), 0.45)
+    sp.glow(((gx0 + gx1) / 2, 0, 1.4), 40, GROW, 0.45)
+    rim = []
+    for i in range(25):
+        t = math.pi * i / 24
+        for x in (gx0, gx1):
+            rim.append(PV((x, gw * math.cos(t), 0.45 + gh * math.sin(t))))
+    sil = hull(rim)
+    hlp = PV((gx0 + 1.0, gw * 0.5, 0.45 + gh * 0.9))
+    fill = sp.radial([(0, "#ffffff", 0.3), (0.4, "#cfe6ff", 0.12), (1, "#9fc0e0", 0.05)], hlp[0], hlp[1], 6 * S)
+    sp.poly2(sil, fill, "#cfe0ef", 0.6, 1.0)
+    sp.glass_vault((gx0, 0, 0.45), (gx1, 0, 0.45), gw, rz=gh)
+    for x in [gx0 + (gx1 - gx0) * k / 4 for k in range(5)]:
+        pts = [(x, gw * math.cos(math.pi * i / 16), 0.45 + gh * math.sin(math.pi * i / 16)) for i in range(17)]
+        sp.polyline3([q for q in pts if dot((0, q[1], q[2] - 0.45), VIEW) > -0.6], "#dfe9f2", 0.05, 0.6)
+    sp.polyline3([(gx0, 0, 0.45 + gh), (gx1, 0, 0.45 + gh)], "#dfe9f2", 0.05, 0.6)
+    sp.light_poly(_orient([(gx1 + 0.02, -gw * 0.7, 0.5), (gx1 + 0.02, gw * 0.7, 0.5),
+                           (gx1 + 0.02, gw * 0.7, 0.45 + gh * 0.7), (gx1 + 0.02, -gw * 0.7, 0.45 + gh * 0.7)], (1, 0, 0)),
+                  GROW, 0.35)
+    sp.lamp((4.9, gw + 0.2, 1.2), AMBER, 8)
+    if v == 2:
+        antenna(sp, (-0.5, 1.8, zt), 1.4)
+    elif v == 4:
+        sp.cyl((-0.4, 1.6, zt), (-0.4, 1.6, zt + 0.8), 0.45, WHITE, bands=[0.5], band_color="#E9C24A")
+
+
+@typed("materials_lab", 10, 8, 6.0, "재료 연구소", heights=[6.0, 6.2, 5.6, 6.0, 6.4])
+def materials_lab(sp: Sprite, v: int):
+    hall = Mat("#D8D4CC", 0.05)
+    sp.contact_shadow(0, 0, 5.4, 4.4, 0.5)
+    sp.box(-4.9, -3.9, 0, 9.8, 7.8, 0.25, CONCRETE)
+    x0, x1, y0, y1, h = -4.6, 1.8, -3.7, 1.3, 3.6
+    # 뒤쪽 시험대 (+x 뒤 마당)
+    def rig():
+        rx, ry = (2.6, -3.4)
+        sp.box(rx, ry, 0.25, 2.1, 2.2, 0.35, DARK)
+        for yy in (ry + 0.2, ry + 1.7):
+            sp.box(rx + 0.85, yy, 0.6, 0.3, 0.3, 2.6, YELLOW)
+        sp.box(rx + 0.7, ry + 0.1, 3.2, 0.6, 2.0, 0.4, YELLOW)
+        sp.cyl((rx + 1.0, ry + 1.1, 3.2), (rx + 1.0, ry + 1.1, 2.3), 0.22, SILVER, cap_mat=STEEL)
+        sp.box(rx + 0.75, ry + 0.85, 0.6, 0.5, 0.5, 0.8, DARK)
+        sp.box(rx + 0.82, ry + 0.95, 1.4, 0.36, 0.3, 0.9, ORANGE)
+        sp.box(rx + 0.75, ry + 0.85, 2.3, 0.5, 0.5, 0.25, DARK)
+        sp.lamp((rx + 1.8, ry + 2.0, 1.0), AMBER, 8)
+    if v != 2:
+        rig()
+    # 공장동
+    sp.box(x0, y0, 0.25, x1 - x0, y1 - y0, h, hall, top=SILVER)
+    f = Sprite.box_faces(x0, y0, 0.25, x1 - x0, y1 - y0, h)
+    band_on(sp, f["left"], 0.8, 0.88, ORANGE)
+    band_on(sp, f["right"], 0.8, 0.88, ORANGE)
+    windows_row(sp, f["left"], 5, 0.58, 0.74, 0.06, 0.04)
+    o, e1, e2 = f["right"]
+    sp.face(sp.on_face(o, e1, e2, 0.2, 0.0, 0.75, 0.62), Mat("#9aa1aa", 0.35), normal=(1, 0, 0), ao=0.15)
+    for k in range(1, 8):
+        sp.line(add(_face_pt(f["right"], 0.2, 0.62 * k / 8), (0.02, 0, 0)),
+                add(_face_pt(f["right"], 0.75, 0.62 * k / 8), (0.02, 0, 0)), 0.03, "#7d848d")
+    sp.stripes(add(_face_pt(f["right"], 0.2, 0.64), (0.02, 0, 0)), mul(e1, 0.55), mul(e2, 0.08), n=8, normal=(1, 0, 0))
+    sp.lamp(add(_face_pt(f["right"], 0.85, 0.7), (0.1, 0, 0)), AMBER, 9)
+    sp.box(-2.6, -2.6, 0.25 + h, 1.6, 1.4, 0.5, STEEL, top=DARK)
+    if v == 2:
+        rig()
+    # 용광로와 굴뚝
+    fx, fy = ((-3.0, 2.5), (-3.0, 2.5), (-2.6, 2.6), (-3.2, 2.4), (-3.0, 2.5))[v]
+    stack_h = (6.0, 6.2, 5.6, 6.0, 6.4)[v]
+    sp.cyl((fx, fy, 0.25), (fx, fy, 2.4), 1.05, Mat("#6B5A4C", 0.15), bands=[0.33, 0.66], cap_mat=STEEL)
+    sp.window(Sprite.cyl_patch((fx, fy, 0.25), (fx, fy, 2.4), 1.05, 0.25, 0.48, 50, 85), "#ff7b2e",
+              glass=Mat("#ff7b2e", 0.3))
+    sp.glow((fx + 0.5, fy + 0.8, 1.0), 20, "#ff7b2e", 0.6)
+    sp.frustum((fx, fy, 2.4), (fx, fy, 2.9), 0.7, 0.4, STEEL)
+    sp.cyl((fx, fy, 2.9), (fx, fy, stack_h - 0.3), 0.36, Mat("#9aa1aa", 0.3), bands=[0.3, 0.6, 0.9],
+           band_color="#D9532C")
+    sp.cyl((fx, fy, stack_h - 0.3), (fx, fy, stack_h), 0.45, DARK, cap_mat=CHAR)
+    sp.lamp((fx, fy, stack_h + 0.12), "#ff5a3c", 6)
+    pipe(sp, [(fx + 0.9, fy - 0.5, 1.6), (fx + 0.9, y1 + 0.05, 1.6)], 0.16)
+    # 크레인 팔 (지브 크레인)
+    mx, my = (3.9, 2.9) if v != 3 else (3.9, -2.9)
+    sp.box(mx - 0.2, my - 0.2, 0.25, 0.4, 0.4, 4.6, YELLOW)
+    bx = (0.2, 0.4, 0.6, 0.6, 0.2)[v]
+    sp.box(bx, my - 0.15, 4.55, mx + 0.2 - bx, 0.3, 0.3, YELLOW)
+    sp.line((mx, my, 3.4), (mx - 1.6, my, 4.55), 0.1, "#C9A23A")
+    hx = bx + 1.2
+    sp.box(hx - 0.2, my - 0.2, 4.4, 0.4, 0.4, 0.2, DARK)
+    sp.line((hx, my, 4.4), (hx, my, 2.0), 0.04, "#3a3f47")
+    load = (ORANGE, Mat("#C2C7CD", 0.6), ORANGE, Mat("#C9A23A"), Mat("#C2C7CD", 0.6))[v]
+    sp.box(hx - 0.45, my - 0.35, 1.3, 0.9, 0.7, 0.7, load)
+    sp.lamp((mx, my, 4.95), AMBER, 8)
+    if v == 4:
+        antenna(sp, (0.8, -3.0, 0.25 + h), 1.4)
+
+
+def _cryo_tank(sp, x, y, r, h, sphere=False):
+    if sphere:
+        legs(sp, [(x - r * 0.6, y - r * 0.6, r + 0.4), (x + r * 0.6, y - r * 0.6, r + 0.4),
+                  (x - r * 0.6, y + r * 0.6, r + 0.4), (x + r * 0.6, y + r * 0.6, r + 0.4)], 0.0)
+        sp.sphere((x, y, r + 0.9), r, FROST)
+        sp.ring3((x, y, r + 0.9), r, "#3E6FB0", 0.1)
+        sp.ring3((x, y, r + 1.3), r * 0.92, "#b5c6cf", 0.05)
+        return 2 * r + 0.9
+    sp.cyl((x, y, 0), (x, y, 0.3), r * 0.85, STEEL)
+    sp.cyl((x, y, 0.3), (x, y, h), r, FROST, bands=[0.2, 0.45, 0.7], band_color="#b5c6cf")
+    cyl_ring(sp, (x, y, 0.3), (x, y, h), r, 0.8, 0.86, BLUE)
+    sp.ellipsoid((x, y, h), r, r, r * 0.45, FROST, clip_z=h)
+    sp.cyl((x, y, h + r * 0.4), (x, y, h + r * 0.4 + 0.3), 0.1, STEEL)
+    sp.cyl((x + 0.25, y, h + r * 0.3), (x + 0.25, y, h + r * 0.3 + 0.25), 0.07, Mat("#3E6FB0", 0.3))
+    return h + r * 0.45
+
+
+@typed("cryo_lab", 9, 7, 4.6, "극저온 연구소", heights=[4.6, 4.4, 4.6, 4.8, 4.6])
+def cryo_lab(sp: Sprite, v: int):
+    sp.contact_shadow(0, 0, 5.0, 3.8, 0.5)
+    x0, x1, y0, y1, h = -4.2, 2.8, -3.2, 0.2, 3.1
+    sp.box(x0 - 0.15, y0 - 0.15, 0, x1 - x0 + 0.3, y1 - y0 + 0.3, 0.3, STEEL)
+    sp.box(x0, y0, 0.3, x1 - x0, y1 - y0, h, WHITE, top=SILVER)
+    f = Sprite.box_faces(x0, y0, 0.3, x1 - x0, y1 - y0, h)
+    band_on(sp, f["left"], 0.84, 0.93, BLUE)
+    band_on(sp, f["right"], 0.84, 0.93, BLUE)
+    band_on(sp, f["right"], 0.76, 0.79, Mat("#9fd8ff", 0.4))
+    o, e1, e2 = f["left"]
+    for u in (0.04, 0.2, 0.36):
+        sp.window(sp.on_face(o, e1, e2, u, 0.4, u + 0.12, 0.7), CYAN_LIGHT)
+    door(sp, f["right"], 0.3, 0.62, 0.72, Mat("#cfd6dc", 0.3))
+    sp.window(sp.on_face(*f["right"], 0.72, 0.4, 0.9, 0.68), CYAN_LIGHT)
+    zt = 0.3 + h
+    sp.box(-3.4, -2.6, zt, 1.6, 1.2, 0.55, STEEL, top=DARK)
+    for cx in (-3.0, -2.2):
+        sp.ring3((cx, -2.0, zt + 0.57), 0.32, "#9aa1aa", 0.05)
+    # 단열 배관 (도관) — 탱크에서 실험동 벽으로
+    zc = (2.1, 2.1, 1.9, 2.3, 2.1)[v]
+    cond = Mat("#EEF3F6", 0.2)
+    for x in (-1.0, 0.6):
+        sp.line((x, 1.0, 0), (x, 1.0, zc - 0.25), 0.1, "#8a9099")
+    sp.cyl((-3.9, 1.0, zc), (1.4, 1.0, zc), 0.24, cond, cap_mat=STEEL,
+           bands=[0.06 + 0.08 * k for k in range(12)], band_color="#a9bfcf")
+    sp.cyl((1.4, 1.0, zc), (1.4, y1, zc), 0.24, cond, cap_mat=STEEL)
+    sp.cyl((1.4, 1.0, zc + 0.24), (1.4, 1.0, zc - 0.24), 0.3, Mat("#C9CCD1", 0.4))
+    sp.box(1.0, y1, zc - 0.45, 0.8, 0.12, 0.9, STEEL)
+    sp.polyline3([(-3.9, 1.0 + 0.25, zc), (1.4, 1.0 + 0.25, zc)], CYAN_LIGHT, 0.04, 0.5, layer="light")
+    # 서리 낀 극저온 탱크
+    tanks = (((-3.1, 2.15, 0.9, 3.6), (-1.1, 2.4, 0.8, 3.2)),
+             ((-3.4, 2.2, 0.7, 3.2), (-1.9, 2.5, 0.65, 2.9), (-0.5, 2.3, 0.6, 2.6)),
+             ((-3.0, 2.1, 0.95, 0.0), (-0.9, 2.45, 0.75, 3.1)),
+             ((-3.1, 2.15, 0.9, 3.9), (-1.1, 2.4, 0.8, 3.6)),
+             ((-3.1, 2.15, 0.9, 3.6), (-1.1, 2.4, 0.8, 3.2)))[v]
+    for (x, y, r, hh) in sorted(tanks, key=lambda t: t[0] + t[1]):
+        top = _cryo_tank(sp, x, y, r, hh, sphere=hh == 0.0)
+        sp.lamp((x + r * 0.7, y + r * 0.7, 1.0), CYAN_LIGHT, 5)
+    if v == 4:          # 바깥 냉동기 상자와 팬
+        sp.box(1.6, 1.4, 0, 1.6, 1.4, 1.2, WHITE, top=SILVER)
+        for cx in (2.0, 2.8):
+            sp.ring3((cx, 2.1, 1.22), 0.3, "#9aa1aa", 0.05)
+            sp.disc((cx, 2.1, 1.21), (0, 0, 1), 0.28, CHAR, edge=False)
+        band_on(sp, Sprite.box_faces(1.6, 1.4, 0, 1.6, 1.4, 1.2)["left"], 0.75, 0.85, BLUE)
+    elif v == 2:
+        o2, e12, e22 = (1.8, 1.4, 0.3), (1.8, 0, 0), (0, 0, 1.8)
+        sp.quad(o2, e12, e22, RADIATOR, back=RADIATOR)
+        sp.panel_grid(o2, e12, e22, 4, 1, "#b9bec4", 0.5, 0.7)
+    sp.lamp((x1 + 0.1, y1 - 0.2, 2.6), CYAN_LIGHT, 8)
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 여가 (green_commons 계열)
+# ═════════════════════════════════════════════════════════════════════
+
+def _barrel_roof(sp, x0, x1, y0, y1, z, rise, mat, n=8, skylight=None):
+    """x 방향으로 누운 낮은 원호 지붕 (띠 n장) + 양 끝 박공. skylight=(k0, k1) 띠는 유리."""
+    def prof(t):
+        return (y0 + (y1 - y0) * t, z + rise * (1 - (2 * t - 1) ** 2))
+    strips = [(prof(i / n), prof((i + 1) / n)) for i in range(n)]
+    for i, ((ya, za), (yb, zb)) in enumerate(strips):
+        pts = _orient([(x0, ya, za), (x1, ya, za), (x1, yb, zb), (x0, yb, zb)], (0, (ya + yb) / 2 - (y0 + y1) / 2, 1))
+        if skylight and skylight[0] <= i < skylight[1]:
+            sp.window(pts, WARM_WINDOW, frame="#9aa1aa", light_alpha=0.6)
+        else:
+            sp.face(pts, mat, ao=0)
+    for x, nx in ((x0, -1), (x1, 1)):
+        gable = [(x, prof(i / 16)[0], prof(i / 16)[1]) for i in range(17)]
+        sp.face(_orient(gable, (nx, 0, 0)), mat, ao=0)
+    return prof
+
+
+@typed("gym", 10, 8, 4.2, "체육관", heights=[4.2, 4.0, 4.4, 4.2, 4.2])
+def gym(sp: Sprite, v: int):
+    x0, x1, y0, y1, h = -4.6, 4.2, -3.5, 3.5, 2.4
+    rise = (1.45, 1.25, 1.65, 1.45, 1.45)[v]
+    accent = (TEAL, ORANGE, TEAL, Mat("#3E6FB0", 0.2), YELLOW)[v]
+    roofm = (Mat("#C9CCD1", 0.35), Mat("#D9D4C8", 0.1), Mat("#C9CCD1", 0.35), Mat("#BFC6CE", 0.4),
+             Mat("#D9D4C8", 0.1))[v]
+    sp.contact_shadow(-0.2, 0, 5.4, 4.2, 0.5)
+    sp.box(x0 - 0.2, y0 - 0.3, 0, x1 - x0 + 0.4, y1 - y0 + 0.6, 0.25, CONCRETE)
+    sp.box(x0, y0, 0.25, x1 - x0, y1 - y0, h, WHITE, top=SILVER)
+    f = Sprite.box_faces(x0, y0, 0.25, x1 - x0, y1 - y0, h)
+    band_on(sp, f["left"], 0.0, 0.1, accent)
+    band_on(sp, f["right"], 0.0, 0.1, accent)
+    # 긴 창 띠: 안에 육상 트랙과 운동 기구 그림자
+    o, e1, e2 = f["left"]
+    n = norm(cross(e1, e2))
+    sp.window(sp.on_face(o, e1, e2, 0.04, 0.3, 0.96, 0.86), WARM_WINDOW)
+    def inside(u0, v0, u1, v1, mat):
+        sp.face([add(p, mul(n, 0.025)) for p in sp.on_face(o, e1, e2, u0, v0, u1, v1)], mat, normal=n, edge=False, ao=0)
+    inside(0.05, 0.31, 0.95, 0.43, TRACK)
+    for vv in (0.35, 0.39):
+        sp.line(add(_face_pt(f["left"], 0.05, vv), mul(n, 0.03)), add(_face_pt(f["left"], 0.95, vv), mul(n, 0.03)),
+                0.025, "#f1f2f0", 0.9)
+    for u in ((0.12, 0.3, 0.55, 0.72, 0.86), (0.18, 0.4, 0.66, 0.84), (0.12, 0.3, 0.55, 0.72, 0.86),
+              (0.1, 0.34, 0.6, 0.8), (0.15, 0.38, 0.62, 0.86))[v]:
+        k = int(u * 10) % 3
+        if k == 0:      # 달리기 기계
+            inside(u, 0.44, u + 0.06, 0.5, Mat("#2e3238"))
+            inside(u + 0.045, 0.5, u + 0.06, 0.66, Mat("#2e3238"))
+        elif k == 1:    # 자전거
+            inside(u, 0.44, u + 0.015, 0.6, Mat("#2e3238"))
+            inside(u - 0.02, 0.58, u + 0.04, 0.62, Mat("#2e3238"))
+            inside(u - 0.02, 0.44, u + 0.05, 0.48, Mat("#2e3238"))
+        else:           # 역기
+            inside(u, 0.52, u + 0.07, 0.54, Mat("#2e3238"))
+            inside(u, 0.47, u + 0.012, 0.59, Mat("#2e3238"))
+            inside(u + 0.058, 0.47, u + 0.07, 0.59, Mat("#2e3238"))
+    for k in range(1, 8):
+        sp.line(add(_face_pt(f["left"], k / 8, 0.3), mul(n, 0.04)), add(_face_pt(f["left"], k / 8, 0.86), mul(n, 0.04)),
+                0.04, "#9aa1aa")
+    # 박공 끝 (+x): 출입문과 창
+    door(sp, f["right"], 0.4, 0.6, 0.78, Mat("#cfd6dc", 0.3))
+    windows_row(sp, f["right"], 2, 0.4, 0.78, 0.1, 0.5)
+    # 둥근 지붕 (등마루에 채광 띠)
+    _barrel_roof(sp, x0 - 0.15, x1 + 0.15, y0 - 0.2, y1 + 0.2, 0.25 + h, rise, roofm, 8,
+                 skylight=(3, 5) if v in (0, 2, 4) else None)
+    if v == 1:
+        for x in (-3.0, 0.0):
+            sp.box(x, -1.0, 0.25 + h + rise - 0.05, 1.0, 0.8, 0.35, STEEL, top=DARK)
+    elif v == 3:
+        antenna(sp, (-3.6, 0.0, 0.25 + h + rise * 0.9), 1.2)
+    sp.lamp((x1 + 0.15, 0.0, 2.35), AMBER, 9)
+    sp.lamp((x1 + 0.15, y1 - 0.3, 1.0), CYAN_LIGHT if accent is TEAL else AMBER, 7)
+
+
+def _fan_ring(sp, apex, r0, r1, a0, a1, z0, z1, wall, roof, k=10):
+    """부채꼴 고리 기둥 (apex 중심, 반지름 r0~r1, 각 a0~a1 도)."""
+    def at(r, t, z):
+        return (apex[0] + r * math.cos(math.radians(t)), apex[1] + r * math.sin(math.radians(t)), z)
+    ts = [a0 + (a1 - a0) * i / k for i in range(k + 1)]
+    # 옆벽 (보이는 쪽만 그려진다)과 바깥 호 벽
+    for t, sgn in ((a0, -1), (a1, 1)):
+        sp.face(_orient([at(r0, t, z0), at(r1, t, z0), at(r1, t, z1), at(r0, t, z1)],
+                        (-math.sin(math.radians(t)) * sgn, math.cos(math.radians(t)) * sgn, 0)), wall)
+    for i in range(k):
+        tm = math.radians((ts[i] + ts[i + 1]) / 2)
+        sp.face(_orient([at(r1, ts[i], z0), at(r1, ts[i + 1], z0), at(r1, ts[i + 1], z1), at(r1, ts[i], z1)],
+                        (math.cos(tm), math.sin(tm), 0)), wall)
+        sp.face(_orient([at(r0, ts[i], z0), at(r0, ts[i + 1], z0), at(r0, ts[i + 1], z1), at(r0, ts[i], z1)],
+                        (-math.cos(tm), -math.sin(tm), 0)), wall)
+    top = [at(r1, t, z1) for t in ts] + [at(r0, t, z1) for t in reversed(ts)]
+    sp.face(_orient(top, (0, 0, 1)), roof, normal=(0, 0, 1))
+    return at
+
+
+@typed("theater", 12, 10, 5.0, "공연장", heights=[5.0, 5.0, 5.4, 4.6, 5.0])
+def theater(sp: Sprite, v: int):
+    apex = (-8.0, 0.0)
+    half = 23.0
+    wall = (CREAM, WHITE, CREAM, Mat("#D8CBB0"), WHITE)[v]
+    roof = (Mat("#9aa1aa", 0.3), Mat("#8E3B3B", 0.15), Mat("#9aa1aa", 0.3), Mat("#7d848d", 0.3), Mat("#3E6FB0", 0.2))[v]
+    accent = (MAROON, MAROON, Mat("#3E6FB0", 0.2), MAROON, ORANGE)[v]
+    steps = ((3.8, 5.6, 4.3), (5.6, 8.6, 3.5), (8.6, 12.4, 2.5))
+    if v == 3:
+        steps = ((3.8, 6.6, 3.9), (6.6, 12.4, 2.6))
+    tower_h = (5.0, 5.0, 5.4, 4.6, 5.0)[v]
+    sp.contact_shadow(-0.4, 0, 6.4, 5.0, 0.5)
+    # 무대탑 (뒤)
+    sp.box(-6.0, -1.7, 0, 2.1, 3.4, tower_h, wall, top=SILVER)
+    band_on(sp, Sprite.box_faces(-6.0, -1.7, 0, 2.1, 3.4, tower_h)["left"], 0.9, 0.97, accent)
+    for r0, r1, hh in steps:
+        _fan_ring(sp, apex, r0, r1, -half, half, 0.0, hh, wall, roof)
+    # 앞면: 유리문, 포스터, 차양(마키)과 전구 줄
+    r1 = steps[-1][1]
+
+    def P_(r, t, z):
+        return (apex[0] + r * math.cos(math.radians(t)), apex[1] + r * math.sin(math.radians(t)), z)
+    hh = steps[-1][2]
+    for t0, t1 in ((-8, -3), (-2.5, 2.5), (3, 8)):
+        sp.window(_orient([P_(r1 + 0.03, t0, 0.05), P_(r1 + 0.03, t1, 0.05), P_(r1 + 0.03, t1, 1.55),
+                           P_(r1 + 0.03, t0, 1.55)], (1, 0, 0)), WARM_WINDOW)
+    for t0, t1, c in ((-19, -12, RED), (12, 19, YELLOW)):
+        q = _orient([P_(r1 + 0.03, t0, 0.5), P_(r1 + 0.03, t1, 0.5), P_(r1 + 0.03, t1, 1.9), P_(r1 + 0.03, t0, 1.9)],
+                    (1, 0, 0))
+        sp.face(q, c, ao=0, edge=False)
+        sp.light_poly(q, WARM_WINDOW, 0.35)
+    for i in range(10):
+        t0 = -half + 2 * half * i / 10
+        t1 = t0 + 2 * half / 10
+        sp.face(_orient([P_(r1 + 0.02, t0, hh - 0.35), P_(r1 + 0.02, t1, hh - 0.35), P_(r1 + 0.02, t1, hh - 0.1),
+                         P_(r1 + 0.02, t0, hh - 0.1)], (math.cos(math.radians((t0 + t1) / 2)), 0.1, 0)), accent,
+                ao=0, edge=False)
+    zm = 2.05
+    ta, tb = -15.0, 15.0
+    k = 8
+    can = [P_(r1, ta + (tb - ta) * i / k, zm) for i in range(k + 1)] + \
+          [P_(r1 + 0.95, tb - (tb - ta) * i / k, zm) for i in range(k + 1)]
+    sp.face(_orient(can, (0, 0, 1)), Mat("#2e3238", 0.2), normal=(0, 0, 1))
+    for i in range(k):
+        a, b = ta + (tb - ta) * i / k, ta + (tb - ta) * (i + 1) / k
+        q = _orient([P_(r1 + 0.95, a, zm - 0.32), P_(r1 + 0.95, b, zm - 0.32), P_(r1 + 0.95, b, zm),
+                     P_(r1 + 0.95, a, zm)], (math.cos(math.radians((a + b) / 2)), math.sin(math.radians((a + b) / 2)), 0))
+        sp.face(q, Mat("#F2C14E", 0.4), ao=0, edge=False)
+        sp.mark_light("#FFE08A", 0.9)
+        sp.light_poly(q, "#FFE08A", 0.9)
+    for i in range(k * 2 + 1):
+        t = ta + (tb - ta) * i / (k * 2)
+        sp.lamp(P_(r1 + 0.97, t, zm - 0.16), "#FFE9B0", 4)
+    for t in (ta + 1, tb - 1):
+        sp.line(P_(r1 + 0.85, t, 0), P_(r1 + 0.85, t, zm - 0.32), 0.07, "#8a9099")
+    sp.glow(P_(r1 + 1.0, 0, 1.0), 40, WARM_WINDOW, 0.4)
+    if v == 2:
+        antenna(sp, (-5.0, 0.0, tower_h), 1.0)
+    elif v == 4:
+        sp.box(-5.6, -1.2, tower_h, 1.2, 1.2, 0.4, STEEL, top=DARK)
+
+
+def _cafe_table(sp, c, umbrella=None, seats=3):
+    for k in range(seats):
+        a = math.radians(200 + 360 * k / seats)
+        p = (c[0] + 0.62 * math.cos(a), c[1] + 0.62 * math.sin(a), 0.0)
+        if dot((math.cos(a), math.sin(a), 0), VIEW) < 0:
+            sp.cyl(p, add(p, (0, 0, 0.42)), 0.16, Mat("#8a5a3c", 0.2), cap_mat=Mat("#a8714c", 0.2))
+    sp.cyl((c[0], c[1], 0), (c[0], c[1], 0.7), 0.05, STEEL)
+    sp.cyl((c[0], c[1], 0.7), (c[0], c[1], 0.76), 0.42, WHITE, cap_mat=WHITE)
+    for k in range(seats):
+        a = math.radians(200 + 360 * k / seats)
+        p = (c[0] + 0.62 * math.cos(a), c[1] + 0.62 * math.sin(a), 0.0)
+        if dot((math.cos(a), math.sin(a), 0), VIEW) >= 0:
+            sp.cyl(p, add(p, (0, 0, 0.42)), 0.16, Mat("#8a5a3c", 0.2), cap_mat=Mat("#a8714c", 0.2))
+    if umbrella:
+        sp.line((c[0], c[1], 0.76), (c[0], c[1], 2.2), 0.05, "#c9ccd1")
+        sp.dome((c[0], c[1], 1.85), 0.95, 0.38, umbrella)
+
+
+@typed("cafe", 7, 7, 3.4, "카페", heights=[3.4, 3.4, 3.6, 3.2, 3.4])
+def cafe(sp: Sprite, v: int):
+    cx, cy, r = -0.8, -0.8, 1.85
+    roofm = (Mat("#B5583A", 0.15), TEAL, Mat("#3E6FB0", 0.2), MAROON, Mat("#C9A23A", 0.2))[v]
+    stripes = ((RED, WHITE), (TEAL, WHITE), (BLUE, WHITE), (MAROON, CREAM), (ORANGE, WHITE))[v]
+    umb = (RED, TEAL, BLUE, None, ORANGE)[v]
+    zb, zt = 0.2, (2.45, 2.45, 2.65, 2.3, 2.45)[v]
+    sp.contact_shadow(0, 0, 3.6, 3.6, 0.45)
+    sp.disc((0.15, 0.15, 0.02), (0, 0, 1), 3.25, Mat("#9b927f"), edge=False)
+    sp.ring3((0.15, 0.15, 0.03), 3.25, "#7d7566", 0.08, front_only=False)
+
+    ri, ro, zi, zo = r + 0.03, r + 0.85, zt - 0.2, zt - 0.6
+    def awning(front):
+        n = 24
+        for k in range(n):
+            t0, t1 = 2 * math.pi * k / n, 2 * math.pi * (k + 1) / n
+            tm = (t0 + t1) / 2
+            if (dot((math.cos(tm), math.sin(tm), 0), VIEW) > -0.1) != front:
+                continue
+            def at(rr, t, z):
+                return (cx + rr * math.cos(t), cy + rr * math.sin(t), z)
+            q = _orient([at(ri, t0, zi), at(ri, t1, zi), at(ro, t1, zo), at(ro, t0, zo)],
+                        (math.cos(tm) * 0.45, math.sin(tm) * 0.45, 1.0))
+            sp.face(q, stripes[k % 2], ao=0)
+            if front:
+                sp.face(_orient([at(ro, t0, zo), at(ro, t1, zo), at(ro, t1, zo - 0.22), at(ro, t0, zo - 0.22)],
+                                (math.cos(tm), math.sin(tm), 0)), stripes[k % 2], ao=0, edge=False)
+    awning(False)
+    sp.cyl((cx, cy, 0), (cx, cy, zb), r + 0.2, CONCRETE)
+    p0, p1 = (cx, cy, zb), (cx, cy, zt)
+    sp.cyl(p0, p1, r, CREAM, cap_mat=WHITE)
+    cyl_windows(sp, p0, p1, r, 0.22, 0.72, toward=(1, 1, 0), n=4, spread=36, width=27)
+    sp.dome((cx, cy, zt), r + 0.12, 0.75, roofm)
+    sp.sphere((cx, cy, zt + 0.82), 0.18, GOLD)
+    sp.lamp((cx, cy, zt + 1.05), WARM_WINDOW, 8)
+    awning(True)
+    sp.glow((cx + 1.0, cy + 1.0, 1.2), 30, WARM_WINDOW, 0.4)
+    tables = (((1.6, 0.9), (0.5, 2.3), (2.4, -1.4), (-2.0, 2.1)), ((1.8, 1.4), (-0.2, 2.4), (2.4, -0.9)),
+              ((1.6, 0.9), (0.5, 2.3), (2.4, -1.4)), ((1.7, 1.0), (0.3, 2.4), (2.5, -1.2), (-2.1, 2.0)),
+              ((1.9, 1.2), (0.0, 2.4), (2.5, -1.1)))[v]
+    lamps = (((2.9, 2.6), (-2.6, 0.6)), ((2.9, 2.9),), ((2.9, 2.6), (-2.6, 0.6), (2.9, -2.6)), ((2.9, 2.6),),
+             ((2.8, 2.8), (-2.7, 0.8)))[v]
+    items = [((x, y, 0), (lambda x=x, y=y, i=i: _cafe_table(sp, (x, y), umb if (i + v) % 2 == 0 else None)))
+             for i, (x, y) in enumerate(tables)]
+    for (x, y) in lamps:
+        def lp(x=x, y=y):
+            sp.line((x, y, 0), (x, y, 2.5), 0.06, "#5c626b")
+            sp.lamp((x, y, 2.6), WARM_WINDOW, 12)
+        items.append(((x, y, 0), lp))
+    sp.parts(items)
+
+
+@typed("sports_dome", 20, 16, 7.0, "저중력 스포츠 돔", heights=[7.0, 6.6, 7.4, 7.0, 7.0])
+def sports_dome(sp: Sprite, v: int):
+    rx, ry, H = ((9.3, 7.3, 6.1), (9.3, 7.3, 5.7), (9.4, 7.4, 6.5), (9.3, 7.3, 6.1), (9.3, 7.3, 6.1))[v]
+    zb = 0.8
+    sp.contact_shadow(0, 0, 10.0, 8.0, 0.45)
+    ell = [(rx * math.cos(2 * math.pi * k / 48), ry * math.sin(2 * math.pi * k / 48)) for k in range(48)]
+    sp.prism(ell, 0, zb, SINTER, top=Mat("#6a6458"))
+    # 트랙과 경기장
+    if v in (0, 2, 4):
+        sp.face([(rx * 0.86 * math.cos(2 * math.pi * k / 40), ry * 0.84 * math.sin(2 * math.pi * k / 40), zb + 0.01)
+                 for k in range(40)], TRACK, normal=(0, 0, 1), ao=0, edge=False)
+    fx, fy = 6.0, 3.4
+    turf = (TURF, TURF, TURF, Mat("#3E7FB8", 0.4), Mat("#C9A066"))[v]
+    sp.face([(-fx, -fy, zb + 0.02), (fx, -fy, zb + 0.02), (fx, fy, zb + 0.02), (-fx, fy, zb + 0.02)], turf,
+            normal=(0, 0, 1), ao=0, edge=False)
+    lc, lw, z = "#f1f2f0", 0.08, zb + 0.03
+    sp.polyline3([(-fx + 0.3, -fy + 0.3, z), (fx - 0.3, -fy + 0.3, z), (fx - 0.3, fy - 0.3, z), (-fx + 0.3, fy - 0.3, z)],
+                 lc, lw, closed=True)
+    sp.line((0, -fy + 0.3, z), (0, fy - 0.3, z), lw, lc)
+    sp.ring3((0, 0, z), 1.3, lc, lw, front_only=False)
+    for s in (-1, 1):
+        x = s * (fx - 0.3)
+        sp.polyline3([(x, -1.6, z), (x - s * 1.4, -1.6, z), (x - s * 1.4, 1.6, z), (x, 1.6, z)], lc, lw)
+    # 골대 (또는 높은 고리)
+    for s in (-1, 1):
+        x = s * (fx - 0.3)
+        if v in (1, 3):
+            sp.line((x + s * 0.4, 0, zb), (x + s * 0.4, 0, zb + 3.2), 0.1, "#c9ccd1")
+            sp.ring3((x, 0, zb + 3.1), 0.45, "#E07B39", 0.08, front_only=False)
+            sp.quad((x + s * 0.4, -0.5, zb + 3.0), (0, 1.0, 0), (0, 0, 0.8), WHITE, back=WHITE)
+        else:
+            for y in (-1.0, 1.0):
+                sp.line((x, y, zb), (x, y, zb + 1.3), 0.08, lc)
+                sp.line((x, y, zb + 1.3), (x + s * 0.6, y, zb), 0.04, "#b9bcc0")
+            sp.line((x, -1.0, zb + 1.3), (x, 1.0, zb + 1.3), 0.08, lc)
+            sp.line((x + s * 0.6, -1.0, zb), (x + s * 0.6, 1.0, zb), 0.04, "#b9bcc0")
+    # 조명탑 넷
+    for (x, y) in ((-5.6, -4.0), (5.6, -4.0), (-5.6, 4.0), (5.6, 4.0)):
+        sp.line((x, y, zb), (x, y, zb + 3.2), 0.1, "#8a9099")
+        sp.box(x - 0.35, y - 0.12, zb + 3.2, 0.7, 0.24, 0.25, DARK)
+        sp.lamp((x, y, zb + 3.45), "#fff4d6", 14)
+    sp.glow((0, 0, zb + 2.0), 90, "#fff4d6", 0.3)
+    # 투명 돔
+    _glass_cap(sp, (0, 0), rx, ry, H, zb, rings=(0.28, 0.55, 0.8), ribs=16, alpha=0.26)
+    # 출입 에어록 (+x)
+    sp.box(8.6, -1.1, 0, 1.2, 2.2, 2.3, CONCRETE, top=Mat("#b3a48e"))
+    f = Sprite.box_faces(8.6, -1.1, 0, 1.2, 2.2, 2.3)
+    door(sp, f["right"], 0.25, 0.75, 0.75, Mat("#5c626b", 0.3))
+    if v == 4:
+        for (x, y) in ((8.6, 6.4), (-8.6, 6.4), (8.6, -6.4)):
+            sp.line((x, y, 0), (x, y, 2.8), 0.08, "#8a9099")
+            sp.lamp((x, y, 2.9), AMBER, 11)
+    elif v == 2:
+        sp.box(-2.0, 7.0, 0, 4.0, 0.9, 1.6, WHITE, top=SILVER)
+        windows_row(sp, Sprite.box_faces(-2.0, 7.0, 0, 4.0, 0.9, 1.6)["left"], 3, 0.4, 0.75, 0.1, 0.08)
+
+
+# ═════════════════════════════════════════════════════════════════════
+# 교신 (comms_center 계열)
+# ═════════════════════════════════════════════════════════════════════
+
+@typed("laser_terminal", 6, 6, 5.0, "레이저 통신소", heights=[5.0, 4.8, 5.2, 5.0, 4.8])
+def laser_terminal(sp: Sprite, v: int):
+    tx, ty = (-0.5, -0.6)
+    el = math.radians((55, 40, 65, 55, 48)[v])
+    d = (0.0, math.cos(el), math.sin(el))
+    tube = (WHITE, WHITE, Mat("#D8DDE2", 0.2), WHITE, Mat("#E5DCC8", 0.05))[v]
+    sp.contact_shadow(0, 0, 3.2, 3.2, 0.5)
+    sp.box(-2.85, -2.85, 0, 5.7, 5.7, 0.25, SINTER, top=Mat("#a39581"))
+    sp.ring3((tx, ty, 0.26), 1.6, "#E9C24A", 0.08, front_only=False)
+    # 받침대와 방위 회전 북
+    sp.cyl((tx, ty, 0.25), (tx, ty, 1.85), 0.72, WHITE, bands=[0.5], band_color="#bdb6a8", cap_mat=STEEL)
+    sp.cyl((tx, ty, 1.85), (tx, ty, 2.3), 1.0, Mat("#5b6470", 0.3), cap_mat=Mat("#7A8490", 0.3))
+    c = (tx, ty, 3.2)
+    arm = Mat("#C9CCD1", 0.35)
+    sp.box(tx - 1.02, ty - 0.32, 2.3, 0.24, 0.64, 1.15, arm)
+    sp.disc((tx - 0.78, ty, c[2]), (1, 0, 0), 0.3, DARK)
+    # 망원경 같은 광학 머리 (위를 본다)
+    b0, b1 = sub(c, mul(d, 0.85)), add(c, mul(d, 1.45))
+    sp.cyl(b0, b1, 0.62, tube, bands=[0.25, 0.7], band_color="#a8a294", cap_mat=STEEL)
+    b2 = add(b1, mul(d, 0.38))
+    sp.frustum(b1, b2, 0.64, 0.74, Mat("#3a3f47", 0.3), caps=False)
+    sp.disc(add(b1, mul(d, 0.05)), d, 0.55, Mat("#1d3a4a", 0.9), edge=False)
+    sp.ring3(add(b1, mul(d, 0.06)), 0.5, "#D2A43C", 0.07, normal=d, front_only=False)
+    sp.disc(add(b1, mul(d, 0.07)), d, 0.16, Mat("#7FE3DA", 0.9), edge=False)
+    sp.glow(add(b2, mul(d, 0.2)), 12, "#7CF29A", 0.75)
+    sp.line(add(b2, mul(d, 0.1)), add(b2, mul(d, 1.6)), 0.05, "#7CF29A", 0.55, layer="light")
+    sp.box(tx + 0.78, ty - 0.32, 2.3, 0.24, 0.64, 1.15, arm)
+    sp.disc((tx + 1.03, ty, c[2]), (1, 0, 0), 0.3, DARK)
+    sp.disc((tx + 1.04, ty, c[2]), (1, 0, 0), 0.12, GOLD)
+    # 냉각 상자 (방열 지느러미, 팬)
+    bx, by = (-2.55, 0.9) if v not in (3,) else (0.9, 0.9)
+    sp.box(bx, by, 0.25, 1.7, 1.5, 1.15, WHITE, top=SILVER)
+    cf = Sprite.box_faces(bx, by, 0.25, 1.7, 1.5, 1.15)
+    o, e1, e2 = cf["left"]
+    for k in range(6):
+        u = 0.1 + k * 0.14
+        _decal(sp, cf["left"], u, 0.15, u + 0.07, 0.8, DARK, 0.01)
+    band_on(sp, cf["right"], 0.8, 0.9, Mat("#3E6FB0", 0.2))
+    sp.ring3((bx + 0.85, by + 0.75, 1.42), 0.45, "#9aa1aa", 0.05)
+    sp.disc((bx + 0.85, by + 0.75, 1.41), (0, 0, 1), 0.42, CHAR, edge=False)
+    pipe(sp, [(bx + 1.7, by + 0.4, 0.6), (tx - 0.2, by + 0.4, 0.6), (tx - 0.2, ty + 0.7, 0.6)], 0.14)
+    sp.lamp((bx + 1.7, by + 1.5, 1.2), CYAN_LIGHT, 6)
+    if v == 1:
+        sp.box(1.2, -2.5, 0.25, 1.2, 1.0, 1.4, Mat("#5b6470", 0.2), top=SILVER)
+        sp.lamp((2.45, -2.0, 1.2), AMBER, 7)
+    elif v == 2:
+        antenna(sp, (2.3, -2.3, 0.25), 2.6)
+    elif v == 4:
+        o2, e12, e22 = (0.6, 1.2, 0.5), (1.9, 0, 0), (0, 1.3, 0.5)
+        sp.quad(o2, e12, e22, SOLAR, back=STEEL)
+        sp.panel_grid(o2, e12, e22, 3, 2, "#6f86b0", 0.45, 0.6)
+        legs(sp, [(0.8, 1.4, 0.55), (2.3, 1.4, 0.55)], 0.25)
+
+
+@typed("lunar_observatory", 8, 8, 7.0, "광학 천문대", heights=[7.0, 6.6, 7.2, 6.8, 7.0])
+def lunar_observatory(sp: Sprite, v: int):
+    cx, cy = -0.8, -0.8
+    R = (2.7, 2.5, 2.8, 2.6, 2.7)[v]
+    zt = (3.7, 3.4, 3.9, 3.6, 3.7)[v]
+    Rd = R + 0.08
+    th = math.radians((45, 70, 40, 55, 45)[v])
+    sp.contact_shadow(0.2, 0.2, 4.0, 4.0, 0.5)
+    sp.cyl((cx, cy, 0), (cx, cy, 0.3), R + 0.4, CONCRETE)
+    # 제어실 (+x 쪽, 뒤)
+    def annex():
+        sp.box(1.3, -3.6, 0, 2.4, 2.6, 2.4, WHITE, top=SILVER)
+        f = Sprite.box_faces(1.3, -3.6, 0, 2.4, 2.6, 2.4)
+        band_on(sp, f["left"], 0.82, 0.92, Mat("#F2A541"))
+        band_on(sp, f["right"], 0.82, 0.92, Mat("#F2A541"))
+        windows_row(sp, f["left"], 2, 0.4, 0.68, 0.15, 0.1)
+        door(sp, f["right"], 0.3, 0.7, 0.75)
+        sp.box(1.0, -2.8, 0.3, 0.5, 1.2, 2.0, WHITE)
+        if v in (1, 3):
+            antenna(sp, (3.2, -3.2, 2.4), 1.4)
+    if v != 4:
+        annex()
+    p0, p1 = (cx, cy, 0.3), (cx, cy, zt)
+    sp.cyl(p0, p1, R, WHITE, bands=[0.94], band_color="#b9b2a5", cap_mat=SILVER)
+    cyl_windows(sp, p0, p1, R, 0.5, 0.6, toward=(1, 1, 0), n=2, spread=30, width=8)
+    ang = Sprite.facing_angle(p0, p1, (0.2, 1.0, 0))
+    sp.face(Sprite.cyl_patch(p0, p1, R, 0.0, 0.62, ang - 9, ang + 9), Mat("#9aa1aa", 0.3), ao=0)
+    sp.lamp(add((cx, cy, 2.55), mul(norm((0.2, 1.0, 0)), R + 0.15)), AMBER, 8)
+    # 슬릿 돔 (슬릿이 열려 있다)
+    sp.sphere((cx, cy, zt), Rd, Mat("#F1F2F0", 0.3), clip_z=zt)
+    h = (math.cos(th), math.sin(th), 0.0)
+    side = (-math.sin(th), math.cos(th), 0.0)
+    al = math.asin(0.48 / Rd)
+    def on(phi, s):
+        m = add(mul(h, math.cos(phi)), (0, 0, math.sin(phi)))
+        q = add(mul(m, math.cos(al)), mul(side, s * math.sin(al)))
+        return (cx + Rd * 1.005 * q[0], cy + Rd * 1.005 * q[1], zt + Rd * 1.005 * q[2])
+    phis = [math.radians(4 + (100 - 4) * k / 12) for k in range(13)]
+    for a, b in zip(phis, phis[1:]):
+        nm = add(mul(h, math.cos((a + b) / 2)), (0, 0, math.sin((a + b) / 2)))
+        sp.face(_orient([on(a, -1), on(a, 1), on(b, 1), on(b, -1)], nm), Mat("#1b1e24"), ao=0, edge=False)
+    for s in (-1, 1):
+        sp.polyline3([on(p, s * 1.25) for p in phis], "#b9bcc0", 0.08)
+    q = add(mul(h, math.cos(math.radians(38))), (0, 0, math.sin(math.radians(38))))
+    tc = (cx + Rd * 0.8 * q[0], cy + Rd * 0.8 * q[1], zt + Rd * 0.8 * q[2])
+    sp.disc(tc, q, 0.36, Mat("#E9E6DF", 0.3))
+    sp.disc(add(tc, mul(q, 0.02)), q, 0.24, Mat("#1d3a4a", 0.9), edge=False)
+    sp.light_poly(_orient([on(phis[1], -1), on(phis[1], 1), on(phis[7], 1), on(phis[7], -1)], q), "#ff4a3a", 0.3)
+    if v == 4:
+        annex()
+    sp.lamp((cx, cy, zt + Rd + 0.15), "#ff5a3c", 6)
+    if v == 2:
+        sp.line((cx + 2.8, cy + 2.8, 0), (cx + 2.8, cy + 2.8, 2.6), 0.07, "#8a9099")
+        sp.lamp((cx + 2.8, cy + 2.8, 2.7), "#ff5a3c", 8)
+
+
+@typed("broadcast_studio", 8, 6, 4.6, "방송 스튜디오", heights=[4.6, 4.4, 4.8, 4.6, 4.6])
+def broadcast_studio(sp: Sprite, v: int):
+    x0, x1, y0, y1, h = -3.75, 2.7, -2.7, 2.0, (3.0, 2.8, 3.2, 3.0, 3.0)[v]
+    body = (WHITE, Mat("#4A4F57", 0.2), WHITE, Mat("#D8DDE2", 0.1), WHITE)[v]
+    sp.contact_shadow(-0.3, -0.2, 4.4, 3.2, 0.5)
+    sp.box(x0 - 0.15, y0 - 0.15, 0, x1 - x0 + 0.3, y1 - y0 + 0.3, 0.3, STEEL)
+    sp.box(x0, y0, 0.3, x1 - x0, y1 - y0, h, body, top=SILVER)
+    f = Sprite.box_faces(x0, y0, 0.3, x1 - x0, y1 - y0, h)
+    band_on(sp, f["right"], 0.9, 0.97, RED)
+    # 바깥을 보는 큰 화면 벽
+    o, e1, e2 = f["left"]
+    n = (0.0, 1.0, 0.0)
+    _decal(sp, f["left"], 0.03, 0.1, 0.97, 0.97, Mat("#22262c", 0.3), 0.02)
+    scr = _decal(sp, f["left"], 0.05, 0.14, 0.95, 0.93, Mat("#1b3560", 0.5), 0.04)
+    sp.light_poly(scr, "#2a5aa0", 0.75)
+    W = length(e1)
+    Hh = length(e2)
+    def at(u, vv, lift=0.06):
+        return add(_face_pt(f["left"], u, vv), mul(n, lift))
+    eu, ev = ((0.72, 0.56), (0.7, 0.56), (0.74, 0.58), (0.28, 0.56), (0.72, 0.56))[v]
+    ec = at(eu, ev)
+    er = 0.27 * Hh
+    sp.face(_circle(ec, n, er, 20), Mat("#2f6db5", 0.4), normal=n, edge=False, ao=0)
+    sp.light_poly(_circle(add(ec, (0, 0.01, 0)), n, er, 20), "#4f8fe0", 0.85)
+    for (du, dv, rr) in ((-0.25, 0.2, 0.42), (0.2, -0.25, 0.32), (0.3, 0.35, 0.22)):
+        cc = add(ec, (-du * er, 0.015, dv * er))
+        sp.face(_circle(cc, n, er * rr, 10), Mat("#5aa04f", 0.3), normal=n, edge=False, ao=0)
+        sp.light_poly(_circle(add(cc, (0, 0.01, 0)), n, er * rr, 10), "#7fd06a", 0.8)
+    bu0, bu1 = (0.08, 0.6) if eu > 0.5 else (0.45, 0.93)
+    ban = [at(bu0, 0.2, 0.07), at(bu1, 0.2, 0.07), at(bu1, 0.36, 0.07), at(bu0, 0.36, 0.07)]
+    sp.face(_orient(ban, n), Mat("#E07B39", 0.3), normal=n, edge=False, ao=0)
+    sp.light_poly(ban, "#ffa060", 0.9)
+    for vv in (0.25, 0.31):
+        sp.line(at(bu0 + 0.04, vv, 0.08), at(bu0 + (bu1 - bu0) * 0.7, vv, 0.08), 0.06, "#f8f4ea", 0.9)
+    lg = [at(0.08 if eu > 0.5 else 0.86, 0.8, 0.07), at(0.14 if eu > 0.5 else 0.92, 0.8, 0.07),
+          at(0.14 if eu > 0.5 else 0.92, 0.9, 0.07), at(0.08 if eu > 0.5 else 0.86, 0.9, 0.07)]
+    sp.face(_orient(lg, n), RED, normal=n, edge=False, ao=0)
+    sp.light_poly(lg, "#ff6a5a", 0.9)
+    sp.glow(at(0.5, 0.55, 0.5), 40, "#4f8fe0", 0.3)
+    # 문과 붉은 방송 중 등
+    door(sp, f["right"], 0.35, 0.68, 0.7, Mat("#5c626b", 0.3), light=False)
+    oa = _face_pt(f["right"], 0.515, 0.82)
+    sp.box(oa[0], oa[1] - 0.45, oa[2], 0.12, 0.9, 0.32, DARK)
+    sign = _orient([(oa[0] + 0.13, oa[1] - 0.4, oa[2] + 0.04), (oa[0] + 0.13, oa[1] + 0.4, oa[2] + 0.04),
+                    (oa[0] + 0.13, oa[1] + 0.4, oa[2] + 0.28), (oa[0] + 0.13, oa[1] - 0.4, oa[2] + 0.28)], (1, 0, 0))
+    sp.face(sign, Mat("#D9332C", 0.4), ao=0, edge=False)
+    sp.mark_light(RED_LIGHT, 0.95)
+    sp.light_poly(sign, RED_LIGHT, 0.95)
+    sp.glow((oa[0] + 0.3, oa[1], oa[2] + 0.16), 14, RED_LIGHT, 0.8)
+    # 지붕: 작은 접시와 기둥
+    zt = 0.3 + h
+    sp.box(-2.9, -2.0, zt, 0.8, 0.8, 0.3, STEEL, top=DARK)
+    _dish(sp, (-2.4, -1.5, zt + 0.95), norm((0.3, 0.8, 0.6)), (0.8, 0.7, 0.95, 0.8, 0.75)[v])
+    sp.line((-2.5, -1.6, zt + 0.3), (-2.4, -1.5, zt + 0.7), 0.1, "#9aa1aa")
+    if v != 1:
+        antenna(sp, (1.6, -1.8, zt), 1.4)
+    if v == 3:
+        sp.box(0.0, -2.2, zt, 1.4, 1.0, 0.45, STEEL, top=DARK)
+    elif v == 4:
+        for x in (-1.0, 0.2):
+            sp.lamp((x, y1 + 0.1, zt + 0.15), "#fff1c9", 7)
+
+
+@typed("data_archive", 7, 5, 4.0, "기록 보관소", heights=[4.0, 3.8, 4.3, 4.0, 3.7])
+def data_archive(sp: Sprite, v: int):
+    zb = (2.0, 2.2, 1.8, 2.0, 2.0)[v]
+    top = (4.0, 3.8, 4.3, 4.0, 3.7)[v]
+    mx0, mx1, my0, my1 = ((-2.0, 1.6, -1.05, 1.05), (-2.0, 1.6, -1.05, 1.05), (-1.8, 1.4, -1.0, 1.0),
+                          (-2.2, 1.8, -0.95, 0.95), (-2.0, 1.6, -1.05, 1.05))[v]
+    sp.contact_shadow(0, 0, 3.9, 2.9, 0.5)
+    # 흙 둑: 바깥 네모(바닥)에서 덩어리를 감싼 안쪽 네모(높이 zb)로 비탈
+    ox0, ox1, oy0, oy1 = -3.45, 3.3, -2.45, 2.45
+    ix0, ix1, iy0, iy1 = mx0 - 0.25, mx1 + 0.25, my0 - 0.25, my1 + 0.25
+    b = [(ox0, oy0, 0), (ox1, oy0, 0), (ox1, oy1, 0), (ox0, oy1, 0)]
+    t = [(ix0, iy0, zb), (ix1, iy0, zb), (ix1, iy1, zb), (ix0, iy1, zb)]
+    for i in range(4):
+        sp.face([b[i], b[(i + 1) % 4], t[(i + 1) % 4], t[i]], BERM, ao=0)
+    sp.face(t, Mat("#6e6862"), normal=(0, 0, 1))
+    for k in (0.33, 0.66):
+        lerp = [add(mul(b[i], 1 - k), mul(t[i], k)) for i in range(4)]
+        sp.polyline3([lerp[3], lerp[2], lerp[1]], "#5f5953", 0.06, 0.7)
+    sp.rock((-2.9, 2.0, 0), 0.35)
+    sp.rock((2.6, -2.1, 0), 0.3)
+    # 검은 덩어리 (아래 절반은 둑 속)
+    z0 = zb - 0.1
+    sp.box(mx0, my0, z0, mx1 - mx0, my1 - my0, top - z0, MONO, top=Mat("#3a3f47", 0.3))
+    f = Sprite.box_faces(mx0, my0, z0, mx1 - mx0, my1 - my0, top - z0)
+    groove = "#17191d"
+    sp.panel_grid(*f["left"], 6, 2, groove, 0.7, 0.9)
+    sp.panel_grid(*f["right"], 3, 2, groove, 0.7, 0.9)
+    sp.panel_grid(*f["top"], 6, 3, groove, 0.6, 0.8)
+    glyph = Mat("#4d5560", 0.3)
+    for (u, vv) in ((0.06, 0.12), (0.4, 0.12), (0.73, 0.12), (0.23, 0.12), (0.56, 0.12))[: 3 + v % 3]:
+        _decal(sp, f["left"], u, vv, u + 0.1, vv + 0.3, glyph, 0.01)
+        _decal(sp, f["left"], u + 0.025, vv + 0.08, u + 0.075, vv + 0.12, Mat("#22262c"), 0.015)
+        _decal(sp, f["left"], u + 0.025, vv + 0.18, u + 0.075, vv + 0.22, Mat("#22262c"), 0.015)
+    # 빛나는 자료 띠와 깜박이는 작은 불빛 (밤)
+    vv0, vv1 = (0.8, 0.86) if v != 4 else (0.62, 0.68)
+    for face in ("left", "right"):
+        strip = _decal(sp, f[face], 0.0, vv0, 1.0, vv1, Mat("#2f8f8a", 0.6), 0.02)
+        sp.light_poly(strip, CYAN_LIGHT, 0.95)
+    for k in range(5):
+        sp.glow(add(_face_pt(f["left"], 0.1 + k * 0.08, 0.72), (0, 0.05, 0)), 3, ("#7CF29A", CYAN_LIGHT)[k % 2], 0.9)
+    # 둑 발치의 작은 출입구 (+x)
+    sp.box(2.3, -0.6, 0, 1.0, 1.2, 1.6, CONCRETE, top=Mat("#b3a48e"))
+    df = Sprite.box_faces(2.3, -0.6, 0, 1.0, 1.2, 1.6)
+    door(sp, df["right"], 0.22, 0.78, 0.78, Mat("#5c626b", 0.3))
+    if v == 2:
+        antenna(sp, (mx0 + 0.4, my0 + 0.4, top), 1.0)
+    elif v == 3:
+        sp.lamp((mx1 + 0.05, my1 + 0.05, top + 0.05), CYAN_LIGHT, 6)

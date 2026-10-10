@@ -100,22 +100,6 @@ def _vtank(sp: Sprite, x, y, z0, h, r, mat: Mat, bands=(), band_color=None, dome
         sp.sphere((x, y, z0 + h), r, mat, clip_z=z0 + h)
 
 
-def _plume(sp: Sprite, x, y, z, n=4, s=1.0, drift=(0.35, -0.15)):
-    """서리 섞인 수증기 기둥: 위로 갈수록 커지고 옅어지는 흰 덩이."""
-    for i in range(n):
-        r = (0.5 + 0.3 * i) * s
-        c = (x + drift[0] * i * s, y + drift[1] * i * s, z + (0.5 + 0.7 * i) * s)
-        a = 0.95 - 0.12 * i
-        q = PV(c)
-        rp = r * S
-        fill = sp.radial([(0, "#ffffff", a), (0.55, "#eef3f6", a * 0.85), (0.85, "#dfe8ee", a * 0.45),
-                          (1, "#dfe8ee", 0.0)], q[0] - rp * 0.25, q[1] - rp * 0.3, rp * 1.1)
-        pts = [(q[0] + rp * math.cos(2 * math.pi * k / 20), q[1] + rp * 0.92 * math.sin(2 * math.pi * k / 20))
-               for k in range(20)]
-        sp.poly2(pts, fill)
-        sp.glass_shell(c, r, r, r * 0.9, None, "#f2f6f8", max(0.2, a * 0.6))
-
-
 def _glass_pane(sp: Sprite, pts3, color="#cfe6ff", alpha=0.22, frame="#dfe9f2"):
     """유리판 (2D는 반투명, 3D는 유리 재질)."""
     sp._rec(("poly", list(pts3), iso._Glass(color, alpha), None))
@@ -229,14 +213,23 @@ def ice_harvester(sp: Sprite, v: int):
     sp.window(sp.on_face(*Sprite.box_faces(1.0, ky - 1.0, 2.3, 1.0, 2.0, 1.9)["right"], 0.25, 0.25, 0.75, 0.5),
               HOT, glass=Mat("#b5481c", 0.3))
     sp.glow((1.6, ky, 3.0), 18, HOT, 0.45)
-    # 냉각 응축기와 굴뚝 (수증기 기둥)
+    # 서리 낀 냉각 포집 탱크와 뚜껑 덮인 배기관 (수증기는 탱크에 얼려 모은다)
     cy = 1.4 * side
-    sp.box(-5.2, cy - 0.9, 2.3, 1.8, 1.8, 1.3, FROST, top=ICE)
-    stacks = [(-4.3, cy)] + ([(-3.3, cy)] if v == 3 else [])
-    for (x, y) in stacks:
-        sp.cyl((x, y, 3.6), (x, y, 4.6), 0.28, STEEL, cap_mat=CHAR)
-    for (x, y) in stacks:
-        _plume(sp, x, y, 4.5, 4 if v != 3 else 3, 1.0 if v != 4 else 1.15)
+    sp.box(-5.3, cy - 1.0, 2.3, 2.0, 2.0, 0.45, STEEL, top=DARK)
+    tanks = [(-4.75, cy - 0.45), (-3.85, cy + 0.45)] if v != 4 else [(-4.3, cy)]
+    tr = 0.55 if v != 4 else 0.85
+    th = (1.9, 1.9, 1.9, 1.6, 1.7)[v]
+    vents = [(-5.0, cy + 0.65)] + ([(-3.6, cy - 0.65)] if v == 3 else [])
+    for (x, y) in sorted(tanks + vents, key=lambda p: p[0] + p[1]):
+        if (x, y) in vents:
+            sp.cyl((x, y, 2.75), (x, y, 5.3), 0.2, STEEL, bands=[0.5], cap_mat=CHAR)
+            sp.cyl((x, y, 5.3), (x, y, 5.42), 0.42, DARK, cap_mat=STEEL)
+            sp.ring3((x, y, 2.8), 0.32, "#dfe9f2", 0.12)
+            sp.lamp((x, y, 5.6), "#ff5a3c", 6)
+        else:
+            _vtank(sp, x, y, 2.75, th, tr, FROST, bands=[0.3, 0.6], band_color="#b5c6cf")
+            cyl_ring(sp, (x, y, 2.75), (x, y, 2.75 + th), tr, 0.82, 0.88, BLUE)
+            sp.ellipsoid((x, y, 2.75), tr + 0.18, tr + 0.18, 0.28, ICE, clip_z=2.75)
     # 운전실
     cab_y0 = 0.4 if side > 0 else -2.4
     sp.box(0.4, cab_y0, 2.3, 1.8, 2.0, 1.5, WHITE, top=SILVER)
@@ -297,9 +290,10 @@ def heat_probe_field(sp: Sprite, v: int):
     pipe(sp, [(hx, ys[0], 0.8), (hx, ys[-1], 0.8), (hx, tank[1], 0.8), (tank[0] - 0.5, tank[1], 0.8)], 0.15)
     # 냉각 포집 탱크와 제어함
     _vtank(sp, tank[0], tank[1], 0.0, 1.1, 0.62, FROST, bands=[0.5], band_color="#3E6FB0")
-    if v in (2, 4):
-        _vtank(sp, tank[0], tank[1] + (1.25 if v == 2 else 1.3), 0.0, 1.2, 0.5, FROST, bands=[0.5],
-               band_color="#3E6FB0")
+    if v == 2:
+        _vtank(sp, tank[0] - 1.35, tank[1] + 0.2, 0.0, 1.2, 0.5, FROST, bands=[0.5], band_color="#3E6FB0")
+    if v == 4:
+        _vtank(sp, tank[0], tank[1] + 1.3, 0.0, 1.2, 0.5, FROST, bands=[0.5], band_color="#3E6FB0")
     sx, sy = (4.0, -3.0) if v != 4 else (4.0, 1.2)
     sp.box(sx - 0.45, sy - 0.4, 0, 0.9, 0.8, 0.9, WHITE, top=SILVER)
     sp.window(sp.on_face(*Sprite.box_faces(sx - 0.45, sy - 0.4, 0, 0.9, 0.8, 0.9)["left"], 0.25, 0.45, 0.75, 0.75),
@@ -471,12 +465,12 @@ def rassor(sp: Sprite, v: int):
         sp.box(-1.9, -1.4, 0, 3.8, 2.8, 0.06, DARK)
         sp.stripes((-1.9, 1.4, 0.06), (3.8, 0, 0), (0, -0.25, 0), n=10, normal=(0, 0, 1))
     if v == 2:
-        _pile(sp, -1.55, 0.0, 0.75, 0.9, 0.35)
-        _pile(sp, 1.6, 0.1, 0.6, 0.8, 0.3)
+        _pile(sp, -1.45, 0.0, 0.5, 0.9, 0.35)
+        _pile(sp, 1.45, 0.1, 0.5, 0.8, 0.3)
     else:
-        _pile(sp, 1.5, 0.35, 0.5, 0.6, 0.22)
-    zf = (0.5, 1.05, 0.42, 0.5, 0.5)[v]          # 앞 드럼 높이 (들어 올리면 흙을 쏟는다)
-    zb = (0.5, 0.5, 0.42, 0.9, 0.5)[v]
+        _pile(sp, 1.5, 0.35, 0.45, 0.6, 0.22)
+    zf = (0.5, 1.05, 0.47, 0.5, 0.5)[v]          # 앞 드럼 높이 (들어 올리면 흙을 쏟는다)
+    zb = (0.5, 0.5, 0.47, 0.9, 0.5)[v]
 
     def drum(x, z):
         p0, p1 = (x, -0.72, z), (x, 0.72, z)
@@ -501,7 +495,7 @@ def rassor(sp: Sprite, v: int):
     drum(1.45, zf)
     if v == 1:
         for k in range(3):
-            sp.rock((1.75 + 0.12 * k, -0.2 + 0.25 * k, 0.15 + 0.25 * k), 0.08)
+            sp.rock((1.62 + 0.08 * k, -0.2 + 0.25 * k, 0.15 + 0.25 * k), 0.08)
     if v in (1, 3):
         antenna(sp, (-0.5, -0.4, 1.03), 0.6)
     sp.cyl((0.55, 0.0, 1.03), (0.55, 0.0, 1.35), 0.05, STEEL, edge=False)
@@ -709,7 +703,8 @@ def solar_sinterer(sp: Sprite, v: int):
     for (c, r) in dishes:
         back = sub(c, mul(n, 0.7))
         sp.box(back[0] - 0.45, back[1] - 0.45, 0, 0.9, 0.9, 0.5, CONCRETE)
-        sp.cyl((back[0], back[1], 0.5), (back[0], back[1], back[2] - 0.3), 0.24, STEEL)
+        sp.cyl((back[0], back[1], 0.5), (back[0], back[1], back[2]), 0.24, STEEL)
+        sp.line((back[0], back[1], back[2]), sub(c, mul(n, 0.05)), 0.3, "#7d848d")
     # 레골리스 판 (소결 자국)
     bx0, by0, bx1, by1 = (-2.6, 0.5, 2.6, 3.6) if v != 1 else (-3.0, 0.3, 2.2, 3.7)
     sp.box(bx0, by0, 0, bx1 - bx0, by1 - by0, 0.5, CONCRETE, top=bed_mat)
@@ -726,8 +721,8 @@ def solar_sinterer(sp: Sprite, v: int):
     # 거울
     for (c, r) in dishes:
         u, w = basis(n)
-        sp.disc(c, n, r + 0.14, DARK, back=DARK)
-        sp.disc(add(c, mul(n, 0.04)), n, r, mirror, back=DARK)
+        sp.disc(c, n, r + 0.14, DARK, back=STEEL)
+        sp.disc(add(c, mul(n, 0.04)), n, r, mirror, back=STEEL)
         # 오목한 느낌: 가운데로 갈수록 어두운 반사
         cc = PV(add(c, mul(n, 0.05)))
         with sp._nest():
@@ -851,10 +846,10 @@ def brick_press(sp: Sprite, v: int):
     ptop = Mat(hexc(scale(paint.albedo, 1.12)), 0.1)
     px, py = -2.75, -1.1
     # 호퍼 (뒤)
-    legs(sp, [(px - 0.5, py - 1.5, 2.8), (px + 0.5, py - 1.5, 2.8)], 0.0)
-    sp.frustum((px, py - 1.3, 2.7), (px, py - 1.3, 3.55), 0.25, 0.75, STEEL)
-    sp.ellipsoid((px, py - 1.3, 3.5), 0.62, 0.62, 0.18, REGOLITH)
-    sp.line((px, py - 1.3, 2.7), (px, py - 0.5, 1.8), 0.2, "#7d848d")
+    legs(sp, [(px - 0.5, py - 1.4, 2.8), (px + 0.5, py - 1.4, 2.8)], 0.0)
+    sp.frustum((px, py - 1.2, 2.7), (px, py - 1.2, 3.55), 0.25, 0.68, STEEL)
+    sp.ellipsoid((px, py - 1.2, 3.5), 0.56, 0.56, 0.16, REGOLITH)
+    sp.line((px, py - 1.2, 2.7), (px, py - 0.5, 1.8), 0.2, "#7d848d")
     # 압착기 틀
     sp.box(px - 1.0, py - 1.0, 0, 2.0, 2.0, 0.9, DARK, top=Mat("#5c626b"))
     sp.box(px - 0.7, py - 1.0, 0.9, 0.5, 0.4, 2.2, paint, top=ptop)
@@ -996,6 +991,7 @@ def hydrogen_reducer(sp: Sprite, v: int):
     for (x, y) in ((cx - 1.2, cy - 1.2), (cx + 1.2, cy - 1.2), (cx - 1.2, cy + 1.2)):
         sp.line((x, y, 0.3), (x, y, 3.4), 0.12, "#7d848d")
     # 반응 탑
+    sp.cyl((cx, cy, 0.3), (cx, cy, 0.95), 0.28, DARK)
     sp.frustum((cx, cy, 0.9), (cx, cy, 1.6), 0.35, 0.95, STEEL)
     sp.cyl((cx, cy, 1.6), (cx, cy, top), 0.95, col, bands=[0.25, 0.5, 0.75], band_color="#8a9099", cap_mat=STEEL)
     cyl_ring(sp, (cx, cy, 1.6), (cx, cy, top), 0.95, 0.06, 0.12, band)
@@ -1056,7 +1052,7 @@ def carbothermal_reactor(sp: Sprite, v: int):
     mc = sub(port, mul(mn, 2.1 if v != 3 else 1.8))
     tx, ty = mc[0] - 0.5, mc[1] - 0.5
     sp.line((tx, ty, 0.3), (tx, ty, mc[2] + 0.25), 0.16, "#8a9099")
-    sp.line((tx, ty, mc[2] - 0.6), sub(mc, mul(mn, 0.2)), 0.1, "#8a9099")
+    sp.line((tx, ty, mc[2] - 0.6), sub(mc, mul(mn, 0.03)), 0.1, "#8a9099")
     sp.disc(mc, mn, 1.0 if v != 4 else 1.2, Mat("#D9E2EA", 0.9), back=STEEL)
     sp.ring3(add(mc, mul(mn, 0.02)), 1.0 if v != 4 else 1.2, "#5c626b", 0.1, normal=mn, front_only=False)
     sp.ring3(add(mc, mul(mn, 0.02)), 0.5, "#9aa7b3", 0.05, normal=mn, front_only=False)
@@ -1227,7 +1223,7 @@ def machine_shop(sp: Sprite, v: int):
     ym = (y0 + y1) / 2
     # 크레인 레일 기둥 (뒤 줄)
     rx1 = 5.0
-    sp.box(rx1 - 0.15, -2.55, 0.15, 0.3, 0.3, 3.85, YELLOW)
+    sp.box(rx1 - 0.15, -2.55, 0.15, 0.3, 0.3, 3.85, Mat("#6a7079", 0.3))
     sp.box(x0, y0, 0.15, x1 - x0, y1 - y0, zw - 0.15, wall, top=wall)
     f = Sprite.box_faces(x0, y0, 0.15, x1 - x0, y1 - y0, zw - 0.15)
     sp.panel_grid(*f["left"], 16, 1, "#a3a9b0", 0.45, 0.8)
@@ -1237,8 +1233,8 @@ def machine_shop(sp: Sprite, v: int):
     door(sp, f["left"], 0.06, 0.13, 0.58, Mat("#5c626b", 0.3))
     # 박공 지붕
     eave = 0.25
-    sp.face([(x0 - eave, y0 - eave, zw), (x1 + eave, y0 - eave, zw), (x1 + eave, ym, zr), (x0 - eave, ym, zr)][::-1], roof)
-    sp.face([(x0 - eave, ym, zr), (x1 + eave, ym, zr), (x1 + eave, y1 + eave, zw), (x0 - eave, y1 + eave, zw)][::-1], roof)
+    sp.face([(x0 - eave, y0 - eave, zw), (x1 + eave, y0 - eave, zw), (x1 + eave, ym, zr), (x0 - eave, ym, zr)], roof)
+    sp.face([(x0 - eave, ym, zr), (x1 + eave, ym, zr), (x1 + eave, y1 + eave, zw), (x0 - eave, y1 + eave, zw)], roof)
     sp.face([(x1, y0, zw), (x1, y1, zw), (x1, ym, zr)], wall)
     sp.panel_grid((x0 - eave, ym, zr), (x1 - x0 + 2 * eave, 0, 0), (0, y1 + eave - ym, zw - zr), 18, 1, "#7d848d", 0.45, 0.7)
     if v == 2:
@@ -1261,10 +1257,10 @@ def machine_shop(sp: Sprite, v: int):
     sp.stripes((x1 + 0.03, dy0, dz), (0, dy1 - dy0, 0), (0, 0, 0.3), n=12, normal=(1, 0, 0))
     # 문 밖 크레인 레일 (노랑) 과 다리보
     for ry in (-2.4, 0.6):
-        sp.box(x1 - 0.4, ry - 0.15, 3.85, rx1 - x1 + 0.55, 0.3, 0.3, YELLOW, top=Mat("#F0D27A"))
+        sp.box(x1 - 0.4, ry - 0.15, 3.85, rx1 - x1 + 0.55, 0.3, 0.3, Mat("#6a7079", 0.3), top=Mat("#8C939C", 0.3))
     cx = (4.2, 4.2, 3.6, 4.4, 4.0)[v]
-    sp.box(cx - 0.2, -2.6, 4.15, 0.4, 3.4, 0.3, ORANGE, top=Mat("#E9965E"))
-    sp.box(cx - 0.25, -0.9, 3.85, 0.5, 0.5, 0.3, DARK)
+    sp.box(cx - 0.2, -2.6, 4.15, 0.4, 3.4, 0.3, Mat("#C9553A", 0.1), top=Mat("#D9735A", 0.1))
+    sp.box(cx - 0.25, -0.9, 3.85, 0.5, 0.5, 0.3, YELLOW)
     hook_z = 1.6 if v != 3 else 0.9
     sp.line((cx, -0.65, 3.85), (cx, -0.65, hook_z + 0.3), 0.05, "#9aa1aa")
     if v == 3:
@@ -1272,7 +1268,7 @@ def machine_shop(sp: Sprite, v: int):
     else:
         sp.polyline3([(cx - 0.12, -0.65, hook_z + 0.3), (cx - 0.12, -0.65, hook_z), (cx + 0.12, -0.65, hook_z + 0.1)],
                      "#5c626b", 0.08)
-    sp.box(rx1 - 0.15, 0.45, 0.15, 0.3, 0.3, 3.85, YELLOW)
+    sp.box(rx1 - 0.15, 0.45, 0.15, 0.3, 0.3, 3.85, Mat("#6a7079", 0.3))
     # 밖: 쇠막대 걸이와 상자
     for k in range(5):
         sp.line((3.2, 1.7 + k * 0.08, 0.35 + k * 0.03), (5.0, 1.7 + k * 0.08, 0.35 + k * 0.03), 0.09, "#9aa1aa")
@@ -1373,8 +1369,9 @@ def foundry(sp: Sprite, v: int):
     f = Sprite.box_faces(x0, y0, 0.15, x1 - x0, y1 - y0, 3.2)
     sp.panel_grid(*f["left"], 14, 1, "#4a4f57", 0.5, 0.9)
     band_on(sp, f["left"], 0.85, 0.93, band)
-    sp.face([(x0 - 0.2, y0 - 0.2, 4.1), (x0 - 0.2, y1 + 0.3, 3.35), (x1 + 0.2, y1 + 0.3, 3.35), (x1 + 0.2, y0 - 0.2, 4.1)],
-            Mat("#4a4f57", 0.2), normal=None)
+    sp.face([(x0 - 0.2, y0 - 0.2, 4.1), (x1 + 0.2, y0 - 0.2, 4.1), (x1 + 0.2, y1 + 0.3, 3.35), (x0 - 0.2, y1 + 0.3, 3.35)],
+            Mat("#4a4f57", 0.2))
+    sp.panel_grid((x0 - 0.2, y0 - 0.2, 4.1), (x1 - x0 + 0.4, 0, 0), (0, y1 - y0 + 0.5, -0.75), 14, 1, "#3a3f47", 0.45, 0.8)
     sp.face([(x1, y0, 3.35), (x1, y0, 4.0), (x1, y1, 3.35)][::-1], shed)
     # 열린 문: 안쪽 따뜻한 빛
     o, e1, e2 = f["left"]
@@ -1420,3 +1417,831 @@ def foundry(sp: Sprite, v: int):
         crate(sp, 3.2, 0.5, 0.9, Mat("#8C939C", 0.3), 0.15)
     sp.lamp((x1, y1 + 0.1, 3.0), AMBER, 9)
     sp.lamp((4.4, 3.4, 1.2), AMBER, 8)
+
+
+# ── 로봇 정비 계열 ───────────────────────────────────────────────────
+
+def _rover(sp: Sprite, x, y, s=1.0, body: Mat = WHITE, accent: Mat = ORANGE, z=0.0, mast=True):
+    """작은 네 바퀴 로봇 (x 방향으로 놓임). (x, y)는 가운데."""
+    L, W = 1.5 * s, 1.0 * s
+    wr = 0.28 * s
+    for wx in (x - L * 0.32, x + L * 0.32):
+        sp.cyl((wx, y - W / 2 - 0.12 * s, z + wr), (wx, y - W / 2 + 0.06 * s, z + wr), wr, TRACK, cap_mat=STEEL)
+    sp.box(x - L / 2, y - W / 2, z + wr * 0.9, L, W, 0.5 * s, body, top=SILVER)
+    f = Sprite.box_faces(x - L / 2, y - W / 2, z + wr * 0.9, L, W, 0.5 * s)
+    band_on(sp, f["left"], 0.15, 0.4, accent)
+    sp.box(x - L * 0.35, y - W * 0.38, z + wr * 0.9 + 0.5 * s, L * 0.6, W * 0.76, 0.05 * s, SOLAR)
+    if mast:
+        sp.line((x + L * 0.38, y, z + wr * 0.9 + 0.5 * s), (x + L * 0.38, y, z + wr + 0.95 * s), 0.05 * s, "#9aa1aa")
+        sp.box(x + L * 0.38 - 0.1 * s, y - 0.15 * s, z + wr + 0.95 * s, 0.2 * s, 0.3 * s, 0.14 * s, DARK)
+    for wx in (x - L * 0.32, x + L * 0.32):
+        sp.cyl((wx, y + W / 2 - 0.06 * s, z + wr), (wx, y + W / 2 + 0.12 * s, z + wr), wr, TRACK, cap_mat=STEEL)
+
+
+@typed("robot_garage", 6, 5, 3.0, "로봇 차고", heights=[3.0, 3.0, 3.0, 3.2, 3.0])
+def robot_garage(sp: Sprite, v: int):
+    """옆이 트인 지붕만 있는 차고: 충전 기둥 둘과 쉬고 있는 작은 로봇."""
+    sp.contact_shadow(0, 0, 3.1, 2.6, 0.4)
+    sp.box(-2.9, -2.4, 0, 5.8, 4.8, 0.15, SINTER)
+    sp.stripes((-2.9, 2.4, 0.15), (5.8, 0, 0), (0, -0.3, 0), n=14, normal=(0, 0, 1))
+    canopy = (WHITE, WHITE, WHITE, Mat("#E07B39", 0.1), WHITE)[v]
+    edge = ORANGE if v != 3 else WHITE
+    posts = [(-2.6, -2.15), (0.0, -2.15), (2.6, -2.15), (-2.6, 2.15), (0.0, 2.15), (2.6, 2.15)]
+    for (x, y) in posts[:3]:
+        sp.line((x, y, 0.15), (x, y, 2.45), 0.14, "#8a9099")
+    # 충전 기둥 (뒤)
+    peds = [(-1.7, -1.55), (0.5, -1.55)] if v != 2 else [(-0.6, -1.55)]
+    for (px, py) in peds:
+        sp.box(px - 0.3, py - 0.3, 0.15, 0.6, 0.6, 1.1, Mat("#5B6470", 0.2), top=Mat("#7A8490", 0.2))
+        pf = Sprite.box_faces(px - 0.3, py - 0.3, 0.15, 0.6, 0.6, 1.1)
+        sp.window(sp.on_face(*pf["left"], 0.2, 0.55, 0.8, 0.8), "#7CF29A", frame=None, glass=Mat("#2c8f4f", 0.4))
+        sp.window(sp.on_face(*pf["right"], 0.2, 0.55, 0.8, 0.8), "#7CF29A", frame=None, glass=Mat("#2c8f4f", 0.4))
+    # 로봇
+    if v == 2:
+        _rover(sp, -1.3, 0.4, 0.95, WHITE, ORANGE)
+        _rover(sp, 1.3, 0.2, 0.95, WHITE, TEAL)
+        pipe(sp, [(-0.6, -1.25, 0.7), (-0.6, 0.0, 0.3), (-1.0, 0.0, 0.3)], 0.06, "#2a2d33")
+    else:
+        rx, ry = (0.6, 0.35) if v != 4 else (-0.4, 0.5)
+        _rover(sp, rx, ry, 1.1, WHITE, (ORANGE, ORANGE, ORANGE, YELLOW, BLUE)[v])
+        pipe(sp, [(0.5, -1.25, 0.7), (0.5, -0.4, 0.3), (rx - 0.4, -0.3, 0.45)], 0.06, "#2a2d33")
+    if v == 4:
+        crate(sp, 1.4, 0.8, 0.8, ORANGE, 0.15)
+        crate(sp, 1.6, -0.6, 0.6, Mat("#C9A23A"), 0.15)
+    # 지붕
+    n = 8
+    prof = [(-2.35 + 4.7 * i / n, 2.3 + 0.75 * math.sin(math.pi * i / n)) for i in range(n + 1)]
+    for i in range(n):
+        (ya, za), (yb, zb) = prof[i], prof[i + 1]
+        m = SOLAR if (v == 1 and i in (2, 3, 4, 5)) else canopy
+        sp.face([(-2.8, ya, za), (2.8, ya, za), (2.8, yb, zb), (-2.8, yb, zb)][::-1], m, two_sided=True,
+                back=Mat("#9aa1aa", 0.2), ao=0)
+        if m is SOLAR:
+            sp.panel_grid((-2.8, ya, za + 0.01), (5.6, 0, 0), (0, yb - ya, zb - za), 7, 1, "#6f86b0", 0.45, 0.6)
+    for x in (-2.8, -0.93, 0.93, 2.8):
+        sp.polyline3([(x, ya, za) for (ya, za) in prof], "#9aa1aa", 0.05)
+    sp.polyline3([(-2.8, prof[-1][0], prof[-1][1]), (2.8, prof[-1][0], prof[-1][1])],
+                 hexc(edge.albedo) if v != 1 else "#3FB8AF", 0.16)
+    for (x, y) in posts[3:]:
+        sp.line((x, y, 0.15), (x, y, 2.4), 0.14, "#8a9099")
+    sp.lamp((2.6, 2.15, 2.3), AMBER, 9)
+    sp.glow((0.0, 0.0, 1.8), 30, WARM_WINDOW, 0.3)
+
+
+def _hopper_drone(sp: Sprite, x, y, z=0.12, s=1.0, foil: Mat = GOLD):
+    """달 표면용 로켓 호퍼 드론: 금박 몸통, 벌린 다리 넷, 아래 엔진 종."""
+    feet = [(x + dx * 0.75 * s, y + dy * 0.75 * s) for dx, dy in ((-1, -1), (1, -1), (-1, 1), (1, 1))]
+    for (fx, fy) in feet[:2]:
+        sp.line((fx, fy, z + 0.05), (x + (fx - x) * 0.45, y + (fy - y) * 0.45, z + 0.75 * s), 0.07, "#9aa1aa")
+    sp.frustum((x, y, z + 0.55 * s), (x, y, z + 0.25 * s), 0.18 * s, 0.32 * s, DARK)
+    sp.cyl((x, y, z + 0.55 * s), (x, y, z + 1.0 * s), 0.5 * s, foil, cap_mat=SILVER)
+    for (tx, ty) in ((x - 0.15 * s, y - 0.5 * s), (x + 0.5 * s, y + 0.1 * s)):
+        sp.sphere((tx, ty, z + 0.78 * s), 0.22 * s, WHITE)
+    sp.box(x - 0.12 * s, y - 0.12 * s, z + 1.0 * s, 0.24 * s, 0.24 * s, 0.18 * s, DARK)
+    for (fx, fy) in feet[2:]:
+        sp.line((fx, fy, z + 0.05), (x + (fx - x) * 0.45, y + (fy - y) * 0.45, z + 0.75 * s), 0.07, "#9aa1aa")
+    for (fx, fy) in feet:
+        sp.disc((fx, fy, z + 0.05), (0, 0, 1), 0.12 * s, STEEL)
+    sp.lamp((x, y, z + 1.25 * s), "#ff5a3c", 5)
+
+
+def _small_pad(sp: Sprite, x, y, r, mark="X"):
+    sp.cyl((x, y, 0.0), (x, y, 0.12), r, CONCRETE, cap_mat=Mat("#A89A84"))
+    sp.ring3((x, y, 0.13), r * 0.75, "#E9C24A", 0.12, front_only=False)
+    if mark == "X":
+        d = r * 0.45
+        sp.line((x - d, y - d, 0.13), (x + d, y + d, 0.13), 0.12, "#E9C24A")
+        sp.line((x - d, y + d, 0.13), (x + d, y - d, 0.13), 0.12, "#E9C24A")
+    for k in range(4):
+        a = math.pi / 4 + k * math.pi / 2
+        sp.lamp((x + r * 0.95 * math.cos(a), y + r * 0.95 * math.sin(a), 0.16), AMBER, 6)
+
+
+@typed("drone_hangar", 10, 8, 4.0, "드론 격납고", heights=[3.4, 3.4, 3.4, 3.8, 3.4])
+def drone_hangar(sp: Sprite, v: int):
+    """지붕 판을 뒤 레일 위로 밀어 연 낮은 격납고 (안에 승강대 위 드론) 와 옆 패드의 작은 호퍼 드론들."""
+    sp.contact_shadow(0, 0, 5.4, 4.2, 0.45)
+    sp.box(-4.8, -3.8, 0, 9.6, 7.6, 0.12, SINTER)
+    wall = Mat("#C9CED4", 0.2)
+    x0, x1, y0, y1, zt, t = -4.4, 0.6, -2.6, 1.0, 2.6, 0.2
+    open_y = (-2.0, -2.0, -2.3, -1.6, -2.0)[v]       # 닫힌 쪽 끝 (그 앞이 열려 있다)
+    pads = [(3.3, -2.35, 1.3), (3.3, 1.2, 1.3)] + ([(-2.4, 2.75, 1.05)] if v in (0, 3) else [])
+    filled = ((0, 2), (0, 1), (1,), (0, 1, 2), (0,))[v]
+    # 레일 뒤 연장 기둥
+    for x in (x0 + 0.1, x1 - 0.1):
+        sp.line((x, -3.75, 0.12), (x, -3.75, zt), 0.14, "#8a9099")
+    # 안쪽: 뒤·왼쪽 벽 (안쪽 면), 바닥, 승강대 위 드론
+    sp.box(x0, y0, 0.12, x1 - x0, t, zt - 0.12, wall, top=Mat("#B9C0C8", 0.2))
+    sp.box(x0, y0 + t, 0.12, t, y1 - y0 - t, zt - 0.12, wall, top=Mat("#B9C0C8", 0.2))
+    floor = [(x0 + t, y0 + t, 0.14), (x1 - t, y0 + t, 0.14), (x1 - t, y1 - t, 0.14), (x0 + t, y1 - t, 0.14)]
+    sp.face(floor, Mat("#4a4f57"), normal=(0, 0, 1), ao=0)
+    sp.light_poly(floor, "#ffcf8a", 0.45)
+    lx, ly = -1.9, -0.75
+    lift_z = (0.9, 0.9, 1.2, 0.6, 0.9)[v]
+    sp.box(lx - 1.0, ly - 0.95, 0.14, 2.0, 1.9, lift_z - 0.14, Mat("#5c626b", 0.3), top=Mat("#7d848d", 0.3))
+    sp.stripes((lx + 1.0, ly + 0.95, lift_z), (-2.0, 0, 0), (0, 0, -0.15), n=8)
+    _hopper_drone(sp, lx, ly, lift_z, 0.95)
+    if v == 2:
+        crate(sp, -4.0, 0.0, 0.6, ORANGE, 0.14)
+    # 앞·오른쪽 벽 (바깥 면)
+    sp.box(x0, y1 - t, 0.12, x1 - x0, t, zt - 0.12, wall, top=Mat("#B9C0C8", 0.2))
+    fl = Sprite.box_faces(x0, y1 - t, 0.12, x1 - x0, t, zt - 0.12)
+    sp.panel_grid(*fl["left"], 14, 1, "#a3a9b0", 0.45, 0.8)
+    sp.stripes(add(fl["left"][0], (0, 0.01, zt - 0.42)), (-(x1 - x0), 0, 0), (0, 0, 0.28), n=18, normal=(0, 1, 0))
+    windows_row(sp, fl["left"], 3, 0.35, 0.6, 0.45, 0.06)
+    sp.box(x1 - t, y0 + t, 0.12, t, y1 - y0 - 2 * t, zt - 0.12, wall, top=Mat("#B9C0C8", 0.2))
+    fr = Sprite.box_faces(x1 - t, y0 + t, 0.12, t, y1 - y0 - 2 * t, zt - 0.12)
+    sp.panel_grid(*fr["right"], 10, 1, "#a3a9b0", 0.45, 0.8)
+    sp.stripes(add(fr["right"][0], (0.01, 0, zt - 0.42)), (0, y1 - y0 - 2 * t, 0), (0, 0, 0.28), n=12, normal=(1, 0, 0))
+    door(sp, fr["right"], 0.55, 0.85, 0.75, Mat("#8C939C", 0.3))
+    # 미닫이 지붕: 레일과 뒤로 밀린 판 둘
+    for x in (x0 - 0.05, x1 - 0.15):
+        sp.box(x, -3.9, zt, 0.2, y1 + 3.9, 0.14, STEEL)
+    sp.box(x0 - 0.1, -3.9, zt + 0.14, x1 - x0 + 0.2, open_y + 3.9, 0.14, Mat("#B9C0C8", 0.3))
+    sp.box(x0 - 0.05, -3.75, zt + 0.28, x1 - x0 + 0.1, open_y + 3.75 + 0.1, 0.14, WHITE, top=Mat("#E2E2DE"))
+    sp.panel_grid((x0 - 0.05, -3.75, zt + 0.42), (x1 - x0 + 0.1, 0, 0), (0, open_y + 3.85, 0), 6, 1, "#b9b4a8", 0.45, 0.8)
+    if v == 3:
+        antenna(sp, (x0 + 0.3, -3.4, zt + 0.42), 1.0)
+    for i, (px, py, pr) in enumerate(pads):
+        _small_pad(sp, px, py, pr)
+        if i in filled:
+            _hopper_drone(sp, px, py, 0.13, 1.05 if pr > 1.2 else 0.85, GOLD if i != 1 or v != 4 else SILVER)
+    if v in (1, 4):
+        _vtank(sp, 1.6, -3.2, 0.12, 1.4, 0.45, WHITE, bands=[0.5], band_color="#d8853b")
+        pipe(sp, [(1.6, -2.75, 0.5), (2.2, -2.4, 0.2)], 0.08, "#3a3f47")
+    sp.lamp((x1 + 0.1, y1 + 0.1, zt), AMBER, 9)
+    sp.lamp((x0, y1 + 0.1, zt), AMBER, 9)
+
+
+@typed("teleop_center", 8, 6, 4.6, "원격 조종실", heights=[4.6, 4.6, 4.6, 4.4, 4.6])
+def teleop_center(sp: Sprite, v: int):
+    """화면이 가득 보이는 조종실 모듈과 하늘을 향한 큰 접시 안테나."""
+    sp.contact_shadow(0, 0, 4.2, 3.2, 0.45)
+    sp.box(-3.9, -2.9, 0, 7.8, 5.8, 0.15, SINTER)
+    band = (TEAL, TEAL, ORANGE, BLUE, TEAL)[v]
+    dish_left = v == 3
+    dx, dy = (2.4, -1.3) if not dish_left else (-2.6, -1.6)
+    # 큰 접시 (뒤)
+    def dish():
+        sp.box(dx - 0.5, dy - 0.5, 0.15, 1.0, 1.0, 0.5, CONCRETE)
+        sp.cyl((dx, dy, 0.65), (dx, dy, 2.6), 0.22, STEEL)
+        sp.box(dx - 0.3, dy - 0.3, 2.3, 0.6, 0.6, 0.45, DARK)
+        sp.cyl((dx, dy, 2.75), (dx, dy, 3.2), 0.15, STEEL, edge=False)
+        c = (dx, dy, 3.25)
+        n = norm((0.35, 0.55, 0.75))
+        r = 1.45 if v != 4 else 1.25
+        sp.disc(c, n, r, WHITE, back=STEEL, seg=40)
+        sp.ring3(c, r, "#b9b2a5", 0.09, normal=n, front_only=False)
+        sp.ring3(c, r * 0.6, "#d8d2c6", 0.05, normal=n, front_only=False)
+        feed = add(c, mul(n, 1.0))
+        u, w = basis(n)
+        for a in (0, 120, 240):
+            rim = add(c, add(mul(u, r * 0.9 * math.cos(math.radians(a))), mul(w, r * 0.9 * math.sin(math.radians(a)))))
+            sp.line(rim, feed, 0.05, "#8a9099")
+        sp.sphere(feed, 0.16, GOLD)
+    if not dish_left:
+        dish()
+    x0, x1, y0, y1, z0, z1 = -3.5, 1.2, -2.4, 1.6, 0.15, 2.9
+    if dish_left:
+        x0, x1 = -1.6, 3.3
+        dish()
+    sp.box(x0, y0, z0, x1 - x0, y1 - y0, z1 - z0, WHITE, top=SILVER)
+    f = Sprite.box_faces(x0, y0, z0, x1 - x0, y1 - y0, z1 - z0)
+    band_on(sp, f["left"], 0.86, 0.94, band)
+    band_on(sp, f["right"], 0.86, 0.94, band)
+    # 큰 창 안의 화면들
+    scr = ("#7FE3DA", "#9BEA7A", "#7fb6ff", "#FFC56E")
+    o, e1, e2 = f["left"]
+    sp.window(sp.on_face(o, e1, e2, 0.05, 0.3, 0.72, 0.78), "#4a6a80", frame="#2a2f36", glass=Mat("#1a2530", 0.8),
+              light_alpha=0.6)
+    cols = 6 if v != 1 else 5
+    for r in range(2):
+        for k in range(cols):
+            u0 = 0.08 + k * (0.61 / cols)
+            v0 = 0.36 + r * 0.2
+            c = scr[(k + r * 2 + v) % 4]
+            sp.window(sp.on_face(o, e1, e2, u0, v0, u0 + 0.61 / cols - 0.02, v0 + 0.15), c, frame="#1a1d22",
+                      glass=Mat(c, 0.3), light_alpha=0.9)
+    door(sp, f["left"], 0.78, 0.92, 0.7, Mat("#8C939C", 0.3))
+    o, e1, e2 = f["right"]
+    sp.window(sp.on_face(o, e1, e2, 0.1, 0.35, 0.9, 0.75), "#4a6a80", frame="#2a2f36", glass=Mat("#1a2530", 0.8),
+              light_alpha=0.6)
+    for k in range(4):
+        u0 = 0.14 + k * 0.19
+        c = scr[(k + 1 + v) % 4]
+        sp.window(sp.on_face(o, e1, e2, u0, 0.42, u0 + 0.16, 0.66), c, frame="#1a1d22", glass=Mat(c, 0.3),
+                  light_alpha=0.9)
+    # 지붕 장비
+    sp.box(x0 + 0.4, y0 + 0.4, z1, 1.2, 1.0, 0.45, STEEL)
+    antenna(sp, (x0 + 2.4, y0 + 0.5, z1), 1.5)
+    if v in (2, 4):
+        o2, a2, b2 = (x0 + 0.3, y0 + 1.7, z1 + 0.2), (2.6, 0, 0), (0, 1.8, 0.3)
+        sp.quad(o2, a2, b2, SOLAR, back=STEEL)
+        sp.panel_grid(o2, a2, b2, 4, 2, "#6f86b0", 0.45, 0.6)
+    if v == 1:
+        sp.disc((x1 - 0.6, y1 - 0.6, z1 + 0.7), norm((0.3, 0.6, 0.75)), 0.5, WHITE, back=STEEL)
+        sp.line((x1 - 0.6, y1 - 0.6, z1), (x1 - 0.6, y1 - 0.6, z1 + 0.68), 0.06, "#8a9099")
+    sp.lamp((x1, y1 + 0.1, 2.5), AMBER, 8)
+
+
+@typed("robot_depot", 14, 10, 6.0, "대형 정비 기지", heights=[6.0, 6.0, 6.0, 6.0, 6.4])
+def robot_depot(sp: Sprite, v: int):
+    """큰 정비동의 열린 칸마다 로봇, 앞마당의 문형 크레인, 밖에 선 부품 선반."""
+    sp.contact_shadow(0, 0, 7.2, 5.2, 0.5)
+    sp.box(-6.8, -4.8, 0, 13.6, 9.6, 0.15, SINTER)
+    band = (ORANGE, ORANGE, YELLOW, TEAL, ORANGE)[v]
+    hall = Mat("#DAD3C4")
+    x0, x1, y0, y1, h = -6.4, 2.6, -4.4, 0.8, 4.4
+    sp.box(x0, y0, 0.15, x1 - x0, y1 - y0, h - 0.15, hall, top=SILVER)
+    f = Sprite.box_faces(x0, y0, 0.15, x1 - x0, y1 - y0, h - 0.15)
+    band_on(sp, f["left"], 0.88, 0.95, band)
+    band_on(sp, f["right"], 0.88, 0.95, band)
+    o, e1, e2 = f["left"]
+    nb = 3 if v != 2 else 4
+    bays = []
+    for k in range(nb):
+        u0 = 0.05 + k * (0.92 / nb)
+        u1 = u0 + 0.92 / nb - 0.05
+        pts = sp.on_face(o, e1, e2, u0, 0.0, u1, 0.62)
+        sp.face(pts, CHAR, normal=(0, 1, 0), ao=0)
+        sp.light_poly([add(p, (0, 0.02, 0)) for p in pts], "#ffcf8a", 0.5)
+        sp.stripes(add(sp.on_face(o, e1, e2, u0, 0.62, u1, 0.7)[0], (0, 0.01, 0)), mul(e1, u1 - u0), (0, 0, 0.3), n=8,
+                   normal=(0, 1, 0))
+        bays.append((x1 - (x1 - x0) * (u0 + u1) / 2))
+    # 칸 안의 로봇 (문 바로 안쪽)
+    for k, bx in enumerate(bays):
+        if (k + v) % 4 == 3:
+            continue
+        _rover(sp, bx, y1 - 0.75, 1.0, WHITE, (ORANGE, TEAL, YELLOW)[k % 3])
+    o, e1, e2 = f["right"]
+    windows_row(sp, f["right"], 3, 0.45, 0.65, 0.12, 0.08)
+    door(sp, f["right"], 0.08, 0.22, 0.5, Mat("#8C939C", 0.3))
+    # 지붕 장비
+    if v in (1, 4):
+        for k in range(3):
+            o2, a2, b2 = (x0 + 0.6 + k * 2.6, y0 + 0.6, h + 0.2), (2.2, 0, 0), (0, 3.6, 0.6)
+            sp.quad(o2, a2, b2, SOLAR, back=STEEL)
+            sp.panel_grid(o2, a2, b2, 3, 4, "#6f86b0", 0.45, 0.6)
+    else:
+        sp.box(x0 + 1.0, y0 + 1.0, h, 2.0, 1.6, 0.6, STEEL)
+        sp.box(x0 + 4.0, y0 + 1.0, h, 1.2, 1.2, 0.4, STEEL)
+    if v == 4:
+        antenna(sp, (x1 - 0.6, y0 + 0.6, h), 1.8)
+    # 앞마당 크레인: 레일 둘, 다리 넷, 다리보, 매단 로봇
+    gx = (-2.2, -2.2, -3.6, -0.6, -2.2)[v]
+    ry0, ry1 = 1.3, 4.3
+    for ry in (ry0, ry1):
+        sp.box(-6.4, ry - 0.12, 0.15, 9.0, 0.24, 0.12, STEEL)
+    for ry in (ry0,):
+        for lx in (gx - 1.0, gx + 1.0):
+            sp.box(lx - 0.18, ry - 0.18, 0.27, 0.36, 0.36, 5.2, YELLOW)
+    for lx in (gx - 1.0, gx + 1.0):
+        sp.box(lx - 0.22, ry0 - 0.3, 5.45, 0.44, ry1 - ry0 + 0.6, 0.5, YELLOW, top=Mat("#F0D27A"))
+    sp.box(gx - 1.1, 2.35, 5.5, 2.2, 0.9, 0.55, ORANGE, top=Mat("#E9965E"))
+    sp.box(gx - 0.4, 2.45, 5.05, 0.8, 0.7, 0.45, DARK)
+    lift = (1.4, 1.4, 0.0, 2.2, 1.4)[v]
+    sp.line((gx, 2.8, 5.0), (gx, 2.8, lift + 1.4), 0.05, "#9aa1aa")
+    for dxx in (-0.5, 0.5):
+        sp.line((gx, 2.8, lift + 1.4), (gx + dxx, 2.8, lift + 0.9), 0.04, "#9aa1aa")
+    _rover(sp, gx, 2.8, 1.1, WHITE, ORANGE, z=lift)
+    for lx in (gx - 1.0, gx + 1.0):
+        sp.box(lx - 0.18, ry1 - 0.18, 0.27, 0.36, 0.36, 5.2, YELLOW)
+    sp.lamp((gx + 1.0, ry1, 5.7), AMBER, 10)
+    # 부품 선반 (밖, 오른쪽)
+    for (rx, ry) in ((4.2, -3.6), (4.2, -0.6)) if v != 3 else ((4.2, -3.6),):
+        for (px, py) in ((rx, ry), (rx + 2.2, ry)):
+            sp.line((px, py, 0.15), (px, py, 2.6), 0.08, "#7d848d")
+        for z in (0.5, 1.4, 2.3):
+            sp.box(rx, ry, z, 2.2, 1.0, 0.08, Mat("#8C939C", 0.3))
+        for k in range(3):
+            crate(sp, rx + 0.15 + k * 0.7, ry + 0.2, 0.55, (ORANGE, Mat("#C9A23A"), STEEL)[(k + v) % 3], 0.58)
+        sp.cyl((rx + 0.6, ry + 0.1, 1.85), (rx + 0.6, ry + 0.4, 1.85), 0.35, TRACK, cap_mat=STEEL)
+        sp.cyl((rx + 1.5, ry + 0.1, 1.85), (rx + 1.5, ry + 0.4, 1.85), 0.35, TRACK, cap_mat=STEEL)
+        sp.box(rx + 0.2, ry + 0.2, 2.38, 1.8, 0.6, 0.3, WHITE)
+        for (px, py) in ((rx, ry + 1.0), (rx + 2.2, ry + 1.0)):
+            sp.line((px, py, 0.15), (px, py, 2.6), 0.08, "#7d848d")
+    if v == 3:
+        _rover(sp, 5.2, 0.4, 1.0, WHITE, TEAL)
+    sp.lamp((x1 + 0.1, y1 + 0.1, 4.0), AMBER, 10)
+    sp.lamp((6.5, 3.6, 1.4), AMBER, 9)
+
+
+# ── 추진제 계열 ──────────────────────────────────────────────────────
+
+def _frost_pipe(sp: Sprite, pts, w=0.2):
+    """서리 앉은 극저온 관."""
+    sp.polyline3(pts, "#9fb4c0", w + 0.1)
+    sp.polyline3(pts, "#eef4f7", w)
+
+
+@typed("liquefier", 6, 5, 5.0, "소형 액화기", heights=[5.0, 5.0, 5.0, 5.0, 5.2])
+def liquefier(sp: Sprite, v: int):
+    """작은 냉각 상자: 위에 극저온 냉동기와 방열판, 서리가 앉은 탱크 하나."""
+    sp.contact_shadow(0, 0, 3.2, 2.7, 0.5)
+    _pad(sp, 6, 5)
+    band = (BLUE, BLUE, Mat("#D9893F", 0.1), BLUE, TEAL)[v]
+    # 냉각 상자
+    x0, y0, x1, y1, h = -2.5, -2.0, 0.1, 0.5, 3.7
+    sp.box(x0, y0, 0.3, x1 - x0, y1 - y0, h, WHITE, top=SILVER)
+    f = Sprite.box_faces(x0, y0, 0.3, x1 - x0, y1 - y0, h)
+    band_on(sp, f["left"], 0.84, 0.92, band)
+    band_on(sp, f["right"], 0.84, 0.92, band)
+    band_on(sp, f["left"], 0.0, 0.16, FROST)
+    band_on(sp, f["right"], 0.0, 0.16, FROST)
+    sp.panel_grid(*f["left"], 3, 1, "#c9c3b6", 0.45, 0.8)
+    sp.window(sp.on_face(*f["left"], 0.6, 0.5, 0.88, 0.66), "#9fd8ff")
+    o, e1, e2 = f["right"]
+    sp.face(sp.on_face(o, e1, e2, 0.2, 0.25, 0.8, 0.55), STEEL, normal=(1, 0, 0), ao=0)
+    for k in range(3):
+        sp.face(sp.on_face(o, e1, e2, 0.28, 0.3 + k * 0.08, 0.72, 0.33 + k * 0.08), DARK, normal=(1, 0, 0), ao=0, edge=False)
+    # 위: 냉동기 머리와 방열판
+    zt = 0.3 + h
+    rad = (-2.35, -1.95) if v != 3 else (-2.35, 0.35)
+    o2, a2, b2 = (rad[0], rad[1], zt), (2.2, 0, 0), (0, 0, 1.15)
+    sp.quad(o2, a2, b2, RADIATOR, back=RADIATOR)
+    sp.panel_grid(o2, a2, b2, 6, 1, "#b9bec4", 0.5, 0.7)
+    heads = [(-1.6, -0.6)] if v != 4 else [(-1.9, -0.4), (-0.8, -0.4)]
+    for (hx, hy) in heads:
+        sp.cyl((hx, hy, zt), (hx, hy, zt + 0.35), 0.45, STEEL, cap_mat=DARK)
+        sp.cyl((hx, hy, zt + 0.35), (hx, hy, zt + 0.95), 0.25, SILVER, bands=[0.25, 0.5, 0.75], band_color="#7d848d")
+    sp.box(-0.7, -1.7, zt, 0.7, 0.9, 0.5, STEEL)
+    # 서리 앉은 탱크
+    tx, ty = 1.6, 0.6
+    sp.ellipsoid((tx, ty, 0.3), 1.1, 1.0, 0.12, ICE, clip_z=0.3)
+    if v == 1:
+        legs(sp, [(tx - 0.6, ty - 0.6, 1.4), (tx + 0.6, ty - 0.6, 1.4), (tx - 0.6, ty + 0.6, 1.4), (tx + 0.6, ty + 0.6, 1.4)], 0.3)
+        sp.sphere((tx, ty, 2.0), 0.95, FROST)
+        sp.ring3((tx, ty, 2.0), 0.96, "#3E6FB0", 0.1)
+        top_z = 2.95
+    else:
+        _vtank(sp, tx, ty, 0.3, 2.3, 0.8, FROST, bands=[0.33, 0.66], band_color="#b5c6cf")
+        cyl_ring(sp, (tx, ty, 0.3), (tx, ty, 2.6), 0.8, 0.8, 0.88, band)
+        top_z = 3.1
+    _frost_pipe(sp, [(x1, -0.4, 1.5), (tx, -0.4, 1.5), (tx, ty - 0.6, 1.5)], 0.18)
+    _frost_pipe(sp, [(x1, 0.2, 2.6), (tx - 0.4, 0.2, top_z - 0.1)], 0.14)
+    sp.ellipsoid((tx + 0.3, ty + 0.9, 0.3), 0.5, 0.35, 0.1, ICE, clip_z=0.3)
+    if v == 2:
+        crate(sp, 1.0, -2.2, 0.7, ORANGE, 0.3)
+    sp.lamp((x1 + 0.05, y1 + 0.05, 3.6), CYAN_LIGHT, 8)
+    sp.lamp((tx, ty, top_z + 0.2), "#ff5a3c", 6)
+
+
+@typed("large_propellant_plant", 14, 10, 11.0, "대형 추진제 공장", heights=[11.0, 11.0, 10.4, 11.0, 11.4])
+def large_propellant_plant(sp: Sprite, v: int):
+    """키 큰 탱크 여럿, 액화 탑, 관 걸이 — 산소·수소를 대량으로 만들어 얼린다."""
+    sp.contact_shadow(0, 0, 7.4, 5.2, 0.5)
+    _pad(sp, 14, 10)
+    lox, lh2 = FROST, FOAM
+    tanks = ((-5.6, lox, 8.4), (-3.2, lox, 8.8), (-0.8, lh2, 9.2), (1.6, lh2, 8.0))
+    if v == 1:
+        tanks = ((-5.6, lh2, 8.0), (-3.2, lox, 9.2), (-0.8, lox, 9.2), (1.6, lh2, 8.4))
+    ty, tr = -3.25, 1.15
+    tower_x = 4.6 if v != 3 else -6.0
+    # 액화 탑 (뒤 왼쪽 판이면 먼저)
+    def tower():
+        tx = tower_x
+        sp.box(tx - 0.9, -3.9, 0.3, 1.8, 1.8, 9.6, WHITE, top=SILVER)
+        f = Sprite.box_faces(tx - 0.9, -3.9, 0.3, 1.8, 1.8, 9.6)
+        for vv in (0.3, 0.62, 0.9):
+            band_on(sp, f["left"], vv, vv + 0.03, BLUE)
+            band_on(sp, f["right"], vv, vv + 0.03, BLUE)
+        sp.panel_grid(*f["left"], 2, 10, "#c9c3b6", 0.45, 0.8)
+        sp.window(sp.on_face(*f["left"], 0.25, 0.08, 0.75, 0.14), "#9fd8ff")
+        sp.cyl((tx, -3.0, 9.9), (tx, -3.0, 10.5), 0.5, STEEL, cap_mat=DARK)
+        sp.cyl((tx, -3.0, 10.5), (tx, -3.0, 11.0), 0.28, SILVER, bands=[0.5])
+        o2, a2, b2 = (tx + 0.9, -3.8, 6.0), (0, 1.6, 0), (1.2, 0, 3.4)
+        if tx + 2.1 <= 6.9:
+            sp.quad(o2, a2, b2, RADIATOR, back=RADIATOR)
+            sp.panel_grid(o2, a2, b2, 1, 6, "#b9bec4", 0.5, 0.7)
+        sp.lamp((tx, -3.0, 11.15), "#ff5a3c", 7)
+    if tower_x < 0:
+        tower()
+    for (x, m, h) in tanks:
+        if v == 2 and x == 1.6:
+            legs(sp, [(x - 0.8, ty - 0.8, 2.0), (x + 0.8, ty - 0.8, 2.0), (x - 0.8, ty + 0.8, 2.0), (x + 0.8, ty + 0.8, 2.0)], 0.3)
+            sp.sphere((x, ty, 2.8), 1.3, m)
+            sp.ring3((x, ty, 2.8), 1.31, "#a45a1c", 0.08)
+            continue
+        sp.cyl((x, ty, 0.3), (x, ty, h), tr, m, bands=[0.2, 0.4, 0.6, 0.8],
+               band_color="#b5c6cf" if m is lox else "#a45a1c")
+        sp.sphere((x, ty, h), tr, m, clip_z=h)
+    if tower_x > 0:
+        tower()
+    # 관 걸이 (세 줄)
+    py = -0.9
+    for x in (-6.2, -3.8, -1.4, 1.0, 3.4):
+        for yy in (py - 0.35, py + 0.35):
+            sp.line((x, yy, 0.3), (x, yy, 2.6), 0.1, "#7d848d")
+        sp.line((x, py - 0.4, 2.6), (x, py + 0.4, 2.6), 0.12, "#7d848d")
+    for k, (col, w) in enumerate((("#eef4f7", 0.22), ("#7fb6ff", 0.18), ("#e0a060", 0.18))):
+        yy = py - 0.25 + k * 0.25
+        pipe(sp, [(-6.4, yy, 2.75), (5.4, yy, 2.75)], w, col)
+    for (x, m, h) in tanks:
+        pipe(sp, [(x, ty + tr, 1.4), (x, py - 0.25, 1.4), (x, py - 0.25, 2.65)], 0.14,
+             "#eef4f7" if m is lox else "#e0a060")
+    # 앞: 처리동, 방열판, 조종함
+    sp.box(-6.4, 1.0, 0.3, 4.8, 3.2, 2.8, WHITE, top=SILVER)
+    f = Sprite.box_faces(-6.4, 1.0, 0.3, 4.8, 3.2, 2.8)
+    band_on(sp, f["left"], 0.82, 0.9, BLUE)
+    windows_row(sp, f["left"], 4, 0.4, 0.64, 0.08, 0.06)
+    door(sp, f["right"], 0.35, 0.7, 0.7)
+    for k, yy in enumerate((1.5, 3.0) if v != 3 else (1.5, 2.6, 3.7)):
+        o, e1, e2 = (-0.6, yy, 0.3), (4.8, 0, 0), (0, 0, 2.6)
+        sp.line((-0.5, yy, 0.3), (-0.5, yy, 2.9), 0.1, "#7d848d")
+        sp.quad(o, e1, e2, RADIATOR, back=RADIATOR)
+        sp.panel_grid(o, e1, e2, 8, 1, "#b9bec4", 0.5, 0.7)
+    if v == 4:
+        sp.cyl((5.8, 3.4, 0.3), (5.8, 3.4, 6.0), 0.18, STEEL)
+        sp.lamp((5.8, 3.4, 6.2), "#ff5a3c", 6)
+    sp.box(5.0, 1.6, 0.3, 1.4, 1.2, 1.6, WHITE, top=SILVER)
+    sp.window(sp.on_face(*Sprite.box_faces(5.0, 1.6, 0.3, 1.4, 1.2, 1.6)["left"], 0.2, 0.45, 0.8, 0.75), "#9fd8ff")
+    sp.lamp((-3.2, ty, 9.0 if v != 1 else 9.4), "#ff5a3c", 6)
+    sp.lamp((6.4, 4.4, 1.2), AMBER, 9)
+    sp.lamp((-1.6, 4.3, 2.6), AMBER, 9)
+
+
+@typed("boiloff_depot", 10, 8, 7.0, "무증발 저장소", heights=[7.0, 7.0, 6.6, 7.0, 7.0])
+def boiloff_depot(sp: Sprite, v: int):
+    """받침 위에 누운 아주 큰 흰 단열 탱크 하나, 위에 햇빛 가림막, 끝에 극저온 냉동기."""
+    sp.contact_shadow(0, 0, 5.3, 4.2, 0.5)
+    sp.box(-4.8, -3.8, 0, 9.6, 7.6, 0.2, CONCRETE)
+    shield = (Mat("#D9B45A", 0.5), Mat("#D9B45A", 0.5), SILVER, Mat("#D9B45A", 0.5), Mat("#C9CED4", 0.4))[v]
+    band = (BLUE, Mat("#D9893F", 0.1), BLUE, BLUE, TEAL)[v]
+    r = 2.15
+    cz = 0.25 + r + 0.35
+    xa, xb = -2.4, 1.6
+    # 받침 (뒤 반은 탱크에 가린다)
+    for x in (-2.0, 0.0, 2.0) if v != 2 else (-1.6, 1.6):
+        sp.box(x - 0.35, -1.7, 0.2, 0.7, 3.4, 1.1, CONCRETE, top=Mat("#b3a690"))
+    sp.ellipsoid((xa, 0, cz), 1.25, r, r, WHITE)
+    sp.cyl((xa, 0, cz), (xb, 0, cz), r, WHITE, bands=[0.25, 0.5, 0.75], band_color="#c9c3b6", caps=False)
+    cyl_ring(sp, (xa, 0, cz), (xb, 0, cz), r, 0.1, 0.16, band)
+    sp.ellipsoid((xb, 0, cz), 1.25, r, r, WHITE)
+    sp.ring3((xb + 0.02, 0, cz), r * 0.98, "#c9c3b6", 0.06, normal=(1, 0, 0))
+    # 냉동기 + 방열판 (끝)
+    cx0 = xb + 1.35
+    sp.box(cx0, -1.9, 0.2, 1.0, 1.2, 1.5, STEEL, top=SILVER)
+    sp.window(sp.on_face(*Sprite.box_faces(cx0, -1.9, 0.2, 1.0, 1.2, 1.5)["right"], 0.2, 0.5, 0.8, 0.75), "#9fd8ff")
+    _frost_pipe(sp, [(xb + 0.9, -0.9, cz - 0.6), (cx0 + 0.5, -1.3, 1.7)], 0.16)
+    if v != 3:
+        o, e1, e2 = (cx0 + 0.1, 0.2, 0.2), (0, 2.6, 0), (0, 0, 2.6)
+    else:
+        o, e1, e2 = (-4.6, 2.9, 0.2), (3.0, 0, 0), (0, 0, 2.4)
+    sp.quad(o, e1, e2, RADIATOR, back=RADIATOR)
+    sp.panel_grid(o, e1, e2, 6, 1, "#b9bec4", 0.5, 0.7)
+    # 햇빛 가림막: 해 쪽(+y)이 낮게 기울인 판, 기둥 넷
+    zb, zf = (6.9, 5.9) if v != 4 else (6.4, 6.4)
+    post_pts = [(-4.4, -3.0), (3.6, -3.0), (-4.4, 3.0), (3.6, 3.0)]
+    for (x, y) in post_pts[:2]:
+        sp.line((x, y, 0.2), (x, y, zb), 0.12, "#8a9099")
+    o, e1, e2 = (-4.6, -3.2, zb), (8.4, 0, 0), (0, 6.4, zf - zb)
+    sp.quad(o, e1, e2, shield, back=Mat("#8a7a52", 0.3) if shield is not SILVER else STEEL)
+    sp.panel_grid(o, e1, e2, 6, 4, "#a8853a" if shield is not SILVER else "#8a9099", 0.5, 0.8)
+    for (x, y) in post_pts[2:]:
+        sp.line((x, y, 0.2), (x, y, zf), 0.12, "#8a9099")
+    sp.lamp((3.6, 3.0, zf + 0.2), AMBER, 9)
+    sp.lamp((-4.4, 3.0, zf + 0.2), AMBER, 9)
+    if v == 1:
+        antenna(sp, (cx0 + 0.5, -1.3, 1.7), 1.4)
+
+
+@typed("launch_fueler", 7, 7, 14.0, "발사대 급유탑", heights=[14.0, 14.0, 13.0, 14.0, 14.0])
+def launch_fueler(sp: Sprite, v: int):
+    """높은 붉은 격자 정비탑: 연료 팔과 늘어진 탯줄 호스, 밑동에 작은 탱크들."""
+    sp.contact_shadow(-0.3, -0.3, 3.6, 3.6, 0.5)
+    sp.box(-3.4, -3.4, 0, 6.8, 6.8, 0.3, CONCRETE, top=Mat("#b3a690"))
+    sp.stripes((3.4, 3.4, 0.3), (-6.8, 0, 0), (0, -0.35, 0), n=16, normal=(0, 0, 1))
+    red = "#C9553A"
+    cx, cy, hw = -1.6, -1.6, 0.9
+    H = 13.2 if v != 2 else 12.2
+    # 뒤 기둥
+    for (x, y) in ((cx - hw, cy - hw), (cx + hw, cy - hw), (cx - hw, cy + hw)):
+        sp.line((x, y, 0.3), (x, y, H), 0.16, red)
+    # 탑 안: 승강기와 관
+    sp.box(cx - 0.45, cy - 0.45, 4.6 if v != 3 else 8.0, 0.9, 0.9, 1.3, WHITE, top=SILVER)
+    pipe(sp, [(cx + 0.3, cy + 0.6, 0.3), (cx + 0.3, cy + 0.6, H - 2.4)], 0.16, "#eef4f7")
+    pipe(sp, [(cx + 0.6, cy + 0.3, 0.3), (cx + 0.6, cy + 0.3, H - 2.4)], 0.16, "#e0a060")
+    # 발판 층
+    for z in [z for z in (3.3, 6.3, 9.3, 12.3) if z < H - 0.5] + [H]:
+        sp.box(cx - hw - 0.15, cy - hw - 0.15, z, 2 * hw + 0.3, 2 * hw + 0.3, 0.15, Mat("#8C939C", 0.3))
+    # 앞 기둥과 가새 (보이는 두 면)
+    sp.line((cx + hw, cy + hw, 0.3), (cx + hw, cy + hw, H), 0.16, red)
+    n = int(H / 1.5)
+    for k in range(n):
+        za, zb = 0.3 + k * (H - 0.3) / n, 0.3 + (k + 1) * (H - 0.3) / n
+        if k % 2 == 0:
+            sp.line((cx + hw, cy - hw, za), (cx + hw, cy + hw, zb), 0.08, red)
+            sp.line((cx - hw, cy + hw, za), (cx + hw, cy + hw, zb), 0.08, red)
+        else:
+            sp.line((cx + hw, cy + hw, za), (cx + hw, cy - hw, zb), 0.08, red)
+            sp.line((cx + hw, cy + hw, za), (cx - hw, cy + hw, zb), 0.08, red)
+    # 꼭대기
+    sp.box(cx - 0.5, cy - 0.5, H + 0.15, 1.0, 1.0, 0.5, WHITE, top=SILVER)
+    antenna(sp, (cx, cy, H + 0.65), 0.6)
+    # 연료 팔 (붐) 과 늘어진 탯줄 호스
+    arm_list = [((10.4, 3.4), (1, 0, 0))]
+    if v in (1, 4):
+        arm_list.append(((6.9, 2.8), (1, 0, 0)))
+    if v == 3:
+        arm_list = [((10.4, 3.2), (0, 1, 0))]
+    if v == 2:
+        arm_list = [((9.4, 3.0), (1, 0, 0))]
+    for (z, L), d in arm_list:
+        p0 = (cx + hw * d[0], cy + hw * d[1], z)
+        p1 = add(p0, mul(d, L))
+        sp.truss(p0, p1, 0.55, red, 0.08, 6, side=(0, 0, 1))
+        sp.box(p1[0] - 0.3, p1[1] - 0.3, z - 0.75, 0.6, 0.6, 0.5, DARK)
+        for k, col in enumerate(("#eef4f7", "#2a2d33")):
+            off = (-0.15 + 0.3 * k) * (1 - abs(d[0])), (-0.15 + 0.3 * k) * (1 - abs(d[1]))
+            a0 = add(p0, add(mul(d, 0.6), (off[1], off[0], -0.25)))
+            a1 = add(p1, (off[1], off[0], -0.75))
+            pts = []
+            for i in range(11):
+                t = i / 10
+                q = add(a0, mul(sub(a1, a0), t))
+                pts.append((q[0], q[1], q[2] - 1.8 * math.sin(math.pi * t)))
+            sp.polyline3(pts, col, 0.13)
+            sp.polyline3([a1, add(a1, (0, 0, -1.2))], col, 0.13)
+        sp.lamp((p1[0], p1[1], z + 0.35), "#ff5a3c", 6)
+    # 밑동 탱크
+    if v != 4:
+        legs(sp, [(1.2, -2.6, 1.0), (2.4, -2.6, 1.0), (1.2, -1.4, 1.0), (2.4, -1.4, 1.0)], 0.3)
+        sp.sphere((1.8, -2.0, 1.6), 0.85, FROST)
+        sp.ring3((1.8, -2.0, 1.6), 0.86, "#3E6FB0", 0.1)
+        legs(sp, [(-2.6, 1.2, 1.0), (-1.4, 1.2, 1.0), (-2.6, 2.4, 1.0), (-1.4, 2.4, 1.0)], 0.3)
+        sp.sphere((-2.0, 1.8, 1.6), 0.85, FOAM)
+        sp.ring3((-2.0, 1.8, 1.6), 0.86, "#a45a1c", 0.1)
+    else:
+        sp.cyl((1.8, -2.0, 0.3), (1.8, -2.0, 2.6), 0.75, FROST, bands=[0.5], band_color="#3E6FB0")
+        sp.sphere((1.8, -2.0, 2.6), 0.75, FROST, clip_z=2.6)
+        sp.cyl((-2.0, 1.8, 0.3), (-2.0, 1.8, 2.2), 0.75, FOAM, bands=[0.5], band_color="#a45a1c")
+        sp.sphere((-2.0, 1.8, 2.2), 0.75, FOAM, clip_z=2.2)
+    pipe(sp, [(1.8, -1.2, 0.6), (cx + hw + 0.3, -1.2, 0.6), (cx + hw + 0.3, cy + 0.6, 0.6)], 0.14, "#eef4f7")
+    pipe(sp, [(-1.2, 1.8, 0.6), (-1.2, cy + hw + 0.3, 0.6), (cx + 0.6, cy + hw + 0.3, 0.6)], 0.14, "#e0a060")
+    sp.box(1.6, 1.4, 0.3, 1.2, 1.0, 1.2, WHITE, top=SILVER)
+    sp.window(sp.on_face(*Sprite.box_faces(1.6, 1.4, 0.3, 1.2, 1.0, 1.2)["left"], 0.2, 0.45, 0.8, 0.75))
+    sp.lamp((cx, cy, H + 1.3), "#ff5a3c", 7)
+    sp.lamp((3.0, 3.0, 0.5), AMBER, 9)
+
+
+# ── 착륙장 계열 ──────────────────────────────────────────────────────
+
+def _berm_arc(sp: Sprite, r_in, r_out, h, gap_deg, gap_w=34.0, front=None, seg=60, mat: Mat = BERM):
+    """한 곳이 트인 둥근 흙 둑 (gap_deg 방향, 폭 gap_w도). front=False면 뒤 반, True면 앞 반."""
+    rm = (r_in + r_out) / 2
+    g = math.radians(gap_deg)
+    half = math.radians(gap_w / 2)
+
+    def in_gap(t):
+        d = (t - g + math.pi) % (2 * math.pi) - math.pi
+        return abs(d) < half
+
+    def P3(r, t, z):
+        return (r * math.cos(t), r * math.sin(t), z)
+    items = []
+    for i in range(seg):
+        t0, t1 = 2 * math.pi * i / seg, 2 * math.pi * (i + 1) / seg
+        if in_gap((t0 + t1) / 2):
+            continue
+        items.append((dot((math.cos((t0 + t1) / 2), math.sin((t0 + t1) / 2), 0.0), VIEW), t0, t1))
+    # 트인 자리의 두 끝면
+    caps = []
+    for t, sgn in ((g - half, -1), (g + half, 1)):
+        caps.append((dot((math.cos(t), math.sin(t), 0.0), VIEW), t, sgn))
+    for key, t0, t1 in sorted(items):
+        is_front = key > 0
+        if front is not None and is_front != front:
+            continue
+        o0, o1 = P3(r_out, t0, 0), P3(r_out, t1, 0)
+        m0, m1 = P3(rm, t0, h), P3(rm, t1, h)
+        i0, i1 = P3(r_in, t0, 0), P3(r_in, t1, 0)
+        sp.face([o0, o1, m1, m0], mat, edge=False, ao=0.0)
+        sp.face([i1, i0, m0, m1], mat, edge=False, ao=0.0)
+    for key, t, sgn in caps:
+        if front is not None and (key > 0) != front:
+            continue
+        tri = [P3(r_out, t, 0), P3(rm, t, h), P3(r_in, t, 0)]
+        if sgn < 0:
+            tri = tri[::-1]
+        sp.face(tri, Mat("#6a645e"), edge=False, ao=0.0)
+
+
+def _arc_line(sp: Sprite, r, z, gap_deg, gap_w, color, w=0.06, seg=72):
+    g = math.radians(gap_deg)
+    half = math.radians(gap_w / 2)
+    run = []
+    for i in range(seg + 1):
+        t = 2 * math.pi * i / seg
+        d = (t - g + math.pi) % (2 * math.pi) - math.pi
+        vis = dot((math.cos(t), math.sin(t), 0.0), VIEW) > -0.05
+        if abs(d) >= half and vis:
+            run.append((r * math.cos(t), r * math.sin(t), z))
+        elif run:
+            if len(run) > 1:
+                sp.polyline3(run, color, w, 0.8)
+            run = []
+    if len(run) > 1:
+        sp.polyline3(run, color, w, 0.8)
+
+
+@typed("sintered_pad", 30, 30, 0.6, "소결 착륙장", heights=[0.6, 0.6, 0.6, 0.6, 0.6])
+def sintered_pad(sp: Sprite, v: int):
+    """마이크로파로 구워 유리처럼 매끈하고 어두운 둥근 착륙장: 동심원 줄과 가장자리 등."""
+    r = 14.0
+    glassy = Mat("#3A3634", 0.6)
+    sp.cyl((0, 0, 0), (0, 0, 0.35), r + 0.5, Mat("#7a6e60"), cap_mat=Mat("#8a7c68"))
+    sp.cyl((0, 0, 0.35), (0, 0, 0.42), r, glassy, cap_mat=glassy, edge=False)
+    # 유리질 윤기 (2D만)
+    with sp._nest():
+        c = PV((-4.0, 4.0, 0.42))
+        fill = sp.radial([(0, "#ffffff", 0.16), (0.5, "#cfd8e0", 0.06), (1, "#cfd8e0", 0.0)], c[0], c[1], r * S * 0.9)
+        sp.poly2([PV((r * 0.97 * math.cos(2 * math.pi * k / 48), r * 0.97 * math.sin(2 * math.pi * k / 48), 0.43))
+                  for k in range(48)], fill)
+    ring_col = "#6b6058" if v != 2 else "#7a6a58"
+    for rr in ((3.5, 7.0, 10.5) if v != 1 else (4.5, 9.0)):
+        sp.ring3((0, 0, 0.44), rr, ring_col, 0.12, front_only=False)
+    if v in (1, 2):
+        for i in range(8 if v == 1 else 12):
+            a = 2 * math.pi * i / (8 if v == 1 else 12)
+            sp.line((3.5 * math.cos(a), 3.5 * math.sin(a), 0.44), (r * 0.98 * math.cos(a), r * 0.98 * math.sin(a), 0.44),
+                    0.08, ring_col)
+    # 가운데 표시
+    if v == 3:
+        sp.line((-2.2, 0, 0.45), (2.2, 0, 0.45), 0.45, "#E9C24A")
+        sp.line((0, -2.2, 0.45), (0, 2.2, 0.45), 0.45, "#E9C24A")
+        sp.ring3((0, 0, 0.45), 3.0, "#E9C24A", 0.25, front_only=False)
+    else:
+        sp.ring3((0, 0, 0.45), 2.6, "#E9C24A" if v != 1 else "#ECE7DC", 0.4, front_only=False)
+        sp.disc((0, 0, 0.45), (0, 0, 1), 0.7, Mat("#E9C24A") if v != 1 else Mat("#ECE7DC"))
+    sp.ring3((0, 0, 0.44), r - 0.25, "#8a7c68", 0.18, front_only=False)
+    # 가장자리 등
+    light = CYAN_LIGHT if v in (0, 2, 3) else AMBER
+    n = 24 if v != 2 else 32
+    for i in range(n):
+        a = 2 * math.pi * i / n
+        sp.lamp((r * 0.985 * math.cos(a), r * 0.985 * math.sin(a), 0.5), light, 8)
+    if v == 4:
+        # 모서리로 나가는 유도로
+        for k in range(6):
+            t = k / 5
+            p = (r * 0.72 + t * 4.2, r * 0.72 + t * 4.2, 0.44 if t < 0.3 else 0.05)
+        sp.face([(9.6, 10.6, 0.06), (10.6, 9.6, 0.06), (14.6, 13.6, 0.06), (13.6, 14.6, 0.06)], glassy, normal=(0, 0, 1), ao=0)
+        sp.line((10.1, 10.1, 0.08), (14.1, 14.1, 0.08), 0.12, "#E9C24A")
+    for (x, y) in ((13.4, -13.4), (-13.4, 13.4)):
+        sp.box(x - 0.3, y - 0.3, 0, 0.6, 0.6, 0.4, CONCRETE)
+        _mast(sp, x, y, 2.2, AMBER, 16, z=0.4)
+
+
+@typed("bermed_pad", 34, 34, 3.0, "방벽 착륙장", heights=[3.0, 3.0, 3.0, 3.0, 3.0])
+def bermed_pad(sp: Sprite, v: int):
+    """높은 레골리스 둑을 둘러친 착륙장 — 둑 한 곳만 트여 드나든다."""
+    gap = (45.0, 0.0, 90.0, 45.0, 20.0)[v]
+    gw = (34.0, 30.0, 30.0, 42.0, 30.0)[v]
+    r_in, r_out, h = 12.6, 16.6, 3.0
+    _berm_arc(sp, r_in, r_out, h, gap, gw, front=False)
+    sp.face([(12.6 * math.cos(2 * math.pi * k / 64), 12.6 * math.sin(2 * math.pi * k / 64), 0.04) for k in range(64)],
+            SINTER, normal=(0, 0, 1), ao=0)
+    for rr in (4.0, 8.0):
+        sp.ring3((0, 0, 0.05), rr, "#8a7c68", 0.08, front_only=False)
+    # 표시: 노란 고리 + 네모, 트인 자리에서 가운데로 오는 유도선
+    sp.ring3((0, 0, 0.06), 2.6, "#E9C24A", 0.35, front_only=False)
+    q = 1.3
+    sp.polyline3([(-q, -q, 0.06), (q, -q, 0.06), (q, q, 0.06), (-q, q, 0.06)], "#ECE7DC", 0.3, closed=True)
+    g = math.radians(gap)
+    sp.line((3.0 * math.cos(g), 3.0 * math.sin(g), 0.06), (r_out * math.cos(g), r_out * math.sin(g), 0.06), 0.3, "#E9C24A")
+    hw_ = math.radians(gw / 2)
+    sp.face([(r_in * math.cos(g - hw_), r_in * math.sin(g - hw_), 0.04), (r_out * math.cos(g - hw_), r_out * math.sin(g - hw_), 0.04),
+             (r_out * math.cos(g + hw_), r_out * math.sin(g + hw_), 0.04), (r_in * math.cos(g + hw_), r_in * math.sin(g + hw_), 0.04)],
+            SINTER, normal=(0, 0, 1), ao=0)
+    for i in range(12):
+        a = 2 * math.pi * i / 12
+        sp.lamp((r_in * 0.95 * math.cos(a), r_in * 0.95 * math.sin(a), 0.1), AMBER, 8)
+    _berm_arc(sp, r_in, r_out, h, gap, gw, front=True)
+    _arc_line(sp, (r_in + r_out) / 2 - 0.9, h * 0.55, gap, gw, "#5f5953", 0.07)
+    _arc_line(sp, (r_in + r_out) / 2 + 0.9, h * 0.55, gap, gw, "#5f5953", 0.07)
+    # 둑 위 등과 출입구 기둥
+    for i in range(16):
+        a = 2 * math.pi * i / 16
+        d = (a - g + math.pi) % (2 * math.pi) - math.pi
+        if abs(d) > math.radians(gw / 2 + 6):
+            rm = (r_in + r_out) / 2
+            sp.lamp((rm * math.cos(a), rm * math.sin(a), h + 0.15), AMBER if v != 4 else "#ff5a3c", 8)
+    for s in (-1, 1):
+        a = g + s * math.radians(gw / 2 - 4)
+        rr = (r_in + r_out) / 2 + 0.6
+        p = (rr * math.cos(a), rr * math.sin(a), 0)
+        sp.box(p[0] - 0.3, p[1] - 0.3, 0, 0.6, 0.6, 0.5, CONCRETE)
+        _mast(sp, p[0], p[1], 3.6, "#7CF29A" if v != 3 else AMBER, 14, z=0.5)
+
+
+@typed("hopper_pad", 14, 14, 0.8, "호퍼 발착장", heights=[0.8, 0.8, 0.8, 0.8, 0.8])
+def hopper_pad(sp: Sprite, v: int):
+    """작은 팔각 패드: 가운데 H 표시, 모서리에 연료 호스 받침."""
+    R = 5.9
+    octo = [(R * math.cos(math.radians(22.5 + 45 * k)), R * math.sin(math.radians(22.5 + 45 * k))) for k in range(8)]
+    top = Mat("#A89A84") if v != 2 else Mat("#8f8a84")
+    corner = ((5.3, -5.3), (5.3, -5.3), (-5.3, 5.3), (5.3, -5.3), (5.3, 5.3))[v]
+    # 연료 받침 (뒤 모서리면 먼저)
+    def stand():
+        sx, sy = corner
+        tx, ty = sx + 0.9 * (1 if sx > 0 else -1), sy + 0.9 * (1 if sy > 0 else -1)
+        sp.box(tx - 0.55, ty - 0.55, 0, 1.1, 1.1, 0.2, CONCRETE)
+        sp.sphere((tx, ty, 0.85), 0.6, WHITE if v != 4 else FOAM)
+        sp.ring3((tx, ty, 0.85), 0.61, "#d8853b", 0.1)
+        sp.box(sx - 0.35, sy - 0.35, 0, 0.7, 0.7, 1.3, YELLOW, top=Mat("#F0D27A"))
+        sf = Sprite.box_faces(sx - 0.35, sy - 0.35, 0, 0.7, 0.7, 1.3)
+        sp.stripes(sf["left"][0], (-0.7, 0, 0), (0, 0, 0.25), n=4)
+        sp.cyl((sx, sy + 0.35, 1.0), (sx, sy + 0.6, 1.0), 0.32, DARK, cap_mat=STEEL)
+        mid = (sx * 0.85, sy * 0.85)
+        sp.polyline3([(sx, sy + 0.5, 0.75), (sx - 0.1 * sx / abs(sx), sy + 0.7, 0.3), (mid[0], mid[1], 0.4),
+                      (mid[0] * 0.92, mid[1] * 0.92, 0.42)], "#2a2d33", 0.1)
+        sp.lamp((sx, sy, 1.45), AMBER, 8)
+    if corner[0] + corner[1] <= 0:
+        stand()
+    sp.prism(octo, 0, 0.35, CONCRETE, top=top)
+    sp.polyline3([(x * 0.94, y * 0.94, 0.36) for x, y in octo], "#ECE7DC" if v != 3 else "#E9C24A", 0.18, closed=True)
+    sp.ring3((0, 0, 0.36), 3.6, "#E9C24A" if v != 1 else "#ECE7DC", 0.3, front_only=False)
+    hc = Mat("#ECE7DC") if v != 1 else YELLOW
+    for (x0, y0, x1, y1) in ((-1.5, -1.6, -0.9, 1.6), (0.9, -1.6, 1.5, 1.6), (-0.9, -0.3, 0.9, 0.3)):
+        sp.face([(x0, y0, 0.37), (x1, y0, 0.37), (x1, y1, 0.37), (x0, y1, 0.37)], hc, normal=(0, 0, 1), ao=0, edge=False)
+    light = AMBER if v != 3 else "#7CF29A"
+    for (x, y) in octo:
+        sp.lamp((x * 0.97, y * 0.97, 0.42), light, 7)
+    if corner[0] + corner[1] > 0:
+        stand()
+    if v == 3:
+        _mast(sp, -5.4, -5.4, 2.6, AMBER, 14)
+
+
+@typed("heavy_pad", 44, 44, 6.0, "대형 착륙장", heights=[6.0, 6.0, 6.0, 6.0, 6.4])
+def heavy_pad(sp: Sprite, v: int):
+    """아주 큰 네모 착륙장: 굵은 표시, 두 변의 폭발막이 벽, 모서리의 정비탑."""
+    L = 20.4
+    wall_h = (5.0, 5.0, 4.4, 5.0, 5.6)[v]
+    wall = CONCRETE if v != 2 else SINTER
+    # 폭발막이 벽 (뒤 두 변, 안쪽으로 기울어진 면)
+    sp.tbox(-22.0, -22.0, -20.6, L, 0.45, wall_h, wall, top=Mat("#b3a690"))
+    sp.tbox(-20.6, -22.0, L, -20.6, 0.45, wall_h, wall, top=Mat("#b3a690"))
+    for k in range(9):
+        y = -18.0 + k * 4.5
+        sp.line((-20.6 + 0.02, y, 0.2), (-20.6 + 0.02 - 0.0, y, wall_h - 0.4), 0.06, "#8a7c68")
+    sp.stripes((-20.55, L, wall_h - 1.2), (0, -(L + 20.6), 0), (0, 0, 0.6), n=40, normal=(1, 0, 0))
+    sp.stripes((L, -20.55, wall_h - 1.2), (-(L + 20.6), 0, 0), (0, 0, 0.6), n=40, normal=(0, 1, 0))
+    # 판
+    sp.box(-L, -L, 0, 2 * L, 2 * L, 0.35, Mat("#8a7c68"), top=Mat("#A39581"))
+    step = 2 * L / 10
+    for k in range(1, 10):
+        t = -L + k * step
+        sp.line((t, -L, 0.36), (t, L, 0.36), 0.07, "#8a7c68")
+        sp.line((-L, t, 0.36), (L, t, 0.36), 0.07, "#8a7c68")
+    m = L - 2.0
+    yel = "#E9C24A"
+    sp.polyline3([(-m, -m, 0.37), (m, -m, 0.37), (m, m, 0.37), (-m, m, 0.37)], yel, 0.5, closed=True)
+    sp.ring3((0, 0, 0.37), 8.0, yel, 0.6, front_only=False)
+    sp.ring3((0, 0, 0.37), 6.6, "#ECE7DC" if v != 3 else yel, 0.25, front_only=False)
+    if v in (0, 2, 4):
+        for (a, b) in (((-4.5, -4.5), (4.5, 4.5)), ((-4.5, 4.5), (4.5, -4.5))):
+            sp.line((a[0], a[1], 0.38), (b[0], b[1], 0.38), 0.7, "#ECE7DC")
+    else:
+        for k in range(4):
+            a = math.pi / 4 + k * math.pi / 2
+            sp.line((3.0 * math.cos(a), 3.0 * math.sin(a), 0.38), (6.2 * math.cos(a), 6.2 * math.sin(a), 0.38), 0.6, "#ECE7DC")
+    # 모서리 갈매기 표시
+    for (sx, sy) in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+        cx, cy = sx * (m - 2.4), sy * (m - 2.4)
+        sp.polyline3([(cx - sx * 2.0, cy, 0.38), (cx, cy, 0.38), (cx, cy - sy * 2.0, 0.38)], yel, 0.45)
+    # 가장자리 등
+    for k in range(17):
+        t = -L + k * (2 * L / 16)
+        for p in ((t, L, 0.4), (L, t, 0.4)):
+            sp.lamp(p, AMBER, 9)
+    for k in range(17):
+        t = -L + k * (2 * L / 16)
+        for p in ((t, -L + 0.3, 0.4), (-L + 0.3, t, 0.4)):
+            sp.lamp(p, AMBER, 7)
+    # 정비탑 (오른쪽 모서리) + 연료 팔
+    tx, ty = (18.6, -18.6) if v != 3 else (-18.4, 18.4)
+    hw, H = 1.2, 8.0 if v != 4 else 8.8
+    red = "#C9553A"
+    sp.box(tx - 1.8, ty - 1.8, 0.35, 3.6, 3.6, 0.3, CONCRETE)
+    for (x, y) in ((tx - hw, ty - hw), (tx + hw, ty - hw), (tx - hw, ty + hw)):
+        sp.line((x, y, 0.65), (x, y, H), 0.18, red)
+    sp.cyl((tx, ty, 0.65), (tx, ty, H - 0.6), 0.3, Mat("#eef4f7", 0.3))
+    for z in (2.8, 5.4, H):
+        sp.box(tx - hw - 0.15, ty - hw - 0.15, z, 2 * hw + 0.3, 2 * hw + 0.3, 0.18, Mat("#8C939C", 0.3))
+    sp.line((tx + hw, ty + hw, 0.65), (tx + hw, ty + hw, H), 0.18, red)
+    for k in range(5):
+        za, zb = 0.65 + k * (H - 0.65) / 5, 0.65 + (k + 1) * (H - 0.65) / 5
+        sp.line((tx + hw, ty - hw, za), (tx + hw, ty + hw, zb), 0.09, red)
+        sp.line((tx - hw, ty + hw, za), (tx + hw, ty + hw, zb), 0.09, red)
+    d = norm((-tx, -ty, 0))
+    p0 = (tx + d[0] * hw, ty + d[1] * hw, H - 1.4)
+    p1 = add(p0, mul(d, 5.0))
+    sp.truss(p0, p1, 0.6, red, 0.09, 6, side=(0, 0, 1))
+    sp.polyline3([p1, (p1[0], p1[1], p1[2] - 2.2), (p1[0] + d[0] * 0.8, p1[1] + d[1] * 0.8, 1.0)], "#2a2d33", 0.14)
+    sp.box(tx - 0.6, ty - 0.6, H + 0.18, 1.2, 1.2, 0.6, WHITE, top=SILVER)
+    sp.lamp((tx, ty, H + 1.0), "#ff5a3c", 8)
+    sp.lamp(p1, AMBER, 9)
+    if v == 1:
+        _vtank(sp, tx - 3.2, ty + 0.4, 0.35, 2.2, 0.9, FROST, bands=[0.5], band_color="#3E6FB0")
+        _vtank(sp, tx - 0.4, ty + 3.2, 0.35, 2.2, 0.9, FOAM, bands=[0.5], band_color="#a45a1c")
