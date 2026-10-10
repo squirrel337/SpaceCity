@@ -1,6 +1,6 @@
 extends SceneTree
 ## 화면이 실제로 도는지 확인하는 연기 시험 — 메인 씬을 띄우고, 자동 운영으로 60일을 돌리고,
-## 탭을 모두 열어 보고, 저장·불러오기를 왕복한다. 오류가 하나라도 나면 실패한다.
+## 탭을 모두 열어 보고, 저장·불러오기를 왕복한 뒤 3년 보고서까지 간다. 오류가 하나라도 나면 실패한다.
 ##   godot --headless --path game --script res://tests/smoke_test.gd
 
 var main: Control
