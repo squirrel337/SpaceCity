@@ -34,6 +34,11 @@ static func snapshot(sim: CitySim, d: int) -> Dictionary:
 	var dose_sum := 0.0
 	for c in sim.cohorts:
 		dose_sum += c[0] * c[1]
+	var type_mix := 0          # 어떤 종류를 몇 기 지었나 (데이터 순서 가중 합)
+	var i := 0
+	for m in sim.M:
+		i += 1
+		type_mix += i * int(sim.counts.get(m, 0))
 	return {
 		"day": d, "hour": sim.hour, "pop": sim.population(), "o2_kg": s["o2_kg"], "co2_air": sim.co2_air,
 		"food_kg": s["food_kg"], "water_kg": s["water_kg"], "h2_kg": s["h2_kg"], "tank_co2_kg": s["co2_kg"],
@@ -46,5 +51,5 @@ static func snapshot(sim: CitySim, d: int) -> Dictionary:
 		"brownout_h": sim.stats.get("brownout_h", 0), "crop_losses": sim.stats.get("crop_losses", 0),
 		"exposed": sim.stats.get("exposed_person_events", 0), "departed_dose": sim.stats.get("departed_dose", 0),
 		"deaths": deaths, "next_cargo": sim.next_cargo, "next_crewed": sim.next_crewed, "dose_sum": dose_sum,
-		"rationing": 1 if sim.rationing else 0, "seq": sim.seq,
+		"rationing": 1 if sim.rationing else 0, "seq": sim.seq, "type_mix": type_mix,
 	}

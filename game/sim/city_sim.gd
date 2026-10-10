@@ -7,7 +7,7 @@ extends RefCounted
 signal noted(hour: int, text: String, kind: String)
 
 const STOCK_KEYS := ["o2_kg", "water_kg", "h2_kg", "ch4_kg", "co2_kg", "wastewater_kg", "food_kg"]
-const VARIABLE := ["electrolyzer", "sabatier", "water_recycler", "hydroponics"]
+const VARIABLE := ["electrolyzer", "sabatier", "water_recycler", "hydroponics"]   # 가동률이 시간마다 달라지는 계열
 const CAUSES_KO := {"hypoxia": "산소 결핍", "co2": "이산화탄소 중독", "starvation": "기아"}
 ## 추천 운영의 건설 순서: 생명유지 → 대피·주거 → 전력 → 식량 → 나머지
 const BUILD_PRIORITY := {
@@ -70,6 +70,8 @@ var daily: Array = []
 
 # 파생값 — refresh()가 하루에 한 번 갱신한다
 var wk := {}
+var active := {}                 # 계열 -> 가동 중인(1기 이상) 모듈 id (데이터 순서). 0기를 건너뛰어도 합은 같다
+var hourly := {}                 # 계열 합 중 한 시간마다 쓰는 것 (가동 수가 바뀌는 refresh 때만 다시 센다)
 var caps := {}
 var housing_cap := 0.0
 var air := 0.0
@@ -97,6 +99,8 @@ var seat_limit_by_scrubbers := true
 
 ## 자동 운영 (AutoPolicy). null이면 플레이어가 짓고 연구를 고른다.
 var autopilot: AutoPolicy = null
+## 'variety' 자동 운영이 계열의 종류를 돌아가며 고르는 차례
+var variety_turn := 0
 ## 대화형: 대피소가 모자란 대형 폭풍이면 대피 원칙을 플레이어에게 묻는다
 var interactive := false
 var pending_storm := {}
@@ -179,6 +183,44 @@ func recipe(mid: String, side: String, key: String) -> float:
 	return float(M[mid].get("recipe", {}).get(side, {}).get(key, 0.0))
 
 
+func family(mid: String) -> String:
+	return GameData.FAM_OF.get(mid, mid)
+
+
+## provides[key]가 0이 아닌 모듈 (데이터 순서)
+func with_prov(key: String) -> Array:
+	return GameData.WITH.get(key, [])
+
+
+## 계열의 가동 중인 모듈마다 provides[key]를 곱해 더한다 (데이터 순서, 보통 덧셈 — 파이썬 fam_sum과 같다)
+func fam_prov(fam: String, key: String) -> float:
+	var total := 0.0
+	for m in active[fam]:
+		total += wk[m] * float(prov(m, key))
+	return total
+
+
+func fam_recipe(fam: String, side: String, key: String) -> float:
+	var total := 0.0
+	for m in active[fam]:
+		total += wk[m] * recipe(m, side, key)
+	return total
+
+
+func fam_spec(fam: String, key: String) -> float:
+	var total := 0.0
+	for m in active[fam]:
+		total += wk[m] * float(M[m][key])
+	return total
+
+
+func fam_n(fam: String) -> int:
+	var n := 0
+	for m in active[fam]:
+		n += int(wk[m])
+	return n
+
+
 func priority_of(mid: String) -> int:
 	var p: Variant = M[mid].get("priority")
 	return int(p) if p != null else 0
@@ -189,22 +231,45 @@ func refresh() -> void:
 	wk = {}
 	for mid in M:
 		wk[mid] = maxi(0, int(counts.get(mid, 0)) - int(broken.get(mid, 0)))
+	active = {}
+	for fam in GameData.FAMILY:
+		var on: Array = []
+		for m in GameData.FAMILY[fam]:
+			if wk[m]:
+				on.append(m)
+		active[fam] = on
+	hourly = {
+		"o2_hydro": fam_recipe("hydroponics", "out", "o2_kg"), "o2_algae": fam_recipe("algae_reactor", "out", "o2_kg"),
+		"o2_green": fam_recipe("green_commons", "out", "o2_kg"), "o2_mre": fam_recipe("mre_plant", "out", "o2_kg"),
+		"e_o2": fam_recipe("electrolyzer", "out", "o2_kg"), "e_water": fam_recipe("electrolyzer", "in", "water_kg"),
+		"sab_n": fam_n("sabatier"), "sab_h2": fam_recipe("sabatier", "in", "h2_kg"),
+		"sab_co2": fam_recipe("sabatier", "in", "co2_kg"), "rec_day": fam_prov("water_recycler", "wastewater_kg_day"),
+		"e_kw": fam_spec("electrolyzer", "power_kw"), "sab_kw": fam_spec("sabatier", "power_kw"),
+		"rec_kw": fam_spec("water_recycler", "power_kw"), "hydro_kw": fam_spec("hydroponics", "power_kw"),
+		"scrub_day": fam_prov("co2_scrubber", "co2_kg_day"), "hydro_n": fam_n("hydroponics"),
+	}
 	caps = {}
 	for key in STOCK_KEYS:
 		var total := 0.0
-		for mid in M:
+		for mid in with_prov("storage"):
 			total += float(prov(mid, "storage", {}).get(key, 0.0)) * wk[mid]
 		caps[key] = total
 	housing_cap = 0.0
-	for mid in M:
+	for mid in with_prov("housing"):
 		housing_cap += float(prov(mid, "housing")) * int(counts.get(mid, 0))
 	air = maxf(1.0, housing_cap) * float(C["air_kg_per_housing"])
 	co2_floor = ppm_to_kg(C["co2_ppm"]["floor"])
 	var bonus := 1.5 if techs.has("shielding_2") else 1.0
-	shelter_cap = (float(prov("storm_shelter", "shelter")) * int(counts.get("storm_shelter", 0)) * bonus
-		+ float(prov("regolith_dome", "shelter")) * int(counts.get("regolith_dome", 0)))
-	bat_cap = float(prov("battery_bank", "storage_kwh")) * wk["battery_bank"]
-	rfc_cap = float(prov("rfc_unit", "storage_kwh")) * wk["rfc_unit"]
+	shelter_cap = 0.0
+	for mid in with_prov("shelter"):
+		var sh := float(prov(mid, "shelter"))
+		if sh:
+			if family(mid) == "storm_shelter":
+				shelter_cap += sh * int(counts.get(mid, 0)) * bonus
+			else:
+				shelter_cap += sh * int(counts.get(mid, 0))
+	bat_cap = fam_prov("battery_bank", "storage_kwh")
+	rfc_cap = fam_prov("rfc_unit", "storage_kwh")
 	var towers := 0
 	var parts := []
 	var tile_factor: Dictionary = C["illumination"]["tile_factor"]
@@ -213,30 +278,39 @@ func refresh() -> void:
 		parts.append(float(tile_factor[t]) * int(tiles[t]))
 	var factor := PyCompat.fsum(parts) / towers if towers else 0.0
 	var boost := 1.2 if techs.has("tall_towers") else 1.0
-	solar_kw = float(prov("solar_tower", "generation_kw")) * wk["solar_tower"] * factor * boost
-	fission_kw = 0.0
-	for mid in ["fission_40kw", "fission_1mw"]:
-		fission_kw += float(prov(mid, "generation_kw")) * wk[mid]
-	heat_cap = float(prov("radiator", "heat_kw")) * wk["radiator"]
+	solar_kw = fam_prov("solar_tower", "generation_kw") * factor * boost
+	fission_kw = 0.0           # 일조와 상관없이 늘 같은 출력 (핵분열·동위원소·핵융합)
+	for mid in with_prov("generation_kw"):
+		if family(mid) != "solar_tower":
+			fission_kw += float(prov(mid, "generation_kw")) * wk[mid]
+	heat_cap = 0.0
+	for mid in with_prov("heat_kw"):
+		if prov(mid, "heat_kw"):
+			heat_cap += float(prov(mid, "heat_kw")) * wk[mid]
 	var printing := false
 	for item in queue:
 		if item["print_t"] > 0:
 			printing = true
 			break
 	var loads := {1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0}
+	var robots_powered := false
 	for mid in M:
+		if not wk[mid]:
+			continue
 		var p := priority_of(mid)
-		if not p or mid in VARIABLE or not wk[mid]:
+		var fam := family(mid)
+		if not p or fam in VARIABLE:
 			continue
 		var kw: float = float(M[mid]["power_kw"]) * wk[mid]
-		if mid == "regolith_printer" and not printing:
+		if fam == "regolith_printer" and not printing:
 			kw *= 0.1
-		elif mid == "mre_plant" and stock.get("regolith_t", 0.0) < recipe("mre_plant", "in", "regolith_t"):
+		elif fam == "mre_plant" and stock.get("regolith_t", 0.0) < recipe(mid, "in", "regolith_t"):
 			kw = 0.0
-		elif mid == "parts_fab" and stock.get("metal_t", 0.0) < recipe("parts_fab", "in", "metal_t"):
+		elif fam == "parts_fab" and stock.get("metal_t", 0.0) < recipe(mid, "in", "metal_t"):
 			kw = 0.0
-		elif mid == "robot_bay":
+		elif fam == "robot_bay" and not robots_powered:
 			kw += float(C["robots"]["power_kw"]) * (robots - robots_broken)
+			robots_powered = true       # 로봇 충전은 정비고 계열 한 번만
 		loads[p] += kw
 	static_load = loads
 	recovery = 0.98 if techs.has("closed_loop_ls2") else float(prov("water_recycler", "recovery"))
@@ -291,37 +365,34 @@ func step_hour(pop: float) -> void:
 
 	# 가변 가동률: 전기분해기는 필요한 만큼, 사바티에·재활용기는 원료만큼
 	var farms_on_before: bool = prev[2] and crops_alive()
-	var bio_o2: float = ((wk["hydroponics"] * recipe("hydroponics", "out", "o2_kg") if farms_on_before else 0.0)
-		+ (wk["algae_reactor"] * recipe("algae_reactor", "out", "o2_kg") if prev[2] else 0.0)
-		+ (wk["green_commons"] * recipe("green_commons", "out", "o2_kg") if prev[4] else 0.0)
-		+ (wk["mre_plant"] * recipe("mre_plant", "out", "o2_kg") if prev[3] else 0.0))
+	var hr := hourly
+	var bio_o2: float = ((hr["o2_hydro"] if farms_on_before else 0.0)
+		+ (hr["o2_algae"] if prev[2] else 0.0)
+		+ (hr["o2_green"] if prev[4] else 0.0)
+		+ (hr["o2_mre"] if prev[3] else 0.0))
 	var want: float = pop * PER["o2_kg"] - bio_o2 + maxf(0.0, 0.95 * caps["o2_kg"] - s["o2_kg"])
-	var e_cap: float = wk["electrolyzer"] * recipe("electrolyzer", "out", "o2_kg")
+	var e_cap: float = hr["e_o2"]
 	var u_elec := 0.0
 	if e_cap:
 		u_elec = minf(1.0, maxf(0.0, want) / e_cap)
-	var water_need: float = wk["electrolyzer"] * recipe("electrolyzer", "in", "water_kg") * u_elec * h
+	var water_need: float = hr["e_water"] * u_elec * h
 	if water_need > s["water_kg"] and s["water_kg"] > 0:
 		u_elec *= s["water_kg"] / water_need
 	elif s["water_kg"] <= 0:
 		u_elec = 0.0
-	var n_sab: int = wk["sabatier"]
+	var n_sab: int = hr["sab_n"]
 	var u_sab := 0.0
 	if n_sab:
-		u_sab = maxf(0.0, minf(1.0, minf(s["h2_kg"] / (n_sab * recipe("sabatier", "in", "h2_kg") * h),
-			s["co2_kg"] / (n_sab * recipe("sabatier", "in", "co2_kg") * h))))
-	var n_rec: int = wk["water_recycler"]
-	var rec_rate: float = n_rec * float(prov("water_recycler", "wastewater_kg_day")) * h
+		u_sab = maxf(0.0, minf(1.0, minf(s["h2_kg"] / (hr["sab_h2"] * h), s["co2_kg"] / (hr["sab_co2"] * h))))
+	var rec_rate: float = hr["rec_day"] * h
 	var u_rec := 0.0
 	if rec_rate:
 		u_rec = minf(1.0, s["wastewater_kg"] / rec_rate)
 	var light_cut := 0.6 if (lit > 0 and techs.has("sunlight_piping")) else 1.0
 
 	var loads: Dictionary = static_load.duplicate()
-	loads[1] += (float(M["electrolyzer"]["power_kw"]) * wk["electrolyzer"] * u_elec
-		+ float(M["sabatier"]["power_kw"]) * n_sab * u_sab
-		+ float(M["water_recycler"]["power_kw"]) * n_rec * maxf(u_rec, 0.2))
-	loads[2] += float(M["hydroponics"]["power_kw"]) * wk["hydroponics"] * light_cut
+	loads[1] += (hr["e_kw"] * u_elec + hr["sab_kw"] * u_sab + hr["rec_kw"] * maxf(u_rec, 0.2))
+	loads[2] += hr["hydro_kw"] * light_cut
 
 	# 전력 배분: 정책 문턱으로 미리 끄고, 그래도 모자라면 낮은 순위부터 강제로 끈다
 	var gen: float = solar_kw * lit + fission_kw
@@ -381,23 +452,27 @@ func step_hour(pop: float) -> void:
 	var bio_removal := 0.0
 	var food := 0.0
 	if on[2] and crops_alive():
-		var n_farm: int = wk["hydroponics"]
-		food += n_farm * recipe("hydroponics", "out", "food_kg") * h
-		s["o2_kg"] += n_farm * recipe("hydroponics", "out", "o2_kg") * h
-		bio_removal += n_farm * recipe("hydroponics", "in", "co2_kg") * h
-		s["water_kg"] -= n_farm * recipe("hydroponics", "in", "water_kg") * h
+		for m in active["hydroponics"]:
+			var n_farm: int = wk[m]
+			food += n_farm * recipe(m, "out", "food_kg") * h
+			s["o2_kg"] += n_farm * recipe(m, "out", "o2_kg") * h
+			bio_removal += n_farm * recipe(m, "in", "co2_kg") * h
+			s["water_kg"] -= n_farm * recipe(m, "in", "water_kg") * h
 	var algae := 0.0
 	if on[2]:
-		var n_algae: int = wk["algae_reactor"]
-		algae = n_algae * recipe("algae_reactor", "out", "food_kg") * h
-		food += algae
-		s["o2_kg"] += n_algae * recipe("algae_reactor", "out", "o2_kg") * h
-		bio_removal += n_algae * recipe("algae_reactor", "in", "co2_kg") * h
-		s["water_kg"] -= n_algae * recipe("algae_reactor", "in", "water_kg") * h
+		for m in active["algae_reactor"]:
+			var n_algae: int = wk[m]
+			var a: float = n_algae * recipe(m, "out", "food_kg") * h
+			algae += a
+			food += a
+			s["o2_kg"] += n_algae * recipe(m, "out", "o2_kg") * h
+			bio_removal += n_algae * recipe(m, "in", "co2_kg") * h
+			s["water_kg"] -= n_algae * recipe(m, "in", "water_kg") * h
 	if on[4]:
-		var n_green: int = wk["green_commons"]
-		s["o2_kg"] += n_green * recipe("green_commons", "out", "o2_kg") * h
-		bio_removal += n_green * recipe("green_commons", "in", "co2_kg") * h
+		for m in active["green_commons"]:
+			var n_green: int = wk[m]
+			s["o2_kg"] += n_green * recipe(m, "out", "o2_kg") * h
+			bio_removal += n_green * recipe(m, "in", "co2_kg") * h
 	s["food_kg"] += food
 	_add(today, "food_made", food)
 	if food > 0:
@@ -405,22 +480,24 @@ func step_hour(pop: float) -> void:
 
 	# CO₂: 식물이 먼저 흡수하고, 나머지는 제거기가 농축 탱크로 옮긴다
 	co2_air = maxf(co2_floor, co2_air - bio_removal)
-	var scrub: float = wk["co2_scrubber"] * float(prov("co2_scrubber", "co2_kg_day")) * h * frac1
+	var scrub: float = hr["scrub_day"] * h * frac1
 	var moved := minf(scrub, co2_air - co2_floor)
 	co2_air -= moved
 	s["co2_kg"] += moved
 
 	# 1순위 화학 공정 (전력이 모자라면 frac1만큼만)
 	var k := h * frac1
-	var n_e: float = wk["electrolyzer"] * u_elec * k
-	s["water_kg"] -= n_e * recipe("electrolyzer", "in", "water_kg")
-	s["o2_kg"] += n_e * recipe("electrolyzer", "out", "o2_kg")
-	s["h2_kg"] += n_e * recipe("electrolyzer", "out", "h2_kg")
-	var n_s: float = n_sab * u_sab * k
-	s["co2_kg"] -= n_s * recipe("sabatier", "in", "co2_kg")
-	s["h2_kg"] -= n_s * recipe("sabatier", "in", "h2_kg")
-	s["ch4_kg"] += n_s * recipe("sabatier", "out", "ch4_kg")
-	s["water_kg"] += n_s * recipe("sabatier", "out", "water_kg")
+	for m in active["electrolyzer"]:
+		var n_e: float = wk[m] * u_elec * k
+		s["water_kg"] -= n_e * recipe(m, "in", "water_kg")
+		s["o2_kg"] += n_e * recipe(m, "out", "o2_kg")
+		s["h2_kg"] += n_e * recipe(m, "out", "h2_kg")
+	for m in active["sabatier"]:
+		var n_s: float = wk[m] * u_sab * k
+		s["co2_kg"] -= n_s * recipe(m, "in", "co2_kg")
+		s["h2_kg"] -= n_s * recipe(m, "in", "h2_kg")
+		s["ch4_kg"] += n_s * recipe(m, "out", "ch4_kg")
+		s["water_kg"] += n_s * recipe(m, "out", "water_kg")
 	var processed := minf(s["wastewater_kg"], rec_rate * frac1)
 	s["wastewater_kg"] -= processed
 	s["water_kg"] += processed * recovery
@@ -428,15 +505,19 @@ func step_hour(pop: float) -> void:
 	# 3순위 산업
 	if run3:
 		var k3 := h * run3
-		s["water_kg"] += wk["ice_miner"] * recipe("ice_miner", "out", "water_kg") * mining * k3
-		s["regolith_t"] += wk["excavator"] * recipe("excavator", "out", "regolith_t") * k3
-		var n_m := minf(wk["mre_plant"] * k3, s["regolith_t"] / recipe("mre_plant", "in", "regolith_t"))
-		s["regolith_t"] -= n_m * recipe("mre_plant", "in", "regolith_t")
-		s["metal_t"] += n_m * recipe("mre_plant", "out", "metal_t")
-		s["o2_kg"] += n_m * recipe("mre_plant", "out", "o2_kg")
-		var n_p := minf(wk["parts_fab"] * k3, s["metal_t"] / recipe("parts_fab", "in", "metal_t"))
-		s["metal_t"] -= n_p * recipe("parts_fab", "in", "metal_t")
-		s["parts"] += n_p * recipe("parts_fab", "out", "parts")
+		for m in active["ice_miner"]:
+			s["water_kg"] += wk[m] * recipe(m, "out", "water_kg") * mining * k3
+		for m in active["excavator"]:
+			s["regolith_t"] += wk[m] * recipe(m, "out", "regolith_t") * k3
+		for m in active["mre_plant"]:
+			var n_m := minf(wk[m] * k3, s["regolith_t"] / recipe(m, "in", "regolith_t"))
+			s["regolith_t"] -= n_m * recipe(m, "in", "regolith_t")
+			s["metal_t"] += n_m * recipe(m, "out", "metal_t")
+			s["o2_kg"] += n_m * recipe(m, "out", "o2_kg")
+		for m in active["parts_fab"]:
+			var n_p := minf(wk[m] * k3, s["metal_t"] / recipe(m, "in", "metal_t"))
+			s["metal_t"] -= n_p * recipe(m, "in", "metal_t")
+			s["parts"] += n_p * recipe(m, "out", "parts")
 
 	# 저장 한도: 넘치는 수소·CO₂·메탄은 배출, 넘치는 폐수는 손실
 	for key in ["h2_kg", "ch4_kg", "co2_kg", "wastewater_kg", "o2_kg", "water_kg", "food_kg"]:
@@ -446,7 +527,7 @@ func step_hour(pop: float) -> void:
 			s[key] = caps[key]
 
 	# 작물: 72시간 넘게 전력을 못 받으면 고사
-	farm_dark_h = 0 if (on[2] or not wk["hydroponics"]) else farm_dark_h + 1
+	farm_dark_h = 0 if (on[2] or not hr["hydro_n"]) else farm_dark_h + 1
 	if farm_dark_h >= int(C["crops"]["dead_after_unpowered_h"]) and crops_alive():
 		crops_dead_until = hour + int(C["crops"]["regrow_days"]) * 24
 		_add(stats, "crop_losses", 1)
@@ -563,8 +644,8 @@ func _repair_order(a: String, b: String) -> bool:
 
 
 func _queue_order(a: Dictionary, b: Dictionary) -> bool:
-	var ka: int = BUILD_PRIORITY.get(a["id"], 5)
-	var kb: int = BUILD_PRIORITY.get(b["id"], 5)
+	var ka: int = BUILD_PRIORITY.get(family(a["id"]), 5)
+	var kb: int = BUILD_PRIORITY.get(family(b["id"]), 5)
 	if ka != kb:
 		return ka < kb
 	return a["seq"] < b["seq"]
@@ -591,7 +672,7 @@ func work_robots() -> void:
 	# 건설: 우선순위 정렬을 켜면 생명유지부터, 끄면 들어온 순서대로 작업량을 준다
 	if queue_by_priority:
 		queue.sort_custom(_queue_order)
-	var print_cap: float = float(prov("regolith_printer", "print_t_day")) * wk["regolith_printer"]
+	var print_cap: float = fam_prov("regolith_printer", "print_t_day")
 	for item in queue:
 		if rd <= 0 and print_cap <= 0:
 			break
@@ -623,9 +704,14 @@ func work_robots() -> void:
 
 func can_afford(cost: Dictionary, reserve: float = 40.0) -> bool:
 	var s := stock
-	return (s["parts"] - float(cost.get("parts", 0.0)) >= reserve
-		and s["regolith_t"] >= float(cost.get("regolith_t", 0.0))
-		and s["metal_t"] >= float(cost.get("metal_t", 0.0)))
+	if not (s["parts"] - float(cost.get("parts", 0.0)) >= reserve
+			and s["regolith_t"] >= float(cost.get("regolith_t", 0.0))
+			and s["metal_t"] >= float(cost.get("metal_t", 0.0))):
+		return false
+	for key in cost:
+		if not key in ["parts", "regolith_t", "metal_t"] and float(s.get(key, 0.0)) < float(cost[key]):
+			return false            # 물 등 (얼음 차폐 돔)
+	return true
 
 
 func build_block_reason(mid: String, reserve: float = 0.0) -> String:
@@ -633,7 +719,7 @@ func build_block_reason(mid: String, reserve: float = 0.0) -> String:
 	var m: Dictionary = M[mid]
 	if m["tech"] != null and not techs.has(m["tech"]):
 		return "연구 필요: " + T[m["tech"]]["name"]
-	if mid == "solar_tower" and free_tile() == "":
+	if family(mid) == "solar_tower" and free_tile() == "":
 		return "타워를 세울 능선 자리가 없다"
 	if not can_afford(m["cost"], reserve):
 		return "자재 부족"
@@ -649,7 +735,7 @@ func enqueue(mid: String, tile: String = "", reserve: float = 40.0) -> bool:
 		return false
 	for key in m["cost"]:
 		stock[key] -= float(m["cost"][key])
-	var print_t: float = float(m["cost"].get("regolith_t", 0.0)) if mid == "regolith_dome" else 0.0
+	var print_t: float = float(m["cost"].get("regolith_t", 0.0)) if m.get("printed", false) else 0.0
 	seq += 1
 	queue.append({"id": mid, "rd": float(m["build_rd"]), "rd_total": float(m["build_rd"]),
 		"print_t": print_t, "print_total": print_t, "seq": seq, "cost": m["cost"].duplicate(), "tile": tile})
@@ -701,10 +787,13 @@ func free_tile() -> String:
 func research() -> void:
 	var prod := 0.8 + 0.4 * morale / 100
 	var p4_share := 1.0 - float(today.get("p4_off_h", 0)) / 24.0
-	var scientists := minf(wk["research_lab"] * float(M["research_lab"]["crew"]),
-		population() * C["workforce_share"] * 0.3)
+	var scientists := minf(fam_spec("research_lab", "crew"), population() * C["workforce_share"] * 0.3)
+	var rp_direct := 0.0          # 연구원 없이 나오는 연구 (교신·천문대 등)
+	for m in with_prov("rp_day"):
+		if family(m) != "research_lab":
+			rp_direct += wk[m] * float(prov(m, "rp_day"))
 	var rp: float = (scientists * prod * p4_share
-		+ wk["comms_center"] * float(prov("comms_center", "rp_day")) * p4_share
+		+ rp_direct * p4_share
 		+ C["earth"]["earth_rp_day"])
 	last_rp = rp
 	rp_bank += rp
@@ -775,7 +864,7 @@ func earth(d: int) -> void:
 			return
 		var seats: int = mini(int(e["crewed_seats"]), int(housing_cap - population()))
 		if seat_limit_by_scrubbers:
-			var scrub: float = wk["co2_scrubber"] * float(prov("co2_scrubber", "co2_kg_day"))
+			var scrub: float = fam_prov("co2_scrubber", "co2_kg_day")
 			seats = mini(seats, int(scrub / PER["co2_kg"] / 1.1 - population()))
 		if seats > 0:
 			support -= e["crewed_cost_support"]
@@ -845,8 +934,8 @@ func deliver_cargo() -> void:
 	var s := stock
 	var capacity := int(e["cargo_capacity_units"])
 	var horizon: float = e["cargo_interval_days"] + 15
-	var produced: float = (wk["hydroponics"] * recipe("hydroponics", "out", "food_kg") * (1 if crops_alive() else 0)
-		+ wk["algae_reactor"] * recipe("algae_reactor", "out", "food_kg"))
+	var produced: float = (fam_recipe("hydroponics", "out", "food_kg") * (1 if crops_alive() else 0)
+		+ fam_recipe("algae_reactor", "out", "food_kg"))
 	var deficit: float = (population() * PER["food_kg"] - produced) * horizon
 	var reserve: float = population() * PER["food_kg"] * food_buffer_days
 	var food_t := maxf(0.0, deficit + reserve - s["food_kg"]) / 1000.0
@@ -932,8 +1021,15 @@ func solar_storm(dose: float, kind: String, shelter_factor: float = -1.0) -> voi
 func dose_and_departures() -> void:
 	var rates: Dictionary = C["dose_msv_day"]
 	var pop := population()
-	var domes: float = int(counts.get("regolith_dome", 0)) * float(prov("regolith_dome", "housing"))
-	var covered: float = mini(covered_habs, int(counts.get("hab_module", 0))) * float(prov("hab_module", "housing"))
+	var domes := 0.0              # 돔 계열 (두꺼운 차폐)
+	var covered_more := 0.0       # 벽 자체가 피복인 거주 (인쇄 거주동 등)
+	for m in with_prov("housing"):
+		var dose_class := String(prov(m, "dose", ""))
+		if family(m) == "regolith_dome" or dose_class == "dome":
+			domes += int(counts.get(m, 0)) * float(prov(m, "housing"))
+		elif dose_class == "covered":
+			covered_more += int(counts.get(m, 0)) * float(prov(m, "housing"))
+	var covered: float = mini(covered_habs, int(counts.get("hab_module", 0))) * float(prov("hab_module", "housing")) + covered_more
 	var in_dome := minf(pop, domes)
 	var in_covered := minf(pop - in_dome, covered)
 	var bare := maxf(0.0, pop - in_dome - in_covered)
@@ -970,14 +1066,25 @@ func update_morale() -> void:
 		target -= 15 if crowd > 1.0 else (5 if crowd > 0.95 else 0)
 		if shelter_cap < pop:
 			target -= 5
-		if wk["medical_bay"] * float(prov("medical_bay", "care")) < pop:
+		var care := 0.0
+		for m in with_prov("care"):
+			care += wk[m] * float(prov(m, "care"))
+		if care < pop:
 			target -= 5
 	if algae_food_share > 0.25:
 		target -= 5
 	if rationing:
 		target -= C["rationing"]["morale_penalty"]
-	target += minf(15, wk["green_commons"] * float(prov("green_commons", "morale")))
-	target += float(prov("comms_center", "morale")) if wk["comms_center"] else 0.0
+	var leisure := 0.0            # 공원·체육관·주방… (합쳐서 최대 +15)
+	for m in with_prov("morale"):
+		if family(m) != "comms_center":
+			leisure += wk[m] * float(prov(m, "morale"))
+	target += minf(15, leisure)
+	var contact := 0.0            # 지구와의 연결 — 가동 중인 교신 계열 중 가장 좋은 것 하나
+	for m in GameData.FAMILY["comms_center"]:
+		if wk[m] and float(prov(m, "morale")) > contact:
+			contact = float(prov(m, "morale"))
+	target += contact
 	p4_off_week.append(int(today.get("p4_off_h", 0)))
 	if p4_off_week.size() > 7:
 		p4_off_week = p4_off_week.slice(p4_off_week.size() - 7)
@@ -1120,7 +1227,7 @@ const SAVE_FIELDS := ["seed_value", "days", "hour", "counts", "broken", "tiles",
 	"express_eta", "rationing", "hungry_days", "algae_food_share", "recent_deaths", "recent_exposure",
 	"p4_off_week", "today", "stats", "deaths", "max_co2", "min_reserve_days", "notes", "daily", "battery", "rfc",
 	"co2_air", "shed_soc", "food_buffer_days", "ration_below_days", "express_below_days", "queue_by_priority",
-	"seat_limit_by_scrubbers", "pending_storm", "trust_low_days", "_day_pop"]
+	"seat_limit_by_scrubbers", "pending_storm", "trust_low_days", "_day_pop", "variety_turn"]
 
 
 func to_save() -> Dictionary:

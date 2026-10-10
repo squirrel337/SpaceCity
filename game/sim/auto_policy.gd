@@ -2,6 +2,7 @@ class_name AutoPolicy
 extends RefCounted
 ## 자동 운영 — 밸런스 시뮬레이터의 Policy와 City.decide()를 그대로 옮겼다.
 ## "good"은 문서의 추천 운영, "naive"는 눈앞의 성장만 좇는 운영이다.
+## "variety"는 추천 운영과 같되 계열마다 여러 종류를 돌아가며 짓는다 (새 건물 규칙을 파이썬과 맞춰 보는 용도).
 ## 게임에서는 '시드 자동 운영'으로, 테스트에서는 파이썬과의 결과 비교에 쓴다.
 
 const GOOD_RESEARCH := ["sintered_construction", "regenerative_fuel_cell", "space_weather_forecast",
@@ -18,13 +19,15 @@ const NAIVE_RESEARCH := ["algae_bioreactor", "sunlight_piping", "autonomous_robo
 
 var name: String
 var prepared: bool
+var variety: bool
 ## 1·2·3년차 식량 자급률 목표
 var food_targets: Array
 
 
 func _init(policy_name: String) -> void:
 	name = policy_name
-	prepared = policy_name == "good"
+	prepared = policy_name in ["good", "variety"]
+	variety = policy_name == "variety"
 	food_targets = [0.5, 0.75, 1.0] if prepared else [0.6, 0.85, 1.0]
 
 
@@ -50,16 +53,21 @@ func decide(sim: CitySim, day: int) -> void:
 
 	# 생명유지: 추천 운영은 여유분을, 준비 없는 운영은 문제가 터진 뒤에 짓는다
 	if prepared or sim.co2_ppm() > C["co2_ppm"]["bad"]:
-		if sim.planned("co2_scrubber") * float(sim.prov("co2_scrubber", "co2_kg_day")) < 1.3 * pop_next * PER["co2_kg"]:
-			sim.enqueue("co2_scrubber")
-	if sim.planned("electrolyzer") * sim.recipe("electrolyzer", "out", "o2_kg") < 1.2 * pop_next * PER["o2_kg"]:
-		sim.enqueue("electrolyzer")
-	if sim.planned("water_recycler") * float(sim.prov("water_recycler", "wastewater_kg_day")) < 1.15 * pop_next * PER["water_use_kg"]:
-		sim.enqueue("water_recycler")
+		if _cap(sim, "co2_scrubber", "prov", "co2_kg_day") < 1.3 * pop_next * PER["co2_kg"]:
+			build(sim, "co2_scrubber")
+	if _cap(sim, "electrolyzer", "out", "o2_kg") < 1.2 * pop_next * PER["o2_kg"]:
+		build(sim, "electrolyzer")
+	if _cap(sim, "water_recycler", "prov", "wastewater_kg_day") < 1.15 * pop_next * PER["water_use_kg"]:
+		build(sim, "water_recycler")
 	if prepared:
 		var bonus := 1.5 if sim.techs.has("shielding_2") else 1.0
-		if sim.planned("storm_shelter") * 40 * bonus + sim.planned("regolith_dome") * 60 < pop_next:
-			sim.enqueue("storm_shelter")
+		var shelter := 0.0
+		for m in sim.with_prov("shelter"):
+			var sh := float(sim.prov(m, "shelter"))
+			if sh:
+				shelter += sim.planned(m) * (sh * (bonus if sim.family(m) == "storm_shelter" else 1.0))
+		if shelter < pop_next:
+			build(sim, "storm_shelter")
 		if sim.covered_habs + sim.queued("regolith_cover") < int(sim.counts.get("hab_module", 0)):
 			sim.enqueue_special("regolith_cover")
 
@@ -70,13 +78,16 @@ func decide(sim: CitySim, day: int) -> void:
 		if pr == 1 or pr == 2:
 			p1p2 += float(sim.M[m]["power_kw"]) * int(sim.counts.get(m, 0))
 	var fission := 0.0
-	for m in ["fission_40kw", "fission_1mw"]:
-		fission += float(sim.prov(m, "generation_kw")) * sim.planned(m)
-	var storage_planned: float = (sim.planned("battery_bank") * float(sim.prov("battery_bank", "storage_kwh"))
-		+ sim.planned("rfc_unit") * float(sim.prov("rfc_unit", "storage_kwh")))
+	for m in sim.with_prov("generation_kw"):
+		if sim.family(m) != "solar_tower":
+			fission += sim.planned(m) * float(sim.prov(m, "generation_kw"))
+	var storage_planned := 0.0
+	for m in sim.with_prov("storage_kwh"):
+		if sim.family(m) in ["battery_bank", "rfc_unit"]:
+			storage_planned += sim.planned(m) * float(sim.prov(m, "storage_kwh"))
 	if prepared and storage_planned < maxf(0.0, p1p2 * 0.7 - fission) * 48:
-		if not sim.enqueue("rfc_unit") and not sim.techs.has("regenerative_fuel_cell"):
-			sim.enqueue("battery_bank")
+		if not build(sim, "rfc_unit") and not sim.techs.has("regenerative_fuel_cell"):
+			build(sim, "battery_bank")
 
 	# 발전: 평균 발전량이 평균 수요의 1.25배(준비 없는 운영은 1.05배)
 	var load_sum := 0.0
@@ -92,54 +103,105 @@ func decide(sim: CitySim, day: int) -> void:
 	if towers_gen + fission < (1.25 if prepared else 1.05) * avg_load:
 		var tile := sim.free_tile()
 		if tile != "" and not (prepared and tile == "C" and sim.techs.has("megawatt_fission")):
-			sim.enqueue("solar_tower", tile)
-		elif not sim.enqueue("fission_1mw"):
-			sim.enqueue("fission_40kw")
-	if sim.planned("radiator") * float(sim.prov("radiator", "heat_kw")) < 1.2 * avg_load:
-		sim.enqueue("radiator")
+			build(sim, "solar_tower", tile)
+		elif not build(sim, "fission_1mw"):
+			build(sim, "fission_40kw")
+	var heat := 0.0
+	for m in sim.with_prov("heat_kw"):
+		if sim.prov(m, "heat_kw"):
+			heat += sim.planned(m) * float(sim.prov(m, "heat_kw"))
+	if heat < 1.2 * avg_load:
+		build(sim, "radiator")
 
 	# 거주: 다음 유인선 도착분까지 집을 준비
-	var housing: float = (sim.planned("hab_module") * float(sim.prov("hab_module", "housing"))
-		+ sim.planned("regolith_dome") * float(sim.prov("regolith_dome", "housing")))
+	var housing := 0.0
+	for m in sim.with_prov("housing"):
+		if sim.prov(m, "housing"):
+			housing += sim.planned(m) * float(sim.prov(m, "housing"))
 	if housing < pop_next:
 		if sim.techs.has("sintered_construction"):
-			if sim.planned("regolith_printer") or sim.enqueue("regolith_printer"):
-				sim.enqueue("regolith_dome")
+			if fam_planned(sim, "regolith_printer") or build(sim, "regolith_printer"):
+				build(sim, "regolith_dome")
 		elif not prepared:
-			sim.enqueue("hab_module")
+			build(sim, "hab_module")
 		elif day > 60:
-			sim.enqueue("hab_module")
+			build(sim, "hab_module")
 
 	# 식량 자급률 목표
 	var target: float = food_targets[year_index]
-	var need: float = target * pop * PER["food_kg"] - sim.planned("algae_reactor") * sim.recipe("algae_reactor", "out", "food_kg")
-	if sim.planned("hydroponics") * sim.recipe("hydroponics", "out", "food_kg") < need:
-		sim.enqueue("hydroponics")
-	if not prepared and sim.techs.has("algae_bioreactor") and sim.planned("algae_reactor") < pop / 60:
-		sim.enqueue("algae_reactor")
-	if sim.caps["food_kg"] < pop * PER["food_kg"] * 120 and not sim.queued("food_store"):
-		sim.enqueue("food_store")
-	if sim.caps["o2_kg"] < pop * PER["o2_kg"] * 25 and not sim.queued("tank_farm"):
-		sim.enqueue("tank_farm")
+	var need: float = target * pop * PER["food_kg"] - _cap(sim, "algae_reactor", "out", "food_kg")
+	if _cap(sim, "hydroponics", "out", "food_kg") < need:
+		build(sim, "hydroponics")
+	if not prepared and sim.techs.has("algae_bioreactor") and fam_planned(sim, "algae_reactor") < pop / 60:
+		build(sim, "algae_reactor")
+	if sim.caps["food_kg"] < pop * PER["food_kg"] * 120 and not fam_queued(sim, "food_store"):
+		build(sim, "food_store")
+	if sim.caps["o2_kg"] < pop * PER["o2_kg"] * 25 and not fam_queued(sim, "tank_farm"):
+		build(sim, "tank_farm")
 
 	# 물: 하루 순손실을 얼음 채굴이 넉넉히 덮도록
 	var loss: float = pop * PER["water_use_kg"] * (1 - sim.recovery) + pop * PER["o2_kg"] * 0.6 * 1.125
-	if sim.planned("ice_miner") * sim.recipe("ice_miner", "out", "water_kg") * sim.mining * 0.8 < loss + 150:
-		sim.enqueue("ice_miner")
+	if _cap(sim, "ice_miner", "out", "water_kg") * sim.mining * 0.8 < loss + 150:
+		build(sim, "ice_miner")
 
 	# 사회·연구·산업
-	if sim.planned("research_lab") < ceil(pop / 60):
-		sim.enqueue("research_lab")
-	if prepared and sim.planned("green_commons") < floor(pop / 100):
-		sim.enqueue("green_commons")
-	if sim.planned("medical_bay") * float(sim.prov("medical_bay", "care")) < pop_next:
-		sim.enqueue("medical_bay")
+	if fam_planned(sim, "research_lab") < ceil(pop / 60):
+		build(sim, "research_lab")
+	if prepared and fam_planned(sim, "green_commons") < floor(pop / 100):
+		build(sim, "green_commons")
+	var care := 0.0
+	for m in sim.with_prov("care"):
+		if sim.prov(m, "care"):
+			care += sim.planned(m) * float(sim.prov(m, "care"))
+	if care < pop_next:
+		build(sim, "medical_bay")
 	@warning_ignore("integer_division")
-	if sim.planned("excavator") < 1 + (sim.queued("regolith_dome") + sim.queued("storm_shelter")) / 2:
-		sim.enqueue("excavator")
-	if sim.techs.has("molten_regolith_electrolysis") and sim.planned("mre_plant") < 1:
-		sim.enqueue("mre_plant")
-	if sim.techs.has("local_manufacturing") and sim.planned("parts_fab") < 2 * maxi(1, sim.planned("mre_plant")):
-		sim.enqueue("parts_fab")
+	if fam_planned(sim, "excavator") < 1 + (fam_queued(sim, "regolith_dome") + fam_queued(sim, "storm_shelter")) / 2:
+		build(sim, "excavator")
+	if sim.techs.has("molten_regolith_electrolysis") and fam_planned(sim, "mre_plant") < 1:
+		build(sim, "mre_plant")
+	if sim.techs.has("local_manufacturing") and fam_planned(sim, "parts_fab") < 2 * maxi(1, fam_planned(sim, "mre_plant")):
+		build(sim, "parts_fab")
 	if sim.robots + sim.queued("robot") < 8 + pop / 40:
 		sim.enqueue_special("robot")
+
+
+## 계열의 계획 수량 (완공 + 대기)
+static func fam_planned(sim: CitySim, fam: String) -> int:
+	var n := 0
+	for m in GameData.FAMILY[fam]:
+		n += sim.planned(m)
+	return n
+
+
+static func fam_queued(sim: CitySim, fam: String) -> int:
+	var n := 0
+	for m in GameData.FAMILY[fam]:
+		n += sim.queued(m)
+	return n
+
+
+## 계열의 계획 수량 × 값 ("prov" 열쇠, 또는 조리법 "out"·"in" 열쇠) — 데이터 순서로 더한다
+static func _cap(sim: CitySim, fam: String, side: String, key: String) -> float:
+	var total := 0.0
+	for m in GameData.FAMILY[fam]:
+		var v: float = float(sim.prov(m, key)) if side == "prov" else sim.recipe(m, side, key)
+		total += sim.planned(m) * v
+	return total
+
+
+## 정책의 건설: 보통은 계열의 기본 모듈. 'variety'는 계열의 종류를 돌아가며 고르고, 못 지으면 기본 모듈
+func build(sim: CitySim, fam: String, tile: String = "") -> bool:
+	if not variety:
+		return sim.enqueue(fam, tile)
+	var options := []
+	for m in GameData.FAMILY[fam]:
+		if sim.M[m]["tech"] == null or sim.techs.has(sim.M[m]["tech"]):
+			options.append(m)
+	if options.is_empty():
+		return sim.enqueue(fam, tile)
+	var pick: String = options[sim.variety_turn % options.size()]
+	sim.variety_turn += 1
+	if pick != fam and sim.enqueue(pick, tile):
+		return true
+	return sim.enqueue(fam, tile)

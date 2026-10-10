@@ -28,6 +28,14 @@ try:
 except ImportError:  # 탈것을 아직 만들기 전
     VEHICLES = {}
 
+
+def load_types() -> None:
+    """새 건물 종류(types_<묶음>.py)를 모두 불러 BUILDINGS에 더한다."""
+    import importlib
+    for path in sorted(HERE.glob("types_*.py")):
+        if path.stem != "types_common":
+            importlib.import_module(path.stem)
+
 ART = HERE.parent.parent / "art"
 
 
@@ -293,6 +301,7 @@ def models() -> str:
 
 
 def build() -> dict[str, str]:
+    load_types()
     files: dict[str, str] = {}
     meta = {"px_per_m": iso.S, "projection": "orthographic, azimuth 45°, elevation 30°"}
     for group, reg in (("buildings", BUILDINGS), ("vehicles", VEHICLES)):

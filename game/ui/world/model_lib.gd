@@ -13,6 +13,7 @@ const GLASS := 1
 const GLOW := 2
 const LAMP_COLOR := Color(1.0, 0.95, 0.82)
 
+static var path := PATH              # 모형 파일 (미리보기 도구가 바꿀 수 있다)
 static var _data: Dictionary = {}
 static var _pal: Array = []          # [Color(선형), gloss, alpha]
 static var _cache: Dictionary = {}
@@ -21,7 +22,7 @@ static var _mats: Array = []
 
 static func data() -> Dictionary:
 	if _data.is_empty():
-		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(PATH))
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 		_data = parsed if parsed is Dictionary else {"palette": [], "buildings": {}, "vehicles": {}}
 		_pal.clear()
 		for p in _data.get("palette", []):

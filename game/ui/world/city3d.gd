@@ -402,7 +402,7 @@ func _update_tool() -> void:
 	var building := tool != null and tool.mode == "build" and tool.has_at
 	_ghost.visible = building
 	_pad.visible = building
-	_zones.visible = tool != null and tool.mode == "build" and tool.kind == "solar_tower"
+	_zones.visible = tool != null and tool.mode == "build" and CityPlan.fam(tool.kind) == "solar_tower"
 	var ok := tool == null or tool.reason == ""
 	var good := Color(0.35, 0.95, 0.55)
 	var bad := Color(1.0, 0.32, 0.22)
@@ -618,7 +618,7 @@ func _progress_of(it: Dictionary) -> float:
 func _draw_tool_overlay(view: WorldView, ov: Control, font: Font, bold: Font) -> void:
 	if tool == null or not tool.active():
 		return
-	if tool.mode == "build" and tool.kind == "solar_tower":
+	if tool.mode == "build" and CityPlan.fam(tool.kind) == "solar_tower":
 		for t in BaseLayout.ZONES:
 			var used := int(sim.tiles.get(t, 0))
 			var cap := int(sim.C["illumination"]["tiles"][t])

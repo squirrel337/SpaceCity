@@ -42,6 +42,7 @@ func _process(_delta: float) -> bool:
 		_map_check()
 		_world_check()
 		_plan_check()
+		_types_check()
 		main._on_module_tapped("hab_module")
 		main._show_help()
 		main._show_report()
@@ -92,8 +93,10 @@ func _map_check() -> void:
 	var m: BaseMap = main.base_map
 	_check(m.layout.capacity("hab_module") >= 30, "거주 모듈 자리가 모자란다")
 	_check(m.layout.capacity("solar_tower") == 38, "태양광 타워 자리가 능선 칸(8+10+20)과 다르다")
+	_check(main.sim.M.size() == 145 and GameData.FAMILY.size() == 29, "건물이 29계열 145종이 아니다")
 	for kind in main.sim.M:
-		_check(m.layout.capacity(kind) > 0, "지도에 자리가 없는 건물: " + kind)
+		if GameData.family(kind) == kind:
+			_check(m.layout.capacity(kind) > 0, "지도에 기본 자리가 없는 계열: " + kind)
 		_check(ArtLib.variants(kind) == 5, "변형이 5가지가 아닌 건물: " + kind)
 		for v in range(ArtLib.variants(kind)):
 			_check(ArtLib.texture(ArtLib.building(kind, v)["file"]) != null, "그림이 없는 건물: %s v%d" % [kind, v])
@@ -320,6 +323,41 @@ func _plan_check() -> void:
 	_check(tool.has_at and city._ghost.visible, "3D 유령 건물이 보이지 않는다")
 	tool.stop()
 	print("smoke: plan %d buildings, %d roads, route %d points" % [plan.buildings.size(), plan.edges.size(), path.size()])
+
+
+func _types_check() -> void:
+	## 건물 145종: 계열 규칙으로 도는 시뮬레이션, 자리 찾기, 거리 규칙
+	var v := CitySim.new(2061, 1.0, "variety")
+	for d in range(120):
+		for _i in range(24):
+			v.step_hour(v.population())
+		v.step_day(d)
+	var mixed := 0
+	for mid in v.counts:
+		if GameData.family(mid) != mid:
+			mixed += int(v.counts[mid])
+	_check(mixed > 0, "variety 운영이 새 종류를 짓지 않았다")
+	_check(v.population() > 0 and v.deaths.is_empty(), "variety 운영 120일에 사망자가 났다")
+	var plan: CityPlan = main.plan
+	var placed := 0
+	for mid in main.sim.M:
+		if GameData.family(mid) == mid:
+			continue
+		var spot := plan.suggest(mid)
+		if not spot.is_empty():
+			placed += 1
+	_check(placed >= 110, "빈자리를 찾은 새 종류가 모자란다: %d / 116" % placed)
+	# 거리 규칙: 매립형 원자로는 거주 건물에 20 m까지, 100 kW 원자로는 60 m — 둘이 갈리는 자리가 있어야 한다
+	var core: Rect2 = plan.layout.rects["core"]
+	var split := false
+	for k in range(0, 60):
+		var at := Vector2(core.end.x + 10.0 + k * 2.0, core.get_center().y + 30.0)
+		if plan.check_spot("buried_reactor", at, 0) == "":
+			_check(plan.check_spot("fission_100kw", at, 0).contains("원자로"), "100 kW 원자로가 거주 건물 가까이 놓인다")
+			split = true
+			break
+	_check(split, "매립형 원자로를 거주구 가까이 놓을 자리를 찾지 못했다")
+	print("smoke: types %d mixed built, %d/116 placeable" % [mixed, placed])
 
 
 func _check(ok: bool, message: String) -> void:

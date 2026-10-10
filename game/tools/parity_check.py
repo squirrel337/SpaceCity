@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """파이썬 밸런스 시뮬레이터와 Godot(GDScript) 이식본이 같은 결과를 내는지 하루 단위로 비교한다.
 
-    python3 game/tools/parity_check.py --godot godot                 # 시드 2061·1000, 두 정책, 3년
+    python3 game/tools/parity_check.py --godot godot                 # 시드 2061·1000, 세 정책, 3년
     python3 game/tools/parity_check.py --godot godot --seeds 7 --years 1
 
 두 시뮬레이터의 일별 원시 상태(반올림 전)를 모두 비교한다. 상대 오차 1e-9를 넘는 값이 하나라도 있으면 실패다.
@@ -36,6 +36,7 @@ def snapshot(c, day):
         "exposed": c.stats["exposed_person_events"], "departed_dose": c.stats["departed_dose"],
         "deaths": sum(c.deaths.values()), "next_cargo": c.next_cargo, "next_crewed": c.next_crewed,
         "dose_sum": sum(x[0] * x[1] for x in c.cohorts), "rationing": int(c.rationing), "seq": c.seq,
+        "type_mix": sum((i + 1) * c.counts[m] for i, m in enumerate(cb.MODULES)),
     }
 
 
@@ -89,7 +90,7 @@ def main():
     parser = argparse.ArgumentParser(description="파이썬 시뮬레이터와 GDScript 이식본 비교")
     parser.add_argument("--godot", default="godot", help="Godot 실행 파일")
     parser.add_argument("--seeds", type=int, nargs="+", default=[2061, 1000])
-    parser.add_argument("--policies", nargs="+", default=["good", "naive"])
+    parser.add_argument("--policies", nargs="+", default=["good", "naive", "variety"])
     parser.add_argument("--years", type=float, default=3)
     args = parser.parse_args()
     failed = False
@@ -99,7 +100,7 @@ def main():
             gd = godot_rows(args.godot, seed, policy, args.years)
             problem, (worst, where) = compare(py, gd)
             status = "실패" if problem else "일치"
-            print(f"시드 {seed:>5} · {policy:<5} · {len(py)}일: {status} (최대 상대 오차 {worst:.1e})")
+            print(f"시드 {seed:>5} · {policy:<7} · {len(py)}일: {status} (최대 상대 오차 {worst:.1e})")
             if problem:
                 print("  " + problem)
                 failed = True

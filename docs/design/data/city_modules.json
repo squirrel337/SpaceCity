@@ -206,7 +206,8 @@
         "housing": 60,
         "shelter": 60
       },
-      "note": "두꺼운 소결 레골리스 껍질. 거주자 전원이 태양 양성자 폭풍에서도 보호된다"
+      "note": "두꺼운 소결 레골리스 껍질. 거주자 전원이 태양 양성자 폭풍에서도 보호된다",
+      "printed": true
     },
     {
       "id": "electrolyzer",
@@ -895,6 +896,3101 @@
         "rp_day": 2
       },
       "note": "가족과의 영상 통화. 지구까지 왕복 2.6초"
+    },
+    {
+      "id": "transhab",
+      "name": "대형 팽창 거주동",
+      "family": "hab_module",
+      "category": "habitat",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 70
+      },
+      "build_rd": 25,
+      "power_kw": 6,
+      "crew": 0,
+      "mtbf_days": 2000,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "housing": 16
+      },
+      "note": "TransHab 규모의 큰 팽창식 거주동 — 기본 모듈의 두 배를 담는다. 여러 겹 천 벽은 미세 운석에 약하다"
+    },
+    {
+      "id": "crew_capsule",
+      "name": "승무원 캡슐",
+      "family": "hab_module",
+      "category": "habitat",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 25
+      },
+      "build_rd": 8,
+      "power_kw": 2,
+      "crew": 0,
+      "mtbf_days": 4000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "housing": 4
+      },
+      "note": "착륙선 선실을 떼어 내 쓰는 비상 거주 칸. 싸고 빨리 서지만 네 명뿐이다"
+    },
+    {
+      "id": "printed_hab",
+      "name": "인쇄 거주동",
+      "family": "hab_module",
+      "category": "habitat",
+      "priority": 1,
+      "tech": "sintered_construction",
+      "start": 0,
+      "cost": {
+        "parts": 40,
+        "regolith_t": 300
+      },
+      "build_rd": 45,
+      "power_kw": 8,
+      "crew": 0,
+      "mtbf_days": 6000,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "housing": 24,
+        "dose": "covered"
+      },
+      "printed": true,
+      "note": "레골리스 프린터가 두꺼운 벽으로 쌓은 벌집 거주동 (ICON·포스터+파트너스 개념). 벽이 곧 피복이라 선량이 피복 모듈 수준"
+    },
+    {
+      "id": "hab_stack",
+      "name": "수직 거주탑",
+      "family": "hab_module",
+      "category": "habitat",
+      "priority": 1,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 200,
+        "metal_t": 2
+      },
+      "build_rd": 60,
+      "power_kw": 14,
+      "crew": 0,
+      "mtbf_days": 2500,
+      "repair": {
+        "parts": 4,
+        "rd": 2
+      },
+      "provides": {
+        "housing": 32
+      },
+      "note": "강철 골조에 거주 모듈 넷을 쌓은 탑. 땅을 적게 쓰고 전망이 좋지만 금속이 든다"
+    },
+    {
+      "id": "ice_dome",
+      "name": "얼음 차폐 돔",
+      "family": "regolith_dome",
+      "category": "habitat",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 30,
+        "water_kg": 40000
+      },
+      "build_rd": 40,
+      "power_kw": 20,
+      "crew": 0,
+      "mtbf_days": 5000,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "housing": 40,
+        "shelter": 40
+      },
+      "note": "물을 얼린 두께 1 m 껍질 (나사 '아이스 홈' 개념). 물은 좋은 방사선 차폐다 — 대신 귀한 물 40 t가 든다"
+    },
+    {
+      "id": "crater_roof",
+      "name": "크레이터 지붕",
+      "family": "regolith_dome",
+      "category": "habitat",
+      "priority": 1,
+      "tech": "shielding_2",
+      "start": 0,
+      "cost": {
+        "parts": 120,
+        "regolith_t": 600,
+        "metal_t": 4
+      },
+      "build_rd": 140,
+      "power_kw": 60,
+      "crew": 0,
+      "mtbf_days": 6000,
+      "repair": {
+        "parts": 6,
+        "rd": 4
+      },
+      "provides": {
+        "housing": 150,
+        "shelter": 150
+      },
+      "note": "작은 크레이터에 지붕을 씌워 넓은 지하 공간을 만든다. 크레이터 벽이 차폐가 된다"
+    },
+    {
+      "id": "dome_cluster",
+      "name": "돔 마을",
+      "family": "regolith_dome",
+      "category": "habitat",
+      "priority": 1,
+      "tech": "sintered_construction",
+      "start": 0,
+      "cost": {
+        "parts": 60,
+        "regolith_t": 650
+      },
+      "build_rd": 95,
+      "power_kw": 42,
+      "crew": 0,
+      "mtbf_days": 6000,
+      "repair": {
+        "parts": 5,
+        "rd": 3
+      },
+      "provides": {
+        "housing": 90,
+        "shelter": 90
+      },
+      "printed": true,
+      "note": "작은 돔 셋을 가운데 돔에 이은 마을. 하나가 뚫려도 나머지는 산다"
+    },
+    {
+      "id": "garden_dome",
+      "name": "정원 돔",
+      "family": "regolith_dome",
+      "category": "habitat",
+      "priority": 1,
+      "tech": "sunlight_piping",
+      "start": 0,
+      "cost": {
+        "parts": 50,
+        "regolith_t": 450
+      },
+      "build_rd": 80,
+      "power_kw": 35,
+      "crew": 1,
+      "mtbf_days": 5000,
+      "repair": {
+        "parts": 4,
+        "rd": 3
+      },
+      "provides": {
+        "housing": 40,
+        "shelter": 40,
+        "morale": 3
+      },
+      "printed": true,
+      "note": "천창으로 햇빛을 들인 돔 안에 나무를 심었다. 숲이 있는 집은 사기를 올린다"
+    },
+    {
+      "id": "pem_electrolyzer",
+      "name": "고분자막 전기분해기",
+      "family": "electrolyzer",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 25
+      },
+      "build_rd": 8,
+      "power_kw": 36,
+      "crew": 0,
+      "mtbf_days": 600,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "water_kg": 168.75
+        },
+        "out": {
+          "o2_kg": 150,
+          "h2_kg": 18.75
+        }
+      },
+      "note": "ISS 산소 발생기(OGA)와 같은 고분자 전해질막 방식. 같은 산소에 전기가 덜 든다"
+    },
+    {
+      "id": "soe_electrolyzer",
+      "name": "고체산화물 전기분해기",
+      "family": "electrolyzer",
+      "category": "life_support",
+      "priority": 1,
+      "tech": "closed_loop_ls2",
+      "start": 0,
+      "cost": {
+        "parts": 40
+      },
+      "build_rd": 12,
+      "power_kw": 44,
+      "crew": 0,
+      "mtbf_days": 350,
+      "repair": {
+        "parts": 3,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "water_kg": 247.5
+        },
+        "out": {
+          "o2_kg": 220,
+          "h2_kg": 27.5
+        }
+      },
+      "note": "800 °C 세라믹 셀 (화성 MOXIE와 같은 고체산화물). 효율이 가장 높지만 데웠다 식히기를 견디지 못해 자주 고장 난다"
+    },
+    {
+      "id": "mini_electrolyzer",
+      "name": "소형 전기분해기",
+      "family": "electrolyzer",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 6
+      },
+      "build_rd": 3,
+      "power_kw": 11,
+      "crew": 0,
+      "mtbf_days": 500,
+      "repair": {
+        "parts": 1,
+        "rd": 0.5
+      },
+      "recipe": {
+        "in": {
+          "water_kg": 45
+        },
+        "out": {
+          "o2_kg": 40,
+          "h2_kg": 5
+        }
+      },
+      "note": "비상용 작은 전해조. 싸고 빨리 서지만 산소가 적다"
+    },
+    {
+      "id": "alkaline_electrolyzer",
+      "name": "알칼리 전기분해기",
+      "family": "electrolyzer",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 15
+      },
+      "build_rd": 6,
+      "power_kw": 34,
+      "crew": 0,
+      "mtbf_days": 1200,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "water_kg": 135
+        },
+        "out": {
+          "o2_kg": 120,
+          "h2_kg": 15
+        }
+      },
+      "note": "100년 된 알칼리 수전해. 효율은 낮지만 튼튼하다"
+    },
+    {
+      "id": "amine_scrubber",
+      "name": "고체 아민 흡착기",
+      "family": "co2_scrubber",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 8
+      },
+      "build_rd": 3,
+      "power_kw": 4,
+      "crew": 0,
+      "mtbf_days": 500,
+      "repair": {
+        "parts": 1,
+        "rd": 0.5
+      },
+      "provides": {
+        "co2_kg_day": 160
+      },
+      "note": "오리온 우주선의 아민 흡착 방식. 진공에 열어 재생해 전기가 적게 든다"
+    },
+    {
+      "id": "molecular_sieve",
+      "name": "분자체 흡착기",
+      "family": "co2_scrubber",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 12
+      },
+      "build_rd": 4,
+      "power_kw": 9,
+      "crew": 0,
+      "mtbf_days": 220,
+      "repair": {
+        "parts": 1,
+        "rd": 0.5
+      },
+      "provides": {
+        "co2_kg_day": 220
+      },
+      "note": "ISS의 4층 분자체(CDRA). 용량은 크지만 자주 고장 났던 방식이다"
+    },
+    {
+      "id": "lioh_canister",
+      "name": "수산화리튬 정화기",
+      "family": "co2_scrubber",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 2
+      },
+      "build_rd": 1,
+      "power_kw": 0.5,
+      "crew": 0,
+      "mtbf_days": 60,
+      "repair": {
+        "parts": 1,
+        "rd": 0.2
+      },
+      "provides": {
+        "co2_kg_day": 60
+      },
+      "note": "아폴로 13호의 그 통. 전기는 거의 안 들지만 통을 자주 갈아야 한다 (짧은 고장 간격 = 통 교체)"
+    },
+    {
+      "id": "ionic_scrubber",
+      "name": "이온성 액체 흡수기",
+      "family": "co2_scrubber",
+      "category": "life_support",
+      "priority": 1,
+      "tech": "closed_loop_ls2",
+      "start": 0,
+      "cost": {
+        "parts": 30
+      },
+      "build_rd": 10,
+      "power_kw": 12,
+      "crew": 0,
+      "mtbf_days": 700,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "co2_kg_day": 320
+      },
+      "note": "이온성 액체에 CO₂를 녹였다 되찾는 차세대 흡수기. 크고 조용하다"
+    },
+    {
+      "id": "bosch_reactor",
+      "name": "보시 반응기",
+      "family": "sabatier",
+      "category": "life_support",
+      "priority": 1,
+      "tech": "closed_loop_ls2",
+      "start": 0,
+      "cost": {
+        "parts": 30
+      },
+      "build_rd": 10,
+      "power_kw": 8,
+      "crew": 0,
+      "mtbf_days": 250,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 110,
+          "h2_kg": 10
+        },
+        "out": {
+          "ch4_kg": 0,
+          "water_kg": 90
+        }
+      },
+      "note": "CO₂를 고체 탄소와 물로 바꾼다. 수소를 메탄으로 버리지 않지만 쌓인 탄소 때문에 촉매를 자주 간다"
+    },
+    {
+      "id": "sabatier_large",
+      "name": "대형 사바티에 반응기",
+      "family": "sabatier",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 22
+      },
+      "build_rd": 8,
+      "power_kw": 6,
+      "crew": 0,
+      "mtbf_days": 600,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 275,
+          "h2_kg": 50
+        },
+        "out": {
+          "ch4_kg": 100,
+          "water_kg": 225
+        }
+      },
+      "note": "같은 반응을 큰 그릇에서 — 여러 기를 두는 것보다 싸다"
+    },
+    {
+      "id": "microchannel_sabatier",
+      "name": "마이크로채널 반응기",
+      "family": "sabatier",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 18
+      },
+      "build_rd": 5,
+      "power_kw": 3,
+      "crew": 0,
+      "mtbf_days": 900,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 165,
+          "h2_kg": 30
+        },
+        "out": {
+          "ch4_kg": 60,
+          "water_kg": 135
+        }
+      },
+      "note": "미세 유로에 촉매를 입힌 작고 효율 좋은 반응기 (PNNL 개념)"
+    },
+    {
+      "id": "sabatier_compact",
+      "name": "소형 사바티에 반응기",
+      "family": "sabatier",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 5
+      },
+      "build_rd": 2,
+      "power_kw": 1.5,
+      "crew": 0,
+      "mtbf_days": 600,
+      "repair": {
+        "parts": 1,
+        "rd": 0.5
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 55,
+          "h2_kg": 10
+        },
+        "out": {
+          "ch4_kg": 20,
+          "water_kg": 45
+        }
+      },
+      "note": "작고 싼 반응기. 초기 기지의 보조용"
+    },
+    {
+      "id": "vapor_compressor",
+      "name": "증기 압축 증류기",
+      "family": "water_recycler",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 12
+      },
+      "build_rd": 5,
+      "power_kw": 6,
+      "crew": 0,
+      "mtbf_days": 350,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "wastewater_kg_day": 700
+      },
+      "note": "ISS 소변 처리기(UPA)의 회전 증류기"
+    },
+    {
+      "id": "membrane_bioreactor",
+      "name": "막 생물반응기",
+      "family": "water_recycler",
+      "category": "life_support",
+      "priority": 1,
+      "tech": "closed_loop_ls2",
+      "start": 0,
+      "cost": {
+        "parts": 25
+      },
+      "build_rd": 10,
+      "power_kw": 12,
+      "crew": 1,
+      "mtbf_days": 600,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "wastewater_kg_day": 1500
+      },
+      "note": "미생물이 유기물을 먹고 막이 걸러 내는 하수 처리 방식"
+    },
+    {
+      "id": "forward_osmosis",
+      "name": "정삼투 정수기",
+      "family": "water_recycler",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 10
+      },
+      "build_rd": 4,
+      "power_kw": 2,
+      "crew": 0,
+      "mtbf_days": 900,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "wastewater_kg_day": 500
+      },
+      "note": "삼투압으로 물을 끌어내 전기가 거의 들지 않는다. 느리다"
+    },
+    {
+      "id": "multifilter_plant",
+      "name": "다중 여과 정수장",
+      "family": "water_recycler",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 30
+      },
+      "build_rd": 12,
+      "power_kw": 16,
+      "crew": 0,
+      "mtbf_days": 500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "wastewater_kg_day": 1800
+      },
+      "note": "ISS 물 처리기(WPA)를 키운 다단 여과·촉매 산화 설비"
+    },
+    {
+      "id": "cryo_tank",
+      "name": "극저온 탱크",
+      "family": "tank_farm",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 30
+      },
+      "build_rd": 8,
+      "power_kw": 4,
+      "crew": 0,
+      "mtbf_days": 2500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "storage": {
+          "o2_kg": 9000,
+          "h2_kg": 1500,
+          "ch4_kg": 3000
+        }
+      },
+      "note": "액체 산소·수소를 담는 단열 탱크와 냉동기"
+    },
+    {
+      "id": "water_cistern",
+      "name": "매립 물탱크",
+      "family": "tank_farm",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 12,
+        "regolith_t": 80
+      },
+      "build_rd": 10,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 9000,
+      "repair": {
+        "parts": 1,
+        "rd": 2
+      },
+      "provides": {
+        "storage": {
+          "water_kg": 80000,
+          "wastewater_kg": 8000
+        }
+      },
+      "note": "레골리스 밑에 묻은 물탱크. 땅의 열로 얼지 않는다"
+    },
+    {
+      "id": "gas_rack",
+      "name": "고압 기체 저장대",
+      "family": "tank_farm",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 14
+      },
+      "build_rd": 5,
+      "power_kw": 1,
+      "crew": 0,
+      "mtbf_days": 4000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "storage": {
+          "o2_kg": 4000,
+          "h2_kg": 600,
+          "ch4_kg": 2000,
+          "co2_kg": 3000
+        }
+      },
+      "note": "복합재 고압 용기를 줄지어 세운 선반"
+    },
+    {
+      "id": "bladder_store",
+      "name": "팽창식 저장 주머니",
+      "family": "tank_farm",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 6
+      },
+      "build_rd": 2,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 1200,
+      "repair": {
+        "parts": 1,
+        "rd": 0.5
+      },
+      "provides": {
+        "storage": {
+          "water_kg": 30000,
+          "wastewater_kg": 8000,
+          "co2_kg": 2000
+        }
+      },
+      "note": "접어 싣는 물·폐수 주머니. 싸지만 잘 샌다"
+    },
+    {
+      "id": "aeroponic_farm",
+      "name": "공기분무 농장",
+      "family": "hydroponics",
+      "category": "food",
+      "priority": 2,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 40
+      },
+      "build_rd": 12,
+      "power_kw": 62,
+      "crew": 2,
+      "mtbf_days": 650,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 16,
+          "water_kg": 1.5
+        },
+        "out": {
+          "food_kg": 8,
+          "o2_kg": 13
+        }
+      },
+      "note": "뿌리에 양액 안개를 뿌린다 (나사 에어로포닉스). 물이 덜 들고 더 자란다"
+    },
+    {
+      "id": "vertical_farm",
+      "name": "수직 농장",
+      "family": "hydroponics",
+      "category": "food",
+      "priority": 2,
+      "tech": "sunlight_piping",
+      "start": 0,
+      "cost": {
+        "parts": 90
+      },
+      "build_rd": 25,
+      "power_kw": 150,
+      "crew": 4,
+      "mtbf_days": 900,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 32,
+          "water_kg": 5
+        },
+        "out": {
+          "food_kg": 16,
+          "o2_kg": 26
+        }
+      },
+      "note": "LED 선반을 여섯 층 쌓은 농장. 땅은 적게 쓰고 전기는 많이 든다"
+    },
+    {
+      "id": "potato_bay",
+      "name": "감자 재배실",
+      "family": "hydroponics",
+      "category": "food",
+      "priority": 2,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 18
+      },
+      "build_rd": 7,
+      "power_kw": 30,
+      "crew": 1,
+      "mtbf_days": 1100,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 9,
+          "water_kg": 2
+        },
+        "out": {
+          "food_kg": 5,
+          "o2_kg": 7
+        }
+      },
+      "note": "빛을 적게 먹는 감자·고구마 (국제감자센터 '화성 감자' 실험)"
+    },
+    {
+      "id": "wheat_bay",
+      "name": "밀 재배실",
+      "family": "hydroponics",
+      "category": "food",
+      "priority": 2,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 55
+      },
+      "build_rd": 16,
+      "power_kw": 105,
+      "crew": 3,
+      "mtbf_days": 800,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 22,
+          "water_kg": 4
+        },
+        "out": {
+          "food_kg": 11,
+          "o2_kg": 18
+        }
+      },
+      "note": "나사 생물재생 실험(BPC)의 밀 — 면적당 수확이 가장 높고 빛이 아주 많이 든다"
+    },
+    {
+      "id": "spirulina_tank",
+      "name": "스피룰리나 배양조",
+      "family": "algae_reactor",
+      "category": "food",
+      "priority": 2,
+      "tech": "algae_bioreactor",
+      "start": 0,
+      "cost": {
+        "parts": 18
+      },
+      "build_rd": 6,
+      "power_kw": 18,
+      "crew": 1,
+      "mtbf_days": 600,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 21,
+          "water_kg": 1.5
+        },
+        "out": {
+          "o2_kg": 15,
+          "food_kg": 4
+        }
+      },
+      "note": "먹을 수 있는 남조류 (ESA MELiSSA). 식량이 많고 산소는 조금 적다"
+    },
+    {
+      "id": "chlorella_column",
+      "name": "클로렐라 기둥",
+      "family": "algae_reactor",
+      "category": "food",
+      "priority": 2,
+      "tech": "algae_bioreactor",
+      "start": 0,
+      "cost": {
+        "parts": 20
+      },
+      "build_rd": 7,
+      "power_kw": 22,
+      "crew": 1,
+      "mtbf_days": 550,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 44,
+          "water_kg": 1
+        },
+        "out": {
+          "o2_kg": 32,
+          "food_kg": 1
+        }
+      },
+      "note": "가는 유리관 수백 개에 클로렐라를 키운다. 산소 공장이다"
+    },
+    {
+      "id": "algae_raceway",
+      "name": "조류 수로",
+      "family": "algae_reactor",
+      "category": "food",
+      "priority": 2,
+      "tech": "algae_bioreactor",
+      "start": 0,
+      "cost": {
+        "parts": 10
+      },
+      "build_rd": 5,
+      "power_kw": 8,
+      "crew": 1,
+      "mtbf_days": 1200,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 19,
+          "water_kg": 3
+        },
+        "out": {
+          "o2_kg": 14,
+          "food_kg": 2
+        }
+      },
+      "note": "물길을 따라 도는 개방형 배양장 (여압 홀 안). 싸고 튼튼하지만 물이 많이 든다"
+    },
+    {
+      "id": "cyanobacteria_reactor",
+      "name": "남세균 반응기",
+      "family": "algae_reactor",
+      "category": "food",
+      "priority": 2,
+      "tech": "algae_bioreactor",
+      "start": 0,
+      "cost": {
+        "parts": 22
+      },
+      "build_rd": 8,
+      "power_kw": 17,
+      "crew": 1,
+      "mtbf_days": 500,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 36,
+          "water_kg": 1.5
+        },
+        "out": {
+          "o2_kg": 26,
+          "food_kg": 1.5
+        }
+      },
+      "note": "레골리스 양분으로 자라는 남세균 (아나베나) — 현지 자원으로 키우는 첫 생물"
+    },
+    {
+      "id": "cold_store",
+      "name": "냉동 저장고",
+      "family": "food_store",
+      "category": "food",
+      "priority": 2,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 14
+      },
+      "build_rd": 5,
+      "power_kw": 4,
+      "crew": 0,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "storage": {
+          "food_kg": 25000
+        }
+      },
+      "note": "얼려서 오래 둔다. 냉동기가 전기를 먹는다"
+    },
+    {
+      "id": "seed_vault",
+      "name": "종자 금고",
+      "family": "food_store",
+      "category": "food",
+      "priority": 2,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 10,
+        "regolith_t": 40
+      },
+      "build_rd": 6,
+      "power_kw": 1,
+      "crew": 0,
+      "mtbf_days": 9000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "storage": {
+          "food_kg": 2000
+        },
+        "morale": 1
+      },
+      "note": "지구의 종자를 묻어 둔 금고 (스발바르 종자 금고의 달판). 희망이 사기를 조금 올린다"
+    },
+    {
+      "id": "grain_silo",
+      "name": "곡물 사일로",
+      "family": "food_store",
+      "category": "food",
+      "priority": 2,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 9,
+        "regolith_t": 30
+      },
+      "build_rd": 5,
+      "power_kw": 1,
+      "crew": 0,
+      "mtbf_days": 6000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "storage": {
+          "food_kg": 18000
+        }
+      },
+      "note": "세운 원통 사일로. 땅을 적게 쓴다"
+    },
+    {
+      "id": "galley",
+      "name": "공동 주방",
+      "family": "food_store",
+      "category": "food",
+      "priority": 2,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 20
+      },
+      "build_rd": 8,
+      "power_kw": 8,
+      "crew": 2,
+      "mtbf_days": 2500,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "storage": {
+          "food_kg": 3000
+        },
+        "morale": 2
+      },
+      "note": "함께 요리하고 먹는 곳. 우주 생활에서 식사는 가장 큰 즐거움이다"
+    },
+    {
+      "id": "tall_solar_tower",
+      "name": "50 m 트러스 타워",
+      "family": "solar_tower",
+      "category": "power",
+      "priority": null,
+      "tech": "tall_towers",
+      "start": 0,
+      "cost": {
+        "parts": 60,
+        "metal_t": 1
+      },
+      "build_rd": 25,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 1200,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "generation_kw": 160
+      },
+      "note": "그림자 위로 더 높이 — 50 m 높이에서는 빛을 받는 시간이 늘어난다"
+    },
+    {
+      "id": "light_solar_tower",
+      "name": "경량 타워",
+      "family": "solar_tower",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 14
+      },
+      "build_rd": 7,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 1000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "generation_kw": 70
+      },
+      "note": "접어 세우는 가벼운 타워. 싸지만 패널이 작다"
+    },
+    {
+      "id": "bifacial_tower",
+      "name": "양면 패널 타워",
+      "family": "solar_tower",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 34
+      },
+      "build_rd": 14,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 1500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "generation_kw": 120
+      },
+      "note": "앞뒤로 빛을 받는 양면 패널 — 레골리스에 반사된 빛까지 쓴다"
+    },
+    {
+      "id": "tracking_tower",
+      "name": "추적식 타워",
+      "family": "solar_tower",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 40
+      },
+      "build_rd": 16,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 900,
+      "repair": {
+        "parts": 3,
+        "rd": 1
+      },
+      "provides": {
+        "generation_kw": 135
+      },
+      "note": "해를 따라 도는 회전 타워. 기계 장치라 고장이 잦다"
+    },
+    {
+      "id": "kilopower_10",
+      "name": "킬로파워 10 kW",
+      "family": "fission_40kw",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 20
+      },
+      "build_rd": 10,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 6000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "generation_kw": 10
+      },
+      "note": "나사 KRUSTY 시험(2018)의 1~10 kW 원자로. 작고 단순하다"
+    },
+    {
+      "id": "rtg_pack",
+      "name": "방사성동위원소 발전기",
+      "family": "fission_40kw",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 8
+      },
+      "build_rd": 2,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 15000,
+      "repair": {
+        "parts": 1,
+        "rd": 0.5
+      },
+      "provides": {
+        "generation_kw": 3
+      },
+      "clearance_m": 10,
+      "note": "플루토늄-238 붕괴열로 수십 년 전기를 낸다 (보이저·큐리오시티). 적지만 끊기지 않는다"
+    },
+    {
+      "id": "fission_100kw",
+      "name": "100 kW 원자로",
+      "family": "fission_40kw",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 130
+      },
+      "build_rd": 55,
+      "power_kw": 0,
+      "crew": 1,
+      "mtbf_days": 4500,
+      "repair": {
+        "parts": 6,
+        "rd": 3
+      },
+      "provides": {
+        "generation_kw": 100
+      },
+      "note": "나사 핵분열 지표 발전(FSP)의 다음 단계 규모"
+    },
+    {
+      "id": "buried_reactor",
+      "name": "매립형 원자로",
+      "family": "fission_40kw",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 70,
+        "regolith_t": 200
+      },
+      "build_rd": 45,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 4500,
+      "repair": {
+        "parts": 5,
+        "rd": 4
+      },
+      "provides": {
+        "generation_kw": 40
+      },
+      "clearance_m": 20,
+      "note": "레골리스 3 m 밑에 묻어 차폐했다 — 사람 사는 건물에 20 m까지 다가가도 된다"
+    },
+    {
+      "id": "fission_500kw",
+      "name": "500 kW 원자로",
+      "family": "fission_1mw",
+      "category": "power",
+      "priority": null,
+      "tech": "megawatt_fission",
+      "start": 0,
+      "cost": {
+        "parts": 150,
+        "regolith_t": 60,
+        "metal_t": 3
+      },
+      "build_rd": 80,
+      "power_kw": 0,
+      "crew": 1,
+      "mtbf_days": 5000,
+      "repair": {
+        "parts": 7,
+        "rd": 4
+      },
+      "provides": {
+        "generation_kw": 500
+      },
+      "note": "메가와트급의 절반 — 먼저 세워 운전 경험을 쌓는다"
+    },
+    {
+      "id": "brayton_reactor",
+      "name": "브레이턴 원자로",
+      "family": "fission_1mw",
+      "category": "power",
+      "priority": null,
+      "tech": "megawatt_fission",
+      "start": 0,
+      "cost": {
+        "parts": 320,
+        "regolith_t": 100,
+        "metal_t": 7
+      },
+      "build_rd": 140,
+      "power_kw": 0,
+      "crew": 2,
+      "mtbf_days": 4200,
+      "repair": {
+        "parts": 12,
+        "rd": 6
+      },
+      "provides": {
+        "generation_kw": 1300
+      },
+      "note": "헬륨-제논 가스 터빈으로 열을 전기로 바꾼다 — 같은 노심에서 전기가 더 나온다"
+    },
+    {
+      "id": "molten_salt_reactor",
+      "name": "용융염 원자로",
+      "family": "fission_1mw",
+      "category": "power",
+      "priority": null,
+      "tech": "megawatt_fission",
+      "start": 0,
+      "cost": {
+        "parts": 420,
+        "regolith_t": 150,
+        "metal_t": 12
+      },
+      "build_rd": 200,
+      "power_kw": 0,
+      "crew": 3,
+      "mtbf_days": 3600,
+      "repair": {
+        "parts": 15,
+        "rd": 8
+      },
+      "provides": {
+        "generation_kw": 2200
+      },
+      "note": "녹인 소금에 연료를 녹인 원자로. 출력이 크지만 배관이 까다롭다"
+    },
+    {
+      "id": "he3_fusion_pilot",
+      "name": "헬륨-3 핵융합 시험로",
+      "family": "fission_1mw",
+      "category": "power",
+      "priority": null,
+      "tech": "rotating_habitat",
+      "start": 0,
+      "cost": {
+        "parts": 900,
+        "regolith_t": 300,
+        "metal_t": 30
+      },
+      "build_rd": 400,
+      "power_kw": 0,
+      "crew": 6,
+      "mtbf_days": 1500,
+      "repair": {
+        "parts": 30,
+        "rd": 15
+      },
+      "provides": {
+        "generation_kw": 3000
+      },
+      "note": "레골리스의 헬륨-3를 태우는 시험로. 2060년대에는 아직 실험이라 고장이 잦다"
+    },
+    {
+      "id": "solid_state_bank",
+      "name": "전고체 배터리",
+      "family": "battery_bank",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 65
+      },
+      "build_rd": 8,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 4000,
+      "repair": {
+        "parts": 3,
+        "rd": 1
+      },
+      "provides": {
+        "storage_kwh": 1200
+      },
+      "note": "고체 전해질 배터리. 두 배 넘게 담고 불이 나지 않는다"
+    },
+    {
+      "id": "nickel_hydrogen_bank",
+      "name": "니켈-수소 전지",
+      "family": "battery_bank",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 22
+      },
+      "build_rd": 6,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 6000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "storage_kwh": 400
+      },
+      "note": "허블·ISS가 쓴 압력 용기 전지. 담는 양은 적지만 수십 년을 간다"
+    },
+    {
+      "id": "supercap_bank",
+      "name": "초고용량 축전기",
+      "family": "battery_bank",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 8
+      },
+      "build_rd": 2,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 10000,
+      "repair": {
+        "parts": 1,
+        "rd": 0.5
+      },
+      "provides": {
+        "storage_kwh": 60
+      },
+      "note": "조금 담지만 싸고 거의 닳지 않는다"
+    },
+    {
+      "id": "sodium_bank",
+      "name": "나트륨이온 배터리",
+      "family": "battery_bank",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 18
+      },
+      "build_rd": 6,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "storage_kwh": 450
+      },
+      "note": "리튬 대신 흔한 나트륨 — 값이 싸다"
+    },
+    {
+      "id": "rfc_large",
+      "name": "대형 재생 연료전지",
+      "family": "rfc_unit",
+      "category": "power",
+      "priority": null,
+      "tech": "regenerative_fuel_cell",
+      "start": 0,
+      "cost": {
+        "parts": 50
+      },
+      "build_rd": 22,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 1200,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "storage_kwh": 6000
+      },
+      "note": "큰 수소·산소 탱크와 연료전지. 긴 그림자를 버티는 축전의 중심"
+    },
+    {
+      "id": "iron_air_bank",
+      "name": "철-공기 장주기 전지",
+      "family": "rfc_unit",
+      "category": "power",
+      "priority": null,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 18,
+        "metal_t": 2
+      },
+      "build_rd": 14,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "storage_kwh": 3000
+      },
+      "note": "녹스는 철로 전기를 담는다 (100시간 저장). 현지 금속을 쓴다"
+    },
+    {
+      "id": "thermal_wadi",
+      "name": "열 저장 와디",
+      "family": "rfc_unit",
+      "category": "power",
+      "priority": null,
+      "tech": "sintered_construction",
+      "start": 0,
+      "cost": {
+        "parts": 12,
+        "regolith_t": 80
+      },
+      "build_rd": 12,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 6000,
+      "repair": {
+        "parts": 1,
+        "rd": 2
+      },
+      "provides": {
+        "storage_kwh": 1200
+      },
+      "note": "소결 레골리스 덩어리에 낮의 열을 담아 밤에 스털링 엔진으로 되찾는다 (ESA '와디' 개념)"
+    },
+    {
+      "id": "gas_store",
+      "name": "압축 기체 축전기",
+      "family": "rfc_unit",
+      "category": "power",
+      "priority": null,
+      "tech": "regenerative_fuel_cell",
+      "start": 0,
+      "cost": {
+        "parts": 14
+      },
+      "build_rd": 8,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 2500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "storage_kwh": 900
+      },
+      "note": "기체를 압축해 담았다가 터빈으로 되찾는다"
+    },
+    {
+      "id": "heatpipe_radiator",
+      "name": "히트파이프 방열판",
+      "family": "radiator",
+      "category": "thermal",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 16
+      },
+      "build_rd": 5,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 6000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "heat_kw": 360
+      },
+      "note": "히트파이프 수백 개가 열을 고르게 퍼뜨린다"
+    },
+    {
+      "id": "tall_radiator",
+      "name": "수직 방열탑",
+      "family": "radiator",
+      "category": "thermal",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 14
+      },
+      "build_rd": 6,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 5000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "heat_kw": 320
+      },
+      "note": "패널을 세워 낮은 해를 옆으로 받는다 — 극지에 맞는 방열"
+    },
+    {
+      "id": "droplet_radiator",
+      "name": "액적 방열기",
+      "family": "radiator",
+      "category": "thermal",
+      "priority": null,
+      "tech": "orbital_assembly",
+      "start": 0,
+      "cost": {
+        "parts": 60
+      },
+      "build_rd": 20,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 1500,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "heat_kw": 1100
+      },
+      "note": "뜨거운 기름방울을 흩뿌렸다 받는다 — 가볍고 크다"
+    },
+    {
+      "id": "regolith_sink",
+      "name": "레골리스 열 저장소",
+      "family": "radiator",
+      "category": "thermal",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 5,
+        "regolith_t": 100
+      },
+      "build_rd": 6,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 9000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "heat_kw": 160
+      },
+      "note": "배관을 레골리스에 묻어 열을 땅에 버린다. 고장이 거의 없다"
+    },
+    {
+      "id": "microwave_extractor",
+      "name": "마이크로파 추출기",
+      "family": "ice_miner",
+      "category": "industry",
+      "priority": 3,
+      "tech": "polar_prospecting",
+      "start": 0,
+      "cost": {
+        "parts": 55
+      },
+      "build_rd": 18,
+      "power_kw": 110,
+      "crew": 1,
+      "mtbf_days": 300,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "recipe": {
+        "in": {},
+        "out": {
+          "water_kg": 900
+        }
+      },
+      "note": "마이크로파로 얼음 섞인 흙을 데워 땅을 파지 않고 수증기를 뽑는다"
+    },
+    {
+      "id": "ice_harvester",
+      "name": "대형 얼음 수확기",
+      "family": "ice_miner",
+      "category": "industry",
+      "priority": 3,
+      "tech": "autonomous_robots_2",
+      "start": 0,
+      "cost": {
+        "parts": 130
+      },
+      "build_rd": 35,
+      "power_kw": 230,
+      "crew": 3,
+      "mtbf_days": 150,
+      "repair": {
+        "parts": 5,
+        "rd": 3
+      },
+      "recipe": {
+        "in": {},
+        "out": {
+          "water_kg": 2000
+        }
+      },
+      "note": "퍼서 굽고 얼리는 거대한 무한궤도 공장. 많이 캐지만 극저온에서 자주 멈춘다"
+    },
+    {
+      "id": "heat_probe_field",
+      "name": "열 탐침 밭",
+      "family": "ice_miner",
+      "category": "industry",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 15
+      },
+      "build_rd": 6,
+      "power_kw": 20,
+      "crew": 0,
+      "mtbf_days": 900,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {},
+        "out": {
+          "water_kg": 250
+        }
+      },
+      "note": "얼음층에 가열 탐침을 꽂아 수증기를 관으로 뽑는다 — 싸고 튼튼하다"
+    },
+    {
+      "id": "sublimation_plant",
+      "name": "승화 정제 공장",
+      "family": "ice_miner",
+      "category": "industry",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 45
+      },
+      "build_rd": 16,
+      "power_kw": 60,
+      "crew": 2,
+      "mtbf_days": 400,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "recipe": {
+        "in": {},
+        "out": {
+          "water_kg": 600
+        }
+      },
+      "note": "회전 가마에서 얼음을 승화시켜 깨끗한 물만 모은다"
+    },
+    {
+      "id": "bucket_wheel",
+      "name": "버킷휠 굴착기",
+      "family": "excavator",
+      "category": "industry",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 70
+      },
+      "build_rd": 18,
+      "power_kw": 45,
+      "crew": 1,
+      "mtbf_days": 250,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "recipe": {
+        "in": {},
+        "out": {
+          "regolith_t": 150
+        }
+      },
+      "note": "도는 바퀴에 달린 바가지가 쉬지 않고 판다"
+    },
+    {
+      "id": "rassor",
+      "name": "래서 굴착 로봇",
+      "family": "excavator",
+      "category": "industry",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 14
+      },
+      "build_rd": 5,
+      "power_kw": 8,
+      "crew": 0,
+      "mtbf_days": 600,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {},
+        "out": {
+          "regolith_t": 30
+        }
+      },
+      "note": "나사 RASSOR — 마주 도는 드럼 두 개로 파서 저중력에서도 미끄러지지 않는다"
+    },
+    {
+      "id": "dragline",
+      "name": "드래그라인",
+      "family": "excavator",
+      "category": "industry",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 45
+      },
+      "build_rd": 14,
+      "power_kw": 30,
+      "crew": 1,
+      "mtbf_days": 400,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {},
+        "out": {
+          "regolith_t": 100
+        }
+      },
+      "note": "긴 붐에 매단 바가지를 끌어 판다"
+    },
+    {
+      "id": "regolith_sorter",
+      "name": "레골리스 체질기",
+      "family": "excavator",
+      "category": "industry",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 20
+      },
+      "build_rd": 6,
+      "power_kw": 12,
+      "crew": 0,
+      "mtbf_days": 500,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {},
+        "out": {
+          "regolith_t": 40
+        }
+      },
+      "note": "파낸 흙을 체로 걸러 인쇄·소결에 쓸 고운 흙을 고른다"
+    },
+    {
+      "id": "gantry_printer",
+      "name": "대형 갠트리 프린터",
+      "family": "regolith_printer",
+      "category": "industry",
+      "priority": 3,
+      "tech": "sintered_construction",
+      "start": 0,
+      "cost": {
+        "parts": 95
+      },
+      "build_rd": 25,
+      "power_kw": 65,
+      "crew": 2,
+      "mtbf_days": 350,
+      "repair": {
+        "parts": 4,
+        "rd": 2
+      },
+      "provides": {
+        "print_t_day": 50
+      },
+      "note": "레일 위의 큰 문틀이 돔 벽을 층층이 쌓는다"
+    },
+    {
+      "id": "solar_sinterer",
+      "name": "태양 집광 소결기",
+      "family": "regolith_printer",
+      "category": "industry",
+      "priority": 3,
+      "tech": "sintered_construction",
+      "start": 0,
+      "cost": {
+        "parts": 25
+      },
+      "build_rd": 8,
+      "power_kw": 6,
+      "crew": 1,
+      "mtbf_days": 800,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "print_t_day": 12
+      },
+      "note": "거울로 햇빛을 모아 레골리스를 녹여 굳힌다. 전기가 거의 들지 않는다"
+    },
+    {
+      "id": "binder_jet_printer",
+      "name": "결합제 분사 프린터",
+      "family": "regolith_printer",
+      "category": "industry",
+      "priority": 3,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 60
+      },
+      "build_rd": 15,
+      "power_kw": 22,
+      "crew": 1,
+      "mtbf_days": 300,
+      "repair": {
+        "parts": 3,
+        "rd": 1
+      },
+      "provides": {
+        "print_t_day": 35
+      },
+      "note": "모래에 결합제를 뿌려 굳히는 D-Shape 방식"
+    },
+    {
+      "id": "brick_press",
+      "name": "레골리스 벽돌 압착기",
+      "family": "regolith_printer",
+      "category": "industry",
+      "priority": 3,
+      "tech": "sintered_construction",
+      "start": 0,
+      "cost": {
+        "parts": 45
+      },
+      "build_rd": 12,
+      "power_kw": 35,
+      "crew": 2,
+      "mtbf_days": 450,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "print_t_day": 25
+      },
+      "note": "눌러 구운 벽돌을 로봇이 쌓는다"
+    },
+    {
+      "id": "ffc_reducer",
+      "name": "FFC 환원로",
+      "family": "mre_plant",
+      "category": "industry",
+      "priority": 3,
+      "tech": "molten_regolith_electrolysis",
+      "start": 0,
+      "cost": {
+        "parts": 70
+      },
+      "build_rd": 30,
+      "power_kw": 140,
+      "crew": 2,
+      "mtbf_days": 500,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "recipe": {
+        "in": {
+          "regolith_t": 1
+        },
+        "out": {
+          "metal_t": 0.4,
+          "o2_kg": 350
+        }
+      },
+      "note": "녹인 염화칼슘 속에서 레골리스를 환원한다 (메탈리시스·ESA). 낮은 온도에서 금속을 더 많이 뽑는다"
+    },
+    {
+      "id": "hydrogen_reducer",
+      "name": "수소 환원로",
+      "family": "mre_plant",
+      "category": "industry",
+      "priority": 3,
+      "tech": "sintered_construction",
+      "start": 0,
+      "cost": {
+        "parts": 50
+      },
+      "build_rd": 20,
+      "power_kw": 70,
+      "crew": 2,
+      "mtbf_days": 650,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "regolith_t": 3
+        },
+        "out": {
+          "metal_t": 0.2,
+          "o2_kg": 150
+        }
+      },
+      "note": "일메나이트를 수소로 환원해 물(→ 산소)을 얻는다. 단순하지만 수율이 낮다"
+    },
+    {
+      "id": "carbothermal_reactor",
+      "name": "탄소열 환원로",
+      "family": "mre_plant",
+      "category": "industry",
+      "priority": 3,
+      "tech": "molten_regolith_electrolysis",
+      "start": 0,
+      "cost": {
+        "parts": 85
+      },
+      "build_rd": 35,
+      "power_kw": 230,
+      "crew": 2,
+      "mtbf_days": 350,
+      "repair": {
+        "parts": 4,
+        "rd": 2
+      },
+      "recipe": {
+        "in": {
+          "regolith_t": 2.5
+        },
+        "out": {
+          "metal_t": 0.5,
+          "o2_kg": 650
+        }
+      },
+      "note": "메탄으로 녹은 레골리스를 환원한다 — 산소가 많이 나온다"
+    },
+    {
+      "id": "mre_line",
+      "name": "대형 전해 라인",
+      "family": "mre_plant",
+      "category": "industry",
+      "priority": 3,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 220
+      },
+      "build_rd": 90,
+      "power_kw": 560,
+      "crew": 6,
+      "mtbf_days": 300,
+      "repair": {
+        "parts": 8,
+        "rd": 4
+      },
+      "recipe": {
+        "in": {
+          "regolith_t": 6
+        },
+        "out": {
+          "metal_t": 1.8,
+          "o2_kg": 1500
+        }
+      },
+      "note": "큰 전해조 셋을 한 줄로 — 산소와 금속을 대량으로"
+    },
+    {
+      "id": "metal_printer",
+      "name": "금속 3D 프린터",
+      "family": "parts_fab",
+      "category": "industry",
+      "priority": 3,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 30,
+        "metal_t": 1
+      },
+      "build_rd": 12,
+      "power_kw": 12,
+      "crew": 1,
+      "mtbf_days": 600,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "metal_t": 0.1
+        },
+        "out": {
+          "parts": 1
+        }
+      },
+      "note": "금속 가루를 레이저로 녹여 부품을 찍는다. 작고 정밀하다"
+    },
+    {
+      "id": "machine_shop",
+      "name": "기계 공작소",
+      "family": "parts_fab",
+      "category": "industry",
+      "priority": 3,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 80,
+        "metal_t": 3
+      },
+      "build_rd": 35,
+      "power_kw": 60,
+      "crew": 6,
+      "mtbf_days": 600,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "recipe": {
+        "in": {
+          "metal_t": 0.5
+        },
+        "out": {
+          "parts": 3.5
+        }
+      },
+      "note": "선반·밀링이 있는 공작소. 사람이 많이 든다"
+    },
+    {
+      "id": "electronics_fab",
+      "name": "전자 부품 공장",
+      "family": "parts_fab",
+      "category": "industry",
+      "priority": 3,
+      "tech": "robot_fabrication",
+      "start": 0,
+      "cost": {
+        "parts": 90,
+        "metal_t": 1
+      },
+      "build_rd": 40,
+      "power_kw": 55,
+      "crew": 4,
+      "mtbf_days": 450,
+      "repair": {
+        "parts": 4,
+        "rd": 2
+      },
+      "recipe": {
+        "in": {
+          "metal_t": 0.05
+        },
+        "out": {
+          "parts": 1.2
+        }
+      },
+      "note": "현지 실리콘으로 회로를 굽는다 — 가장 귀한 부품"
+    },
+    {
+      "id": "foundry",
+      "name": "주조소",
+      "family": "parts_fab",
+      "category": "industry",
+      "priority": 3,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 120,
+        "metal_t": 5
+      },
+      "build_rd": 50,
+      "power_kw": 160,
+      "crew": 8,
+      "mtbf_days": 400,
+      "repair": {
+        "parts": 5,
+        "rd": 3
+      },
+      "recipe": {
+        "in": {
+          "metal_t": 1.0
+        },
+        "out": {
+          "parts": 6
+        }
+      },
+      "note": "녹인 금속을 거푸집에 붓는다. 크고 거칠다"
+    },
+    {
+      "id": "robot_garage",
+      "name": "로봇 차고",
+      "family": "robot_bay",
+      "category": "industry",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 10
+      },
+      "build_rd": 8,
+      "power_kw": 4,
+      "crew": 1,
+      "mtbf_days": 2500,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "robot_slots": 6
+      },
+      "note": "충전 기둥이 있는 작은 차고"
+    },
+    {
+      "id": "drone_hangar",
+      "name": "드론 격납고",
+      "family": "robot_bay",
+      "category": "industry",
+      "priority": 3,
+      "tech": "autonomous_robots_2",
+      "start": 0,
+      "cost": {
+        "parts": 35
+      },
+      "build_rd": 18,
+      "power_kw": 14,
+      "crew": 2,
+      "mtbf_days": 1800,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "robot_slots": 16
+      },
+      "note": "로켓 드론이 뜨고 내리는 격납고"
+    },
+    {
+      "id": "teleop_center",
+      "name": "원격 조종실",
+      "family": "robot_bay",
+      "category": "industry",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 25
+      },
+      "build_rd": 12,
+      "power_kw": 8,
+      "crew": 3,
+      "mtbf_days": 2500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "robot_slots": 8,
+        "rp_day": 1
+      },
+      "note": "지구와 기지 안에서 로봇을 원격 조종하는 방. 쌓인 기록이 연구가 된다"
+    },
+    {
+      "id": "robot_depot",
+      "name": "대형 정비 기지",
+      "family": "robot_bay",
+      "category": "industry",
+      "priority": 3,
+      "tech": "robot_fabrication",
+      "start": 0,
+      "cost": {
+        "parts": 60
+      },
+      "build_rd": 30,
+      "power_kw": 20,
+      "crew": 4,
+      "mtbf_days": 1800,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "robot_slots": 30
+      },
+      "note": "크레인이 있는 큰 정비장"
+    },
+    {
+      "id": "liquefier",
+      "name": "소형 액화기",
+      "family": "propellant_plant",
+      "category": "industry",
+      "priority": 3,
+      "tech": "cryogenic_propellant",
+      "start": 0,
+      "cost": {
+        "parts": 22
+      },
+      "build_rd": 10,
+      "power_kw": 45,
+      "crew": 1,
+      "mtbf_days": 550,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "o2_kg": 428.5,
+          "h2_kg": 71.5
+        },
+        "out": {
+          "propellant_t": 0.5
+        }
+      },
+      "note": "작은 액화기. 먼저 세워 착륙선 연료를 댄다"
+    },
+    {
+      "id": "large_propellant_plant",
+      "name": "대형 추진제 공장",
+      "family": "propellant_plant",
+      "category": "industry",
+      "priority": 3,
+      "tech": "cryogenic_propellant",
+      "start": 0,
+      "cost": {
+        "parts": 100
+      },
+      "build_rd": 45,
+      "power_kw": 240,
+      "crew": 4,
+      "mtbf_days": 450,
+      "repair": {
+        "parts": 4,
+        "rd": 2
+      },
+      "recipe": {
+        "in": {
+          "o2_kg": 2571,
+          "h2_kg": 429
+        },
+        "out": {
+          "propellant_t": 3
+        }
+      },
+      "note": "수출용 대량 생산 — 지구 궤도로 연료를 판다"
+    },
+    {
+      "id": "boiloff_depot",
+      "name": "무증발 저장소",
+      "family": "propellant_plant",
+      "category": "industry",
+      "priority": 3,
+      "tech": "cryogenic_propellant",
+      "start": 0,
+      "cost": {
+        "parts": 40
+      },
+      "build_rd": 15,
+      "power_kw": 12,
+      "crew": 0,
+      "mtbf_days": 2500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "o2_kg": 171.4,
+          "h2_kg": 28.6
+        },
+        "out": {
+          "propellant_t": 0.2
+        }
+      },
+      "note": "능동 냉각으로 증발을 막는 큰 탱크. 조금씩 채운다"
+    },
+    {
+      "id": "launch_fueler",
+      "name": "발사대 급유탑",
+      "family": "propellant_plant",
+      "category": "industry",
+      "priority": 3,
+      "tech": "cryogenic_propellant",
+      "start": 0,
+      "cost": {
+        "parts": 55
+      },
+      "build_rd": 20,
+      "power_kw": 80,
+      "crew": 2,
+      "mtbf_days": 500,
+      "repair": {
+        "parts": 3,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "o2_kg": 857,
+          "h2_kg": 143
+        },
+        "out": {
+          "propellant_t": 1
+        }
+      },
+      "note": "착륙장 옆 급유탑. 생산과 급유를 한자리에서"
+    },
+    {
+      "id": "sintered_pad",
+      "name": "소결 착륙장",
+      "family": "landing_pad",
+      "category": "logistics",
+      "priority": 3,
+      "tech": "sintered_construction",
+      "start": 0,
+      "cost": {
+        "parts": 15,
+        "regolith_t": 150
+      },
+      "build_rd": 25,
+      "power_kw": 2,
+      "crew": 0,
+      "mtbf_days": 9000,
+      "repair": {
+        "parts": 2,
+        "rd": 2
+      },
+      "provides": {
+        "landing_slots": 1
+      },
+      "note": "마이크로파로 표면을 유리처럼 구운 착륙장 — 분사가 흙을 덜 날린다"
+    },
+    {
+      "id": "bermed_pad",
+      "name": "방벽 착륙장",
+      "family": "landing_pad",
+      "category": "logistics",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 12,
+        "regolith_t": 450
+      },
+      "build_rd": 35,
+      "power_kw": 2,
+      "crew": 0,
+      "mtbf_days": 8000,
+      "repair": {
+        "parts": 2,
+        "rd": 2
+      },
+      "provides": {
+        "landing_slots": 1
+      },
+      "clearance_m": 15,
+      "note": "둘레에 레골리스 방벽을 쌓았다 — 다른 건물이 15 m까지 다가와도 된다"
+    },
+    {
+      "id": "hopper_pad",
+      "name": "호퍼 발착장",
+      "family": "landing_pad",
+      "category": "logistics",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 6,
+        "regolith_t": 60
+      },
+      "build_rd": 8,
+      "power_kw": 1,
+      "crew": 0,
+      "mtbf_days": 8000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "landing_slots": 0
+      },
+      "clearance_m": 15,
+      "note": "로켓 호퍼와 작은 드론이 뜨고 내리는 작은 판"
+    },
+    {
+      "id": "heavy_pad",
+      "name": "대형 착륙장",
+      "family": "landing_pad",
+      "category": "logistics",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 30,
+        "regolith_t": 600
+      },
+      "build_rd": 50,
+      "power_kw": 4,
+      "crew": 0,
+      "mtbf_days": 8000,
+      "repair": {
+        "parts": 3,
+        "rd": 3
+      },
+      "provides": {
+        "landing_slots": 2
+      },
+      "note": "큰 화물선 두 척이 동시에 내린다. 분사 방벽과 급유 설비가 있다"
+    },
+    {
+      "id": "poly_shelter",
+      "name": "폴리에틸렌 대피소",
+      "family": "storm_shelter",
+      "category": "safety",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 18
+      },
+      "build_rd": 5,
+      "power_kw": 1,
+      "crew": 0,
+      "mtbf_days": 6000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "shelter": 20
+      },
+      "note": "수소가 많은 폴리에틸렌 벽 — 가볍고 빨리 서지만 좁다"
+    },
+    {
+      "id": "deep_shelter",
+      "name": "지하 대피소",
+      "family": "storm_shelter",
+      "category": "safety",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 25,
+        "regolith_t": 500
+      },
+      "build_rd": 60,
+      "power_kw": 3,
+      "crew": 0,
+      "mtbf_days": 9000,
+      "repair": {
+        "parts": 2,
+        "rd": 2
+      },
+      "provides": {
+        "shelter": 120
+      },
+      "note": "경사로로 내려가는 깊은 굴. 넓고 안전하지만 파는 데 오래 걸린다"
+    },
+    {
+      "id": "rover_shelter",
+      "name": "대피 차량",
+      "family": "storm_shelter",
+      "category": "safety",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 30
+      },
+      "build_rd": 6,
+      "power_kw": 2,
+      "crew": 0,
+      "mtbf_days": 1500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "shelter": 12
+      },
+      "note": "차폐 선실이 있는 대형 로버. 밖에서 일하던 사람을 태워 버틴다"
+    },
+    {
+      "id": "magnetic_shelter",
+      "name": "자기 차폐실",
+      "family": "storm_shelter",
+      "category": "safety",
+      "priority": 1,
+      "tech": "shielding_2",
+      "start": 0,
+      "cost": {
+        "parts": 80
+      },
+      "build_rd": 25,
+      "power_kw": 30,
+      "crew": 0,
+      "mtbf_days": 2000,
+      "repair": {
+        "parts": 4,
+        "rd": 2
+      },
+      "provides": {
+        "shelter": 40
+      },
+      "note": "초전도 코일로 양성자를 휘게 하는 능동 차폐 시험실 — 전기를 먹는다"
+    },
+    {
+      "id": "clinic",
+      "name": "진료소",
+      "family": "medical_bay",
+      "category": "safety",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 8
+      },
+      "build_rd": 4,
+      "power_kw": 4,
+      "crew": 1,
+      "mtbf_days": 2500,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "care": 60
+      },
+      "note": "작은 진료소. 의사 한 명"
+    },
+    {
+      "id": "surgery_center",
+      "name": "수술 센터",
+      "family": "medical_bay",
+      "category": "safety",
+      "priority": 1,
+      "tech": "low_g_medicine",
+      "start": 0,
+      "cost": {
+        "parts": 55
+      },
+      "build_rd": 25,
+      "power_kw": 25,
+      "crew": 6,
+      "mtbf_days": 1800,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "care": 320
+      },
+      "note": "저중력 수술을 할 수 있는 병원"
+    },
+    {
+      "id": "telemedicine",
+      "name": "원격 진료실",
+      "family": "medical_bay",
+      "category": "safety",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 15
+      },
+      "build_rd": 6,
+      "power_kw": 6,
+      "crew": 1,
+      "mtbf_days": 2200,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "care": 100
+      },
+      "note": "지구 의사가 화면 너머로 진료한다 (빛 왕복 2.6초)"
+    },
+    {
+      "id": "rehab_center",
+      "name": "재활 운동실",
+      "family": "medical_bay",
+      "category": "safety",
+      "priority": 1,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 20
+      },
+      "build_rd": 8,
+      "power_kw": 12,
+      "crew": 1,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "care": 40,
+        "morale": 2
+      },
+      "note": "저중력 골밀도 감소를 막는 운동 기구와 짧은 원심기"
+    },
+    {
+      "id": "field_lab",
+      "name": "현장 실험실",
+      "family": "research_lab",
+      "category": "research",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 8
+      },
+      "build_rd": 5,
+      "power_kw": 5,
+      "crew": 2,
+      "mtbf_days": 1500,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "rp_day": 2
+      },
+      "note": "바퀴 달린 작은 실험실. 표본을 바로 본다"
+    },
+    {
+      "id": "biology_lab",
+      "name": "생명과학 연구소",
+      "family": "research_lab",
+      "category": "research",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 40
+      },
+      "build_rd": 20,
+      "power_kw": 25,
+      "crew": 8,
+      "mtbf_days": 1400,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "rp_day": 8
+      },
+      "note": "달에서 자라는 생물을 연구한다"
+    },
+    {
+      "id": "materials_lab",
+      "name": "재료 연구소",
+      "family": "research_lab",
+      "category": "research",
+      "priority": 4,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 60,
+        "metal_t": 1
+      },
+      "build_rd": 25,
+      "power_kw": 40,
+      "crew": 10,
+      "mtbf_days": 1300,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "rp_day": 10
+      },
+      "note": "레골리스로 무엇을 만들 수 있는지 시험한다"
+    },
+    {
+      "id": "cryo_lab",
+      "name": "극저온 연구소",
+      "family": "research_lab",
+      "category": "research",
+      "priority": 4,
+      "tech": "polar_prospecting",
+      "start": 0,
+      "cost": {
+        "parts": 45
+      },
+      "build_rd": 20,
+      "power_kw": 30,
+      "crew": 6,
+      "mtbf_days": 1200,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "rp_day": 6
+      },
+      "note": "영구음영 얼음 속의 휘발성 물질과 수십억 년의 기록을 연구한다"
+    },
+    {
+      "id": "gym",
+      "name": "체육관",
+      "family": "green_commons",
+      "category": "social",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 15
+      },
+      "build_rd": 8,
+      "power_kw": 10,
+      "crew": 1,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 3
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 0
+        },
+        "out": {
+          "o2_kg": 0
+        }
+      },
+      "note": "달리기 트랙과 운동 기구. 매일 두 시간 운동은 우주 생활의 의무다"
+    },
+    {
+      "id": "theater",
+      "name": "공연장",
+      "family": "green_commons",
+      "category": "social",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 30
+      },
+      "build_rd": 15,
+      "power_kw": 15,
+      "crew": 2,
+      "mtbf_days": 3500,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 4
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 0
+        },
+        "out": {
+          "o2_kg": 0
+        }
+      },
+      "note": "부채꼴 객석의 공연장. 연극·음악·영화"
+    },
+    {
+      "id": "cafe",
+      "name": "카페",
+      "family": "green_commons",
+      "category": "social",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 12
+      },
+      "build_rd": 6,
+      "power_kw": 6,
+      "crew": 2,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 3
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 0
+        },
+        "out": {
+          "o2_kg": 0
+        }
+      },
+      "note": "둥근 카페. 일 밖에서 만나는 곳"
+    },
+    {
+      "id": "sports_dome",
+      "name": "저중력 스포츠 돔",
+      "family": "green_commons",
+      "category": "social",
+      "priority": 4,
+      "tech": "low_g_medicine",
+      "start": 0,
+      "cost": {
+        "parts": 60,
+        "regolith_t": 200
+      },
+      "build_rd": 40,
+      "power_kw": 40,
+      "crew": 2,
+      "mtbf_days": 3500,
+      "repair": {
+        "parts": 2,
+        "rd": 2
+      },
+      "provides": {
+        "morale": 7
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 0
+        },
+        "out": {
+          "o2_kg": 0
+        }
+      },
+      "note": "1/6 중력에서 하는 새 운동 — 달 사람의 자부심"
+    },
+    {
+      "id": "laser_terminal",
+      "name": "레이저 통신소",
+      "family": "comms_center",
+      "category": "social",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 25
+      },
+      "build_rd": 8,
+      "power_kw": 8,
+      "crew": 1,
+      "mtbf_days": 1500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 7,
+        "rp_day": 1
+      },
+      "note": "광통신으로 지구와 영상 통화가 끊기지 않는다 — 사기가 가장 많이 오른다"
+    },
+    {
+      "id": "lunar_observatory",
+      "name": "광학 천문대",
+      "family": "comms_center",
+      "category": "social",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 35
+      },
+      "build_rd": 18,
+      "power_kw": 10,
+      "crew": 1,
+      "mtbf_days": 1800,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 1,
+        "rp_day": 5
+      },
+      "note": "공기가 없는 하늘 — 지구의 어떤 천문대보다 맑다"
+    },
+    {
+      "id": "broadcast_studio",
+      "name": "방송 스튜디오",
+      "family": "comms_center",
+      "category": "social",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 18
+      },
+      "build_rd": 8,
+      "power_kw": 8,
+      "crew": 2,
+      "mtbf_days": 2500,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 4,
+        "rp_day": 0.5
+      },
+      "note": "기지 소식을 지구로 내보내고 지구 방송을 받는다"
+    },
+    {
+      "id": "data_archive",
+      "name": "기록 보관소",
+      "family": "comms_center",
+      "category": "social",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 15
+      },
+      "build_rd": 6,
+      "power_kw": 4,
+      "crew": 1,
+      "mtbf_days": 4000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 2,
+        "rp_day": 1.5
+      },
+      "note": "모든 관측과 기록을 두 벌로 보관한다"
     }
   ]
 }

@@ -133,7 +133,7 @@ func _build() -> void:
 	toasts.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	toasts.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	toasts.offset_right = -12
-	toasts.offset_bottom = -12
+	toasts.offset_bottom = -62          # 왼쪽 아래 단추 줄 위로
 	modal = Modal.new()
 	modal.chosen.connect(_on_modal_choice)
 	add_child(modal)
@@ -848,10 +848,15 @@ func _on_module_tapped(mid: String) -> void:
 		return
 	var m: Dictionary = sim.M[mid]
 	var count := int(sim.counts.get(mid, 0))
-	var body := "%s · %d기 (고장 %d · 건설 중 %d)\n%s\n\n전력 %s kW · 운영 인원 %d명 · 고장 간격 %s일 · 수리 부품 %d · %s 로봇·일\n\n%s" % [
+	var fam := GameData.family(mid)
+	var kin := []
+	for other in GameData.FAMILY[fam]:
+		if other != mid:
+			kin.append(String(sim.M[other]["name"]) + (" ×%d" % int(sim.counts[other]) if int(sim.counts.get(other, 0)) else ""))
+	var body := "%s · %d기 (고장 %d · 건설 중 %d)\n%s\n\n전력 %s kW · 운영 인원 %d명 · 고장 간격 %s일 · 수리 부품 %d · %s 로봇·일\n\n%s\n\n같은 계열: %s" % [
 		Palette.CATEGORY_KO[m["category"]], count, int(sim.broken.get(mid, 0)), sim.queued(mid), BuildPanel.describe(m),
 		Fmt.n(float(m["power_kw"])), int(m["crew"]), Fmt.n(float(m["mtbf_days"])), int(m["repair"]["parts"]),
-		Fmt.n(float(m["repair"]["rd"]), 1), String(m.get("note", ""))]
+		Fmt.n(float(m["repair"]["rd"]), 1), String(m.get("note", "")), ", ".join(kin)]
 	var reason := sim.build_block_reason(mid, 0.0)
 	var choices := [["close", "닫기", ""]]
 	choices.push_front(["build:" + mid, "1기 더 짓기 — 자리 고르기", reason if reason != "" else BuildPanel._cost_text(m["cost"])])

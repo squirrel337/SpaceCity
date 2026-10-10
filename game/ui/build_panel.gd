@@ -13,6 +13,7 @@ var auto_sort := CheckBox.new()
 var queue_box := VBoxContainer.new()
 var catalog := VBoxContainer.new()
 var message := ThemeFactory.muted("")
+var _open := {}          # 계열 → 같은 계열의 다른 종류를 펼쳐 보이나
 
 
 func _init() -> void:
@@ -77,18 +78,48 @@ func rebuild() -> void:
 	catalog.add_child(_special_entry("regolith_cover"))
 	if sim.techs.has("robot_fabrication"):
 		catalog.add_child(_special_entry("robot"))
+	# 분류마다 계열(기본 모듈 29종)을 보이고, 같은 계열의 다른 종류 4가지는 펼쳐서 본다
 	for cat in ORDER:
-		var mids := []
-		for mid in sim.M:
-			if sim.M[mid]["category"] == cat:
-				mids.append(mid)
-		if mids.is_empty():
+		var fams := []
+		for fam in GameData.FAMILY:
+			if sim.M[fam]["category"] == cat:
+				fams.append(fam)
+		if fams.is_empty():
 			continue
 		var head := ThemeFactory.heading(Palette.CATEGORY_KO[cat], 15)
 		head.add_theme_color_override("font_color", Palette.CATEGORY[cat])
 		catalog.add_child(head)
-		for mid in mids:
-			catalog.add_child(_entry(mid))
+		for fam in fams:
+			catalog.add_child(_entry(fam))
+			var members: Array = GameData.FAMILY[fam].slice(1)
+			if members.is_empty():
+				continue
+			var built := 0
+			for m in members:
+				built += int(sim.counts.get(m, 0)) + sim.queued(m)
+			var toggle := Button.new()
+			toggle.flat = true
+			toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			toggle.custom_minimum_size.y = 34
+			toggle.add_theme_font_size_override("font_size", 13)
+			toggle.add_theme_color_override("font_color", Palette.CATEGORY[cat].lightened(0.2))
+			var names := []
+			for m in members:
+				names.append(sim.M[m]["name"])
+			toggle.text = ("▾ " if _open.get(fam, false) else "▸ ") + "같은 계열 %d종 — %s%s" % [members.size(),
+				", ".join(names), ("  (지음·대기 %d)" % built) if built else ""]
+			toggle.clip_text = true
+			toggle.tooltip_text = "같은 일을 하는 다른 설계 — 비용·전력·크기·고장 간격이 다르다"
+			toggle.pressed.connect(func():
+				_open[fam] = not _open.get(fam, false)
+				rebuild())
+			catalog.add_child(toggle)
+			if _open.get(fam, false):
+				for m in members:
+					var indent := MarginContainer.new()
+					indent.add_theme_constant_override("margin_left", 16)
+					indent.add_child(_entry(m))
+					catalog.add_child(indent)
 
 
 func _queue_row(i: int, item: Dictionary) -> Control:
@@ -206,6 +237,8 @@ static func _cost_text(cost: Dictionary) -> String:
 		parts.append("레골리스 %s t" % Fmt.n(cost["regolith_t"]))
 	if cost.get("metal_t", 0):
 		parts.append("금속 %s t" % Fmt.n(cost["metal_t"]))
+	if cost.get("water_kg", 0):
+		parts.append("물 %s t" % Fmt.n(float(cost["water_kg"]) / 1000.0))
 	return " + ".join(parts)
 
 
@@ -222,6 +255,15 @@ static func describe(m: Dictionary) -> String:
 			out.append(labels[key] % Fmt.n(pv[key]))
 	if pv.has("efficiency"):
 		out.append("왕복 효율 %s" % Fmt.pct(pv["efficiency"]))
+	elif pv.has("storage_kwh") and m.has("family"):
+		# 축전 계열은 같은 왕복 효율을 쓴다 (배터리 90%, 재생 연료전지 50%)
+		var base: Dictionary = GameData.MODULES[m["family"]].get("provides", {})
+		if base.has("efficiency"):
+			out.append("왕복 효율 %s" % Fmt.pct(base["efficiency"]))
+	if String(pv.get("dose", "")) == "covered":
+		out.append("두꺼운 벽 — 피복 모듈 수준 선량")
+	if m.has("clearance_m"):
+		out.append("거리 규칙 %d m" % int(m["clearance_m"]))
 	if pv.has("recovery"):
 		out.append("회수 %s" % Fmt.pct(pv["recovery"]))
 	if pv.has("storage"):

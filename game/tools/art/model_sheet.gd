@@ -1,8 +1,9 @@
 extends SceneTree
 ## art/models.json의 3D 모형을 게임과 같은 렌더러로 그려 한 장의 PNG로 모은다 (화면이 있어야 한다: Xvfb).
 ##   xvfb-run -a godot --path game --rendering-driver opengl3 --script res://tools/art/model_sheet.gd -- \
-##       --out models.png [--cols 6] [--cell 320] [--night] [--yaw 45] hab_module hab_module:2 vehicles/ltv ...
-## 이름만 주면 건물(변형 0), "이름:v"는 변형 v, "vehicles/이름"은 탈것, "all"은 건물 전부, "all:v"는 그 변형 전부.
+##       --out models.png [--cols 6] [--cell 320] [--night] [--yaw 45] [--models 다른/models.json] hab_module hab_module:2 ...
+## 이름만 주면 건물(변형 0), "이름:v"는 변형 v, "vehicles/이름"은 탈것, "all"은 건물 전부, "all:v"는 그 변형 전부,
+## "every"는 건물마다 모든 변형. --models는 이름보다 앞에 둔다.
 
 var _out := "models.png"
 var _cols := 6
@@ -36,6 +37,9 @@ func _initialize() -> void:
 			"--sun":
 				_sun_turn = float(args[i + 1])
 				i += 1
+			"--models":
+				ModelLib.path = args[i + 1]
+				i += 1
 			_:
 				_add_item(a)
 		i += 1
@@ -44,6 +48,14 @@ func _initialize() -> void:
 
 
 func _add_item(a: String) -> void:
+	if a == "every":
+		# 건물마다 모든 변형 (한 줄에 한 건물: --cols 5)
+		var all_ids: Array = ModelLib.data()["buildings"].keys()
+		all_ids.sort()
+		for id in all_ids:
+			for v in range(ModelLib.variants(id)):
+				_items.append(["buildings", id, v])
+		return
 	if a.begins_with("all"):
 		var v := int(a.get_slice(":", 1)) if a.contains(":") else 0
 		var ids: Array = ModelLib.data()["buildings"].keys()

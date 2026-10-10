@@ -62,7 +62,7 @@ func _events(sim: CitySim) -> void:
 
 
 func _pad_spot() -> Vector3:
-	var pads := plan.built_of("landing_pad")
+	var pads := plan.built_of_family("landing_pad")
 	if pads.is_empty():
 		pads = plan.layout.slots.get("landing_pad", [])
 	return pads[0] if pads.size() > 0 else Vector3.ZERO
@@ -85,7 +85,7 @@ func _hub() -> Vector3:
 ## 이 종류 중 하나가 서 있는 곳 (없으면 기본 배치의 구역 문)
 func _place_of(kinds: Array, gate: String) -> Vector3:
 	for kind in kinds:
-		var list := plan.built_of(kind)
+		var list := plan.built_of_family(kind)
 		if not list.is_empty():
 			return list[0]
 	return plan.layout.gates.get(gate, _hub())
@@ -118,7 +118,7 @@ func _ensure(sim: CitySim) -> void:
 	if _count("hopper") < 1:
 		var home: Vector3 = plan.layout.gates.get("life", _hub()) + Vector3(-6, 6, 0)
 		_spawn("hopper", "hopper", home, 0.0, {"state": "parked", "wait": 12.0})
-	var digs_at := plan.built_of("excavator")
+	var digs_at := plan.built_of_family("excavator")
 	var digs := mini(digs_at.size(), 2)
 	while _count("digger") < digs:
 		var site: Vector3 = digs_at[_count("digger")]
@@ -150,7 +150,7 @@ func _robot_home(_sim: CitySim) -> Vector3:
 
 func _random_core_spot() -> Vector3:
 	## 거주 모듈 하나의 옆 (사람이 걸어 다니는 곳)
-	var habs := plan.built_of("hab_module")
+	var habs := plan.built_of_family("hab_module")
 	if habs.is_empty():
 		return _hub()
 	var h: Vector3 = habs[_rng.randi() % habs.size()]
@@ -299,7 +299,7 @@ func _hopper(a: Dictionary, dt: float, sim: CitySim) -> void:
 			a["wait"] -= dt
 			if a["wait"] > 0.0:
 				return
-			var towers := plan.built_of("solar_tower")
+			var towers := plan.built_of_family("solar_tower")
 			if a["state"] == "parked":
 				if towers.is_empty():
 					a["wait"] = 10.0

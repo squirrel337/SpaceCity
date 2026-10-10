@@ -8,7 +8,9 @@
     python3 city_balance.py                      # 추천 정책 1회, 분기별 요약
     python3 city_balance.py --policy naive       # 준비 없이 성장만 좇는 정책
     python3 city_balance.py --monte-carlo 200    # 두 정책을 각각 200회 돌려 비교
-    python3 city_balance.py --module-table       # 문서용 모듈 표 (Markdown)
+    python3 city_balance.py --module-table       # 문서용 모듈 표 (Markdown, 기본 29종)
+    python3 city_balance.py --module-catalog     # 전체 모듈 표 (29계열 145종)
+    python3 city_balance.py --policy variety     # 계열의 여러 종류를 섞어 짓는 시험 정책
     python3 city_balance.py --csv daily.csv      # 일별 기록 (차트용)
 
 표준 라이브러리만 사용한다. 같은 시드·정책은 언제나 같은 결과를 낸다.
@@ -36,7 +38,7 @@ PER = C["per_person_day"]
 START = date.fromisoformat(C["start"]["date"])
 STOCK_KEYS = ("o2_kg", "water_kg", "h2_kg", "ch4_kg", "co2_kg", "wastewater_kg", "food_kg")
 CAUSES_KO = {"hypoxia": "산소 결핍", "co2": "이산화탄소 중독", "starvation": "기아"}
-# 가동률이 시간마다 달라지는 모듈 — 나머지는 하루 단위로 미리 합산해 둔다
+# 가동률이 시간마다 달라지는 계열 — 나머지는 하루 단위로 미리 합산해 둔다
 VARIABLE = {"electrolyzer", "sabatier", "water_recycler", "hydroponics"}
 # 추천 정책의 건설 순서: 생명유지 → 대피·주거 → 전력 → 식량 → 나머지
 BUILD_PRIORITY = {
@@ -47,6 +49,24 @@ BUILD_PRIORITY = {
     "fission_40kw": 3, "fission_1mw": 3, "radiator": 3,
     "hydroponics": 4, "tank_farm": 4, "food_store": 4,
 }
+
+
+def family(mid):
+    """모듈의 계열 (기본 모듈 29종의 id). 계열이 같으면 같은 규칙에 들어가고, 수치는 저마다 다르다."""
+    m = MODULES.get(mid)
+    return m.get("family", mid) if m else mid
+
+
+# 계열 → 모듈 id (데이터 순서, 기본 모듈이 맨 앞)
+FAMILY = {}
+for _mid in MODULES:
+    FAMILY.setdefault(family(_mid), []).append(_mid)
+# provides 열쇠 → 그 값이 0이 아닌 모듈 (데이터 순서) — 0을 더하지 않을 뿐 합은 같다
+WITH = {}
+for _mid, _m in MODULES.items():
+    for _key, _value in _m.get("provides", {}).items():
+        if _value:
+            WITH.setdefault(_key, []).append(_mid)
 
 
 def spec(mid, key, default=0.0):
@@ -84,11 +104,13 @@ def solar_activity(year):
 
 
 class Policy:
-    """플레이어 대역. 'good'은 문서의 추천 운영, 'naive'는 눈앞의 성장만 좇는 운영."""
+    """플레이어 대역. 'good'은 문서의 추천 운영, 'naive'는 눈앞의 성장만 좇는 운영.
+    'variety'는 추천 운영과 같되 계열마다 여러 종류를 돌아가며 짓는다 (새 건물 규칙을 시험하는 용도)."""
 
     def __init__(self, name):
         self.name = name
-        self.prepared = name == "good"
+        self.prepared = name in ("good", "variety")
+        self.variety = name == "variety"
         # 어두울 때 축전량이 이 비율 아래로 내려가면 4·3·2순위를 미리 끈다 (절전 정책)
         self.shed_soc = {4: 0.5, 3: 0.4, 2: 0.2} if self.prepared else {4: 0.0, 3: 0.0, 2: 0.0}
         self.research = (
@@ -137,6 +159,7 @@ class City:
         self.techs = set()
         self.rp_bank = 0.0
         self.research_queue = list(self.policy.research)
+        self.variety_turn = 0
         self.farm_dark_h = 0
         self.crops_dead_until = -1
         self.prev = {2: True, 3: True, 4: True}
@@ -166,43 +189,86 @@ class City:
     def refresh(self):
         wk = {mid: max(0, self.counts[mid] - self.broken[mid]) for mid in MODULES}
         self.wk = wk
-        self.caps = {key: sum(provided(m, "storage", {}).get(key, 0.0) * wk[m] for m in MODULES)
+        # 계열마다 가동 중인(1기 이상) 모듈 — 0기를 건너뛰어도 합은 같다
+        self.active = {fam: [m for m in members if wk[m]] for fam, members in FAMILY.items()}
+        fs = self.fam_sum
+        o2_out = lambda m: recipe(m, "out", "o2_kg")  # noqa: E731
+        power = lambda m: spec(m, "power_kw")  # noqa: E731
+        # 한 시간마다 쓰는 계열 합 (가동 수가 바뀌는 refresh 때만 다시 센다)
+        self.hourly = {
+            "o2_hydro": fs("hydroponics", o2_out), "o2_algae": fs("algae_reactor", o2_out),
+            "o2_green": fs("green_commons", o2_out), "o2_mre": fs("mre_plant", o2_out),
+            "e_o2": fs("electrolyzer", o2_out), "e_water": fs("electrolyzer", lambda m: recipe(m, "in", "water_kg")),
+            "sab_n": self.fam_n("sabatier"), "sab_h2": fs("sabatier", lambda m: recipe(m, "in", "h2_kg")),
+            "sab_co2": fs("sabatier", lambda m: recipe(m, "in", "co2_kg")),
+            "rec_day": fs("water_recycler", lambda m: provided(m, "wastewater_kg_day")),
+            "e_kw": fs("electrolyzer", power), "sab_kw": fs("sabatier", power), "rec_kw": fs("water_recycler", power),
+            "hydro_kw": fs("hydroponics", power), "scrub_day": fs("co2_scrubber", lambda m: provided(m, "co2_kg_day")),
+            "hydro_n": self.fam_n("hydroponics"),
+        }
+        self.caps = {key: sum(provided(m, "storage", {}).get(key, 0.0) * wk[m] for m in WITH["storage"])
                      for key in STOCK_KEYS}
-        self.housing_cap = sum(provided(m, "housing") * self.counts[m] for m in MODULES)
+        self.housing_cap = sum(provided(m, "housing") * self.counts[m] for m in WITH["housing"])
         self.air = max(1.0, self.housing_cap) * C["air_kg_per_housing"]
         self.co2_floor = self.ppm_to_kg(C["co2_ppm"]["floor"])
         bonus = 1.5 if "shielding_2" in self.techs else 1.0
-        self.shelter_cap = (provided("storm_shelter", "shelter") * self.counts["storm_shelter"] * bonus
-                            + provided("regolith_dome", "shelter") * self.counts["regolith_dome"])
-        self.bat_cap = provided("battery_bank", "storage_kwh") * wk["battery_bank"]
-        self.rfc_cap = provided("rfc_unit", "storage_kwh") * wk["rfc_unit"]
+        self.shelter_cap = 0.0
+        for m in WITH["shelter"]:
+            if provided(m, "shelter"):
+                if family(m) == "storm_shelter":
+                    self.shelter_cap += provided(m, "shelter") * self.counts[m] * bonus
+                else:
+                    self.shelter_cap += provided(m, "shelter") * self.counts[m]
+        self.bat_cap = self.fam_sum("battery_bank", lambda m: provided(m, "storage_kwh"))
+        self.rfc_cap = self.fam_sum("rfc_unit", lambda m: provided(m, "storage_kwh"))
         towers = sum(self.tiles.values())
         tile_factor = C["illumination"]["tile_factor"]
         factor = sum(tile_factor[t] * n for t, n in self.tiles.items()) / towers if towers else 0.0
         boost = 1.2 if "tall_towers" in self.techs else 1.0
-        self.solar_kw = provided("solar_tower", "generation_kw") * wk["solar_tower"] * factor * boost
-        self.fission_kw = sum(provided(m, "generation_kw") * wk[m] for m in ("fission_40kw", "fission_1mw"))
-        self.heat_cap = provided("radiator", "heat_kw") * wk["radiator"]
+        self.solar_kw = self.fam_sum("solar_tower", lambda m: provided(m, "generation_kw")) * factor * boost
+        self.fission_kw = 0.0          # 일조와 상관없이 늘 같은 출력 (핵분열·동위원소·핵융합)
+        for m in WITH["generation_kw"]:
+            if family(m) != "solar_tower":
+                self.fission_kw += provided(m, "generation_kw") * wk[m]
+        self.heat_cap = 0.0
+        for m in WITH["heat_kw"]:
+            if provided(m, "heat_kw"):
+                self.heat_cap += provided(m, "heat_kw") * wk[m]
         printing = any(item["print_t"] > 0 for item in self.queue)
         s = self.stock
         static = {1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0}
+        robots_powered = False
         for mid in MODULES:
+            if not wk[mid]:
+                continue
             p = spec(mid, "priority")
-            if not p or mid in VARIABLE or not wk[mid]:
+            fam = family(mid)
+            if not p or fam in VARIABLE:
                 continue
             kw = spec(mid, "power_kw") * wk[mid]
-            if mid == "regolith_printer" and not printing:
+            if fam == "regolith_printer" and not printing:
                 kw *= 0.1
-            elif mid == "mre_plant" and s.get("regolith_t", 0) < recipe("mre_plant", "in", "regolith_t"):
+            elif fam == "mre_plant" and s.get("regolith_t", 0) < recipe(mid, "in", "regolith_t"):
                 kw = 0.0
-            elif mid == "parts_fab" and s.get("metal_t", 0) < recipe("parts_fab", "in", "metal_t"):
+            elif fam == "parts_fab" and s.get("metal_t", 0) < recipe(mid, "in", "metal_t"):
                 kw = 0.0
-            elif mid == "robot_bay":
+            elif fam == "robot_bay" and not robots_powered:
                 kw += C["robots"]["power_kw"] * (self.robots - self.robots_broken)
+                robots_powered = True       # 로봇 충전은 정비고 계열 한 번만
             static[p] += kw
         self.static_load = static
         self.recovery = 0.98 if "closed_loop_ls2" in self.techs else provided("water_recycler", "recovery")
         self.mining = 1.4 if "polar_prospecting" in self.techs else 1.0
+
+    def fam_sum(self, fam, value):
+        """계열의 가동 중인 모듈마다 value(모듈)를 곱해 더한다 (데이터 순서, 보통 덧셈)."""
+        total = 0.0
+        for m in self.active[fam]:
+            total += self.wk[m] * value(m)
+        return total
+
+    def fam_n(self, fam):
+        return sum(self.wk[m] for m in self.active[fam])
 
     def ppm_to_kg(self, ppm):
         return ppm / 1e6 * (self.air / 29.0) * 44.0
@@ -235,33 +301,30 @@ class City:
 
         # 가변 가동률: 전기분해기는 필요한 만큼, 사바티에·재활용기는 원료만큼
         farms_on_before = self.prev[2] and self.crops_alive()
-        bio_o2 = ((wk["hydroponics"] * recipe("hydroponics", "out", "o2_kg") if farms_on_before else 0.0)
-                  + (wk["algae_reactor"] * recipe("algae_reactor", "out", "o2_kg") if self.prev[2] else 0.0)
-                  + (wk["green_commons"] * recipe("green_commons", "out", "o2_kg") if self.prev[4] else 0.0)
-                  + (wk["mre_plant"] * recipe("mre_plant", "out", "o2_kg") if self.prev[3] else 0.0))
+        hr = self.hourly
+        bio_o2 = ((hr["o2_hydro"] if farms_on_before else 0.0)
+                  + (hr["o2_algae"] if self.prev[2] else 0.0)
+                  + (hr["o2_green"] if self.prev[4] else 0.0)
+                  + (hr["o2_mre"] if self.prev[3] else 0.0))
         want = pop * PER["o2_kg"] - bio_o2 + max(0.0, 0.95 * self.caps["o2_kg"] - s["o2_kg"])
-        e_cap = wk["electrolyzer"] * recipe("electrolyzer", "out", "o2_kg")
+        e_cap = hr["e_o2"]
         u_elec = min(1.0, max(0.0, want) / e_cap) if e_cap else 0.0
-        water_need = wk["electrolyzer"] * recipe("electrolyzer", "in", "water_kg") * u_elec * h
+        water_need = hr["e_water"] * u_elec * h
         if water_need > s["water_kg"] > 0:
             u_elec *= s["water_kg"] / water_need
         elif s["water_kg"] <= 0:
             u_elec = 0.0
-        n_sab = wk["sabatier"]
+        n_sab = hr["sab_n"]
         u_sab = 0.0
         if n_sab:
-            u_sab = max(0.0, min(1.0, s["h2_kg"] / (n_sab * recipe("sabatier", "in", "h2_kg") * h),
-                                 s["co2_kg"] / (n_sab * recipe("sabatier", "in", "co2_kg") * h)))
-        n_rec = wk["water_recycler"]
-        rec_rate = n_rec * provided("water_recycler", "wastewater_kg_day") * h
+            u_sab = max(0.0, min(1.0, s["h2_kg"] / (hr["sab_h2"] * h), s["co2_kg"] / (hr["sab_co2"] * h)))
+        rec_rate = hr["rec_day"] * h
         u_rec = min(1.0, s["wastewater_kg"] / rec_rate) if rec_rate else 0.0
         light_cut = 0.6 if (lit > 0 and "sunlight_piping" in self.techs) else 1.0
 
         load = dict(self.static_load)
-        load[1] += (spec("electrolyzer", "power_kw") * wk["electrolyzer"] * u_elec
-                    + spec("sabatier", "power_kw") * n_sab * u_sab
-                    + spec("water_recycler", "power_kw") * n_rec * max(u_rec, 0.2))
-        load[2] += spec("hydroponics", "power_kw") * wk["hydroponics"] * light_cut
+        load[1] += hr["e_kw"] * u_elec + hr["sab_kw"] * u_sab + hr["rec_kw"] * max(u_rec, 0.2)
+        load[2] += hr["hydro_kw"] * light_cut
 
         # 전력 배분: 정책 문턱으로 미리 끄고, 그래도 모자라면 낮은 순위부터 강제로 끈다
         gen = self.solar_kw * lit + self.fission_kw
@@ -320,23 +383,27 @@ class City:
         bio_removal = 0.0
         food = 0.0
         if on[2] and self.crops_alive():
-            n = wk["hydroponics"]
-            food += n * recipe("hydroponics", "out", "food_kg") * h
-            s["o2_kg"] += n * recipe("hydroponics", "out", "o2_kg") * h
-            bio_removal += n * recipe("hydroponics", "in", "co2_kg") * h
-            s["water_kg"] -= n * recipe("hydroponics", "in", "water_kg") * h
+            for m in self.active["hydroponics"]:
+                n = wk[m]
+                food += n * recipe(m, "out", "food_kg") * h
+                s["o2_kg"] += n * recipe(m, "out", "o2_kg") * h
+                bio_removal += n * recipe(m, "in", "co2_kg") * h
+                s["water_kg"] -= n * recipe(m, "in", "water_kg") * h
         algae = 0.0
         if on[2]:
-            n = wk["algae_reactor"]
-            algae = n * recipe("algae_reactor", "out", "food_kg") * h
-            food += algae
-            s["o2_kg"] += n * recipe("algae_reactor", "out", "o2_kg") * h
-            bio_removal += n * recipe("algae_reactor", "in", "co2_kg") * h
-            s["water_kg"] -= n * recipe("algae_reactor", "in", "water_kg") * h
+            for m in self.active["algae_reactor"]:
+                n = wk[m]
+                a = n * recipe(m, "out", "food_kg") * h
+                algae += a
+                food += a
+                s["o2_kg"] += n * recipe(m, "out", "o2_kg") * h
+                bio_removal += n * recipe(m, "in", "co2_kg") * h
+                s["water_kg"] -= n * recipe(m, "in", "water_kg") * h
         if on[4]:
-            n = wk["green_commons"]
-            s["o2_kg"] += n * recipe("green_commons", "out", "o2_kg") * h
-            bio_removal += n * recipe("green_commons", "in", "co2_kg") * h
+            for m in self.active["green_commons"]:
+                n = wk[m]
+                s["o2_kg"] += n * recipe(m, "out", "o2_kg") * h
+                bio_removal += n * recipe(m, "in", "co2_kg") * h
         s["food_kg"] += food
         self.day["food_made"] += food
         if food > 0:
@@ -344,22 +411,24 @@ class City:
 
         # CO₂: 식물이 먼저 흡수하고, 나머지는 제거기가 농축 탱크로 옮긴다
         self.co2_air = max(self.co2_floor, self.co2_air - bio_removal)
-        scrub = wk["co2_scrubber"] * provided("co2_scrubber", "co2_kg_day") * h * frac1
+        scrub = hr["scrub_day"] * h * frac1
         moved = min(scrub, self.co2_air - self.co2_floor)
         self.co2_air -= moved
         s["co2_kg"] += moved
 
         # 1순위 화학 공정 (전력이 모자라면 frac1만큼만)
         k = h * frac1
-        n = wk["electrolyzer"] * u_elec * k
-        s["water_kg"] -= n * recipe("electrolyzer", "in", "water_kg")
-        s["o2_kg"] += n * recipe("electrolyzer", "out", "o2_kg")
-        s["h2_kg"] += n * recipe("electrolyzer", "out", "h2_kg")
-        n = n_sab * u_sab * k
-        s["co2_kg"] -= n * recipe("sabatier", "in", "co2_kg")
-        s["h2_kg"] -= n * recipe("sabatier", "in", "h2_kg")
-        s["ch4_kg"] += n * recipe("sabatier", "out", "ch4_kg")
-        s["water_kg"] += n * recipe("sabatier", "out", "water_kg")
+        for m in self.active["electrolyzer"]:
+            n = wk[m] * u_elec * k
+            s["water_kg"] -= n * recipe(m, "in", "water_kg")
+            s["o2_kg"] += n * recipe(m, "out", "o2_kg")
+            s["h2_kg"] += n * recipe(m, "out", "h2_kg")
+        for m in self.active["sabatier"]:
+            n = wk[m] * u_sab * k
+            s["co2_kg"] -= n * recipe(m, "in", "co2_kg")
+            s["h2_kg"] -= n * recipe(m, "in", "h2_kg")
+            s["ch4_kg"] += n * recipe(m, "out", "ch4_kg")
+            s["water_kg"] += n * recipe(m, "out", "water_kg")
         processed = min(s["wastewater_kg"], rec_rate * frac1)
         s["wastewater_kg"] -= processed
         s["water_kg"] += processed * self.recovery
@@ -367,15 +436,19 @@ class City:
         # 3순위 산업
         if run3:
             k3 = h * run3
-            s["water_kg"] += wk["ice_miner"] * recipe("ice_miner", "out", "water_kg") * self.mining * k3
-            s["regolith_t"] += wk["excavator"] * recipe("excavator", "out", "regolith_t") * k3
-            n = min(wk["mre_plant"] * k3, s["regolith_t"] / recipe("mre_plant", "in", "regolith_t"))
-            s["regolith_t"] -= n * recipe("mre_plant", "in", "regolith_t")
-            s["metal_t"] += n * recipe("mre_plant", "out", "metal_t")
-            s["o2_kg"] += n * recipe("mre_plant", "out", "o2_kg")
-            n = min(wk["parts_fab"] * k3, s["metal_t"] / recipe("parts_fab", "in", "metal_t"))
-            s["metal_t"] -= n * recipe("parts_fab", "in", "metal_t")
-            s["parts"] += n * recipe("parts_fab", "out", "parts")
+            for m in self.active["ice_miner"]:
+                s["water_kg"] += wk[m] * recipe(m, "out", "water_kg") * self.mining * k3
+            for m in self.active["excavator"]:
+                s["regolith_t"] += wk[m] * recipe(m, "out", "regolith_t") * k3
+            for m in self.active["mre_plant"]:
+                n = min(wk[m] * k3, s["regolith_t"] / recipe(m, "in", "regolith_t"))
+                s["regolith_t"] -= n * recipe(m, "in", "regolith_t")
+                s["metal_t"] += n * recipe(m, "out", "metal_t")
+                s["o2_kg"] += n * recipe(m, "out", "o2_kg")
+            for m in self.active["parts_fab"]:
+                n = min(wk[m] * k3, s["metal_t"] / recipe(m, "in", "metal_t"))
+                s["metal_t"] -= n * recipe(m, "in", "metal_t")
+                s["parts"] += n * recipe(m, "out", "parts")
 
         # 저장 한도: 넘치는 수소·CO₂·메탄은 배출, 넘치는 폐수는 손실
         caps = self.caps
@@ -386,7 +459,7 @@ class City:
                 s[key] = caps[key]
 
         # 작물: 72시간 넘게 전력을 못 받으면 고사
-        self.farm_dark_h = 0 if (on[2] or not wk["hydroponics"]) else self.farm_dark_h + 1
+        self.farm_dark_h = 0 if (on[2] or not hr["hydro_n"]) else self.farm_dark_h + 1
         if self.farm_dark_h >= C["crops"]["dead_after_unpowered_h"] and self.crops_alive():
             self.crops_dead_until = self.hour + C["crops"]["regrow_days"] * 24
             self.stats["crop_losses"] += 1
@@ -487,8 +560,8 @@ class City:
                 s["parts"] -= repair["parts"]
         # 건설: 추천 정책은 우선순위대로, 준비 없는 정책은 들어온 순서대로 작업량을 준다
         if self.policy.prepared:
-            self.queue.sort(key=lambda item: (BUILD_PRIORITY.get(item["id"], 5), item["seq"]))
-        print_cap = provided("regolith_printer", "print_t_day") * self.wk["regolith_printer"]
+            self.queue.sort(key=lambda item: (BUILD_PRIORITY.get(family(item["id"]), 5), item["seq"]))
+        print_cap = self.fam_sum("regolith_printer", lambda m: provided(m, "print_t_day"))
         for item in self.queue:
             if rd <= 0 and print_cap <= 0:
                 break
@@ -514,7 +587,8 @@ class City:
         s = self.stock
         return (s["parts"] - cost.get("parts", 0) >= reserve
                 and s["regolith_t"] >= cost.get("regolith_t", 0)
-                and s["metal_t"] >= cost.get("metal_t", 0))
+                and s["metal_t"] >= cost.get("metal_t", 0)
+                and all(s.get(k, 0.0) >= v for k, v in cost.items() if k not in ("parts", "regolith_t", "metal_t")))
 
     def enqueue(self, mid, tile=None):
         m = MODULES[mid]
@@ -525,7 +599,7 @@ class City:
             return False
         for key, value in m["cost"].items():
             self.stock[key] -= value
-        print_t = m["cost"].get("regolith_t", 0) if mid == "regolith_dome" else 0
+        print_t = m["cost"].get("regolith_t", 0) if m.get("printed") else 0
         self.seq += 1
         self.queue.append({"id": mid, "rd": m["build_rd"], "print_t": print_t, "seq": self.seq})
         if tile:
@@ -560,96 +634,135 @@ class City:
         pop = self.pop
         pop_next = pop + C["earth"]["crewed_seats"]
         year_index = min(2, day // 365)
-        p = self.planned
+        p = self.fam_planned
+        cap = self.planned_cap
+        build = self.build
 
         # 생명유지: 추천 정책은 여유분을, 준비 없는 정책은 문제가 터진 뒤에 짓는다
         if prepared or self.co2_ppm() > C["co2_ppm"]["bad"]:
-            if p("co2_scrubber") * provided("co2_scrubber", "co2_kg_day") < 1.3 * pop_next * PER["co2_kg"]:
-                self.enqueue("co2_scrubber")
-        if p("electrolyzer") * recipe("electrolyzer", "out", "o2_kg") < 1.2 * pop_next * PER["o2_kg"]:
-            self.enqueue("electrolyzer")
-        if p("water_recycler") * provided("water_recycler", "wastewater_kg_day") < 1.15 * pop_next * PER["water_use_kg"]:
-            self.enqueue("water_recycler")
+            if cap(lambda m: family(m) == "co2_scrubber", lambda m: provided(m, "co2_kg_day")) < 1.3 * pop_next * PER["co2_kg"]:
+                build("co2_scrubber")
+        if cap(lambda m: family(m) == "electrolyzer", lambda m: recipe(m, "out", "o2_kg")) < 1.2 * pop_next * PER["o2_kg"]:
+            build("electrolyzer")
+        if (cap(lambda m: family(m) == "water_recycler", lambda m: provided(m, "wastewater_kg_day"))
+                < 1.15 * pop_next * PER["water_use_kg"]):
+            build("water_recycler")
         if prepared:
             bonus = 1.5 if "shielding_2" in self.techs else 1.0
-            if p("storm_shelter") * 40 * bonus + p("regolith_dome") * 60 < pop_next:
-                self.enqueue("storm_shelter")
+            shelter = cap(lambda m: provided(m, "shelter"),
+                          lambda m: provided(m, "shelter") * (bonus if family(m) == "storm_shelter" else 1.0))
+            if shelter < pop_next:
+                build("storm_shelter")
             if self.covered_habs + self.queued("regolith_cover") < self.counts["hab_module"]:
                 self.enqueue_special("regolith_cover")
 
         # 저장: 1·2순위 부하를 48시간 버티는 축전 (추천 정책만)
         p1p2 = sum(spec(m, "power_kw") * self.counts[m] for m in MODULES if spec(m, "priority") in (1, 2))
-        fission = sum(provided(m, "generation_kw") * p(m) for m in ("fission_40kw", "fission_1mw"))
-        storage_planned = (p("battery_bank") * provided("battery_bank", "storage_kwh")
-                           + p("rfc_unit") * provided("rfc_unit", "storage_kwh"))
+        fission = cap(lambda m: provided(m, "generation_kw") and family(m) != "solar_tower",
+                      lambda m: provided(m, "generation_kw"))
+        storage_planned = cap(lambda m: family(m) in ("battery_bank", "rfc_unit"), lambda m: provided(m, "storage_kwh"))
         if prepared and storage_planned < max(0.0, p1p2 * 0.7 - fission) * 48:
-            if not self.enqueue("rfc_unit") and "regenerative_fuel_cell" not in self.techs:
-                self.enqueue("battery_bank")
+            if not build("rfc_unit") and "regenerative_fuel_cell" not in self.techs:
+                build("battery_bank")
 
         # 발전: 평균 발전량이 평균 수요의 1.25배(준비 없는 정책은 1.05배)
-        avg_load = 0.85 * sum(spec(m, "power_kw") * p(m) for m in MODULES if spec(m, "priority"))
+        avg_load = 0.85 * sum(spec(m, "power_kw") * self.planned(m) for m in MODULES if spec(m, "priority"))
         tile_factor = C["illumination"]["tile_factor"]
         towers_gen = sum(tile_factor[t] * n for t, n in self.tiles.items()) * 100 * 0.9
         if towers_gen + fission < (1.25 if prepared else 1.05) * avg_load:
             tile = self.free_tile()
             if tile and not (prepared and tile == "C" and "megawatt_fission" in self.techs):
-                self.enqueue("solar_tower", tile)
-            elif not self.enqueue("fission_1mw"):
-                self.enqueue("fission_40kw")
-        if p("radiator") * provided("radiator", "heat_kw") < 1.2 * avg_load:
-            self.enqueue("radiator")
+                build("solar_tower", tile)
+            elif not build("fission_1mw"):
+                build("fission_40kw")
+        if cap(lambda m: provided(m, "heat_kw"), lambda m: provided(m, "heat_kw")) < 1.2 * avg_load:
+            build("radiator")
 
         # 거주: 다음 유인선 도착분까지 집을 준비
-        housing = p("hab_module") * provided("hab_module", "housing") + p("regolith_dome") * provided("regolith_dome", "housing")
+        housing = cap(lambda m: provided(m, "housing"), lambda m: provided(m, "housing"))
         if housing < pop_next:
             if "sintered_construction" in self.techs:
-                if self.planned("regolith_printer") or self.enqueue("regolith_printer"):
-                    self.enqueue("regolith_dome")
+                if p("regolith_printer") or build("regolith_printer"):
+                    build("regolith_dome")
             elif not prepared:
-                self.enqueue("hab_module")
+                build("hab_module")
             elif day > 60:
-                self.enqueue("hab_module")
+                build("hab_module")
 
         # 식량 자급률 목표
         target = self.policy.food_targets[year_index]
-        need = target * pop * PER["food_kg"] - p("algae_reactor") * recipe("algae_reactor", "out", "food_kg")
-        if p("hydroponics") * recipe("hydroponics", "out", "food_kg") < need:
-            self.enqueue("hydroponics")
+        food_of = lambda m: recipe(m, "out", "food_kg")  # noqa: E731
+        need = target * pop * PER["food_kg"] - cap(lambda m: family(m) == "algae_reactor", food_of)
+        if cap(lambda m: family(m) == "hydroponics", food_of) < need:
+            build("hydroponics")
         if not prepared and "algae_bioreactor" in self.techs and p("algae_reactor") < pop / 60:
-            self.enqueue("algae_reactor")
-        if self.caps["food_kg"] < pop * PER["food_kg"] * 120 and not self.queued("food_store"):
-            self.enqueue("food_store")
-        if self.caps["o2_kg"] < pop * PER["o2_kg"] * 25 and not self.queued("tank_farm"):
-            self.enqueue("tank_farm")
+            build("algae_reactor")
+        if self.caps["food_kg"] < pop * PER["food_kg"] * 120 and not self.fam_queued("food_store"):
+            build("food_store")
+        if self.caps["o2_kg"] < pop * PER["o2_kg"] * 25 and not self.fam_queued("tank_farm"):
+            build("tank_farm")
 
         # 물: 하루 순손실을 얼음 채굴이 넉넉히 덮도록
         loss = pop * PER["water_use_kg"] * (1 - self.recovery) + pop * PER["o2_kg"] * 0.6 * 1.125
-        if p("ice_miner") * recipe("ice_miner", "out", "water_kg") * self.mining * 0.8 < loss + 150:
-            self.enqueue("ice_miner")
+        if (cap(lambda m: family(m) == "ice_miner", lambda m: recipe(m, "out", "water_kg")) * self.mining * 0.8
+                < loss + 150):
+            build("ice_miner")
 
         # 사회·연구·산업
         if p("research_lab") < math.ceil(pop / 60):
-            self.enqueue("research_lab")
+            build("research_lab")
         if prepared and p("green_commons") < pop // 100:
-            self.enqueue("green_commons")
-        if p("medical_bay") * provided("medical_bay", "care") < pop_next:
-            self.enqueue("medical_bay")
-        if p("excavator") < 1 + (self.queued("regolith_dome") + self.queued("storm_shelter")) // 2:
-            self.enqueue("excavator")
+            build("green_commons")
+        if cap(lambda m: provided(m, "care"), lambda m: provided(m, "care")) < pop_next:
+            build("medical_bay")
+        if p("excavator") < 1 + (self.fam_queued("regolith_dome") + self.fam_queued("storm_shelter")) // 2:
+            build("excavator")
         if "molten_regolith_electrolysis" in self.techs and p("mre_plant") < 1:
-            self.enqueue("mre_plant")
+            build("mre_plant")
         if "local_manufacturing" in self.techs and p("parts_fab") < 2 * max(1, p("mre_plant")):
-            self.enqueue("parts_fab")
+            build("parts_fab")
         if self.robots + self.queued("robot") < 8 + pop / 40:
             self.enqueue_special("robot")
+
+    def fam_planned(self, fam):
+        """계열의 계획 수량 (완공 + 대기)."""
+        return sum(self.planned(m) for m in FAMILY[fam])
+
+    def fam_queued(self, fam):
+        return sum(self.queued(m) for m in FAMILY[fam])
+
+    def planned_cap(self, which, value):
+        """which(모듈)이 참인 모듈마다 계획 수량 × value(모듈)을 더한다 (데이터 순서)."""
+        total = 0.0
+        for m in MODULES:
+            if which(m):
+                total += self.planned(m) * value(m)
+        return total
+
+    def build(self, fam, tile=None):
+        """정책의 건설: 보통은 계열의 기본 모듈. 'variety' 정책은 계열의 종류를 돌아가며 고르고, 못 지으면 기본 모듈."""
+        if not self.policy.variety:
+            return self.enqueue(fam, tile)
+        options = [m for m in FAMILY[fam] if not MODULES[m]["tech"] or MODULES[m]["tech"] in self.techs]
+        if not options:
+            return self.enqueue(fam, tile)
+        pick = options[self.variety_turn % len(options)]
+        self.variety_turn += 1
+        if pick != fam and self.enqueue(pick, tile):
+            return True
+        return self.enqueue(fam, tile)
 
     def research(self):
         prod = 0.8 + 0.4 * self.morale / 100
         p4_share = 1.0 - self.day["p4_off_h"] / 24.0
-        scientists = min(self.wk["research_lab"] * spec("research_lab", "crew"),
+        scientists = min(self.fam_sum("research_lab", lambda m: spec(m, "crew")),
                          self.pop * C["workforce_share"] * 0.3)
+        rp_direct = 0.0           # 연구원 없이 나오는 연구 (교신·천문대 등)
+        for m in WITH["rp_day"]:
+            if family(m) != "research_lab":
+                rp_direct += self.wk[m] * provided(m, "rp_day")
         rp = (scientists * prod * p4_share
-              + self.wk["comms_center"] * provided("comms_center", "rp_day") * p4_share
+              + rp_direct * p4_share
               + C["earth"]["earth_rp_day"])
         self.rp_bank += rp
         self.support += rp * C["earth"]["support_per_rp"]
@@ -708,7 +821,7 @@ class City:
                 return
             seats = min(earth["crewed_seats"], int(self.housing_cap - self.pop))
             if self.policy.prepared:
-                scrub = self.wk["co2_scrubber"] * provided("co2_scrubber", "co2_kg_day")
+                scrub = self.fam_sum("co2_scrubber", lambda m: provided(m, "co2_kg_day"))
                 seats = min(seats, int(scrub / PER["co2_kg"] / 1.1 - self.pop))
             if seats > 0:
                 self.support -= earth["crewed_cost_support"]
@@ -754,8 +867,9 @@ class City:
         s = self.stock
         capacity = earth["cargo_capacity_units"]
         horizon = earth["cargo_interval_days"] + 15
-        produced = (self.wk["hydroponics"] * recipe("hydroponics", "out", "food_kg") * (1 if self.crops_alive() else 0)
-                    + self.wk["algae_reactor"] * recipe("algae_reactor", "out", "food_kg"))
+        food_of = lambda m: recipe(m, "out", "food_kg")  # noqa: E731
+        produced = (self.fam_sum("hydroponics", food_of) * (1 if self.crops_alive() else 0)
+                    + self.fam_sum("algae_reactor", food_of))
         deficit = (self.pop * PER["food_kg"] - produced) * horizon
         reserve = self.pop * PER["food_kg"] * self.policy.food_buffer_days
         food_t = max(0.0, deficit + reserve - s["food_kg"]) / 1000.0
@@ -798,8 +912,14 @@ class City:
     def dose_and_departures(self):
         rates = C["dose_msv_day"]
         pop = self.pop
-        domes = self.counts["regolith_dome"] * provided("regolith_dome", "housing")
-        covered = min(self.covered_habs, self.counts["hab_module"]) * provided("hab_module", "housing")
+        domes = 0                 # 돔 계열 (두꺼운 차폐)
+        covered_more = 0          # 벽 자체가 피복인 거주 (인쇄 거주동 등)
+        for m in WITH["housing"]:
+            if family(m) == "regolith_dome" or provided(m, "dose", "") == "dome":
+                domes += self.counts[m] * provided(m, "housing")
+            elif provided(m, "dose", "") == "covered":
+                covered_more += self.counts[m] * provided(m, "housing")
+        covered = min(self.covered_habs, self.counts["hab_module"]) * provided("hab_module", "housing") + covered_more
         in_dome = min(pop, domes)
         in_covered = min(pop - in_dome, covered)
         bare = max(0.0, pop - in_dome - in_covered)
@@ -829,14 +949,25 @@ class City:
             target -= 15 if crowd > 1.0 else (5 if crowd > 0.95 else 0)
             if self.shelter_cap < pop:
                 target -= 5
-            if self.wk["medical_bay"] * provided("medical_bay", "care") < pop:
+            care = 0.0
+            for m in WITH["care"]:
+                care += self.wk[m] * provided(m, "care")
+            if care < pop:
                 target -= 5
         if self.algae_food_share > 0.25:
             target -= 5
         if self.rationing:
             target -= C["rationing"]["morale_penalty"]
-        target += min(15, self.wk["green_commons"] * provided("green_commons", "morale"))
-        target += provided("comms_center", "morale") if self.wk["comms_center"] else 0
+        leisure = 0.0             # 공원·체육관·주방… (합쳐서 최대 +15)
+        for m in WITH["morale"]:
+            if family(m) != "comms_center":
+                leisure += self.wk[m] * provided(m, "morale")
+        target += min(15, leisure)
+        contact = 0               # 지구와의 연결 — 가동 중인 교신 계열 중 가장 좋은 것 하나
+        for m in FAMILY["comms_center"]:
+            if self.wk[m] and provided(m, "morale") > contact:
+                contact = provided(m, "morale")
+        target += contact
         self.p4_off_week = (self.p4_off_week + [self.day["p4_off_h"]])[-7:]
         if sum(self.p4_off_week) > 48:
             target -= 5
@@ -986,18 +1117,28 @@ def monte_carlo(runs, years):
         print(f"| {label} | {fn(results['good'])} | {fn(results['naive'])} |")
 
 
-def module_table():
-    names = {"habitat": "거주", "life_support": "생명유지", "food": "식량", "power": "전력",
-             "thermal": "열", "industry": "산업", "logistics": "물류", "safety": "안전",
-             "research": "연구", "social": "사회"}
+CATEGORY_KO = {"habitat": "거주", "life_support": "생명유지", "food": "식량", "power": "전력",
+               "thermal": "열", "industry": "산업", "logistics": "물류", "safety": "안전",
+               "research": "연구", "social": "사회"}
+
+
+def module_table(families=False):
+    """문서용 모듈 표. families=True면 계열마다 기본 모듈 아래에 같은 계열의 다른 종류를 둔다 (145종)."""
+    names = CATEGORY_KO
     print("| 모듈 | 분류 | 절전 순위 | 필요 기술 | 시작 | 비용 | 건설 (로봇·일) | 전력 (kW) | 인원 | 고장 간격 (일) "
           "| 수리 (부품 · 로봇·일) | 기능 |")
     print("|---|---|---|---|---|---|---|---|---|---|---|---|")
-    units = (("parts", "부품 {}"), ("regolith_t", "레골리스 {} t"), ("metal_t", "금속 {} t"))
-    for m in MODULES.values():
+    units = (("parts", "부품 {}"), ("regolith_t", "레골리스 {} t"), ("metal_t", "금속 {} t"), ("water_kg", "물 {:,} kg"))
+    if families:
+        rows = [(m, MODULES[m]["id"] != fam) for fam in FAMILY for m in FAMILY[fam]]
+    else:
+        rows = [(m, False) for m in MODULES if family(m) == m]
+    for mid, member in rows:
+        m = MODULES[mid]
         cost = " + ".join(fmt.format(m["cost"][k]) for k, fmt in units if m["cost"].get(k))
         tech = TECHS[m["tech"]]["name"] if m["tech"] else "–"
-        print(f"| {m['name']} | {names[m['category']]} | {m['priority'] or '–'} | {tech} | {m['start'] or '–'} | "
+        name = f"└ {m['name']}" if member else f"**{m['name']}**" if families else m["name"]
+        print(f"| {name} | {names[m['category']]} | {m['priority'] or '–'} | {tech} | {m['start'] or '–'} | "
               f"{cost} | {m['build_rd']:g} | {m['power_kw'] or '–'} | {m['crew'] or '–'} | {m['mtbf_days']:,} | "
               f"{m['repair']['parts']} · {m['repair']['rd']:g} | {describe(m)} |")
 
@@ -1024,6 +1165,14 @@ def describe(m):
             out.append(fmt.format(pv[key]))
     if "efficiency" in pv:
         out.append(f"왕복 효율 {pv['efficiency']:.0%}")
+    elif "storage_kwh" in pv and "family" in m:
+        base = MODULES[m["family"]].get("provides", {})
+        if "efficiency" in base:
+            out.append(f"왕복 효율 {base['efficiency']:.0%}")
+    if pv.get("dose") == "covered":
+        out.append("두꺼운 벽 — 피복 모듈 수준 선량")
+    if "clearance_m" in m:
+        out.append(f"거리 규칙 {m['clearance_m']} m")
     if "recovery" in pv:
         out.append(f"회수 {pv['recovery']:.0%}")
     if "storage" in pv:
@@ -1047,16 +1196,17 @@ def tech_table():
 def main():
     parser = argparse.ArgumentParser(description="SpaceCity 도시 레이어 밸런스 시뮬레이터")
     parser.add_argument("--seed", type=int, default=2061)
-    parser.add_argument("--policy", choices=("good", "naive"), default="good")
+    parser.add_argument("--policy", choices=("good", "naive", "variety"), default="good")
     parser.add_argument("--years", type=float, default=3)
     parser.add_argument("--monte-carlo", type=int, metavar="N", help="두 정책을 N회씩 돌려 비교")
-    parser.add_argument("--module-table", action="store_true", help="문서용 모듈 표 출력")
+    parser.add_argument("--module-table", action="store_true", help="문서용 모듈 표 출력 (기본 모듈 29종)")
+    parser.add_argument("--module-catalog", action="store_true", help="문서용 전체 모듈 표 (29계열 145종)")
     parser.add_argument("--tech-table", action="store_true", help="문서용 기술 표 출력")
     parser.add_argument("--csv", metavar="PATH", help="일별 기록을 CSV로 저장")
     args = parser.parse_args()
 
-    if args.module_table:
-        module_table()
+    if args.module_table or args.module_catalog:
+        module_table(families=args.module_catalog)
         return
     if args.tech_table:
         tech_table()

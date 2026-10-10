@@ -15,8 +15,9 @@ const SNAP_M := 6.0                                  # 길 끝을 꼭짓점·길
 const ROAD_HALF := BaseLayout.ROAD_W * 0.5
 const PAD_CLEAR_M := 30.0                            # 착륙장 둘레: 다른 건물 금지 (착륙 분사가 레골리스를 날린다)
 const REACTOR_CLEAR_M := 60.0                        # 원자로와 사람이 사는 건물 사이
-const PEOPLE := ["hab_module", "regolith_dome", "storm_shelter", "green_commons", "medical_bay", "research_lab"]
-const REACTORS := ["fission_40kw", "fission_1mw"]
+const PEOPLE := ["habitat", "safety", "research", "social"]   # 사람이 머무는 분류
+const REACTORS := ["fission_40kw", "fission_1mw"]             # 원자로 계열
+## 모듈 데이터의 clearance_m가 있으면 그 거리를 쓴다 (매립형 원자로 20 m, 방벽 착륙장 15 m …)
 const TILE_NAMES := {"A": "A 100%", "B": "B 85%", "C": "C 70%"}
 
 var layout: BaseLayout
@@ -132,15 +133,15 @@ func _signature(sim: CitySim) -> String:
 
 ## 자리 없이 지어진 태양광 타워의 일조 칸: 시뮬레이션의 칸 수보다 계획에 모자란 칸
 func _tile_for_built(sim: CitySim, kind: String) -> String:
-	if kind != "solar_tower":
+	if fam(kind) != "solar_tower":
 		return ""
 	var have := {}
 	for e in buildings:
-		if e["id"] == "solar_tower":
+		if fam(String(e["id"])) == "solar_tower":
 			have[e["tile"]] = int(have.get(e["tile"], 0)) + 1
 	var queued := {}
 	for item in sim.queue:
-		if item["id"] == "solar_tower":
+		if fam(String(item["id"])) == "solar_tower":
 			queued[item["tile"]] = int(queued.get(item["tile"], 0)) + 1
 	for t in ["A", "B", "C"]:
 		if int(have.get(t, 0)) < int(sim.tiles.get(t, 0)) - int(queued.get(t, 0)):
@@ -161,6 +162,34 @@ func add_queued(kind: String, at: Vector2, rot: int, variant: int, seq: int, til
 	buildings.append(e)
 	_touch()
 	return e
+
+
+## 계열 (기본 모듈 id) — 배치 규칙과 기본 자리는 계열을 따른다
+static func fam(kind: String) -> String:
+	GameData.load_all()
+	return GameData.FAM_OF.get(kind, kind)
+
+
+static func _module(kind: String) -> Dictionary:
+	GameData.load_all()
+	return GameData.MODULES.get(kind, {})
+
+
+## 이 건물이 지켜야 할 거리 (착륙장·원자로). 데이터에 없으면 계열의 기본값
+static func clearance(kind: String) -> float:
+	var m := _module(kind)
+	if m.has("clearance_m"):
+		return float(m["clearance_m"])
+	var f := fam(kind)
+	if f == "landing_pad":
+		return PAD_CLEAR_M
+	if f in REACTORS:
+		return REACTOR_CLEAR_M
+	return 0.0
+
+
+static func _people(kind: String) -> bool:
+	return String(_module(kind).get("category", "")) in PEOPLE
 
 
 func count_of(kind: String) -> int:
@@ -195,7 +224,7 @@ func _auto_place(kind: String, seq: int, tile: String) -> Dictionary:
 ## 이 종류를 놓기 좋은 빈자리: 기본 배치의 자리를 차례로, 다 막혔으면 구역 둘레를 나선으로 찾는다.
 ## {at, rot, variant, tile} 또는 {}
 func suggest(kind: String, tile: String = "") -> Dictionary:
-	if kind == "solar_tower":
+	if fam(kind) == "solar_tower":
 		for i in layout.tower_slots.size():
 			var ts: Array = layout.tower_slots[i]
 			if tile != "" and ts[1] != tile:
@@ -205,7 +234,7 @@ func suggest(kind: String, tile: String = "") -> Dictionary:
 			if check_spot(kind, at, 0).is_empty():
 				return {"at": at, "rot": 0, "variant": BaseScene.variant_of(kind, i), "tile": zone_of(at)}
 		return {}
-	var slots: Array = layout.slots.get(kind, [])
+	var slots: Array = layout.slots.get(fam(kind), [])
 	for i in slots.size():
 		var p: Vector3 = slots[i]
 		var at := Vector2(p.x, p.y)
@@ -230,7 +259,7 @@ func suggest(kind: String, tile: String = "") -> Dictionary:
 
 
 func _anchor(kind: String) -> Vector2:
-	var d: String = layout.district_of.get(kind, "")
+	var d: String = layout.district_of.get(fam(kind), "")
 	if d != "" and layout.rects.has(d):
 		return (layout.rects[d] as Rect2).get_center()
 	return hub()
@@ -277,13 +306,14 @@ func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1) -> St
 		if not b.has_point(uv) or uv.y < BaseLayout.CREST_V + 2.0:
 			return "기지 밖이다"
 	var zone := zone_of(at)
-	if kind == "solar_tower":
+	var kfam := fam(kind)
+	if kfam == "solar_tower":
 		if zone == "":
 			return "태양광 타워는 능선의 일조 구역(A·B·C)에만 세운다"
 	elif zone != "" or _touches_zone(r):
 		return "능선의 일조 구역은 태양광 타워 자리다"
 	var ice := Vector2(layout.ice_center.x, layout.ice_center.y)
-	if kind == "ice_miner":
+	if kfam == "ice_miner":
 		if at.distance_to(ice) > BaseLayout.ICE_CRATER_R:
 			return "얼음 채굴기는 얼음 분화구(영구 그늘) 안에 세운다"
 	elif _rect_point_dist(r, ice) < BaseLayout.ICE_CRATER_R:
@@ -296,13 +326,15 @@ func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1) -> St
 		if inner.intersects(er):
 			return "다른 건물(%s)과 겹친다" % GameData.module_name(String(e["id"]))
 		var other: String = e["id"]
-		if kind == "landing_pad" and other != "landing_pad" and _rect_dist(r, er) < PAD_CLEAR_M:
-			return "착륙장 둘레 %d m 안에 건물이 있다 (착륙 분사)" % int(PAD_CLEAR_M)
-		if other == "landing_pad" and kind != "landing_pad" and _rect_dist(r, er) < PAD_CLEAR_M:
-			return "착륙장에서 %d m 넘게 떨어져야 한다 (착륙 분사)" % int(PAD_CLEAR_M)
-		if (kind in REACTORS and other in PEOPLE) or (kind in PEOPLE and other in REACTORS):
-			if _rect_dist(r, er) < REACTOR_CLEAR_M:
-				return "원자로와 사람이 사는 건물은 %d m 넘게 떨어져야 한다" % int(REACTOR_CLEAR_M)
+		var ofam := fam(other)
+		if kfam == "landing_pad" and ofam != "landing_pad" and _rect_dist(r, er) < clearance(kind):
+			return "착륙장 둘레 %d m 안에 건물이 있다 (착륙 분사)" % int(clearance(kind))
+		if ofam == "landing_pad" and kfam != "landing_pad" and _rect_dist(r, er) < clearance(other):
+			return "착륙장에서 %d m 넘게 떨어져야 한다 (착륙 분사)" % int(clearance(other))
+		if kfam in REACTORS and _people(other) and _rect_dist(r, er) < clearance(kind):
+			return "이 원자로는 사람이 머무는 건물에서 %d m 넘게 떨어져야 한다" % int(clearance(kind))
+		if ofam in REACTORS and _people(kind) and _rect_dist(r, er) < clearance(other):
+			return "원자로(%s)에서 %d m 넘게 떨어져야 한다" % [GameData.module_name(other), int(clearance(other))]
 	for ed in edges:
 		var a: Vector2 = nodes[ed.x]
 		var c: Vector2 = nodes[ed.y]
@@ -313,7 +345,7 @@ func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1) -> St
 
 ## 자재·연구·일조 칸까지 따진 결과: {reason, tile}
 func check(kind: String, at: Vector2, rot: int, sim: CitySim) -> Dictionary:
-	var tile := zone_of(at) if kind == "solar_tower" else ""
+	var tile := zone_of(at) if fam(kind) == "solar_tower" else ""
 	if sim != null:
 		var m: Dictionary = sim.M[kind]
 		if m["tech"] != null and not sim.techs.has(m["tech"]):
@@ -659,6 +691,15 @@ func random_node(rng: RandomNumberGenerator) -> Vector2:
 
 
 # ── 찾기 ────────────────────────────────────────────────────────
+## 지어진 건물 중 이 계열(종류 모두)의 자리들 (지은 순서)
+func built_of_family(f: String) -> Array:
+	var out := []
+	for e in buildings:
+		if fam(String(e["id"])) == f and int(e["seq"]) < 0:
+			out.append(Vector3(e["x"], e["y"], 0))
+	return out
+
+
 ## 지어진 건물 중 이 종류의 자리들 (지은 순서)
 func built_of(kind: String) -> Array:
 	var out := []

@@ -141,7 +141,7 @@ func commit(keep: bool = false) -> bool:
 func auto_place() -> bool:
 	if mode != "build":
 		return false
-	var want_tile := sim.free_tile() if kind == "solar_tower" else ""
+	var want_tile := sim.free_tile() if CityPlan.fam(kind) == "solar_tower" else ""
 	var s := plan.suggest(kind, want_tile)
 	if s.is_empty():
 		placed.emit(kind, false, "빈자리를 찾지 못했다")
@@ -227,7 +227,7 @@ func status() -> String:
 		"build":
 			var name := GameData.module_name(kind)
 			var extra := ""
-			if kind == "solar_tower":
+			if CityPlan.fam(kind) == "solar_tower":
 				extra = " · 능선의 일조 구역에만 (A 100% · B 85% · C 70%)"
 				if tile != "":
 					extra = " · %s 구역" % CityPlan.TILE_NAMES[tile]

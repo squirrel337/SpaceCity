@@ -53,6 +53,9 @@ func _process(_delta: float) -> bool:
 			_shot("03_power")
 		14:
 			main._select_tab("build")
+			main.tabs["build"]._open["hab_module"] = true     # 계열 하나를 펼쳐 보인다
+			main.tabs["build"].rebuild()
+			main.panel_scroll.scroll_vertical = 260
 			main._refresh_live()
 		16:
 			_shot("04_build")

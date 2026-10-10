@@ -473,7 +473,7 @@ func _draw_tool() -> void:
 		return
 	var c := GOOD if tool.reason == "" else BAD
 	if tool.mode == "build":
-		if tool.kind == "solar_tower":
+		if CityPlan.fam(tool.kind) == "solar_tower":
 			for t in BaseLayout.ZONES:
 				for r in BaseLayout.ZONES[t]:
 					var rr: Rect2 = r
@@ -515,7 +515,7 @@ func _draw_tool() -> void:
 func _draw_tool_hud(font: Font, bold: Font) -> void:
 	if not _tool_on():
 		return
-	if tool.mode == "build" and tool.kind == "solar_tower":
+	if tool.mode == "build" and CityPlan.fam(tool.kind) == "solar_tower":
 		for t in BaseLayout.ZONES:
 			var used := int(sim.tiles.get(t, 0))
 			var cap := int(sim.C["illumination"]["tiles"][t])
