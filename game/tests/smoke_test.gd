@@ -41,6 +41,7 @@ func _process(_delta: float) -> bool:
 		_save_roundtrip()
 		_map_check()
 		_world_check()
+		_plan_check()
 		main._on_module_tapped("hab_module")
 		main._show_help()
 		main._show_report()
@@ -215,6 +216,110 @@ func _world_check() -> void:
 				break
 	_check(picked != "", "3D 도시에서 건물을 고를 수 없다")
 	print("smoke: world %d buildings, picked %s, earth %.3f AU, moon %d km" % [city._boxes.size(), picked, r_au, int(md)])
+
+
+func _plan_check() -> void:
+	## 자리 고르기: 계획과 시뮬레이션의 개수, 겹침 규칙, 일조 구역, 길 잇기·지우기, 길 찾기, 저장, 3D 땅 고르기
+	var sim: CitySim = main.sim
+	var plan: CityPlan = main.plan
+	var tool: PlaceTool = main.tool
+	plan.sync(sim)
+	for kind in sim.counts:
+		var n := plan.built_of(kind).size()
+		_check(n == int(sim.counts[kind]), "계획의 %s 개수(%d)가 시뮬레이션(%d)과 다르다" % [kind, n, int(sim.counts[kind])])
+	for i in plan.buildings.size():
+		for j in range(i + 1, plan.buildings.size()):
+			if plan.entry_rect(plan.buildings[i]).grow(-0.05).intersects(plan.entry_rect(plan.buildings[j])):
+				_check(false, "자동 배치한 건물이 겹친다: %s, %s" % [plan.buildings[i]["id"], plan.buildings[j]["id"]])
+	sim.stock["parts"] += 2000.0
+	sim.stock["regolith_t"] += 500.0
+	sim.stock["metal_t"] += 50.0
+	# 겹치는 자리 → 거절, 빈자리 → 대기열
+	tool.start_build("hab_module")
+	var hab: Vector3 = plan.built_of("hab_module")[0]
+	tool.hover(Vector2(hab.x, hab.y))
+	_check(tool.reason.contains("겹친다"), "건물 위에 겹쳐 놓을 수 있다: " + tool.reason)
+	var spot := plan.suggest("hab_module")
+	_check(not spot.is_empty(), "거주 모듈을 놓을 빈자리가 없다")
+	tool.hover(spot["at"])
+	_check(tool.reason == "", "빈자리에 놓을 수 없다: " + tool.reason)
+	var q0 := sim.queue.size()
+	tool.rotate()
+	tool.rotate()
+	tool.hover(spot["at"])
+	var ok := tool.commit(false)
+	_check(ok and sim.queue.size() == q0 + 1, "고른 자리에 공사가 들어가지 않았다: " + tool.reason)
+	var e := plan.entry_of_seq(sim.seq)
+	_check(not e.is_empty() and int(e["rot"]) == 2, "공사에 자리가 붙지 않았다")
+	_check(not tool.active(), "지은 뒤에도 도구가 켜져 있다")
+	# 태양광 타워: 일조 구역에만, 구역이 곧 일조 칸
+	tool.start_build("solar_tower")
+	tool.hover(Vector2(hab.x, hab.y) + Vector2(40, 40))
+	_check(tool.reason.contains("일조 구역"), "태양광 타워를 능선 밖에 놓을 수 있다: " + tool.reason)
+	var b_zone: Rect2 = BaseLayout.ZONES["B"][1]
+	var bxy := BaseLayout.uv_to_xy(b_zone.get_center())
+	var tiles_b := int(sim.tiles.get("B", 0))
+	tool.hover(bxy)
+	_check(tool.tile == "B", "B 구역이 B 칸이 아니다: " + tool.tile)
+	if tool.reason == "":
+		tool.commit(false)
+		_check(int(sim.tiles.get("B", 0)) == tiles_b + 1, "B 구역 타워가 B 칸을 쓰지 않았다")
+	tool.stop()
+	# 길: 두 점을 이어 길을 내고, 지운다
+	var e0 := plan.edges.size()
+	var r0 := plan.road_rev
+	tool.start_road()
+	var a := plan.hub() + Vector2(0, -60)
+	var b := a + Vector2(-30, 0)
+	var free_a := plan.road_check(a, b) == ""
+	if free_a:
+		tool.click(a)
+		tool.click(b)
+		_check(plan.edges.size() > e0 and plan.road_rev > r0, "길이 생기지 않았다")
+		tool.start_erase()
+		tool.hover(a.lerp(b, 0.5))
+		_check(tool.hover_edge >= 0, "지울 길을 찾지 못했다")
+		tool.erase_hovered()
+	tool.stop()
+	var path := plan.route(plan.layout.gates["pad"], plan.layout.gates["ice"])
+	_check(path.size() >= 3, "착륙장에서 얼음 분화구까지 길을 찾지 못했다")
+	# 저장 왕복
+	var text := JSON.stringify(plan.to_save())
+	var back := CityPlan.from_save(JSON.parse_string(text), sim)
+	_check(back.buildings.size() == plan.buildings.size() and back.edges.size() == plan.edges.size(),
+		"저장한 계획이 다르게 돌아왔다")
+	# 공사가 끝나면 지어진 건물이 된다
+	var uid := int(e["uid"])
+	for _i in range(24 * 40):
+		sim.advance_hour()
+		if sim.queue.all(func(it): return int(it["seq"]) != int(e["seq"])):
+			break
+	plan.sync(sim)
+	var done := false
+	for be in plan.buildings:
+		if int(be["uid"]) == uid:
+			done = int(be["seq"]) < 0
+	_check(done, "다 지은 거주 모듈이 계획에서 지어진 건물이 되지 않았다")
+	# 3D: 화면 점 ↔ 땅 위의 점
+	var w: WorldView = main.world
+	main._set_view("world")
+	w.home(false)
+	for _i in range(3):
+		w._process(0.05)
+	var city := w.city
+	var g0 := plan.hub() + Vector2(12, -8)
+	var sp: Variant = w.screen_of(city.global_transform * city._local(g0))
+	_check(sp != null, "기지 가운데가 화면 밖이다")
+	if sp != null:
+		var g1: Variant = city.ground_at(w, sp)
+		_check(g1 != null and (g1 as Vector2).distance_to(g0) < 1.0, "3D 땅 고르기가 어긋난다: %s vs %s" % [str(g1), str(g0)])
+	main._begin_place("research_lab")
+	_check(tool.mode == "build" and main.place_bar.visible, "자리 고르기 막대가 뜨지 않았다")
+	w._hover(w.size * 0.5)
+	city.update(0.016, 0)
+	_check(tool.has_at and city._ghost.visible, "3D 유령 건물이 보이지 않는다")
+	tool.stop()
+	print("smoke: plan %d buildings, %d roads, route %d points" % [plan.buildings.size(), plan.edges.size(), path.size()])
 
 
 func _check(ok: bool, message: String) -> void:

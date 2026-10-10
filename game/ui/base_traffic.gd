@@ -1,7 +1,7 @@
 class_name BaseTraffic
 extends RefCounted
 ## 지도의 탈것과 사람 — 시뮬레이션의 사건(착륙선 도착, 공사, 고장)에 맞춰 움직인다.
-## 보여 주기만 한다. 시뮬레이션 숫자에는 영향을 주지 않는다.
+## 길은 배치 계획(CityPlan)의 길 그물을 따라 찾는다. 보여 주기만 한다. 시뮬레이션 숫자에는 영향을 주지 않는다.
 
 const LANDER_HIGH := 150.0        # 착륙선이 나타나는 높이 (m)
 const DESCEND_S := 4.0
@@ -10,15 +10,15 @@ const ASCEND_S := 3.5
 const MAX_ROBOTS := 10
 const WALKERS := 6
 
-var layout: BaseLayout
+var plan: CityPlan
 var agents: Array = []
 var _seen := {}
 var _landers_waiting: Array = []
 var _rng := RandomNumberGenerator.new()
 
 
-func _init(p_layout: BaseLayout) -> void:
-	layout = p_layout
+func _init(p_plan: CityPlan = null) -> void:
+	plan = p_plan
 	_rng.seed = 2061
 
 
@@ -31,7 +31,7 @@ func reset(sim: CitySim) -> void:
 
 
 func update(dt: float, sim: CitySim, sites: Array) -> void:
-	if sim == null:
+	if sim == null or plan == null:
 		return
 	_events(sim)
 	_ensure(sim)
@@ -62,8 +62,33 @@ func _events(sim: CitySim) -> void:
 
 
 func _pad_spot() -> Vector3:
-	var pads: Array = layout.slots.get("landing_pad", [])
+	var pads := plan.built_of("landing_pad")
+	if pads.is_empty():
+		pads = plan.layout.slots.get("landing_pad", [])
 	return pads[0] if pads.size() > 0 else Vector3.ZERO
+
+
+## 길 그물 위에서 이 점과 가장 가까운 곳 (길이 없으면 그 점)
+func _road_point(p: Vector3) -> Vector3:
+	var k := plan.nearest_edge(Vector2(p.x, p.y))
+	if k < 0:
+		return p
+	var q := CityPlan._seg_point(plan.nodes[plan.edges[k].x], plan.nodes[plan.edges[k].y], Vector2(p.x, p.y))
+	return Vector3(q.x, q.y, 0)
+
+
+func _hub() -> Vector3:
+	var h := plan.hub()
+	return Vector3(h.x, h.y, 0)
+
+
+## 이 종류 중 하나가 서 있는 곳 (없으면 기본 배치의 구역 문)
+func _place_of(kinds: Array, gate: String) -> Vector3:
+	for kind in kinds:
+		var list := plan.built_of(kind)
+		if not list.is_empty():
+			return list[0]
+	return plan.layout.gates.get(gate, _hub())
 
 
 # ── 항상 있는 탈것 ──────────────────────────────────────────────
@@ -85,17 +110,18 @@ func _spawn(role: String, id: String, pos: Vector3, speed: float, extra: Diction
 
 func _ensure(sim: CitySim) -> void:
 	if _count("rover") < 2:
-		_spawn("rover", "ltv", layout.hub + Vector3(_count("rover") * 6.0, 0, 0), 7.0)
+		_spawn("rover", "ltv", _hub() + Vector3(_count("rover") * 6.0, 0, 0), 7.0)
 	if _count("cruiser") < 1:
-		_spawn("cruiser", "pressurized_rover", layout.hub + Vector3(-8, 3, 0), 4.5)
+		_spawn("cruiser", "pressurized_rover", _hub() + Vector3(-8, 0, 0), 4.5)
 	if _count("hauler") < 1:
-		_spawn("hauler", "cargo_hauler", layout.gates["pad"], 5.0, {"state": "parked"})
+		_spawn("hauler", "cargo_hauler", _road_point(_pad_spot()), 5.0, {"state": "parked"})
 	if _count("hopper") < 1:
-		var home: Vector3 = layout.gates["life"] + Vector3(-6, 6, 0)
+		var home: Vector3 = plan.layout.gates.get("life", _hub()) + Vector3(-6, 6, 0)
 		_spawn("hopper", "hopper", home, 0.0, {"state": "parked", "wait": 12.0})
-	var digs := mini(int(sim.counts.get("excavator", 0)), 2)
+	var digs_at := plan.built_of("excavator")
+	var digs := mini(digs_at.size(), 2)
 	while _count("digger") < digs:
-		var site: Vector3 = layout.slot("excavator", _count("digger"))
+		var site: Vector3 = digs_at[_count("digger")]
 		_spawn("digger", "excavator_robot", site + Vector3(-7, -3, 0), 1.6, {"site": site})
 	while _count("digger") > digs:
 		_remove_one("digger")
@@ -118,19 +144,19 @@ func _remove_one(role: String) -> void:
 			return
 
 
-func _robot_home(sim: CitySim) -> Vector3:
-	if int(sim.counts.get("robot_bay", 0)) > 0:
-		return layout.slot("robot_bay", 0)
-	return layout.gates["industry"]
+func _robot_home(_sim: CitySim) -> Vector3:
+	return _place_of(["robot_bay"], "industry")
 
 
 func _random_core_spot() -> Vector3:
-	## 거주 구역의 골목(모듈 줄 사이) 위의 한 점
-	var r: Rect2 = layout.rects["core"]
-	var rows := int(r.size.y / 10.0)
-	var y := r.position.y + 10.0 * _rng.randi_range(0, rows)
-	var x := _rng.randf_range(r.position.x + 2.0, r.end.x - 2.0)
-	return Vector3(x, y, 0)
+	## 거주 모듈 하나의 옆 (사람이 걸어 다니는 곳)
+	var habs := plan.built_of("hab_module")
+	if habs.is_empty():
+		return _hub()
+	var h: Vector3 = habs[_rng.randi() % habs.size()]
+	var f := ArtLib.footprint("hab_module")
+	var side := 1.0 if _rng.randf() < 0.5 else -1.0
+	return h + Vector3(_rng.randf_range(-f.x, f.x) * 0.5, side * (f.y * 0.5 + 1.5), 0)
 
 
 # ── 움직임 ──────────────────────────────────────────────────────
@@ -150,14 +176,14 @@ func _step(a: Dictionary, dt: float, sim: CitySim, sites: Array) -> void:
 		return
 	match a["role"]:
 		"rover":
-			var choices := ["civic", "life", "farm", "domes", "power", "industry", "core"]
-			var dest: Vector3 = layout.gates[choices[_rng.randi() % choices.size()]]
-			a["path"] = layout.route(a["pos"], dest)
+			var n := plan.random_node(_rng)
+			a["path"] = plan.route(a["pos"], Vector3(n.x, n.y, 0))
 			a["wait"] = _rng.randf_range(1.5, 4.0)
 		"cruiser":
-			var far := "ice" if a["state"] != "out" else "core"
-			a["state"] = "out" if far == "ice" else "idle"
-			a["path"] = layout.route(a["pos"], layout.gates[far] if far != "core" else layout.hub)
+			var out: bool = a["state"] != "out"
+			a["state"] = "out" if out else "idle"
+			var dest := _road_point(_place_of(["ice_miner"], "ice")) if out else _hub()
+			a["path"] = plan.route(a["pos"], dest)
 			a["wait"] = _rng.randf_range(4.0, 8.0)
 		"hauler":
 			_hauler(a)
@@ -203,13 +229,13 @@ func _hauler(a: Dictionary) -> void:
 			pass
 		"loaded":
 			a["state"] = "delivering"
-			a["path"] = layout.route(a["pos"], layout.gates["life"])
+			a["path"] = plan.route(a["pos"], _road_point(_place_of(["tank_farm", "electrolyzer", "food_store"], "life")))
 		"delivering":
 			a["state"] = "returning"
 			a["wait"] = 3.0
 		"returning":
 			a["state"] = "home"
-			a["path"] = layout.route(a["pos"], layout.gates["pad"])
+			a["path"] = plan.route(a["pos"], _road_point(_pad_spot()))
 		"home":
 			a["state"] = "parked"
 
@@ -219,7 +245,7 @@ func _robot(a: Dictionary, sim: CitySim, sites: Array) -> void:
 		if a["state"] != "home":
 			a["state"] = "home"
 			var home := _robot_home(sim) + Vector3((a["index"] % 4) * 3.0 - 4.5, 7.0 + (a["index"] / 4) * 3.0, 0)
-			a["path"] = layout.route(a["pos"], home)
+			a["path"] = plan.route(a["pos"], home)
 		return
 	var site: Dictionary = sites[a["index"] % sites.size()]
 	var spot: Vector3 = site["pos"] + Vector3(site["foot"].x * 0.5 + 2.5, (a["index"] % 3 - 1) * 2.0, 0)
@@ -233,8 +259,7 @@ func _robot(a: Dictionary, sim: CitySim, sites: Array) -> void:
 		return
 	a["state"] = "going"
 	a["site_key"] = site["key"]
-	var gate: Vector3 = layout.gates.get(site["district"], layout.gates["life"])
-	a["path"] = layout.route(a["pos"], gate) + layout.route_into(gate, spot)
+	a["path"] = plan.route(a["pos"], spot)
 
 
 func _lander(a: Dictionary, dt: float) -> void:
@@ -274,13 +299,12 @@ func _hopper(a: Dictionary, dt: float, sim: CitySim) -> void:
 			a["wait"] -= dt
 			if a["wait"] > 0.0:
 				return
-			var towers := int(sim.counts.get("solar_tower", 0))
+			var towers := plan.built_of("solar_tower")
 			if a["state"] == "parked":
-				if towers <= 0:
+				if towers.is_empty():
 					a["wait"] = 10.0
 					return
-				var i := _rng.randi_range(0, mini(towers, layout.tower_slots.size()) - 1)
-				var t: Vector3 = layout.tower_slots[i][0] + Vector3(6, 6, 0)
+				var t: Vector3 = towers[_rng.randi() % towers.size()] + Vector3(6, 6, 0)
 				_start_hop(a, t, "to_tower")
 			else:
 				_start_hop(a, a["home"], "to_home")

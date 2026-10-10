@@ -4,6 +4,8 @@ extends Control
 ## 해는 지평선을 따라 29.5일에 한 바퀴 돌고, 그림자가 해 반대쪽으로 길게 눕는다.
 ## 능선 그늘에 들면(시뮬레이션의 어둠) 몸체를 낮추고 창·등만 켠다.
 ## 끌어서 옮기고, 휠·두 손가락으로 확대한다. 건물을 누르면 정보가 열린다.
+## 건물·길의 자리는 배치 계획(CityPlan)을 따르고, 자리 고르기 도구(PlaceTool)를 3D 세계와 함께 쓴다.
+## 90°·270° 돌린 건물은 그림을 좌우로 뒤집어 보여 준다 (x·y를 맞바꾼 거울상 — 3D는 실제로 돌린다).
 
 signal module_tapped(mid: String)
 
@@ -26,6 +28,8 @@ var speed_level := 0
 var zoom := 0.55
 var center := Vector2.ZERO                     # 화면 가운데에 오는 지도 좌표 (1배 px)
 var layout := BaseLayout.new()
+var plan: CityPlan
+var tool: PlaceTool
 var traffic: BaseTraffic
 var night_k := 0.0
 var sun_dir := Vector2(1, 0)
@@ -53,7 +57,7 @@ func _init() -> void:
 	clip_contents = true
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	traffic = BaseTraffic.new(layout)
+	traffic = BaseTraffic.new()
 	_make_scenery()
 	_lights = Control.new()
 	_lights.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -74,8 +78,15 @@ func _init() -> void:
 var _needs_focus := true
 
 
-func set_sim(new_sim: CitySim) -> void:
+func set_sim(new_sim: CitySim, p_plan: CityPlan = null, p_tool: PlaceTool = null) -> void:
 	sim = new_sim
+	if p_plan == null and sim != null:
+		p_plan = CityPlan.create(sim, layout)
+	plan = p_plan
+	tool = p_tool
+	if plan:
+		layout = plan.layout
+	traffic.plan = plan
 	traffic.reset(sim)
 	night_k = 1.0 if sim and sim.is_dark() else 0.0
 	_needs_focus = true
@@ -124,7 +135,7 @@ func _make_scenery() -> void:
 
 # ── 시간 ────────────────────────────────────────────────────────
 func _process(delta: float) -> void:
-	if not is_visible_in_tree() or sim == null:
+	if not is_visible_in_tree() or sim == null or plan == null:
 		return
 	_t += delta
 	var vis_dt: float = delta * VIS_SPEED[clampi(speed_level, 0, 3)]
@@ -193,7 +204,7 @@ func _clamp() -> void:
 # ── 그리기 ──────────────────────────────────────────────────────
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), SKY)
-	if sim == null:
+	if sim == null or plan == null:
 		return
 	_apply_transform(self)
 	var dim := Color.WHITE.lerp(NIGHT, night_k)
@@ -211,6 +222,7 @@ func _draw() -> void:
 			_draw_building(it, dim)
 		else:
 			_draw_agent(it, dim)
+	_draw_tool()
 	draw_set_transform(Vector2.ZERO)
 
 
@@ -294,27 +306,35 @@ func _arc(c: Vector2, rx: float, toward: Vector2, color: Color) -> void:
 
 func _draw_roads(dim: Color) -> void:
 	var w := BaseLayout.ROAD_W * 0.5
-	for road in layout.roads:
-		for i in range(road.size() - 1):
-			var a: Vector3 = road[i]
-			var b: Vector3 = road[i + 1]
-			var d := (b - a)
-			if d.length() < 0.01:
-				continue
-			var n := Vector3(-d.y, d.x, 0).normalized() * w
-			var ext := d.normalized() * w
-			var q := PackedVector2Array([ArtLib.project(a - ext + n), ArtLib.project(b + ext + n),
-				ArtLib.project(b + ext - n), ArtLib.project(a - ext - n)])
-			draw_colored_polygon(q, ROAD * dim)
-			draw_line(q[0], q[1], ROAD_EDGE * dim, 1.2)
-			draw_line(q[3], q[2], Color(0, 0, 0, 0.25), 1.2)
-	_ellipse(ArtLib.project(layout.hub), 7.0 * ArtLib.PX_PER_M, ROAD * dim)
+	for e in plan.edges:
+		var a: Vector2 = plan.nodes[e.x]
+		var b: Vector2 = plan.nodes[e.y]
+		var q := _road_quad(a, b, w)
+		if q.is_empty():
+			continue
+		draw_colored_polygon(q, ROAD * dim)
+		draw_line(q[0], q[1], ROAD_EDGE * dim, 1.2)
+		draw_line(q[3], q[2], Color(0, 0, 0, 0.25), 1.2)
+	for n in plan.nodes:
+		_ellipse(ArtLib.project(Vector3(n.x, n.y, 0)), w * ArtLib.PX_PER_M * SQRT2, ROAD * dim)
+
+
+const SQRT2 := 1.4142135623730951
+
+
+func _road_quad(a: Vector2, b: Vector2, w: float) -> PackedVector2Array:
+	var d := b - a
+	if d.length() < 0.01:
+		return PackedVector2Array()
+	var n := Vector2(-d.y, d.x).normalized() * w
+	return PackedVector2Array([ArtLib.project(Vector3(a.x + n.x, a.y + n.y, 0)), ArtLib.project(Vector3(b.x + n.x, b.y + n.y, 0)),
+		ArtLib.project(Vector3(b.x - n.x, b.y - n.y, 0)), ArtLib.project(Vector3(a.x - n.x, a.y - n.y, 0))])
 
 
 # ── 그릴 것 모으기 ──────────────────────────────────────────────
 func _collect() -> Array:
 	var items := []
-	for it in BaseScene.collect(sim, layout):
+	for it in BaseScene.collect(sim, plan):
 		var p: Vector3 = it["pos"]
 		it["kind"] = "b"
 		it["depth"] = p.x + p.y
@@ -331,7 +351,7 @@ static func variant_of(kind: String, i: int) -> int:
 
 
 func _sites() -> Array:
-	return BaseScene.sites(sim, layout)
+	return BaseScene.sites(sim, plan)
 
 
 # ── 그림자 ──────────────────────────────────────────────────────
@@ -359,13 +379,15 @@ func _draw_shadows(items: Array) -> void:
 			continue
 		var p: Vector3 = it["pos"]
 		var v: int = it.get("variant", 0)
+		var flip: bool = int(it.get("rot", 0)) % 2 == 1
 		var boxes: Array = CASTERS.get(it["sprite"], []) if (v == 0 or it["sprite"] == "solar_tower") else []
 		if boxes.is_empty():
 			var f := ArtLib.footprint(it["sprite"]) * 0.8
 			var h := float(ArtLib.building(it["sprite"], v).get("height", ArtLib.height(it["sprite"])))
 			h *= 0.5 if it.get("building", false) else 1.0
 			boxes = [[0, 0, f.x, f.y, 0, h]]
-		for bx in boxes:
+		for bx0 in boxes:
+			var bx: Array = [bx0[1], bx0[0], bx0[3], bx0[2], bx0[4], bx0[5]] if flip else bx0
 			var c := Vector2(p.x + bx[0], p.y + bx[1])
 			var hx: float = bx[2] * 0.5
 			var hy: float = bx[3] * 0.5
@@ -391,15 +413,16 @@ func _draw_building(it: Dictionary, dim: Color) -> void:
 		return
 	var p: Vector3 = it["pos"]
 	var mp := ArtLib.project(p)
-	var rect := Rect2(mp - info["anchor"], info["px"])
+	var flip := int(it.get("rot", 0)) % 2 == 1
+	var rect := sprite_rect(info, mp, flip)
 	var mod := dim
 	if it["broken"]:
 		mod = dim * Color(0.62, 0.52, 0.5)
-	draw_texture_rect(tex, rect, false, mod)
+	draw_texture_rect(tex, flipped(rect, flip), false, mod)
 	if info["lights"] and not it["broken"]:
-		_lights_list.append([ArtLib.texture(info["file"], true), rect])
+		_lights_list.append([ArtLib.texture(info["file"], true), flipped(rect, flip)])
 	# 누를 자리: 바닥 크기 × 높이의 상자
-	var f := ArtLib.footprint(it["sprite"]) * 0.5
+	var f := CityPlan.foot_of(it["sprite"], int(it.get("rot", 0))) * 0.5
 	var h: float = info.get("height", ArtLib.height(it["sprite"]))
 	var hex := PackedVector2Array([
 		ArtLib.project(p + Vector3(-f.x, -f.y, h)), ArtLib.project(p + Vector3(f.x, -f.y, h)),
@@ -411,8 +434,99 @@ func _draw_building(it: Dictionary, dim: Color) -> void:
 		_badges.append(["broken", top, "!"])
 	if it.get("building", false):
 		_badges.append(["progress", Vector2(rect.get_center().x, rect.end.y - 4.0), it["progress"]])
-	if it["more"] > 0:
-		_badges.append(["more", Vector2(rect.end.x - 6.0, rect.position.y + 10.0), "+%d" % it["more"]])
+
+
+## 그림이 차지하는 자리 (지도 px). 뒤집으면 원점(바닥 가운데)을 축으로 좌우가 바뀐다
+static func sprite_rect(info: Dictionary, mp: Vector2, flip: bool) -> Rect2:
+	var px: Vector2 = info["px"]
+	var anchor: Vector2 = info["anchor"]
+	if not flip:
+		return Rect2(mp - anchor, px)
+	return Rect2(Vector2(mp.x - px.x + anchor.x, mp.y - anchor.y), px)
+
+
+## 그리기용 사각형: 너비가 음수면 엔진이 같은 자리에 좌우를 뒤집어 그린다
+static func flipped(r: Rect2, flip: bool) -> Rect2:
+	return Rect2(r.position, Vector2(-r.size.x, r.size.y)) if flip else r
+
+
+# ── 자리 고르기 ─────────────────────────────────────────────────
+const GOOD := Color(0.35, 0.95, 0.55)
+const BAD := Color(1.0, 0.32, 0.22)
+
+
+static func _p(q: Vector2) -> Vector2:
+	return ArtLib.project(Vector3(q.x, q.y, 0))
+
+
+func _tool_on() -> bool:
+	return tool != null and tool.active()
+
+
+func _ground(sp: Vector2) -> Vector2:
+	var w := ArtLib.unproject(screen_to_map(sp))
+	return Vector2(w.x, w.y)
+
+
+func _draw_tool() -> void:
+	if not _tool_on():
+		return
+	var c := GOOD if tool.reason == "" else BAD
+	if tool.mode == "build":
+		if tool.kind == "solar_tower":
+			for t in BaseLayout.ZONES:
+				for r in BaseLayout.ZONES[t]:
+					var rr: Rect2 = r
+					var pts := PackedVector2Array()
+					for corner in [rr.position, Vector2(rr.end.x, rr.position.y), rr.end, Vector2(rr.position.x, rr.end.y)]:
+						pts.append(_p(BaseLayout.uv_to_xy(corner)))
+					var zc: Color = City3D.ZONE_COLORS[t]
+					draw_colored_polygon(pts, Color(zc, 0.18))
+					pts.append(pts[0])
+					draw_polyline(pts, Color(zc, 0.85), 1.5)
+		if tool.has_at:
+			var f := CityPlan.foot_of(tool.kind, tool.rot) * 0.5
+			var a := tool.at
+			var poly := PackedVector2Array([_p(a + Vector2(-f.x, -f.y)), _p(a + Vector2(f.x, -f.y)), _p(a + Vector2(f.x, f.y)),
+				_p(a + Vector2(-f.x, f.y))])
+			draw_colored_polygon(poly, Color(c, 0.3))
+			poly.append(poly[0])
+			draw_polyline(poly, Color(c, 0.95), 1.5)
+			var info := ArtLib.building(tool.kind, tool.variant)
+			var tex := ArtLib.texture(info.get("file", "")) if not info.is_empty() else null
+			if tex:
+				var flip := tool.rot % 2 == 1
+				var rect := sprite_rect(info, _p(a), flip)
+				draw_texture_rect(tex, flipped(rect, flip), false, Color(c.lerp(Color.WHITE, 0.5), 0.72))
+	elif tool.mode == "road" and tool.has_at:
+		if tool.road_from != null:
+			var q := _road_quad(tool.road_from, tool.at, BaseLayout.ROAD_W * 0.5)
+			if not q.is_empty():
+				draw_colored_polygon(q, Color(c, 0.55))
+			_ellipse(_p(tool.road_from), 2.2 * ArtLib.PX_PER_M * SQRT2, Color(c, 0.85))
+		_ellipse(_p(tool.at), 2.2 * ArtLib.PX_PER_M * SQRT2, Color(c, 0.85))
+	elif tool.mode == "erase" and tool.hover_edge >= 0 and tool.hover_edge < plan.edges.size():
+		var e: Vector2i = plan.edges[tool.hover_edge]
+		var q2 := _road_quad(plan.nodes[e.x], plan.nodes[e.y], BaseLayout.ROAD_W * 0.5 + 0.6)
+		if not q2.is_empty():
+			draw_colored_polygon(q2, Color(BAD, 0.6))
+
+
+func _draw_tool_hud(font: Font, bold: Font) -> void:
+	if not _tool_on():
+		return
+	if tool.mode == "build" and tool.kind == "solar_tower":
+		for t in BaseLayout.ZONES:
+			var used := int(sim.tiles.get(t, 0))
+			var cap := int(sim.C["illumination"]["tiles"][t])
+			for r in BaseLayout.ZONES[t]:
+				var sp := map_to_screen(_p(BaseLayout.uv_to_xy((r as Rect2).get_center())))
+				_shadow_text(bold, sp - Vector2(40, 18), "%s · %d/%d" % [CityPlan.TILE_NAMES[t], used, cap], 13, City3D.ZONE_COLORS[t])
+	if tool.has_at and tool.reason != "" and tool.mode in ["build", "road"]:
+		var at2 := map_to_screen(_p(tool.at)) + Vector2(16, 10)
+		var w := font.get_string_size(tool.reason, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+		_hud.draw_rect(Rect2(at2 - Vector2(6, 16), Vector2(w + 12, 22)), Color(0.12, 0.03, 0.02, 0.85))
+		_hud.draw_string(font, at2, tool.reason, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1.0, 0.62, 0.5))
 
 
 # ── 탈것 ────────────────────────────────────────────────────────
@@ -482,7 +596,7 @@ func _plume(mp: Vector2, z: float) -> void:
 
 # ── 화면 위 글자 (확대와 상관없이 같은 크기) ─────────────────────
 func _draw_hud() -> void:
-	if sim == null:
+	if sim == null or plan == null:
 		return
 	var font := get_theme_default_font()
 	var bold: Font = ThemeFactory.bold if ThemeFactory.bold else font
@@ -498,9 +612,7 @@ func _draw_hud() -> void:
 				var r := Rect2(sp - Vector2(w * 0.5, 0), Vector2(w, 5))
 				_hud.draw_rect(r, Color(0, 0, 0, 0.6))
 				_hud.draw_rect(Rect2(r.position, Vector2(w * float(b[2]), 5)), Palette.AMBER)
-			"more":
-				_hud.draw_string(bold, sp + Vector2(-8, 0), String(b[2]), HORIZONTAL_ALIGNMENT_LEFT, -1, 14,
-					Palette.AMBER)
+	_draw_tool_hud(font, bold)
 	# 상태 글자 (왼쪽 위)
 	var lit := not sim.is_dark()
 	var state := "일조 — 태양광 %s kW" % Fmt.n(sim.solar_kw)
@@ -590,11 +702,25 @@ func _gui_input(event: InputEvent) -> void:
 					_press = event.position
 				else:
 					if _pressed and not _dragging and _touches.size() < 2:
-						var mid := pick(event.position)
-						if mid != "":
-							module_tapped.emit(mid)
+						if _tool_on():
+							var g := _ground(event.position)
+							if event.device == InputEvent.DEVICE_ID_EMULATION:
+								tool.tap(g)
+							else:
+								tool.click(g, event.shift_pressed)
+						else:
+							var mid := pick(event.position)
+							if mid != "":
+								module_tapped.emit(mid)
 					_pressed = false
 					_dragging = false
+				accept_event()
+			MOUSE_BUTTON_RIGHT:
+				if not event.pressed and _tool_on():
+					if tool.mode == "road" and tool.road_from != null:
+						tool.end_chain()
+					else:
+						tool.stop()
 				accept_event()
 	elif event is InputEventMouseMotion:
 		if _pressed and _touches.size() < 2:
@@ -604,6 +730,10 @@ func _gui_input(event: InputEvent) -> void:
 				center -= event.relative / zoom
 				_clamp()
 		else:
+			if _tool_on() and event.device != InputEvent.DEVICE_ID_EMULATION:
+				tool.hover(_ground(event.position))
+				_hover = ""
+				return
 			var h := pick(event.position)
 			if h != _hover:
 				_hover = h

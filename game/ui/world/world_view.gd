@@ -61,6 +61,8 @@ var _last_click_ms := 0
 var _hover_label := ""
 var _clock := 0.0
 var _ready_done := false
+var plan: CityPlan
+var tool: PlaceTool
 
 
 func _init() -> void:
@@ -101,10 +103,14 @@ func _ready() -> void:
 	home(false)
 
 
-func set_sim(new_sim: CitySim) -> void:
+func set_sim(new_sim: CitySim, p_plan: CityPlan = null, p_tool: PlaceTool = null) -> void:
 	sim = new_sim
+	if p_plan == null and sim != null:
+		p_plan = CityPlan.create(sim, moon.layout if moon else null)
+	plan = p_plan
+	tool = p_tool
 	if city:
-		city.set_sim(sim)
+		city.set_sim(sim, plan, tool)
 	_update_time(0.0)
 	if not _ready_done:
 		home(false)
@@ -493,6 +499,9 @@ func _gui_input(event: InputEvent) -> void:
 		_touch_drag(event)
 		accept_event()
 		return
+	if event is InputEventMouse and (event as InputEventMouse).device == InputEvent.DEVICE_ID_EMULATION:
+		accept_event()          # 터치는 위에서 직접 처리한다
+		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
@@ -510,7 +519,9 @@ func _gui_input(event: InputEvent) -> void:
 					_pressed = false
 			else:
 				if _pressed and not _dragging and mb.button_index == MOUSE_BUTTON_LEFT:
-					_click(mb.position)
+					_click(mb.position, false, mb.shift_pressed)
+				elif _pressed and not _dragging and mb.button_index == MOUSE_BUTTON_RIGHT and _tool_on():
+					_tool_back()
 				_pressed = false
 				_dragging = false
 		accept_event()
@@ -582,7 +593,7 @@ func _touch(ev: InputEventScreenTouch) -> void:
 		_pinch.clear()
 	else:
 		if _touches.size() == 1 and _pressed and not _dragging:
-			_click(ev.position)
+			_click(ev.position, true)
 		_touches.erase(ev.index)
 		_pinch.clear()
 		_pressed = false
@@ -651,7 +662,34 @@ func pick_surface(p: Vector2) -> Vector3:
 	return ((info["frame"] as Basis).inverse() * ecl).normalized()
 
 
-func _click(p: Vector2) -> void:
+## 자리 고르기 도구가 켜져 있고 기지 가까이에 있나
+func _tool_on() -> bool:
+	return tool != null and tool.active() and city != null and city.visible_now()
+
+
+## 오른쪽 클릭: 길을 잇던 중이면 그 줄을 끝내고, 아니면 도구를 끈다
+func _tool_back() -> void:
+	if tool.mode == "road" and tool.road_from != null:
+		tool.end_chain()
+	else:
+		tool.stop()
+
+
+## 도구를 쓰려면 기지가 보여야 한다: 멀리 있으면 기지 위로 돌아온다
+func ensure_near_base() -> void:
+	if cam.focus != "moon" or cam.mode != "body" or cam.dist > 3.0:
+		home()
+
+
+func _click(p: Vector2, touch: bool = false, keep: bool = false) -> void:
+	if _tool_on():
+		var g: Variant = city.ground_at(self, p)
+		if g != null:
+			if touch:
+				tool.tap(g)
+			else:
+				tool.click(g, keep)
+		return
 	for item in _labels:
 		var rect: Rect2 = item[0]
 		if rect.grow(6.0).has_point(p):
@@ -685,6 +723,10 @@ func _hover(p: Vector2) -> void:
 			over = item[1]
 			break
 	_hover_label = over
+	if _tool_on():
+		var g: Variant = city.ground_at(self, p)
+		if g != null:
+			tool.hover(g)
 	if city and city.visible_now():
 		city.hover(self, p)
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if over != "" or (city and city.hovered != "") \

@@ -1,8 +1,9 @@
 class_name BuildPanel
 extends VBoxContainer
-## 건설 탭 — 대기열과 짓기 목록
+## 건설 탭 — 대기열과 짓기 목록. '짓기'를 누르면 3D 세계나 지도에서 자리를 고른다
 
 signal changed
+signal place_requested(mid: String)
 
 const ORDER := ["habitat", "life_support", "food", "power", "thermal", "safety", "industry", "logistics", "research", "social"]
 
@@ -146,6 +147,7 @@ func _entry(mid: String) -> Control:
 	row.add_child(info)
 	var button := Button.new()
 	button.text = "짓기"
+	button.tooltip_text = "지을 자리를 고른다"
 	button.custom_minimum_size = Vector2(72, 44)
 	var reason := sim.build_block_reason(mid, 0.0)
 	if reason != "":
@@ -185,17 +187,8 @@ func _special_entry(kind: String) -> Control:
 
 
 func _on_build(mid: String) -> void:
-	var tile := ""
-	if mid == "solar_tower":
-		tile = sim.free_tile()
-	if sim.enqueue(mid, tile, 0.0):
-		message.text = "%s — 대기열에 넣었다" % sim.M[mid]["name"]
-		if sim.stock["parts"] < 40:
-			message.text += ". 부품 비축이 40 아래다 — 고장 수리가 막힐 수 있다"
-	else:
-		message.text = "%s — 지을 수 없다 (%s)" % [sim.M[mid]["name"], sim.build_block_reason(mid, 0.0)]
-	rebuild()
-	changed.emit()
+	message.text = "%s — 3D 세계나 지도에서 지을 자리를 누른다" % sim.M[mid]["name"]
+	place_requested.emit(mid)
 
 
 func _on_special(kind: String) -> void:

@@ -25,6 +25,13 @@ var _dirty := true
 var city_view: CityView
 var base_map: BaseMap
 var world: WorldView
+var plan: CityPlan
+var tool := PlaceTool.new()
+var place_bar: PanelContainer
+var place_text: Label
+var place_reason: Label
+var place_buttons := {}
+var road_button: Button
 var city_area: Control
 var view_buttons := {}
 var zoom_row: HBoxContainer
@@ -109,6 +116,9 @@ func _build() -> void:
 	city_area.add_child(world)
 	base_map.visible = false
 	city_area.add_child(_build_view_switch())
+	city_area.add_child(_build_place_bar())
+	tool.changed.connect(_update_place_bar)
+	tool.placed.connect(_on_placed)
 	forecast = ForecastBar.new()
 	forecast.custom_minimum_size.y = 46
 	left.add_child(forecast)
@@ -143,6 +153,17 @@ func _build_view_switch() -> Control:
 		b.pressed.connect(_set_view.bind(pair[0]))
 		row.add_child(b)
 		view_buttons[pair[0]] = b
+	road_button = Button.new()
+	road_button.text = "도로"
+	road_button.toggle_mode = true
+	road_button.tooltip_text = "길 내기 — 점을 차례로 눌러 길을 잇는다 (G)"
+	road_button.custom_minimum_size = Vector2(58, 40)
+	road_button.toggled.connect(func(on: bool):
+		if on:
+			_begin_road()
+		elif tool.mode in ["road", "erase"]:
+			tool.stop())
+	row.add_child(road_button)
 	view_buttons["world"].tooltip_text = "달 위의 도시 — 끌어서 돌리고, 휠·두 손가락으로 확대해 행성과 별까지 (M)"
 	view_buttons["map"].tooltip_text = "기지 평면 지도 — 끌어서 옮기고 휠·두 손가락으로 확대 (M)"
 	view_buttons["list"].tooltip_text = "모듈 목록 (M)"
@@ -196,6 +217,128 @@ func _build_view_switch() -> Control:
 	return row
 
 
+## 자리 고르기 막대 (도시 화면 위쪽 가운데): 무엇을 하는 중인지, 놓을 수 없는 까닭, 단추들
+func _build_place_bar() -> Control:
+	place_bar = PanelContainer.new()
+	place_bar.add_theme_stylebox_override("panel", Palette.box(Color(Palette.PANEL, 0.94), Palette.AMBER.darkened(0.3), 10, 8))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	place_bar.add_child(v)
+	place_text = Label.new()
+	place_text.add_theme_font_size_override("font_size", 15)
+	place_text.add_theme_color_override("font_color", Palette.TEXT)
+	v.add_child(place_text)
+	place_reason = Label.new()
+	place_reason.add_theme_font_size_override("font_size", 13)
+	place_reason.add_theme_color_override("font_color", Color(1.0, 0.62, 0.5))
+	v.add_child(place_reason)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	v.add_child(row)
+	for spec in [["here", "여기에 짓기", "고른 자리에 짓는다 (Enter). 마우스는 누르는 곳에 바로 짓는다 — Shift를 누르고 있으면 계속 놓는다"],
+			["rotate", "돌리기", "90° 돌린다 (R)"], ["variant", "모양", "같은 기능의 다른 설계 (V)"],
+			["auto", "빈자리에", "기본 배치의 빈자리에 바로 짓는다"], ["end", "끝", "이어 가던 길을 끝낸다 (오른쪽 클릭)"],
+			["erase", "지우기", "길을 눌러 지운다"], ["close", "닫기", "그만둔다 (Esc)"]]:
+		var b := Button.new()
+		b.text = spec[1]
+		b.tooltip_text = spec[2]
+		b.custom_minimum_size = Vector2(0, 40)
+		b.pressed.connect(_on_place_button.bind(spec[0]))
+		row.add_child(b)
+		place_buttons[spec[0]] = b
+	place_buttons["erase"].toggle_mode = true
+	place_bar.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	place_bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	place_bar.offset_top = 8
+	place_bar.visible = false
+	return place_bar
+
+
+func _on_place_button(which: String) -> void:
+	match which:
+		"here":
+			tool.commit(false)
+		"rotate":
+			tool.rotate()
+		"variant":
+			tool.next_variant()
+		"auto":
+			tool.auto_place()
+		"end":
+			tool.end_chain()
+		"erase":
+			if tool.mode == "erase":
+				tool.start_road()
+			else:
+				tool.start_erase()
+		"close":
+			tool.stop()
+
+
+func _update_place_bar() -> void:
+	if place_bar == null:
+		return
+	place_bar.visible = tool.active()
+	road_button.set_pressed_no_signal(tool.mode in ["road", "erase"])
+	if not tool.active():
+		return
+	var building := tool.mode == "build"
+	place_text.text = tool.status()
+	place_reason.text = tool.reason if tool.has_at else ""
+	place_reason.visible = place_reason.text != ""
+	place_buttons["here"].visible = building
+	place_buttons["here"].disabled = not tool.has_at or tool.reason != ""
+	place_buttons["rotate"].visible = building
+	place_buttons["variant"].visible = building
+	place_buttons["auto"].visible = building
+	place_buttons["end"].visible = tool.mode == "road"
+	place_buttons["end"].disabled = tool.road_from == null
+	place_buttons["erase"].visible = not building
+	place_buttons["erase"].set_pressed_no_signal(tool.mode == "erase")
+	place_bar.reset_size()
+
+
+## 건물 자리 고르기를 시작한다 (건설 탭의 '짓기', 모듈 카드의 '1기 더 짓기')
+func _begin_place(mid: String) -> void:
+	if sim == null:
+		return
+	var reason := sim.build_block_reason(mid, 0.0)
+	if reason != "":
+		_toast("%s — 지을 수 없다 (%s)" % [sim.M[mid]["name"], reason], "warn")
+		return
+	if view_mode == "list":
+		_set_view("world")
+	if view_mode == "world":
+		world.ensure_near_base()
+	tool.start_build(mid)
+
+
+func _begin_road() -> void:
+	if sim == null:
+		return
+	if view_mode == "list":
+		_set_view("world")
+	if view_mode == "world":
+		world.ensure_near_base()
+	tool.start_road()
+
+
+func _on_placed(kind: String, ok: bool, text: String) -> void:
+	var msg := ""
+	if ok:
+		msg = "%s — 고른 자리에 공사를 시작한다" % GameData.module_name(kind)
+		if sim.stock["parts"] < 40:
+			msg += ". 부품 비축이 40 아래다 — 고장 수리가 막힐 수 있다"
+		_toast(msg, "good")
+	else:
+		msg = "%s — 지을 수 없다 (%s)" % [GameData.module_name(kind), text]
+		_toast(msg, "warn")
+	tabs["build"].message.text = msg
+	if tabs[current_tab].has_method("rebuild"):
+		tabs[current_tab].rebuild()
+	_dirty = true
+
+
 func _set_view(mode: String) -> void:
 	view_mode = mode
 	world.visible = mode == "world"
@@ -203,7 +346,11 @@ func _set_view(mode: String) -> void:
 	city_view.visible = mode == "list"
 	zoom_row.visible = mode == "map"
 	world_row.visible = mode == "world"
-	view_buttons[mode].set_pressed_no_signal(true)
+	for k in view_buttons:
+		view_buttons[k].set_pressed_no_signal(k == mode)
+	road_button.visible = mode != "list"
+	if mode == "list" and tool.active():
+		tool.stop()
 	city_view.queue_redraw()
 
 
@@ -303,6 +450,7 @@ func _build_side() -> Control:
 		tabs[key].visible = false
 		host.add_child(tabs[key])
 	tabs["build"].changed.connect(_on_player_change)
+	tabs["build"].place_requested.connect(_begin_place)
 	tabs["research"].changed.connect(_on_player_change)
 	return side
 
@@ -315,15 +463,17 @@ func _new_game(seed_value: int, autopilot: bool) -> void:
 		sim.note("자동 운영 — 시드가 추천 운영 방침으로 짓고 연구한다", "info")
 
 
-func _attach(new_sim: CitySim) -> void:
+func _attach(new_sim: CitySim, plan_data: Variant = null) -> void:
 	sim = new_sim
+	plan = CityPlan.from_save(plan_data, sim)
+	tool.bind(sim, plan)
 	sim.interactive = true
 	sim.noted.connect(_on_note)
 	for key in tabs:
 		tabs[key].bind(sim)
 	city_view.sim = sim
-	base_map.set_sim(sim)
-	world.set_sim(sim)
+	base_map.set_sim(sim, plan, tool)
+	world.set_sim(sim, plan, tool)
 	forecast.sim = sim
 	auto_button.set_pressed_no_signal(sim.autopilot != null)
 	_last_day = sim.current_day()
@@ -344,7 +494,9 @@ func _save() -> void:
 		return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f != null:
-		f.store_string(JSON.stringify(sim.to_save(), "", false, true))
+		var data := sim.to_save()
+		data["plan"] = plan.to_save()
+		f.store_string(JSON.stringify(data, "", false, true))
 		f.close()
 
 
@@ -354,7 +506,7 @@ func _load_save() -> bool:
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 	if not data is Dictionary or int(data.get("version", 0)) != 1:
 		return false
-	_attach(CitySim.from_save(data))
+	_attach(CitySim.from_save(data), data.get("plan"))
 	sim.note("관리 기록 — 저장한 지점에서 다시 가동했다", "info")
 	return true
 
@@ -394,6 +546,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
 		get_viewport().set_input_as_handled()
 		return
+	if event.keycode == KEY_ESCAPE and tool.active() and not modal.visible:
+		if tool.mode == "road" and tool.road_from != null:
+			tool.end_chain()
+		else:
+			tool.stop()
+		get_viewport().set_input_as_handled()
+		return
 	if event.keycode == KEY_ESCAPE:
 		if modal.visible and modal.context in ["menu", "help", "module"]:
 			modal.visible = false
@@ -403,7 +562,29 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if sim == null or modal.visible:
 		return
+	if tool.active():
+		match event.keycode:
+			KEY_R:
+				tool.rotate()
+				get_viewport().set_input_as_handled()
+				return
+			KEY_V:
+				tool.next_variant()
+				get_viewport().set_input_as_handled()
+				return
+			KEY_ENTER, KEY_KP_ENTER:
+				if tool.mode == "build":
+					tool.commit(event.shift_pressed)
+				else:
+					tool.end_chain()
+				get_viewport().set_input_as_handled()
+				return
 	match event.keycode:
+		KEY_G:
+			if tool.mode in ["road", "erase"]:
+				tool.stop()
+			else:
+				_begin_road()
 		KEY_SPACE:
 			_set_speed(0 if speed > 0 else maxi(1, _last_speed))
 		KEY_1:
@@ -673,7 +854,7 @@ func _on_module_tapped(mid: String) -> void:
 		Fmt.n(float(m["repair"]["rd"]), 1), String(m.get("note", ""))]
 	var reason := sim.build_block_reason(mid, 0.0)
 	var choices := [["close", "닫기", ""]]
-	choices.push_front(["build:" + mid, "1기 더 짓기", reason if reason != "" else BuildPanel._cost_text(m["cost"])])
+	choices.push_front(["build:" + mid, "1기 더 짓기 — 자리 고르기", reason if reason != "" else BuildPanel._cost_text(m["cost"])])
 	modal.open("module", Palette.CATEGORY_KO[m["category"]], m["name"], body, choices, Palette.CATEGORY[m["category"]])
 
 
@@ -713,13 +894,7 @@ func _on_modal_choice(context: String, choice: String) -> void:
 			_show_start()
 		"module":
 			if choice.begins_with("build:"):
-				var mid := choice.trim_prefix("build:")
-				if sim.enqueue(mid, sim.free_tile() if mid == "solar_tower" else "", 0.0):
-					_toast("%s — 대기열에 넣었다" % sim.M[mid]["name"], "good")
-				else:
-					_toast("%s — 지을 수 없다 (%s)" % [sim.M[mid]["name"], sim.build_block_reason(mid, 0.0)], "warn")
-				if tabs[current_tab].has_method("rebuild"):
-					tabs[current_tab].rebuild()
+				_begin_place(choice.trim_prefix("build:"))
 	_dirty = true
 	_refresh_live()
 

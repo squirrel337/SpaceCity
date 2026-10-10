@@ -1,63 +1,49 @@
 class_name BaseScene
 extends RefCounted
 ## 기지에 보여 줄 것 — 2D 지도와 3D 도시가 함께 쓴다.
-## 시뮬레이션의 개수·고장·공사 대기열을 자리(BaseLayout)마다의 건물·공사 현장으로 바꾼다.
+## 배치 계획(CityPlan)의 건물마다 시뮬레이션의 고장·공사 진척·피복을 붙인다.
 
 
-## 건물과 공사 현장: {id, sprite, pos, variant, broken, building, progress, more}
-static func collect(sim: CitySim, layout: BaseLayout) -> Array:
+## 건물과 공사 현장: {id, sprite, pos, rot, variant, uid, broken, building, progress}
+static func collect(sim: CitySim, plan: CityPlan) -> Array:
+	plan.sync(sim)
 	var items := []
-	var queued := {}
+	var progress := {}
 	for item in sim.queue:
-		var kind: String = item["id"]
-		if kind == "regolith_cover" or kind == "robot":
+		progress[int(item["seq"])] = clampf(1.0 - float(item["rd"]) / maxf(1e-6, float(item["rd_total"])), 0.0, 1.0)
+	var built := {}
+	for e in plan.buildings:
+		if int(e["seq"]) >= 0:
 			continue
-		queued[kind] = int(queued.get(kind, 0)) + 1
-	var kinds := {}
-	for kind in sim.counts:
-		kinds[kind] = true
-	for kind in queued:
-		kinds[kind] = true
-	for kind in kinds:
-		var cap := layout.capacity(kind)
-		if cap == 0:
-			continue
-		var n := int(sim.counts.get(kind, 0))
-		var broken := int(sim.broken.get(kind, 0))
-		var q := int(queued.get(kind, 0))
-		var shown := mini(n, cap)
-		for i in range(shown):
+		var kind: String = e["id"]
+		if not built.has(kind):
+			built[kind] = []
+		built[kind].append(e)
+	for kind in built:
+		var list: Array = built[kind]
+		var nb := int(sim.broken.get(kind, 0))
+		for i in list.size():
+			var e: Dictionary = list[i]
 			var sprite: String = kind
 			if kind == "hab_module" and i < sim.covered_habs:
 				sprite = "hab_module_covered"
-			items.append({"id": kind, "sprite": sprite, "pos": layout.slot(kind, i), "index": i,
-				"variant": variant_of(kind, i), "broken": i >= shown - broken, "building": false, "progress": 1.0,
-				"more": (n - cap) if (i == shown - 1 and n > cap) else 0})
-		for k in range(q):
-			var i := n + k
-			if i >= cap:
-				break
-			items.append({"id": kind, "sprite": scaffold_for(kind), "pos": layout.slot(kind, i), "index": i,
-				"variant": 0, "building": true, "progress": queue_progress(sim, kind, k), "broken": false, "more": 0})
+			items.append({"id": kind, "sprite": sprite, "pos": Vector3(e["x"], e["y"], 0), "rot": int(e["rot"]),
+				"variant": int(e["variant"]), "uid": int(e["uid"]), "broken": i >= list.size() - nb,
+				"building": false, "progress": 1.0})
+	for e in plan.buildings:
+		var seq := int(e["seq"])
+		if seq < 0:
+			continue
+		var kind: String = e["id"]
+		items.append({"id": kind, "sprite": scaffold_for(kind), "pos": Vector3(e["x"], e["y"], 0), "rot": int(e["rot"]),
+			"variant": 0, "uid": int(e["uid"]), "broken": false, "building": true,
+			"progress": float(progress.get(seq, 0.0))})
 	return items
 
 
-## 자리마다 고정된 변형 (0~4). 같은 종류가 나란히 서도 이웃끼리 모양이 다르다
+## 기본 배치의 자리마다 정한 변형 (0~4). 같은 종류가 나란히 서도 이웃끼리 모양이 다르다
 static func variant_of(kind: String, i: int) -> int:
 	return (absi(kind.hash()) + i * 3) % 5
-
-
-## k번째로 기다리는 같은 종류 공사의 진척 (0~1)
-static func queue_progress(sim: CitySim, kind: String, k: int) -> float:
-	var seen := 0
-	for item in sim.queue:
-		if item["id"] != kind:
-			continue
-		if seen == k:
-			var total: float = maxf(1e-6, item["rd_total"])
-			return clampf(1.0 - item["rd"] / total, 0.0, 1.0)
-		seen += 1
-	return 0.0
 
 
 static func scaffold_for(kind: String) -> String:
@@ -70,32 +56,30 @@ static func scaffold_for(kind: String) -> String:
 	return "scaffold_l"
 
 
-## 로봇이 가야 할 곳: 공사 현장(대기열 앞쪽부터)과 고장 난 건물
-static func sites(sim: CitySim, layout: BaseLayout) -> Array:
+## 로봇이 가야 할 곳: 공사 현장(대기열 앞쪽부터)과 고장 난 건물. {pos, foot, key}
+static func sites(sim: CitySim, plan: CityPlan) -> Array:
 	var out := []
 	if sim == null:
 		return out
-	var counted := {}
+	plan.sync(sim)
 	for item in sim.queue:
-		var kind: String = item["id"]
-		if kind == "regolith_cover" or kind == "robot":
+		var e := plan.entry_of_seq(int(item["seq"]))
+		if e.is_empty():
 			continue
-		var k := int(counted.get(kind, 0))
-		counted[kind] = k + 1
-		var i := int(sim.counts.get(kind, 0)) + k
-		if i >= layout.capacity(kind):
-			continue
-		out.append(_site(layout, kind, i, "q%s%d" % [kind, i]))
+		out.append({"pos": Vector3(e["x"], e["y"], 0), "foot": CityPlan.foot_of(String(e["id"]), int(e["rot"])),
+			"key": "q%d" % int(e["uid"])})
 		if out.size() >= 6:
 			break
 	for kind in sim.broken:
 		var b := int(sim.broken[kind])
-		var n := mini(int(sim.counts.get(kind, 0)), layout.capacity(kind))
-		for j in range(mini(b, n)):
-			out.append(_site(layout, kind, n - 1 - j, "b%s%d" % [kind, j]))
+		if b <= 0:
+			continue
+		var list := []
+		for e in plan.buildings:
+			if e["id"] == kind and int(e["seq"]) < 0:
+				list.append(e)
+		for j in range(mini(b, list.size())):
+			var e: Dictionary = list[list.size() - 1 - j]
+			out.append({"pos": Vector3(e["x"], e["y"], 0), "foot": CityPlan.foot_of(kind, int(e["rot"])),
+				"key": "b%d" % int(e["uid"])})
 	return out
-
-
-static func _site(layout: BaseLayout, kind: String, i: int, key: String) -> Dictionary:
-	return {"pos": layout.slot(kind, i), "foot": ArtLib.footprint(kind), "key": key,
-		"district": "ridge" if kind == "solar_tower" else layout.district_of.get(kind, "core")}

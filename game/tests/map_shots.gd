@@ -65,6 +65,7 @@ func _process(_delta: float) -> bool:
 			main.sim.enqueue("research_lab", "", 0.0)
 			main.sim.enqueue("hydroponics", "", 0.0)
 			main.modal.visible = false
+			main._set_view("map")
 		40:
 			m.fit()
 		44:

@@ -1,8 +1,8 @@
 class_name City3D
 extends Node3D
-## 3D 기지: 건물(자리마다 다섯 가지 모양), 공사 현장(비계), 길, 탈것, 밤의 불빛.
+## 3D 기지: 건물(자리마다 다섯 가지 모양), 공사 현장(비계), 길, 탈것, 밤의 불빛, 자리 고르기의 유령 건물.
 ## 좌표는 부모(MoonSurface.city_root)의 모형 좌표: 미터, Godot 축 (x, z, -y), 원점 = 기지 평지.
-## 무엇을 어디에 둘지는 2D 지도와 같은 규칙(BaseScene, BaseLayout, BaseTraffic)을 쓴다.
+## 무엇을 어디에 둘지는 2D 지도와 같은 배치 계획(CityPlan)과 규칙(BaseScene, BaseTraffic)을 쓴다.
 
 signal module_tapped(mid: String)
 
@@ -13,6 +13,8 @@ const HEADING_DEG := {"se": 0.0, "sw": 90.0, "nw": 180.0, "ne": 270.0}
 var sim: CitySim
 var moon: MoonSurface
 var layout: BaseLayout
+var plan: CityPlan
+var tool: PlaceTool
 var traffic: BaseTraffic
 var hovered := ""
 var hovered_pos := Vector3.ZERO
@@ -31,18 +33,28 @@ var _floods: Array = []
 var _night := 0.0
 var _t := 0.0
 var _boxes: Array = []            # [AABB(로컬), id, item]
+var _road_rev := -1
+var _ghost: MeshInstance3D
+var _ghost_key := ""
+var _ghost_mat: ShaderMaterial
+var _pad: MeshInstance3D
+var _pad_mat: ShaderMaterial
+var _pen: MeshInstance3D
+var _pen_mesh: ImmediateMesh
+var _pen_mat: ShaderMaterial
+var _zones: MeshInstance3D
 
 
 func setup(p_moon: MoonSurface) -> void:
 	moon = p_moon
 	layout = moon.layout
-	traffic = BaseTraffic.new(layout)
+	traffic = BaseTraffic.new()
 	_sites_root = Node3D.new()
 	add_child(_sites_root)
 	_agents_root = Node3D.new()
 	add_child(_agents_root)
-	_build_roads()
 	moon.terrain_ready.connect(_on_terrain_ready)
+	_make_tool_nodes()
 	_ring = MeshInstance3D.new()
 	_ring.mesh = _ring_mesh()
 	var rm := ShaderMaterial.new()
@@ -67,19 +79,22 @@ func setup(p_moon: MoonSurface) -> void:
 ## 지형 높이를 구운 뒤: 건물·길을 새 높이에 다시 놓는다
 func _on_terrain_ready() -> void:
 	_sig = ""
-	if _roads:
-		_roads.queue_free()
-		_roads = null
-	_build_roads()
+	_road_rev = -1
+	if _zones:
+		_zones.mesh = _zone_mesh()
 	for i in _floods.size():
 		var l: OmniLight3D = _floods[i]
 		l.position = _local(Vector2(l.position.x, -l.position.z), 14.0)
 
 
-func set_sim(new_sim: CitySim) -> void:
+func set_sim(new_sim: CitySim, p_plan: CityPlan, p_tool: PlaceTool) -> void:
 	sim = new_sim
+	plan = p_plan
+	tool = p_tool
+	traffic.plan = plan
 	traffic.reset(sim)
 	_sig = ""
+	_road_rev = -1
 
 
 func visible_now() -> bool:
@@ -94,14 +109,22 @@ func _local(p: Vector2, above: float = 0.0) -> Vector3:
 
 # ── 매 프레임 ───────────────────────────────────────────────────
 func update(delta: float, speed_level: int) -> void:
-	if sim == null:
+	if sim == null or plan == null:
 		return
 	_t += delta
+	plan.sync(sim)
+	if plan.road_rev != _road_rev:
+		_road_rev = plan.road_rev
+		if _roads:
+			_roads.queue_free()
+			_roads = null
+		_build_roads()
 	var sig := _signature()
 	if sig != _sig:
 		_sig = sig
 		_rebuild()
-	var sites := BaseScene.sites(sim, layout)
+	_update_tool()
+	var sites := BaseScene.sites(sim, plan)
 	traffic.update(delta * VIS_SPEED[clampi(speed_level, 0, 3)], sim, sites)
 	_sync_agents(delta)
 	_night = move_toward(_night, 1.0 if sim.is_dark() else 0.0, delta / 0.8)
@@ -111,7 +134,7 @@ func update(delta: float, speed_level: int) -> void:
 	for l in _floods:
 		(l as OmniLight3D).light_energy = 1.6 * _night
 		(l as OmniLight3D).omni_range = 70.0 * sc
-	if hovered != "" and _ring:
+	if hovered != "" and _ring and not (tool and tool.active()):
 		_ring.visible = true
 		_ring.position = hovered_pos + Vector3(0, 0.15, 0)
 	elif _ring:
@@ -119,19 +142,14 @@ func update(delta: float, speed_level: int) -> void:
 
 
 func _signature() -> String:
-	var parts := PackedStringArray()
-	var keys := sim.counts.keys()
-	keys.sort()
-	for k in keys:
-		parts.append("%s:%d:%d" % [k, int(sim.counts[k]), int(sim.broken.get(k, 0))])
-	for item in sim.queue:
-		parts.append(String(item["id"]))
-	parts.append(str(sim.covered_habs))
+	var parts := PackedStringArray([str(plan.revision), str(sim.covered_habs)])
+	for k in sim.broken:
+		parts.append("%s:%d" % [k, int(sim.broken[k])])
 	return ",".join(parts)
 
 
 func _rebuild() -> void:
-	_items = BaseScene.collect(sim, layout)
+	_items = BaseScene.collect(sim, plan)
 	var by_key := {}
 	for it in _items:
 		if it["building"]:
@@ -161,7 +179,7 @@ func _rebuild() -> void:
 		m.instance_count = list.size()
 		for i in list.size():
 			var p: Vector3 = list[i]["pos"]
-			m.set_instance_transform(i, Transform3D(Basis(), _local(Vector2(p.x, p.y))))
+			m.set_instance_transform(i, Transform3D(_yaw(int(list[i]["rot"])), _local(Vector2(p.x, p.y))))
 	# 공사 현장 (비계): 따로
 	for c in _sites_root.get_children():
 		c.queue_free()
@@ -171,16 +189,20 @@ func _rebuild() -> void:
 		var mi := MeshInstance3D.new()
 		mi.mesh = ModelLib.mesh("buildings", it["sprite"], 0)
 		var p2: Vector3 = it["pos"]
-		mi.position = _local(Vector2(p2.x, p2.y))
+		mi.transform = Transform3D(_yaw(int(it["rot"])), _local(Vector2(p2.x, p2.y)))
 		_sites_root.add_child(mi)
 	# 누를 상자
 	_boxes.clear()
 	for it in _items:
 		var mesh := ModelLib.mesh("buildings", it["sprite"], it["variant"])
-		var box := mesh.get_aabb()
 		var p3: Vector3 = it["pos"]
-		box.position += _local(Vector2(p3.x, p3.y))
+		var box := Transform3D(_yaw(int(it["rot"])), _local(Vector2(p3.x, p3.y))) * mesh.get_aabb()
 		_boxes.append([box, it["id"], it])
+
+
+## 90° 단위 방향 (위에서 보아 시계 반대 방향)
+static func _yaw(rot: int) -> Basis:
+	return Basis(Vector3.UP, rot * PI * 0.5) if rot % 4 != 0 else Basis()
 
 
 # ── 탈것 ────────────────────────────────────────────────────────
@@ -246,61 +268,219 @@ func _build_roads() -> void:
 	var nrm := PackedVector3Array()
 	var idx := PackedInt32Array()
 	var w := BaseLayout.ROAD_W * 0.5
-	for road in layout.roads:
-		var along := 0.0
-		for i in range(road.size() - 1):
-			var a: Vector3 = road[i]
-			var b: Vector3 = road[i + 1]
-			var d := Vector2(b.x - a.x, b.y - a.y)
-			var length := d.length()
-			if length < 0.01:
-				continue
-			var dir := d / length
-			var n := Vector2(-dir.y, dir.x) * w
-			var a2 := Vector2(a.x, a.y) - dir * w
-			var b2 := Vector2(b.x, b.y) + dir * w
-			var steps := maxi(1, int(ceil((length + 2.0 * w) / 8.0)))
-			var base := verts.size()
-			for k in steps + 1:
-				var t := float(k) / steps
-				var c := a2.lerp(b2, t)
-				for side in [-1.0, 1.0]:
-					var q: Vector2 = c + n * side
-					verts.append(_local(q, 0.06))
-					uvs.append(Vector2(0.5 + side * 0.5, along + t * (length + 2.0 * w)))
-					nrm.append(Vector3.UP)
-			for k in steps:
-				var o := base + k * 2
-				idx.append_array(PackedInt32Array([o, o + 1, o + 2, o + 1, o + 3, o + 2]))
-			along += length
-	# 가운데 원형 광장
-	var hub := Vector2(layout.hub.x, layout.hub.y)
-	var center := verts.size()
-	verts.append(_local(hub, 0.07))
-	uvs.append(Vector2(0.5, 0.0))
-	nrm.append(Vector3.UP)
-	for i in 33:
-		var a3 := TAU * i / 32.0
-		verts.append(_local(hub + Vector2(cos(a3), sin(a3)) * 7.0, 0.07))
-		uvs.append(Vector2(0.2, 0.0))
+	for e in plan.edges:
+		var a: Vector2 = plan.nodes[e.x]
+		var b: Vector2 = plan.nodes[e.y]
+		var d := b - a
+		var length := d.length()
+		if length < 0.01:
+			continue
+		var dir := d / length
+		var n := Vector2(-dir.y, dir.x) * w
+		var steps := maxi(1, int(ceil(length / 8.0)))
+		var base := verts.size()
+		for k in steps + 1:
+			var t := float(k) / steps
+			var c := a.lerp(b, t)
+			for side in [-1.0, 1.0]:
+				var q: Vector2 = c + n * side
+				verts.append(_local(q, 0.06))
+				uvs.append(Vector2(0.5 + side * 0.5, t * length))
+				nrm.append(Vector3.UP)
+		for k in steps:
+			var o := base + k * 2
+			idx.append_array(PackedInt32Array([o, o + 1, o + 2, o + 1, o + 3, o + 2]))
+	# 꼭짓점의 둥근 이음 (꺾이거나 갈라지는 곳, 길 끝)
+	for i in plan.nodes.size():
+		var c2: Vector2 = plan.nodes[i]
+		var center := verts.size()
+		verts.append(_local(c2, 0.065))
+		uvs.append(Vector2(0.5, 0.0))
 		nrm.append(Vector3.UP)
-	for i in 32:
-		idx.append_array(PackedInt32Array([center, center + 2 + i, center + 1 + i]))
-	var arr := []
-	arr.resize(Mesh.ARRAY_MAX)
-	arr[Mesh.ARRAY_VERTEX] = verts
-	arr[Mesh.ARRAY_TEX_UV] = uvs
-	arr[Mesh.ARRAY_NORMAL] = nrm
-	arr[Mesh.ARRAY_INDEX] = idx
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+		for k in 17:
+			var a3 := TAU * k / 16.0
+			verts.append(_local(c2 + Vector2(cos(a3), sin(a3)) * w, 0.065))
+			uvs.append(Vector2(0.3, 0.0))
+			nrm.append(Vector3.UP)
+		for k in 16:
+			idx.append_array(PackedInt32Array([center, center + 2 + k, center + 1 + k]))
 	_roads = MeshInstance3D.new()
-	_roads.mesh = mesh
-	_road_mat = ShaderMaterial.new()
-	_road_mat.shader = load("res://ui/world/shaders/road.gdshader")
+	if not verts.is_empty():
+		var arr := []
+		arr.resize(Mesh.ARRAY_MAX)
+		arr[Mesh.ARRAY_VERTEX] = verts
+		arr[Mesh.ARRAY_TEX_UV] = uvs
+		arr[Mesh.ARRAY_NORMAL] = nrm
+		arr[Mesh.ARRAY_INDEX] = idx
+		var mesh := ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+		_roads.mesh = mesh
+	if _road_mat == null:
+		_road_mat = ShaderMaterial.new()
+		_road_mat.shader = load("res://ui/world/shaders/road.gdshader")
 	_roads.material_override = _road_mat
 	_roads.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_roads)
+
+
+# ── 자리 고르기 ─────────────────────────────────────────────────
+func _make_tool_nodes() -> void:
+	_ghost = MeshInstance3D.new()
+	_ghost_mat = ShaderMaterial.new()
+	_ghost_mat.shader = load("res://ui/world/shaders/ghost.gdshader")
+	_ghost.material_override = _ghost_mat
+	_ghost.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_ghost.visible = false
+	add_child(_ghost)
+	var overlay: Shader = load("res://ui/world/shaders/overlay.gdshader")
+	_pad = MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(1, 1)
+	_pad.mesh = pm
+	_pad_mat = ShaderMaterial.new()
+	_pad_mat.shader = overlay
+	_pad.material_override = _pad_mat
+	_pad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_pad.visible = false
+	add_child(_pad)
+	_pen_mesh = ImmediateMesh.new()
+	_pen = MeshInstance3D.new()
+	_pen.mesh = _pen_mesh
+	_pen_mat = ShaderMaterial.new()
+	_pen_mat.shader = overlay
+	_pen.material_override = _pen_mat
+	_pen.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_pen)
+	_zones = MeshInstance3D.new()
+	_zones.mesh = _zone_mesh()
+	var zm := ShaderMaterial.new()
+	zm.shader = overlay
+	zm.set_shader_parameter("tint", Color(1, 1, 1, 0.3))
+	_zones.material_override = zm
+	_zones.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_zones.visible = false
+	add_child(_zones)
+
+
+const ZONE_COLORS := {"A": Color(1.0, 0.86, 0.35), "B": Color(1.0, 0.66, 0.3), "C": Color(0.85, 0.5, 0.32)}
+
+
+## 능선의 일조 구역 (태양광 타워를 놓을 때만 보인다): 땅을 따라가는 격자 판
+func _zone_mesh() -> ArrayMesh:
+	var verts := PackedVector3Array()
+	var cols := PackedColorArray()
+	var idx := PackedInt32Array()
+	for t in BaseLayout.ZONES:
+		for r in BaseLayout.ZONES[t]:
+			var rect: Rect2 = r
+			var nu := maxi(2, int(rect.size.x / 6.0))
+			var nv := maxi(2, int(rect.size.y / 6.0))
+			var base := verts.size()
+			for j in nv + 1:
+				for i in nu + 1:
+					var uv := rect.position + rect.size * Vector2(float(i) / nu, float(j) / nv)
+					verts.append(_local(BaseLayout.uv_to_xy(uv), 0.2))
+					var edge := i == 0 or j == 0 or i == nu or j == nv
+					var c: Color = ZONE_COLORS[t]
+					c.a = 1.0 if edge else 0.55
+					cols.append(c)
+			for j in nv:
+				for i in nu:
+					var o := base + j * (nu + 1) + i
+					idx.append_array(PackedInt32Array([o, o + 1, o + nu + 2, o, o + nu + 2, o + nu + 1]))
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = verts
+	arr[Mesh.ARRAY_COLOR] = cols
+	arr[Mesh.ARRAY_INDEX] = idx
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return mesh
+
+
+func _update_tool() -> void:
+	var building := tool != null and tool.mode == "build" and tool.has_at
+	_ghost.visible = building
+	_pad.visible = building
+	_zones.visible = tool != null and tool.mode == "build" and tool.kind == "solar_tower"
+	var ok := tool == null or tool.reason == ""
+	var good := Color(0.35, 0.95, 0.55)
+	var bad := Color(1.0, 0.32, 0.22)
+	if building:
+		var key := "%s/%d" % [tool.kind, tool.variant]
+		if key != _ghost_key:
+			_ghost.mesh = ModelLib.mesh("buildings", tool.kind, tool.variant)
+			_ghost_key = key
+		var c := good if ok else bad
+		var pulse := 0.5 + 0.5 * sin(_t * 5.0)
+		_ghost_mat.set_shader_parameter("tint", Color(c, 0.62 + 0.18 * pulse))
+		_ghost.transform = Transform3D(_yaw(tool.rot), _local(tool.at, 0.04))
+		var f := CityPlan.foot_of(tool.kind, tool.rot)
+		_pad.transform = Transform3D(Basis().scaled(Vector3(f.x + 2.0, 1.0, f.y + 2.0)), _local(tool.at, 0.15))
+		_pad_mat.set_shader_parameter("tint", Color(c, 0.4 + 0.15 * pulse))
+	_pen_mesh.clear_surfaces()
+	if tool == null:
+		return
+	if tool.mode == "road" and tool.has_at:
+		_pen_mat.set_shader_parameter("tint", Color(good if ok else bad, 0.6))
+		_pen_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+		if tool.road_from != null:
+			_strip(tool.road_from, tool.at, BaseLayout.ROAD_W * 0.5)
+			_disc(tool.road_from, 2.2)
+		_disc(tool.at, 2.2)
+		_pen_mesh.surface_end()
+	elif tool.mode == "erase" and tool.hover_edge >= 0 and tool.hover_edge < plan.edges.size():
+		_pen_mat.set_shader_parameter("tint", Color(bad, 0.65))
+		var e: Vector2i = plan.edges[tool.hover_edge]
+		_pen_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+		_strip(plan.nodes[e.x], plan.nodes[e.y], BaseLayout.ROAD_W * 0.5 + 0.6)
+		_pen_mesh.surface_end()
+
+
+func _strip(a: Vector2, b: Vector2, w: float) -> void:
+	var d := b - a
+	var length := d.length()
+	if length < 0.01:
+		return
+	var n := Vector2(-d.y, d.x) / length * w
+	var steps := maxi(1, int(ceil(length / 6.0)))
+	for k in steps:
+		var c0 := a.lerp(b, float(k) / steps)
+		var c1 := a.lerp(b, float(k + 1) / steps)
+		var q := [_local(c0 - n, 0.25), _local(c0 + n, 0.25), _local(c1 + n, 0.25), _local(c1 - n, 0.25)]
+		for i in [0, 1, 2, 0, 2, 3]:
+			_pen_mesh.surface_add_vertex(q[i])
+
+
+func _disc(c: Vector2, r: float) -> void:
+	for k in 12:
+		var a0 := TAU * k / 12.0
+		var a1 := TAU * (k + 1) / 12.0
+		_pen_mesh.surface_add_vertex(_local(c, 0.3))
+		_pen_mesh.surface_add_vertex(_local(c + Vector2(cos(a0), sin(a0)) * r, 0.3))
+		_pen_mesh.surface_add_vertex(_local(c + Vector2(cos(a1), sin(a1)) * r, 0.3))
+
+
+## 화면 점 → 땅 위의 점 (모형 좌표 m). 땅을 맞히지 않으면 null
+func ground_at(view: WorldView, p: Vector2) -> Variant:
+	var vp_pos := p * view.px_scale()
+	var cam3 := view._camera
+	var o := cam3.project_ray_origin(vp_pos)
+	var dir := cam3.project_ray_normal(vp_pos)
+	var inv := global_transform.affine_inverse()
+	var lo := inv * o
+	var ld := (inv.basis * dir).normalized()
+	if ld.y > -1e-4:
+		return null
+	var t := -lo.y / ld.y
+	for _i in 4:
+		var q := lo + ld * t
+		var g := _local(Vector2(q.x, -q.z)).y
+		t += (q.y - g) / -ld.y
+	if t <= 0.0:
+		return null
+	var hit := lo + ld * t
+	return Vector2(hit.x, -hit.z)
 
 
 func _ring_mesh() -> ArrayMesh:
@@ -357,6 +537,9 @@ func _pick_item(view: WorldView, p: Vector2) -> Array:
 
 
 func hover(view: WorldView, p: Vector2) -> void:
+	if tool and tool.active():
+		hovered = ""
+		return
 	var hit := _pick_item(view, p)
 	if hit.is_empty():
 		hovered = ""
@@ -390,10 +573,8 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 			elif it["building"]:
 				var r := Rect2(s2 - Vector2(22, 0), Vector2(44, 5))
 				ov.draw_rect(r, Color(0, 0, 0, 0.6))
-				ov.draw_rect(Rect2(r.position, Vector2(44.0 * float(it["progress"]), 5)), Palette.AMBER)
-			if int(it["more"]) > 0:
-				ov.draw_string(bold, s2 + Vector2(10, 0), "+%d" % int(it["more"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 14,
-					Palette.AMBER)
+				ov.draw_rect(Rect2(r.position, Vector2(44.0 * _progress_of(it), 5)), Palette.AMBER)
+	_draw_tool_overlay(view, ov, font, bold)
 	# 상태 (왼쪽 위)
 	var lit := not sim.is_dark()
 	var state := "일조 — 태양광 %s kW" % Fmt.n(sim.solar_kw)
@@ -417,6 +598,49 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 		var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
 		ov.draw_rect(Rect2(mp + Vector2(14, 6), Vector2(w + 14, 22)), Color(0.06, 0.07, 0.1, 0.88))
 		ov.draw_string(font, mp + Vector2(21, 22), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Palette.TEXT)
+
+
+func _progress_of(it: Dictionary) -> float:
+	var e := {}
+	for b in plan.buildings:
+		if int(b["uid"]) == int(it["uid"]):
+			e = b
+			break
+	if e.is_empty():
+		return float(it["progress"])
+	for item in sim.queue:
+		if int(item["seq"]) == int(e["seq"]):
+			return clampf(1.0 - float(item["rd"]) / maxf(1e-6, float(item["rd_total"])), 0.0, 1.0)
+	return 1.0
+
+
+## 자리 고르기: 놓을 수 없는 까닭(유령 옆), 일조 구역 이름
+func _draw_tool_overlay(view: WorldView, ov: Control, font: Font, bold: Font) -> void:
+	if tool == null or not tool.active():
+		return
+	if tool.mode == "build" and tool.kind == "solar_tower":
+		for t in BaseLayout.ZONES:
+			var used := int(sim.tiles.get(t, 0))
+			var cap := int(sim.C["illumination"]["tiles"][t])
+			for r in BaseLayout.ZONES[t]:
+				var c := BaseLayout.uv_to_xy((r as Rect2).get_center())
+				var sp: Variant = view.screen_of(global_transform * _local(c, 6.0))
+				if sp != null:
+					_shadow_text(ov, bold, (sp as Vector2) - Vector2(40, 0), "%s · %d/%d" % [CityPlan.TILE_NAMES[t], used, cap],
+						13, ZONE_COLORS[t])
+	if tool.has_at and tool.mode in ["build", "road"]:
+		var sp1: Variant = view.screen_of(global_transform * _local(tool.at, 0.0))
+		if sp1 != null:
+			var c := Color(0.35, 0.95, 0.55) if tool.reason == "" else Color(1.0, 0.32, 0.22)
+			ov.draw_arc(sp1, 16.0, 0.0, TAU, 32, Color(c, 0.9), 2.0)
+			ov.draw_arc(sp1, 24.0 + 4.0 * sin(_t * 5.0), 0.0, TAU, 32, Color(c, 0.45), 1.5)
+	if tool.has_at and tool.reason != "" and tool.mode in ["build", "road"]:
+		var sp2: Variant = view.screen_of(global_transform * _local(tool.at, 2.0))
+		if sp2 != null:
+			var w := font.get_string_size(tool.reason, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+			var at2 := (sp2 as Vector2) + Vector2(16, 10)
+			ov.draw_rect(Rect2(at2 - Vector2(6, 16), Vector2(w + 12, 22)), Color(0.12, 0.03, 0.02, 0.85))
+			ov.draw_string(font, at2, tool.reason, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1.0, 0.62, 0.5))
 
 
 static func _shadow_text(ov: Control, font: Font, pos: Vector2, text: String, font_size: int, color: Color) -> void:

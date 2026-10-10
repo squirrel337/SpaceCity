@@ -52,6 +52,25 @@ func _shot(name: String) -> void:
 	print("shot ", name)
 
 
+## 길을 그려 볼 빈터: 가운데 둘레에서 ㄱ자 길(40 m, 34 m)이 건물에 걸리지 않는 곳
+func _free_road_start(plan: CityPlan) -> Vector2:
+	var h := plan.hub()
+	for r in range(6, 30):
+		for k in 16:
+			var a := h + Vector2(cos(TAU * k / 16.0), sin(TAU * k / 16.0)) * r * 6.0
+			if plan.road_check(a, a + Vector2(40, 0)) == "" and plan.road_check(a + Vector2(40, 0), a + Vector2(40, 34)) == "" \
+					and plan.nearest_edge(a, 12.0) < 0:
+				return a
+	return h + Vector2(0, 80)
+
+
+## 기지의 한 점(모형 좌표)을 내려다보는 시점
+func _look_at_xy(w: WorldView, g: Vector2, alt_km: float, tilt_deg: float, heading := Vector3(-0.2, -1.0, 0.0)) -> void:
+	var r_m := MoonSurface.R_KM * 1000.0
+	var dir := (w.moon.site_dir() * r_m + w.moon.site_frame() * Vector3(g.x, g.y, 0.0)).normalized()
+	w.cam.look_at_surface("moon", dir, alt_km, deg_to_rad(tilt_deg), w.moon.site_frame() * heading)
+
+
 func _to_day(dark: bool) -> void:
 	var guard := 0
 	while main.sim.is_dark() != dark and guard < 24 * 40:
@@ -90,7 +109,48 @@ func _process(_delta: float) -> bool:
 			["saturn", func(): w.cam.look_from_space("saturn", 58232.0 * 7.0, 1.1, 0.35)],
 			["jupiter", func(): w.cam.look_from_space("jupiter", 69911.0 * 4.0, 0.3, 0.1)],
 			["neighbors", func(): w.cam.look_from_space("sun", 26.0 * Astro.LY, 0.7, 0.5)],
+			["place_ok", func():
+				var spot: Dictionary = main.plan.suggest("research_lab")
+				_look_at_xy(w, spot["at"], 0.14, 55.0)
+				main._begin_place("research_lab")
+				main.tool.hover(spot["at"])],
+			["place_bad", func():
+				var hab: Vector3 = main.plan.built_of("hab_module")[2]
+				_look_at_xy(w, Vector2(hab.x, hab.y), 0.14, 55.0)
+				main._begin_place("hydroponics")
+				main.tool.hover(Vector2(hab.x, hab.y) + Vector2(3, 1))],
+			["place_tower", func():
+				var c := BaseLayout.uv_to_xy((BaseLayout.ZONES["A"][0] as Rect2).get_center())
+				_look_at_xy(w, c + Vector2(60, 60), 0.5, 62.0, Vector3(-1.0, -1.0, 0.0))
+				main._begin_place("solar_tower")
+				main.tool.hover(BaseLayout.uv_to_xy((BaseLayout.ZONES["B"][1] as Rect2).get_center()))],
+			["road", func():
+				main.tool.stop()
+				var a := _free_road_start(main.plan)
+				_look_at_xy(w, a + Vector2(20, 15), 0.16, 55.0)
+				main._begin_road()
+				main.tool.click(a)
+				main.tool.click(a + Vector2(40, 0))
+				main.tool.hover(a + Vector2(40, 34))],
+			["map_place", func():
+				main.tool.stop()
+				main._set_view("map")
+				var spot: Dictionary = main.plan.suggest("hydroponics")
+				main.base_map.zoom = 0.9
+				main.base_map.center = ArtLib.project(Vector3(spot["at"].x, spot["at"].y, 0))
+				main.base_map._clamp()
+				main._begin_place("hydroponics")
+				main.tool.hover(spot["at"])],
+			["map_tower", func():
+				main._begin_place("solar_tower")
+				var c := BaseLayout.uv_to_xy((BaseLayout.ZONES["A"][0] as Rect2).get_center())
+				main.base_map.zoom = 0.55
+				main.base_map.center = ArtLib.project(Vector3(c.x, c.y, 0)) + Vector2(0, 160)
+				main.base_map._clamp()
+				main.tool.hover(c + Vector2(30, -20))],
 			["night", func():
+				main.tool.stop()
+				main._set_view("world")
 				_to_day(true)
 				main._refresh_live()
 				w.home(false)],
