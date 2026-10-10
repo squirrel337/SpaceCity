@@ -9,7 +9,7 @@
 
 | 플랫폼 | 받는 곳 | 실행 |
 |---|---|---|
-| Windows 10/11 (64비트) | 실행 결과의 Artifacts → `SpaceCity-windows-x86_64`, 또는 `prototype-latest` 프리릴리스 | zip을 풀고 `SpaceCity.exe`. 코드 서명이 없어서 SmartScreen이 막으면 '추가 정보 → 실행' |
+| Windows 10/11 (64비트) | 실행 결과의 Artifacts → `SpaceCity-windows-x86_64`, 또는 `prototype-latest` 프리릴리스 | zip을 한 폴더에 모두 풀고 `SpaceCity.exe` (옆의 DLL은 OpenGL 3.3이 없는 PC용 Direct3D 대체 경로다). 코드 서명이 없어서 SmartScreen이 막으면 '추가 정보 → 실행'. F11은 전체 화면 |
 | Android 7.0 이상 | Artifacts → `SpaceCity-android`, 또는 `prototype-latest` 프리릴리스의 APK | 휴대폰에서 APK를 열어 설치 ('출처를 알 수 없는 앱' 허용). 디버그 서명이라 스토어 배포용은 아니다 |
 
 워크플로를 수동으로 실행할 때 `publish`를 켜면 `prototype-latest` 프리릴리스에 두 파일이 올라간다. 휴대폰 브라우저로 그 페이지를 열면 APK를 바로 받을 수 있다.

@@ -15,6 +15,7 @@ on:
     branches: [main, "claude/**"]
     paths:
       - "game/**"
+      - "!game/**/*.md"
       - "docs/design/data/**"
       - "docs/design/sim/**"
       - ".github/workflows/game-builds.yml"
