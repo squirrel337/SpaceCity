@@ -201,13 +201,45 @@ def hull(points):
     return lower[:-1] + upper[:-1]
 
 
+class _Nest:
+    def __init__(self, sp):
+        self.sp = sp
+
+    def __enter__(self):
+        self.sp._rd += 1
+
+    def __exit__(self, *a):
+        self.sp._rd -= 1
+
+
+class _Glass:
+    """3D 기록 전용 반투명 재질."""
+    def __init__(self, color: str, alpha: float):
+        self.albedo = rgb(color)
+        self.gloss = 0.9
+        self.alpha = alpha
+
+
+def _plane_key(n, p):
+    s = 1.0
+    for c in n:
+        if abs(c) > 1e-3:
+            s = 1.0 if c > 0 else -1.0
+            break
+    nn = (round(n[0] * s, 2) + 0.0, round(n[1] * s, 2) + 0.0, round(n[2] * s, 2) + 0.0)
+    return nn + (round(dot(n, p) * s / 0.02) * 0.02,)
+
+
 # ── 스프라이트 ────────────────────────────────────────────────────────
 
 class Sprite:
     """한 장의 그림. 도형을 뒤에서 앞 순서로 부른다."""
 
-    def __init__(self, sid: str):
+    def __init__(self, sid: str, record: bool = False):
         self.sid = sid
+        self.rec: list | None = [] if record else None   # 3차원 기록 (art/models.json)
+        self._rd = 0                                     # 안쪽 도형은 적지 않는다
+        self._planes: dict = {}                          # 같은 평면에 겹친 면 (창·띠) → 조금 띄운다
         self.body: list[str] = []
         self.light: list[str] = []
         self.defs: list[str] = []
@@ -228,6 +260,67 @@ class Sprite:
     def _id(self, prefix: str) -> str:
         self.gid += 1
         return "%s%d" % (prefix, self.gid)
+
+    # 3차원 기록 -------------------------------------------------
+    def _on(self) -> bool:
+        return self.rec is not None and self._rd == 0
+
+    def _nest(self):
+        return _Nest(self)
+
+    def _rec(self, item) -> None:
+        if self._on():
+            self.rec.append(item)
+
+    def _lift(self, pts3, n=None, count: bool = True):
+        """앞서 적은 면과 같은 평면이면 바깥(자기 법선 쪽)으로 조금 띄운다 (3D에서 면이 깜박이지 않게)."""
+        if n is None:
+            n = norm(cross(sub(pts3[1], pts3[0]), sub(pts3[2], pts3[0])))
+        off = self._lift_off(n, pts3[0], count)
+        return [add(p, off) for p in pts3]
+
+    def _lift_off(self, n, p, count: bool = True):
+        """같은 평면에 먼저 적은 면이 있으면 그 면의 바깥 법선 쪽으로 띄울 만큼."""
+        key = _plane_key(n, p)
+        k, out = self._planes.get(key, (0, n))
+        if count:
+            self._planes[key] = (k + 1, out)
+        return mul(out, 0.008 * min(k, 4)) if k > 0 else (0.0, 0.0, 0.0)
+
+    def _plane(self, n, p) -> None:
+        """바깥 법선 n인 면(상자 면·원기둥 뚜껑)을 평면 목록에 올린다."""
+        key = _plane_key(n, p)
+        k, out = self._planes.get(key, (0, n))
+        self._planes[key] = (k + 1, out)
+
+    def mark_light(self, color: str, alpha: float = 0.8) -> None:
+        """방금 적은 도형이 밤에 color로 빛난다 (색 띠·불 켜진 문)."""
+        if self.rec and self._rd == 0 and len(self.rec[-1]) and self.rec[-1][0] in ("fru", "poly"):
+            self.rec[-1] = tuple(self.rec[-1][:-1]) + ((color, alpha),)
+
+    def light_poly(self, pts3, color: str, alpha: float = 0.85):
+        """밤에만 보이는 빛 면 (재배등이 비치는 유리, 열린 문 안의 불빛)."""
+        self.poly2([PV(p) for p in pts3], color, None, 0, alpha, layer="light")
+        if self._on():
+            n = norm(cross(sub(pts3[1], pts3[0]), sub(pts3[2], pts3[0])))
+            self.rec.append(("lpoly", [add(p, mul(n, 0.02)) for p in pts3], color, alpha))
+
+    def line2(self, p0, p1, color: str, sw: float):
+        """화면 굵기(px)로 그리는 3차원 선 — 예전 그림과 같은 SVG를 낸다."""
+        a, b = PV(p0), PV(p1)
+        self.path2("M%.2f,%.2fL%.2f,%.2f" % (a[0], a[1], b[0], b[1]), "none", color, sw)
+        self._rec(("line", [p0, p1], sw / S, color, False))
+
+    def glass_shell(self, c, rx, ry, rz, clip_z=None, color: str = "#cfe6ff", alpha: float = 0.2):
+        """유리 돔·볼트의 3차원 껍질 (2D에서는 따로 그린다). 기록만 한다."""
+        self._rec(("ell", c, rx, ry, rz, clip_z, _Glass(color, alpha)))
+
+    def glass_vault(self, p0, p1, r, color: str = "#cfe6ff", alpha: float = 0.2, rz: float | None = None):
+        self._rec(("hcyl", p0, p1, r, _Glass(color, alpha), True, _Glass(color, alpha), (), None, rz))
+
+    def glass_disc(self, center, normal, r, color: str = "#ffffff", alpha: float = 0.15):
+        """도는 로터·프로펠러의 흐린 원판. 기록만 한다."""
+        self._rec(("disc", center, norm(normal), r, _Glass(color, alpha), None))
 
     # 기본 그리기 ---------------------------------------------------
     def poly2(self, pts, fill: str, stroke: str | None = None, sw: float = 0.6,
@@ -255,6 +348,8 @@ class Sprite:
 
     def polyline3(self, pts3, color: str, width_m: float = 0.08, opacity: float = 1.0,
                   layer: str = "body", closed: bool = False):
+        if self._on() and len(pts3) >= 2:
+            self.rec.append(("line", list(pts3) + ([pts3[0]] if closed else []), width_m, color, layer == "light"))
         pts = [PV(p) for p in pts3]
         if closed:
             pts.append(pts[0])
@@ -293,6 +388,15 @@ class Sprite:
              edge: bool | None = None, normal=None, ao: float = 0.22):
         """평면 다각형. 점은 바깥 법선에서 볼 때 반시계 방향."""
         n = normal or norm(cross(sub(pts3[1], pts3[0]), sub(pts3[2], pts3[0])))
+        if self._on():
+            wn = norm(cross(sub(pts3[1], pts3[0]), sub(pts3[2], pts3[0])))
+            lp = self._lift(pts3, wn)
+            if two_sided and back is not None:
+                # 앞뒤 색이 다른 판: 두 장을 아주 조금 띄워 겹친다
+                self.rec.append(("poly", [add(p, mul(wn, 0.004)) for p in lp], mat, None))
+                self.rec.append(("poly", [add(p, mul(wn, -0.004)) for p in reversed(lp)], back, None))
+            else:
+                self.rec.append(("poly", lp, mat, None))
         if dot(n, VIEW) <= 1e-6:
             if not two_sided:
                 return False
@@ -319,6 +423,16 @@ class Sprite:
     def box(self, x, y, z, w, d, h, mat: Mat, top: Mat | None = None, edge: bool | None = None):
         """(x, y, z)에서 시작하는 축 정렬 상자. 보이는 세 면만 그린다."""
         x1, y1, z1 = x + w, y + d, z + h
+        if self._on():
+            self.rec.append(("box", x, y, z, w, d, h, mat, top or mat))
+            for n, p in (((0, 1, 0), (x, y1, z)), ((1, 0, 0), (x1, y, z)), ((0, -1, 0), (x, y, z)),
+                         ((-1, 0, 0), (x, y, z)), ((0, 0, 1), (x, y, z1)), ((0, 0, -1), (x, y, z))):
+                self._plane(n, p)
+        self._rd += 1
+        self._box_faces(x, y, z, x1, y1, z1, mat, top, edge)
+        self._rd -= 1
+
+    def _box_faces(self, x, y, z, x1, y1, z1, mat, top, edge):
         # 여섯 면 중 카메라를 향한 면만 그려진다 (탈것을 돌려 그릴 때 보이는 면이 바뀐다)
         self.face([(x, y1, z), (x1, y1, z), (x1, y1, z1), (x, y1, z1)], mat, edge=edge, normal=(0, 1, 0))
         self.face([(x1, y, z), (x1, y, z1), (x1, y1, z1), (x1, y1, z)], mat, edge=edge, normal=(1, 0, 0))
@@ -353,6 +467,7 @@ class Sprite:
     def panel_grid(self, origin, e1, e2, n1: int, n2: int, color: str, width_px: float = 0.45,
                    opacity: float = 0.55):
         """판 위의 격자선 (태양전지 칸, 방열판 줄 등)."""
+        self._rec(("grid", origin, e1, e2, n1, n2, color, width_px / S))
         segs = []
         for i in range(1, n1):
             a = add(origin, mul(e1, i / n1))
@@ -377,6 +492,8 @@ class Sprite:
                glass: Mat = GLASS, light_alpha: float = 0.95):
         """창. 낮에는 어두운 유리, 밤에는 불빛."""
         n = norm(cross(sub(pts3[1], pts3[0]), sub(pts3[2], pts3[0])))
+        if self._on():
+            self.rec.append(("win", self._lift(pts3, n), glow, glass, light_alpha))
         if dot(n, VIEW) <= 1e-6:
             return
         pts = [PV(p) for p in pts3]
@@ -396,6 +513,12 @@ class Sprite:
                 cap_mat: Mat | None = None, bands=(), band_color: str | None = None,
                 edge: bool | None = None):
         """p0(반지름 r0)에서 p1(반지름 r1)까지의 원기둥·원뿔대."""
+        if self._on():
+            self.rec.append(("fru", p0, p1, r0, r1, mat, caps, cap_mat or mat, tuple(bands), band_color, None))
+            if caps and length(sub(p1, p0)) > 1e-6:
+                a_ = norm(sub(p1, p0))
+                self._plane(a_, p1)
+                self._plane(mul(a_, -1), p0)
         axis = sub(p1, p0)
         L = length(axis)
         a = norm(axis)
@@ -493,6 +616,9 @@ class Sprite:
 
     def disc(self, center, normal, r, mat: Mat, seg: int = 40, two_sided: bool = True,
              back: Mat | None = None, edge: bool | None = None):
+        if self._on():
+            nn = norm(normal)
+            self.rec.append(("disc", add(center, self._lift_off(nn, center)), nn, r, mat, back if two_sided else None))
         u, v = basis(normal)
         pts = [add(center, add(mul(u, r * math.cos(2 * math.pi * i / seg)),
                                 mul(v, r * math.sin(2 * math.pi * i / seg)))) for i in range(seg)]
@@ -508,6 +634,7 @@ class Sprite:
 
     def sphere(self, c, r, mat: Mat, clip_z: float | None = None):
         """구. clip_z가 있으면 그 높이 위만 (돔)."""
+        self._rec(("ell", c, r, r, r, clip_z, mat))
         pts = []
         for i in range(24):
             th = 2 * math.pi * i / 24
@@ -525,6 +652,7 @@ class Sprite:
     def dome(self, c, r, h: float | None = None, mat: Mat = SINTER, seg: int = 36):
         """바닥 원 반지름 r, 높이 h인 돔 (h=r이면 반구)."""
         h = r if h is None else h
+        self._rec(("ell", c, r, r, h, c[2], mat))
         pts = []
         for i in range(seg):
             th = 2 * math.pi * i / seg
@@ -586,6 +714,15 @@ class Sprite:
               opacity: float = 0.9, seg: int = 48, layer: str = "body"):
         """원 테두리 (보이는 앞쪽 반만)."""
         u, v = basis(normal)
+        if self._on():
+            loop = [add(center, mul(add(mul(u, math.cos(2 * math.pi * i / seg)), mul(v, math.sin(2 * math.pi * i / seg))), r))
+                    for i in range(seg + 1)]
+            self.rec.append(("line", loop, width_m, color, layer == "light"))
+        self._rd += 1
+        self._ring3(center, r, color, width_m, u, v, front_only, opacity, seg, layer)
+        self._rd -= 1
+
+    def _ring3(self, center, r, color, width_m, u, v, front_only, opacity, seg, layer):
         run = []
         for i in range(seg + 1):
             t = 2 * math.pi * i / seg
@@ -602,6 +739,7 @@ class Sprite:
 
     def ellipsoid(self, c, rx, ry, rz, mat: Mat, clip_z: float | None = None, seg: int = 28):
         """타원체 (clip_z 아래는 잘라 낸다 — 흙더미·피복에 쓴다)."""
+        self._rec(("ell", c, rx, ry, rz, clip_z, mat))
         pts = []
         for i in range(seg):
             th = 2 * math.pi * i / seg
@@ -619,6 +757,12 @@ class Sprite:
     def half_cyl(self, p0, p1, r, mat: Mat, caps: bool = True, bands=(), band_color: str | None = None,
                  cap_mat: Mat | None = None):
         """바닥에 누운 반원통 (아치형 격납고·터널). 축은 수평."""
+        if self._on():
+            self.rec.append(("hcyl", p0, p1, r, mat, caps, cap_mat or mat, tuple(bands), band_color, None))
+            if caps and length(sub(p1, p0)) > 1e-6:
+                a_ = norm(sub(p1, p0))
+                self._plane(a_, p1)
+                self._plane(mul(a_, -1), p0)
         axis = sub(p1, p0)
         a = norm(axis)
         side = norm(cross((0.0, 0.0, 1.0), a))       # 수평, 축에 수직
@@ -668,6 +812,14 @@ class Sprite:
     def stripes(self, origin, e1, e2, n: int = 6, colors=("#E9C24A", "#2A2D33"), normal=None):
         """판 위의 사선 경고 줄무늬 (노랑·검정)."""
         nrm = normal or norm(cross(e1, e2))
+        if self._on():
+            off = self._lift_off(nrm, origin)
+            for i in range(n):
+                u0, u1 = i / n, (i + 1) / n
+                q = [add(origin, mul(e1, u0)), add(origin, mul(e1, u1)),
+                     add(add(origin, mul(e1, min(1.0, u1 + 0.5 / n))), e2),
+                     add(add(origin, mul(e1, min(1.0, u0 + 0.5 / n))), e2)]
+                self.rec.append(("poly", [add(p, off) for p in q], colors[i % 2], None))
         if dot(nrm, VIEW) <= 0:
             return
         for i in range(n):
@@ -708,6 +860,23 @@ class Sprite:
                   front: bool | None = None):
         """둥근 흙 둑 (착륙장 둘레·원자로 차폐). front=True면 앞쪽 반, False면 뒤쪽 반만."""
         rm = (r_in + r_out) / 2
+        if self._on() and front is not False:
+            # 3D: 앞뒤 반을 한 번에 (front=False 쪽은 적지 않는다)
+            for i in range(seg):
+                t0, t1 = 2 * math.pi * i / seg, 2 * math.pi * (i + 1) / seg
+                o0 = (c[0] + r_out * math.cos(t0), c[1] + r_out * math.sin(t0), c[2])
+                o1 = (c[0] + r_out * math.cos(t1), c[1] + r_out * math.sin(t1), c[2])
+                m0 = (c[0] + rm * math.cos(t0), c[1] + rm * math.sin(t0), c[2] + h)
+                m1 = (c[0] + rm * math.cos(t1), c[1] + rm * math.sin(t1), c[2] + h)
+                i0 = (c[0] + r_in * math.cos(t0), c[1] + r_in * math.sin(t0), c[2])
+                i1 = (c[0] + r_in * math.cos(t1), c[1] + r_in * math.sin(t1), c[2])
+                self.rec.append(("poly", [o0, o1, m1, m0], mat, None))
+                self.rec.append(("poly", [i1, i0, m0, m1], mat, None))
+        self._rd += 1
+        self._berm(c, r_in, r_out, h, mat, seg, front, rm)
+        self._rd -= 1
+
+    def _berm(self, c, r_in, r_out, h, mat, seg, front, rm):
         order = sorted(range(seg), key=lambda k: dot((math.cos(2 * math.pi * (k + 0.5) / seg),
                                                       math.sin(2 * math.pi * (k + 0.5) / seg), 0.0), VIEW))
         for i in order:
@@ -752,6 +921,7 @@ class Sprite:
 
     def glow(self, p3, r_px: float, color: str = AMBER, strength: float = 0.9):
         """밤 레이어의 불빛 번짐."""
+        self._rec(("glow", p3, r_px / S, color, strength))
         c = PV(p3)
         fill = self.radial([(0, color, strength), (0.35, color, strength * 0.45), (1, color, 0.0)],
                            c[0], c[1], r_px, layer="light")
@@ -761,10 +931,13 @@ class Sprite:
         self.light.append('<polygon points="%s" fill="%s"/>' % (pts_attr(pts), fill))
 
     def lamp(self, p3, color: str = AMBER, r_px: float = 10.0):
+        self._rec(("lamp", p3, color, r_px / S))
         c = PV(p3)
         self.poly2([(c[0] - 0.9, c[1] - 0.9), (c[0] + 0.9, c[1] - 0.9), (c[0] + 0.9, c[1] + 0.9),
                     (c[0] - 0.9, c[1] + 0.9)], "#fff2d0", None)
+        self._rd += 1
         self.glow(p3, r_px, color)
+        self._rd -= 1
 
     # 출력 ---------------------------------------------------------
     def viewbox(self, pad: float = 3.0):

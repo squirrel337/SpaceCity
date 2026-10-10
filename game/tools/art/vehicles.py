@@ -135,7 +135,7 @@ def pressurized_rover(sp: Sprite):
         sp.face([E, H, D, A], WHITE)
         # 앞 유리 불빛
         if dot(norm(cross(sub(G, H), sub(C, H))), iso.VIEW) > 0:
-            sp.poly2([iso.PV(p) for p in (H, G, C, D)], WARM_WINDOW, None, 0, 0.75, layer="light")
+            sp.light_poly([H, G, C, D], WARM_WINDOW, 0.75)
         for y in (-0.8, 0.8):
             lamp_front(sp, (3.12, y, 1.35))
 
@@ -419,6 +419,7 @@ def rotor(sp: Sprite, c, r: float, blades: int = 2, phase: float = 20.0, color="
     pts = [iso.P(c[0] + r * math.cos(2 * math.pi * i / 36), c[1] + r * math.sin(2 * math.pi * i / 36), c[2])
            for i in range(36)]
     sp.poly2(pts, "#ffffff", "#d0d4da", 0.4, 0.14)
+    sp.glass_disc(c, (0, 0, 1), r)
     for b in range(blades):
         a = math.radians(phase + 360.0 * b / blades)
         tip = (c[0] + r * math.cos(a), c[1] + r * math.sin(a), c[2])
@@ -519,6 +520,7 @@ def mars_plane(sp: Sprite):
                 t = 2 * math.pi * i / 36
                 pts.append(iso.P(1.75, side * 4.0 + 1.7 * math.cos(t), 0.6 + 1.7 * math.sin(t)))
             sp.poly2(pts, "#ffffff", "#d0d4da", 0.4, 0.15)
+            sp.glass_disc((1.75, side * 4.0, 0.6), (1, 0, 0), 1.7)
             sp.line((1.75, side * 4.0 - 1.6, 0.6), (1.75, side * 4.0 + 1.6, 0.6), 0.12, "#3a3f47")
         return f
 
@@ -557,6 +559,7 @@ def venus_airship(sp: Sprite):
             pts = [iso.P(-11.6, y + 1.3 * math.cos(2 * math.pi * i / 30), 4.2 + 1.3 * math.sin(2 * math.pi * i / 30))
                    for i in range(30)]
             sp.poly2(pts, "#ffffff", "#d0d4da", 0.4, 0.15)
+            sp.glass_disc((-11.6, y, 4.2), (1, 0, 0), 1.3)
 
     items += [((-13.0, 0, 6.0), fins), ((0, 0, 6.0), envelope), ((0, 0, 1.0), gondola)]
     sp.parts(items)

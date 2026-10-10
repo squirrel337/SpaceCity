@@ -45,6 +45,7 @@ def cyl_ring(sp: Sprite, p0, p1, r, s0, s1, mat: Mat, glow: str | None = None, g
     b = add(p0, mul(axis, s1))
     sil = sp.cyl(a, b, r + 0.02, mat, caps=False, edge=False)
     if glow:
+        sp.mark_light(glow, glow_alpha)
         sp.poly2(sil, glow, None, 0, glow_alpha, layer="light")
 
 
@@ -221,8 +222,8 @@ def dome_oculus(sp: Sprite):
         sp.ring3((0, 0, zz), 6.2 * k, "#83745f", 0.045, opacity=0.8)
     sp.disc((0, 0, 4.86), (0, 0, 1), 1.6, GLASS, edge=False)
     sp.ring3((0, 0, 4.88), 1.6, "#cfc6b6", 0.12, front_only=False)
-    sp.poly2([PV((1.6 * math.cos(t / 20 * 2 * math.pi), 1.6 * math.sin(t / 20 * 2 * math.pi), 4.88)) for t in range(20)],
-             WARM_WINDOW, None, 0, 0.8, layer="light")
+    sp.light_poly([(1.6 * math.cos(t / 20 * 2 * math.pi), 1.6 * math.sin(t / 20 * 2 * math.pi), 4.88) for t in range(20)],
+                  WARM_WINDOW, 0.8)
     sp.glow((0, 0, 5.5), 30, WARM_WINDOW, 0.35)
     sp.half_cyl((5.2, 0, 0), (7.4, 0, 0), 1.3, SINTER, bands=[0.5], band_color="#83745f")
     sp.face([(7.45, -0.5, 0), (7.45, 0.5, 0), (7.45, 0.5, 1.0), (7.45, -0.5, 1.0)], DARK, normal=(1, 0, 0), ao=0)
@@ -601,9 +602,8 @@ def farm_sawtooth(sp: Sprite):
         for k in range(3):
             yy = -1.4 + k * 1.4
             zz = 2.2 + (yy + 2.1) / 4.2 * 1.0
-            a, b = PV((x + 0.2, yy, zz + 0.02)), PV((x + 2.4, yy, zz + 0.02))
-            sp.path2("M%.2f,%.2fL%.2f,%.2f" % (a[0], a[1], b[0], b[1]), "none", "#6DAE57", 1.2)
-        sp.poly2([PV(p) for p in pts], GROW, None, 0, 0.85, layer="light")
+            sp.line2((x + 0.2, yy, zz + 0.02), (x + 2.4, yy, zz + 0.02), "#6DAE57", 1.2)
+        sp.light_poly(pts, GROW, 0.85)
         sp.face([(x + 2.6, 2.1, 2.2), (x, 2.1, 2.2), (x, 2.1, 3.2), (x + 2.6, 2.1, 3.2)], WHITE, ao=0)
     f = Sprite.box_faces(-4.4, -2.2, 0, 8.8, 4.4, 2.2)
     door(sp, f["right"], 0.35, 0.65, 0.8)
@@ -646,9 +646,8 @@ def farm_twin(sp: Sprite):
         sp.half_cyl((-4.0, y, 0.6), (4.0, y, 0.6), 1.2, WHITE, bands=[0.25, 0.5, 0.75], band_color="#b8b2a6")
         pts = [(-3.6, y - 0.35, 1.76), (3.6, y - 0.35, 1.76), (3.6, y + 0.35, 1.76), (-3.6, y + 0.35, 1.76)]
         sp.face(pts, PINK_GLASS, normal=(0, 0, 1), ao=0)
-        a, b = PV((-3.4, y, 1.78)), PV((3.4, y, 1.78))
-        sp.path2("M%.2f,%.2fL%.2f,%.2f" % (a[0], a[1], b[0], b[1]), "none", "#6DAE57", 1.4)
-        sp.poly2([PV(p) for p in pts], GROW, None, 0, 0.85, layer="light")
+        sp.line2((-3.4, y, 1.78), (3.4, y, 1.78), "#6DAE57", 1.4)
+        sp.light_poly(pts, GROW, 0.85)
         sp.face([(4.05, y - 0.4, 0.6), (4.05, y + 0.4, 0.6), (4.05, y + 0.4, 1.5), (4.05, y - 0.4, 1.5)], DARK,
                 normal=(1, 0, 0), ao=0)
     sp.lamp((4.3, 0.0, 1.6), AMBER, 8)
@@ -1500,8 +1499,7 @@ def bay_dome(sp: Sprite):
     sp.dome((-1.0, 0.0, 0.2), 3.8, 3.6, Mat("#DAD3C4"))
     sp.half_cyl((2.2, 0.0, 0.2), (4.2, 0.0, 0.2), 2.0, Mat("#DAD3C4"))
     sp.face([(4.25, -1.4, 0.2), (4.25, 1.4, 0.2), (4.25, 1.4, 1.8), (4.25, -1.4, 1.8)], CHAR, normal=(1, 0, 0), ao=0)
-    sp.poly2([PV((4.27, -1.4, 0.2)), PV((4.27, 1.4, 0.2)), PV((4.27, 1.4, 1.8)), PV((4.27, -1.4, 1.8))],
-             "#ffcf8a", None, 0, 0.5, layer="light")
+    sp.light_poly([(4.27, -1.4, 0.2), (4.27, 1.4, 0.2), (4.27, 1.4, 1.8), (4.27, -1.4, 1.8)], "#ffcf8a", 0.5)
     sp.stripes((4.28, -1.4, 1.8), (0, 2.8, 0), (0, 0, 0.25), n=8, normal=(1, 0, 0))
     sp.lamp((4.4, 2.0, 0.4), AMBER, 7)
 
@@ -1514,8 +1512,8 @@ def bay_double(sp: Sprite):
         sp.half_cyl((-4.0, y, 0.2), (3.0, y, 0.2), 1.45, Mat("#DAD3C4"), bands=[0.25, 0.5, 0.75], band_color="#ada594")
         sp.face([(3.05, y - 1.0, 0.2), (3.05, y + 1.0, 0.2), (3.05, y + 1.0, 1.4), (3.05, y - 1.0, 1.4)], CHAR,
                 normal=(1, 0, 0), ao=0)
-        sp.poly2([PV((3.07, y - 1.0, 0.2)), PV((3.07, y + 1.0, 0.2)), PV((3.07, y + 1.0, 1.4)), PV((3.07, y - 1.0, 1.4))],
-                 "#ffcf8a", None, 0, 0.5, layer="light")
+        sp.light_poly([(3.07, y - 1.0, 0.2), (3.07, y + 1.0, 0.2), (3.07, y + 1.0, 1.4), (3.07, y - 1.0, 1.4)],
+                      "#ffcf8a", 0.5)
     sp.lamp((3.6, 0.0, 0.4), AMBER, 7)
 
 
@@ -1868,6 +1866,7 @@ def _glass_dome(sp: Sprite, c, r, h, z0=0.6):
     hl = PV((c[0] - r * 0.28, c[1] + r * 0.5, z0 + h * 0.8))
     fill = sp.radial([(0, "#ffffff", 0.32), (0.4, "#cfe6ff", 0.12), (1, "#9fc0e0", 0.05)], hl[0], hl[1], r * S * 1.6)
     sp.poly2(sil, fill, "#cfe0ef", 0.6, 1.0)
+    sp.glass_shell((c[0], c[1], z0), r, r, h, z0)
     for zz in (0.25, 0.5, 0.72, 0.9):
         k = math.sqrt(max(0.0, 1 - zz ** 2))
         sp.ring3((c[0], c[1], z0 + h * zz), r * k, "#dfe9f2", 0.05, opacity=0.55)
@@ -1904,6 +1903,7 @@ def commons_vault(sp: Sprite):
     hl = PV((-3.0, 2.0, 4.4))
     fill = sp.radial([(0, "#ffffff", 0.3), (0.4, "#cfe6ff", 0.12), (1, "#9fc0e0", 0.05)], hl[0], hl[1], 9 * S)
     sp.poly2(sil, fill, "#cfe0ef", 0.6, 1.0)
+    sp.glass_vault(p0, p1, 4.4, rz=4.6)
     for x in (-5.0, -2.5, 0.0, 2.5, 5.0):
         pts = [(x, 4.4 * math.cos(math.pi * i / 16), 0.6 + 4.6 * math.sin(math.pi * i / 16)) for i in range(17)]
         sp.polyline3([q for q in pts if dot((0, q[1], q[2] - 0.6), VIEW) > -0.5], "#dfe9f2", 0.06, 0.55)

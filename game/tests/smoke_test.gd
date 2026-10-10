@@ -40,6 +40,7 @@ func _process(_delta: float) -> bool:
 		_check(built > 0, "자동 운영이 아무것도 짓지 않았다")
 		_save_roundtrip()
 		_map_check()
+		_world_check()
 		main._on_module_tapped("hab_module")
 		main._show_help()
 		main._show_report()
@@ -128,6 +129,92 @@ func _map_check() -> void:
 	m.zoom_by(1.5)
 	m.fit()
 	print("smoke: map %d robots working, %d agents" % [working, m.traffic.agents.size()])
+
+
+func _world_check() -> void:
+	## 3D 우주 보기: 모형, 천체 위치, 구글 어스식 조작(끌기·휠·날기), 축척 공간, 3D 도시
+	var w: WorldView = main.world
+	main._set_view("world")
+	_check(w.visible and not main.base_map.visible, "3D 보기로 바뀌지 않았다")
+	for kind in main.sim.M:
+		_check(ModelLib.variants(kind) == 5, "3D 모형 변형이 5가지가 아닌 건물: " + kind)
+		for v in range(5):
+			var mesh := ModelLib.mesh("buildings", kind, v)
+			_check(mesh.get_surface_count() > 0 and mesh.get_aabb().size.length() > 1.0, "빈 3D 모형: %s v%d" % [kind, v])
+	for vid in ["ltv", "pressurized_rover", "cargo_hauler", "hopper", "excavator_robot", "builder_robot", "astronaut",
+			"crew_lander", "cargo_lander"]:
+		_check(ModelLib.mesh("vehicles", vid).get_surface_count() > 0, "빈 탈것 모형: " + vid)
+	# 천체 위치
+	var jd := w.jd
+	var earth := Astro.position("earth", jd)
+	var r_au := Astro.len3(earth) / Astro.AU
+	_check(r_au > 0.98 and r_au < 1.02, "지구-태양 거리가 이상하다: %.3f AU" % r_au)
+	var md := Astro.len3(Astro.moon_geo(jd))
+	_check(md > 355000.0 and md < 408000.0, "지구-달 거리가 이상하다: %d km" % int(md))
+	_check(Astro.systems.size() >= 30, "이웃 항성계가 모자란다")
+	# 기지 위 → 휠로 축소 → 달 전체 → 지구-달 → 태양계 → 별
+	var cam := w.cam
+	w.home(false)
+	w._process(0.016)
+	_check(cam.mode == "body" and cam.focus == "moon", "처음 시점이 달 표면이 아니다")
+	_check(absf(w.moon.local_height_m(Vector2.ZERO)) < 0.01, "기지 평지 높이가 0이 아니다")
+	var d0 := cam.dist
+	var t0 := cam.t_dir.duplicate()
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	ev.position = w.size * 0.5
+	w._gui_input(ev)
+	var mv := InputEventMouseMotion.new()
+	mv.position = w.size * 0.5 + Vector2(120, 40)
+	mv.relative = Vector2(120, 40)
+	w._gui_input(mv)
+	ev.pressed = false
+	w._gui_input(ev)
+	w._process(0.016)
+	_check(Astro.len3(Astro.sub3(cam.t_dir, t0)) > 1e-9, "끌어도 목표가 움직이지 않았다")
+	for _i in range(12):
+		var wheel := InputEventMouseButton.new()
+		wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
+		wheel.pressed = true
+		wheel.position = w.size * 0.5
+		w._gui_input(wheel)
+	w._process(0.016)
+	_check(cam.dist > d0 * 5.0, "휠로 멀어지지 않았다")
+	cam.zoom(1.0e4)
+	w._process(0.016)
+	_check(cam.mode == "space", "멀리서도 지구본 모드다")
+	cam.dist = 3.0e9
+	w._process(0.016)
+	var sun_gap := Astro.len3(Astro.sub3(cam.target, w._info("sun")["center"]))
+	_check(sun_gap < 1.0e8, "태양계 거리에서 목표가 태양으로 옮겨 가지 않았다")
+	cam.dist = 20.0 * Astro.LY
+	w._process(0.016)
+	var star := w.to_render(Astro.systems[0]["pos"])
+	_check(star.length() > 0.0 and star.length() < w._camera.far, "별이 카메라 범위 밖이다")
+	# 화성으로 날아가기
+	cam.fly_to("mars", 3389.5 * 3.2, 0.5)
+	for _i in range(60):
+		w._process(0.02)
+	_check(not cam.flying() and cam.focus == "mars", "화성에 도착하지 못했다")
+	var gap := Astro.len3(Astro.sub3(cam.pos, w._info("mars")["center"]))
+	_check(gap > 3389.5 and gap < 3389.5 * 8.0, "화성에서의 거리가 이상하다: %d km" % int(gap))
+	# 다시 기지: 3D 도시의 건물을 눌러 고른다
+	w.home(false)
+	for _i in range(3):
+		w._process(0.05)
+	var city := w.city
+	_check(not city._boxes.is_empty(), "3D 도시에 건물이 없다")
+	var picked := ""
+	for b in city._boxes:
+		var c: Vector3 = (b[0] as AABB).get_center()
+		var sp: Variant = w.screen_of(city.global_transform * c)
+		if sp != null and Rect2(Vector2.ZERO, w.size).has_point(sp):
+			picked = city.pick(w, sp)
+			if picked != "":
+				break
+	_check(picked != "", "3D 도시에서 건물을 고를 수 없다")
+	print("smoke: world %d buildings, picked %s, earth %.3f AU, moon %d km" % [city._boxes.size(), picked, r_au, int(md)])
 
 
 func _check(ok: bool, message: String) -> void:

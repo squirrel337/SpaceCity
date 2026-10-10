@@ -274,9 +274,8 @@ def hydroponics(sp: Sprite):
         # 식물 줄
         for k in range(3):
             yy = -0.45 + k * 0.45
-            a, b = PV((x0 + 0.1, yy, 2.97)), PV((x1 - 0.1, yy, 2.97))
-            sp.path2("M%.2f,%.2fL%.2f,%.2f" % (a[0], a[1], b[0], b[1]), "none", "#6DAE57", 1.4)
-        sp.poly2([PV(p) for p in pts], GROW, None, 0, 0.85, layer="light")
+            sp.line2((x0 + 0.1, yy, 2.97), (x1 - 0.1, yy, 2.97), "#6DAE57", 1.4)
+        sp.light_poly(pts, GROW, 0.85)
     sp.face([(4.25, -0.6, 1.0), (4.25, 0.6, 1.0), (4.25, 0.6, 2.4), (4.25, -0.6, 2.4)], DARK, normal=(1, 0, 0), ao=0)
     sp.lamp((4.4, 0, 2.75), AMBER, 8)
     sp.glow((0, 0, 3.2), 34, GROW, 0.35)
@@ -567,8 +566,7 @@ def robot_bay(sp: Sprite):
     # 열린 문 (어두운 속에 로봇 실루엣)
     sp.face([(3.45, -1.8, 0.2), (3.45, 1.8, 0.2), (3.45, 1.8, 2.4), (3.45, -1.8, 2.4)], CHAR, normal=(1, 0, 0), ao=0)
     sp.box(3.46, -0.6, 0.2, 0.02, 1.2, 1.3, Mat("#3a3f47"))
-    sp.poly2([PV((3.47, -1.8, 0.2)), PV((3.47, 1.8, 0.2)), PV((3.47, 1.8, 2.4)), PV((3.47, -1.8, 2.4))],
-             "#ffcf8a", None, 0, 0.55, layer="light")
+    sp.light_poly([(3.47, -1.8, 0.2), (3.47, 1.8, 0.2), (3.47, 1.8, 2.4), (3.47, -1.8, 2.4)], "#ffcf8a", 0.55)
     sp.stripes((3.48, -1.8, 2.4), (0, 3.6, 0), (0, 0, 0.3), n=10, normal=(1, 0, 0))
     # 충전 패드
     for y in (-2.4, 2.4):
@@ -713,6 +711,7 @@ def green_commons(sp: Sprite):
     hl = PV((-2.0, 3.5, 5.6))
     fill = sp.radial([(0, "#ffffff", 0.32), (0.4, "#cfe6ff", 0.12), (1, "#9fc0e0", 0.05)], hl[0], hl[1], r * S * 1.6)
     sp.poly2(sil, fill, "#cfe0ef", 0.6, 1.0)
+    sp.glass_shell((0, 0, 0.6), r, r, 6.2, 0.6)
     for zz in (1.8, 3.4, 4.8, 6.0):
         k = math.sqrt(max(0.0, 1 - ((zz - 0.6) / 6.2) ** 2))
         sp.ring3((0, 0, zz), r * k, "#dfe9f2", 0.05, opacity=0.55)

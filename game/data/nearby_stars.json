@@ -1,0 +1,579 @@
+{
+  "_meta": {
+    "description": "SpaceCity 시드 데이터: 실제 근거리 항성과 유명 외계행성계 (게임용 근사값)",
+    "source": "Claude 내장 지식 (2026년 6월까지 학습). 유효숫자 2~3자리 수준의 근사값이다.",
+    "verify_before_release": "출시 전 SIMBAD, Gaia DR3, NASA Exoplanet Archive로 수치를 교차 검증할 것. status가 candidate/disputed인 행성은 특히 주의.",
+    "units": {
+      "distance_ly": "광년",
+      "ra_deg/dec_deg": "적경·적위 (도, J2000 적도 좌표, 근사값)",
+      "mass_sun": "태양질량",
+      "luminosity_sun": "태양광도 (null이면 생성기가 질량으로 추정)",
+      "teff_k": "유효온도 K",
+      "a_au": "궤도 장반경 AU (null이면 공전주기로 계산)",
+      "period_d": "공전주기 (일)",
+      "mass_earth": "지구질량 (시선속도 행성은 최소질량)",
+      "radius_earth": "지구반지름"
+    },
+    "planet_status": {
+      "confirmed": "확인됨",
+      "candidate": "후보 (추가 관측 필요)",
+      "disputed": "보고 후 반박·논쟁 중"
+    },
+    "category": {
+      "neighbor": "25광년 이내 이웃 — 초기 성간 확장 무대",
+      "notable": "유명 외계행성계 — 중반 목표",
+      "landmark": "원거리 랜드마크 — 이벤트·엔드게임용"
+    }
+  },
+  "systems": [
+    {
+      "id": "alpha_centauri",
+      "ra_deg": 219.90, "dec_deg": -60.83,
+      "name": { "ko": "알파 센타우리 AB", "en": "Alpha Centauri AB" },
+      "category": "neighbor",
+      "distance_ly": 4.37,
+      "stars": [
+        { "name": "알파 센타우리 A (리길 켄타우루스)", "spectral": "G2V", "mass_sun": 1.08, "luminosity_sun": 1.52, "teff_k": 5790 },
+        { "name": "알파 센타우리 B (톨리만)", "spectral": "K1V", "mass_sun": 0.91, "luminosity_sun": 0.50, "teff_k": 5260 }
+      ],
+      "planets": [
+        { "name": "Alpha Centauri Ab", "status": "candidate", "a_au": null, "period_d": null, "mass_earth": null, "note": "2025년 JWST 직접촬영 후보. 토성급 가스행성 추정, A의 거주가능영역 안" }
+      ],
+      "features": ["태양형 쌍성 (공전주기 약 80년, 거리 11~35 AU로 변동)", "프록시마가 약 13,000 AU 밖에서 공전"],
+      "game_hook": "가장 가까운 태양형 항성. 쌍성의 섭동으로 안정 궤도가 각 별의 약 2~3 AU 이내로 제한 → 궤도 거주구·소행성 채굴 중심 개척",
+      "confidence": "high"
+    },
+    {
+      "id": "proxima_centauri",
+      "ra_deg": 217.43, "dec_deg": -62.68,
+      "name": { "ko": "프록시마 센타우리", "en": "Proxima Centauri" },
+      "category": "neighbor",
+      "distance_ly": 4.25,
+      "stars": [
+        { "name": "프록시마 센타우리", "spectral": "M5.5Ve", "mass_sun": 0.122, "luminosity_sun": 0.0016, "teff_k": 3040 }
+      ],
+      "planets": [
+        { "name": "Proxima b", "status": "confirmed", "a_au": 0.0485, "period_d": 11.19, "mass_earth": 1.07, "note": "거주가능영역 안, 조석 고정 가능성 높음" },
+        { "name": "Proxima d", "status": "confirmed", "a_au": 0.029, "period_d": 5.12, "mass_earth": 0.26, "note": "2022년 확인된 소형 행성" },
+        { "name": "Proxima c", "status": "disputed", "a_au": 1.5, "period_d": 1900, "mass_earth": 7, "note": "장주기 슈퍼지구 후보, 논쟁 중" }
+      ],
+      "features": ["강력한 플레어 (자외선·X선 폭발)", "알파 센타우리 AB와 중력적으로 묶인 삼중성계의 일원"],
+      "game_hook": "최초 성간 식민 후보. 조석 고정된 b의 명암 경계(터미네이터) 도시 + 플레어 대피 시스템이 핵심 퍼즐",
+      "confidence": "high"
+    },
+    {
+      "id": "barnards_star",
+      "ra_deg": 269.45, "dec_deg": 4.69,
+      "name": { "ko": "바너드 별", "en": "Barnard's Star" },
+      "category": "neighbor",
+      "distance_ly": 5.96,
+      "stars": [
+        { "name": "바너드 별", "spectral": "M4V", "mass_sun": 0.16, "luminosity_sun": 0.0035, "teff_k": 3200 }
+      ],
+      "planets": [
+        { "name": "Barnard d", "status": "confirmed", "a_au": null, "period_d": 2.34, "mass_earth": null, "note": "지구질량의 약 0.2~0.4배급 소형 암석행성 (2025 보고)" },
+        { "name": "Barnard b", "status": "confirmed", "a_au": null, "period_d": 3.15, "mass_earth": null, "note": "2024년 보고, 고온" },
+        { "name": "Barnard c", "status": "confirmed", "a_au": null, "period_d": 4.12, "mass_earth": null, "note": "2025년 보고, 고온" },
+        { "name": "Barnard e", "status": "confirmed", "a_au": null, "period_d": 6.74, "mass_earth": null, "note": "2025년 보고, 고온" }
+      ],
+      "features": ["밤하늘에서 고유운동이 가장 큰 별 (연 약 10.3″)", "약 100억 년 된 고령 항성", "1970년대 영국행성간협회 '다이달로스 계획'의 목표"],
+      "game_hook": "다이달로스 오마주 — 인류 최초 성간 무인 탐사선 미션의 목표. 행성은 모두 뜨거워 궤도 기지형 개척",
+      "confidence": "medium"
+    },
+    {
+      "id": "wolf_359",
+      "ra_deg": 164.12, "dec_deg": 7.01,
+      "name": { "ko": "울프 359", "en": "Wolf 359" },
+      "category": "neighbor",
+      "distance_ly": 7.86,
+      "stars": [
+        { "name": "울프 359", "spectral": "M6V", "mass_sun": 0.11, "luminosity_sun": 0.0011, "teff_k": 2800 }
+      ],
+      "planets": [],
+      "features": ["플레어 별", "행성 후보 보고가 있으나 미확정"],
+      "game_hook": "어둡고 불안정한 플레어 별 — 위험 항로·요새 무대",
+      "confidence": "medium"
+    },
+    {
+      "id": "lalande_21185",
+      "ra_deg": 165.83, "dec_deg": 35.97,
+      "name": { "ko": "랄랑드 21185", "en": "Lalande 21185" },
+      "category": "neighbor",
+      "distance_ly": 8.31,
+      "stars": [
+        { "name": "랄랑드 21185", "spectral": "M2V", "mass_sun": 0.39, "luminosity_sun": 0.022, "teff_k": 3550 }
+      ],
+      "planets": [
+        { "name": "Lalande 21185 b", "status": "confirmed", "a_au": null, "period_d": 9.87, "mass_earth": 2.7, "note": "고온 슈퍼지구" },
+        { "name": "Lalande 21185 c", "status": "candidate", "a_au": null, "period_d": 2900, "mass_earth": 14, "note": "외곽 해왕성급 후보" }
+      ],
+      "features": ["북반구에서 가장 밝은 적색왜성 중 하나"],
+      "game_hook": "비교적 밝고 안정적인 적색왜성 — 성간 중계 기지 후보",
+      "confidence": "medium"
+    },
+    {
+      "id": "sirius",
+      "ra_deg": 101.29, "dec_deg": -16.72,
+      "name": { "ko": "시리우스", "en": "Sirius" },
+      "category": "neighbor",
+      "distance_ly": 8.6,
+      "stars": [
+        { "name": "시리우스 A", "spectral": "A1V", "mass_sun": 2.06, "luminosity_sun": 25.4, "teff_k": 9940 },
+        { "name": "시리우스 B", "spectral": "DA2 (백색왜성)", "mass_sun": 1.02, "luminosity_sun": 0.056, "teff_k": 25000 }
+      ],
+      "planets": [],
+      "features": ["밤하늘에서 가장 밝은 별", "백색왜성 동반성 B (공전주기 약 50년)", "나이 약 2~3억 년의 젊은 계"],
+      "game_hook": "생명에는 부적합(젊고 뜨거움)하지만 광도가 커서 거대 에너지 기지에 최적. 백색왜성 B 근접 관측은 고밀도 물리 연구 보너스",
+      "confidence": "high"
+    },
+    {
+      "id": "luyten_726_8",
+      "ra_deg": 24.75, "dec_deg": -17.95,
+      "name": { "ko": "루이텐 726-8 (고래자리 BL·UV)", "en": "Luyten 726-8 (BL Ceti & UV Ceti)" },
+      "category": "neighbor",
+      "distance_ly": 8.7,
+      "stars": [
+        { "name": "고래자리 BL", "spectral": "M5.5V", "mass_sun": 0.10, "luminosity_sun": null, "teff_k": null },
+        { "name": "고래자리 UV", "spectral": "M6V", "mass_sun": 0.10, "luminosity_sun": null, "teff_k": null }
+      ],
+      "planets": [],
+      "features": ["고래자리 UV는 '플레어 별'이라는 분류의 원형"],
+      "game_hook": "주기적 대형 플레어 → 항로 위험도가 시간에 따라 출렁이는 '전자기 폭풍 지대'",
+      "confidence": "medium"
+    },
+    {
+      "id": "ross_248",
+      "ra_deg": 355.48, "dec_deg": 44.17,
+      "name": { "ko": "로스 248", "en": "Ross 248" },
+      "category": "neighbor",
+      "distance_ly": 10.3,
+      "stars": [
+        { "name": "로스 248", "spectral": "M6V", "mass_sun": 0.14, "luminosity_sun": null, "teff_k": null }
+      ],
+      "planets": [],
+      "features": ["태양계로 다가오는 중 — 약 3.6만 년 뒤 태양에 가장 가까운 별이 됨 (최근접 약 3광년)"],
+      "game_hook": "장기 캠페인용 '움직이는 지도' — 수만 년 단위로 이동 비용이 바뀌는 별",
+      "confidence": "medium"
+    },
+    {
+      "id": "epsilon_eridani",
+      "ra_deg": 53.23, "dec_deg": -9.46,
+      "name": { "ko": "에리다누스자리 엡실론 (란)", "en": "Epsilon Eridani (Ran)" },
+      "category": "neighbor",
+      "distance_ly": 10.5,
+      "stars": [
+        { "name": "에리다누스자리 엡실론", "spectral": "K2V", "mass_sun": 0.82, "luminosity_sun": 0.34, "teff_k": 5080 }
+      ],
+      "planets": [
+        { "name": "Epsilon Eridani b (에기르)", "status": "confirmed", "a_au": 3.5, "period_d": 2690, "mass_earth": null, "note": "목성 질량의 약 0.6~0.8배 거대행성" }
+      ],
+      "features": ["나이 약 4~8억 년의 젊은 항성", "다중 잔해 원반 — 안쪽 소행성대 + 외곽 고리(약 70 AU)"],
+      "game_hook": "잔해 원반 = 자원 풍부한 채굴 중심지. 젊은 계라 생명이 있다면 원시 단계",
+      "confidence": "high"
+    },
+    {
+      "id": "lacaille_9352",
+      "ra_deg": 346.47, "dec_deg": -35.85,
+      "name": { "ko": "라카유 9352 (GJ 887)", "en": "Lacaille 9352 (GJ 887)" },
+      "category": "neighbor",
+      "distance_ly": 10.7,
+      "stars": [
+        { "name": "라카유 9352", "spectral": "M0.5V", "mass_sun": 0.49, "luminosity_sun": 0.037, "teff_k": 3700 }
+      ],
+      "planets": [
+        { "name": "GJ 887 b", "status": "confirmed", "a_au": null, "period_d": 9.26, "mass_earth": 4.2, "note": "슈퍼지구" },
+        { "name": "GJ 887 c", "status": "confirmed", "a_au": null, "period_d": 21.8, "mass_earth": 7.6, "note": "슈퍼지구" }
+      ],
+      "features": ["플레어 활동이 매우 적은 조용한 적색왜성"],
+      "game_hook": "플레어가 적은 '안전 항구' — 장기 거주구 건설에 유리",
+      "confidence": "medium"
+    },
+    {
+      "id": "ross_128",
+      "ra_deg": 176.94, "dec_deg": 0.80,
+      "name": { "ko": "로스 128", "en": "Ross 128" },
+      "category": "neighbor",
+      "distance_ly": 11.0,
+      "stars": [
+        { "name": "로스 128", "spectral": "M4V", "mass_sun": 0.17, "luminosity_sun": 0.0036, "teff_k": 3190 }
+      ],
+      "planets": [
+        { "name": "Ross 128 b", "status": "confirmed", "a_au": 0.0496, "period_d": 9.87, "mass_earth": 1.4, "note": "온화한 지구급 행성" }
+      ],
+      "features": ["비교적 조용한 적색왜성"],
+      "game_hook": "온화한 행성 + 낮은 활동성 — 초기 성간 식민지 최적 후보 중 하나",
+      "confidence": "high"
+    },
+    {
+      "id": "61_cygni",
+      "ra_deg": 316.73, "dec_deg": 38.75,
+      "name": { "ko": "백조자리 61", "en": "61 Cygni" },
+      "category": "neighbor",
+      "distance_ly": 11.4,
+      "stars": [
+        { "name": "백조자리 61 A", "spectral": "K5V", "mass_sun": 0.70, "luminosity_sun": 0.15, "teff_k": 4500 },
+        { "name": "백조자리 61 B", "spectral": "K7V", "mass_sun": 0.63, "luminosity_sun": 0.085, "teff_k": 4100 }
+      ],
+      "planets": [],
+      "features": ["1838년 베셀이 처음으로 연주시차(별까지의 거리)를 측정한 별", "공전주기 수백 년의 넓은 쌍성"],
+      "game_hook": "천문학사의 상징 — 문화·역사 보너스 이벤트",
+      "confidence": "high"
+    },
+    {
+      "id": "procyon",
+      "ra_deg": 114.83, "dec_deg": 5.22,
+      "name": { "ko": "프로키온", "en": "Procyon" },
+      "category": "neighbor",
+      "distance_ly": 11.46,
+      "stars": [
+        { "name": "프로키온 A", "spectral": "F5IV-V", "mass_sun": 1.50, "luminosity_sun": 6.9, "teff_k": 6530 },
+        { "name": "프로키온 B", "spectral": "DQZ (백색왜성)", "mass_sun": 0.60, "luminosity_sun": 0.0005, "teff_k": null }
+      ],
+      "planets": [],
+      "features": ["주계열 말기 — 준거성으로 진화 중", "백색왜성 동반성 (공전주기 약 41년)"],
+      "game_hook": "밝은 에너지원이지만 천문학적 기준으로 '곧' 팽창할 별 — 장기 리스크",
+      "confidence": "high"
+    },
+    {
+      "id": "epsilon_indi",
+      "ra_deg": 330.84, "dec_deg": -56.79,
+      "name": { "ko": "인디언자리 엡실론", "en": "Epsilon Indi" },
+      "category": "neighbor",
+      "distance_ly": 11.87,
+      "stars": [
+        { "name": "인디언자리 엡실론 A", "spectral": "K5V", "mass_sun": 0.76, "luminosity_sun": 0.22, "teff_k": 4650 },
+        { "name": "인디언자리 엡실론 Ba·Bb", "spectral": "T1 + T6 (갈색왜성 쌍)", "mass_sun": null, "luminosity_sun": null, "teff_k": null }
+      ],
+      "planets": [
+        { "name": "Epsilon Indi Ab", "status": "confirmed", "a_au": null, "period_d": null, "mass_earth": null, "note": "2024년 JWST 직접촬영. 목성의 수 배 질량, 약 2 °C의 차가운 거대행성" }
+      ],
+      "features": ["주성에서 약 1,500 AU 떨어진 갈색왜성 쌍성"],
+      "game_hook": "갈색왜성 = 수소·중수소 연료 기지. 차가운 거대행성 Ab의 위성 탐사",
+      "confidence": "medium"
+    },
+    {
+      "id": "tau_ceti",
+      "ra_deg": 26.02, "dec_deg": -15.94,
+      "name": { "ko": "고래자리 타우", "en": "Tau Ceti" },
+      "category": "neighbor",
+      "distance_ly": 11.9,
+      "stars": [
+        { "name": "고래자리 타우", "spectral": "G8V", "mass_sun": 0.78, "luminosity_sun": 0.52, "teff_k": 5340 }
+      ],
+      "planets": [
+        { "name": "Tau Ceti e", "status": "candidate", "a_au": 0.538, "period_d": 162.9, "mass_earth": 3.9, "note": "거주가능영역 안쪽 경계 부근" },
+        { "name": "Tau Ceti f", "status": "candidate", "a_au": 1.334, "period_d": 636, "mass_earth": 3.9, "note": "거주가능영역 바깥쪽" }
+      ],
+      "features": ["태양과 닮은 단독 G형 별", "태양계보다 약 10배 짙은 잔해 원반 → 충돌 위험"],
+      "game_hook": "가장 '지구 같은' 목적지처럼 보이지만 소행성·혜성 충돌 위험이 큰 함정 — 행성 방어 기술 필요",
+      "confidence": "medium"
+    },
+    {
+      "id": "gj_1061",
+      "ra_deg": 54.00, "dec_deg": -44.51,
+      "name": { "ko": "GJ 1061", "en": "GJ 1061" },
+      "category": "neighbor",
+      "distance_ly": 12.0,
+      "stars": [
+        { "name": "GJ 1061", "spectral": "M5.5V", "mass_sun": 0.12, "luminosity_sun": null, "teff_k": null }
+      ],
+      "planets": [
+        { "name": "GJ 1061 b", "status": "confirmed", "a_au": null, "period_d": 3.2, "mass_earth": 1.4, "note": "고온" },
+        { "name": "GJ 1061 c", "status": "confirmed", "a_au": null, "period_d": 6.7, "mass_earth": 1.7, "note": "거주가능영역 안" },
+        { "name": "GJ 1061 d", "status": "confirmed", "a_au": null, "period_d": 13.0, "mass_earth": 1.6, "note": "거주가능영역 안" }
+      ],
+      "features": ["거주가능영역 안의 행성 2개"],
+      "game_hook": "이웃한 두 온화 행성 — 같은 계 안의 경쟁·협력 식민지 시나리오",
+      "confidence": "medium"
+    },
+    {
+      "id": "yz_ceti",
+      "ra_deg": 18.13, "dec_deg": -17.00,
+      "name": { "ko": "고래자리 YZ", "en": "YZ Ceti" },
+      "category": "neighbor",
+      "distance_ly": 12.1,
+      "stars": [
+        { "name": "고래자리 YZ", "spectral": "M4.5V", "mass_sun": 0.13, "luminosity_sun": null, "teff_k": null }
+      ],
+      "planets": [
+        { "name": "YZ Ceti b", "status": "confirmed", "a_au": null, "period_d": 2.02, "mass_earth": null, "note": "지구급 이하" },
+        { "name": "YZ Ceti c", "status": "confirmed", "a_au": null, "period_d": 3.06, "mass_earth": null, "note": "지구급" },
+        { "name": "YZ Ceti d", "status": "confirmed", "a_au": null, "period_d": 4.66, "mass_earth": null, "note": "지구급" }
+      ],
+      "features": ["2023년 행성-항성 자기 상호작용으로 추정되는 전파 관측"],
+      "game_hook": "행성 자기장 연구지 — 자기권 보호막 기술 보너스",
+      "confidence": "medium"
+    },
+    {
+      "id": "luytens_star",
+      "ra_deg": 111.85, "dec_deg": 5.23,
+      "name": { "ko": "루이텐 별 (GJ 273)", "en": "Luyten's Star (GJ 273)" },
+      "category": "neighbor",
+      "distance_ly": 12.35,
+      "stars": [
+        { "name": "루이텐 별", "spectral": "M3.5V", "mass_sun": 0.29, "luminosity_sun": 0.0088, "teff_k": 3380 }
+      ],
+      "planets": [
+        { "name": "GJ 273 b", "status": "confirmed", "a_au": null, "period_d": 18.65, "mass_earth": 2.9, "note": "거주가능영역 안의 슈퍼지구" },
+        { "name": "GJ 273 c", "status": "confirmed", "a_au": null, "period_d": 4.72, "mass_earth": 1.2, "note": "고온" }
+      ],
+      "features": ["2017년 인류가 b를 향해 메시지 'Sónar Calling GJ 273b'를 송신 — 2030년경 도착"],
+      "game_hook": "실제 보낸 메시지가 도착하는 별. '답신' 이벤트는 빨라야 2040년대 — 어두운 숲 딜레마의 출발점",
+      "confidence": "medium"
+    },
+    {
+      "id": "teegardens_star",
+      "ra_deg": 43.25, "dec_deg": 16.88,
+      "name": { "ko": "티가든 별", "en": "Teegarden's Star" },
+      "category": "neighbor",
+      "distance_ly": 12.5,
+      "stars": [
+        { "name": "티가든 별", "spectral": "M7V", "mass_sun": 0.097, "luminosity_sun": 0.00073, "teff_k": 2900 }
+      ],
+      "planets": [
+        { "name": "Teegarden's Star b", "status": "confirmed", "a_au": null, "period_d": 4.91, "mass_earth": 1.05, "note": "지구 유사도(ESI)가 매우 높은 행성 중 하나" },
+        { "name": "Teegarden's Star c", "status": "confirmed", "a_au": null, "period_d": 11.4, "mass_earth": 1.1, "note": "거주가능영역 바깥쪽 경계 부근" },
+        { "name": "Teegarden's Star d", "status": "confirmed", "a_au": null, "period_d": 26.1, "mass_earth": 0.8, "note": "2024년 보고" }
+      ],
+      "features": ["2003년에야 발견된 매우 어두운 별"],
+      "game_hook": "'두 번째 지구' 홍보 경쟁 — ESI는 높지만 실제 환경은 직접 가봐야 안다",
+      "confidence": "medium"
+    },
+    {
+      "id": "kapteyns_star",
+      "ra_deg": 77.92, "dec_deg": -45.02,
+      "name": { "ko": "캅테인 별", "en": "Kapteyn's Star" },
+      "category": "neighbor",
+      "distance_ly": 12.8,
+      "stars": [
+        { "name": "캅테인 별", "spectral": "sdM1", "mass_sun": 0.27, "luminosity_sun": 0.012, "teff_k": 3550 }
+      ],
+      "planets": [
+        { "name": "Kapteyn b", "status": "disputed", "a_au": null, "period_d": 48.6, "mass_earth": 4.8, "note": "항성 활동 신호를 오인했을 가능성" }
+      ],
+      "features": ["은하 헤일로 출신의 고속·역행 궤도 항성", "나이 약 110억 년"],
+      "game_hook": "가장 오래된 이웃 — 멸망한 선행 문명 유적 무대",
+      "confidence": "medium"
+    },
+    {
+      "id": "wolf_1061",
+      "ra_deg": 247.58, "dec_deg": -12.67,
+      "name": { "ko": "울프 1061", "en": "Wolf 1061" },
+      "category": "neighbor",
+      "distance_ly": 14.0,
+      "stars": [
+        { "name": "울프 1061", "spectral": "M3V", "mass_sun": 0.29, "luminosity_sun": 0.011, "teff_k": 3340 }
+      ],
+      "planets": [
+        { "name": "Wolf 1061 b", "status": "confirmed", "a_au": null, "period_d": 4.89, "mass_earth": 1.9, "note": "고온" },
+        { "name": "Wolf 1061 c", "status": "confirmed", "a_au": null, "period_d": 17.9, "mass_earth": 3.4, "note": "거주가능영역 안쪽 경계" },
+        { "name": "Wolf 1061 d", "status": "confirmed", "a_au": null, "period_d": 217, "mass_earth": 7.7, "note": "한랭" }
+      ],
+      "features": [],
+      "game_hook": "안쪽 경계의 c — 온실 폭주(금성화) 위험 행성, 기후 공학 시나리오",
+      "confidence": "medium"
+    },
+    {
+      "id": "gliese_876",
+      "ra_deg": 343.32, "dec_deg": -14.26,
+      "name": { "ko": "글리제 876", "en": "Gliese 876" },
+      "category": "neighbor",
+      "distance_ly": 15.2,
+      "stars": [
+        { "name": "글리제 876", "spectral": "M4V", "mass_sun": 0.37, "luminosity_sun": 0.0122, "teff_k": 3130 }
+      ],
+      "planets": [
+        { "name": "Gliese 876 d", "status": "confirmed", "a_au": null, "period_d": 1.94, "mass_earth": 6.8, "note": "고온 슈퍼지구" },
+        { "name": "Gliese 876 c", "status": "confirmed", "a_au": null, "period_d": 30.1, "mass_earth": null, "note": "목성의 약 0.7배 거대행성" },
+        { "name": "Gliese 876 b", "status": "confirmed", "a_au": null, "period_d": 61.1, "mass_earth": null, "note": "목성의 약 2배 거대행성" },
+        { "name": "Gliese 876 e", "status": "confirmed", "a_au": null, "period_d": 124, "mass_earth": 15, "note": "천왕성급" }
+      ],
+      "features": ["c–b–e가 1:2:4 라플라스 공명"],
+      "game_hook": "적색왜성의 거대행성 공명계 — 위성 도시 + 정밀한 중력 도움 항로",
+      "confidence": "medium"
+    },
+    {
+      "id": "gliese_581",
+      "ra_deg": 229.86, "dec_deg": -7.72,
+      "name": { "ko": "글리제 581", "en": "Gliese 581" },
+      "category": "neighbor",
+      "distance_ly": 20.5,
+      "stars": [
+        { "name": "글리제 581", "spectral": "M3V", "mass_sun": 0.31, "luminosity_sun": 0.013, "teff_k": 3480 }
+      ],
+      "planets": [
+        { "name": "Gliese 581 e", "status": "confirmed", "a_au": null, "period_d": 3.15, "mass_earth": 1.7, "note": "고온" },
+        { "name": "Gliese 581 b", "status": "confirmed", "a_au": null, "period_d": 5.37, "mass_earth": 16, "note": "해왕성급" },
+        { "name": "Gliese 581 c", "status": "confirmed", "a_au": null, "period_d": 12.9, "mass_earth": 5.5, "note": "온실 폭주 가능성" },
+        { "name": "Gliese 581 d", "status": "disputed", "a_au": null, "period_d": 66.6, "mass_earth": 6.1, "note": "'거주 가능 행성'으로 보도됐으나 항성 활동 착시로 반박" }
+      ],
+      "features": ["2008년 메시지 'A Message From Earth'를 c를 향해 송신 — 2029년경 도착"],
+      "game_hook": "데이터 신뢰도 테마 — 오보를 근거로 출발한 식민선의 비극 이벤트",
+      "confidence": "medium"
+    },
+    {
+      "id": "gliese_667c",
+      "ra_deg": 259.74, "dec_deg": -34.99,
+      "name": { "ko": "글리제 667 C", "en": "Gliese 667 C" },
+      "category": "neighbor",
+      "distance_ly": 23.6,
+      "stars": [
+        { "name": "글리제 667 C", "spectral": "M1.5V", "mass_sun": 0.33, "luminosity_sun": 0.014, "teff_k": 3350 },
+        { "name": "글리제 667 A·B", "spectral": "K3V + K5V", "mass_sun": null, "luminosity_sun": null, "teff_k": null }
+      ],
+      "planets": [
+        { "name": "Gliese 667 Cb", "status": "confirmed", "a_au": null, "period_d": 7.2, "mass_earth": 5.6, "note": "고온" },
+        { "name": "Gliese 667 Cc", "status": "confirmed", "a_au": null, "period_d": 28.1, "mass_earth": 3.8, "note": "거주가능영역 안" }
+      ],
+      "features": ["삼중성계 — 행성 하늘에 밝은 K형 별 두 개가 뜬다"],
+      "game_hook": "'세 개의 태양' 하늘 — 문화·예술 보너스와 복잡한 궤도 역학",
+      "confidence": "medium"
+    },
+    {
+      "id": "trappist_1",
+      "ra_deg": 346.62, "dec_deg": -5.04,
+      "name": { "ko": "트라피스트-1", "en": "TRAPPIST-1" },
+      "category": "notable",
+      "distance_ly": 40.7,
+      "stars": [
+        { "name": "트라피스트-1", "spectral": "M8V", "mass_sun": 0.0898, "luminosity_sun": 0.000553, "teff_k": 2570 }
+      ],
+      "planets": [
+        { "name": "TRAPPIST-1 b", "status": "confirmed", "a_au": 0.0115, "period_d": 1.51, "mass_earth": 1.37, "radius_earth": 1.12, "note": "JWST: 두꺼운 대기 없을 가능성" },
+        { "name": "TRAPPIST-1 c", "status": "confirmed", "a_au": 0.0158, "period_d": 2.42, "mass_earth": 1.31, "radius_earth": 1.10, "note": "JWST: 두꺼운 대기 없을 가능성" },
+        { "name": "TRAPPIST-1 d", "status": "confirmed", "a_au": 0.0223, "period_d": 4.05, "mass_earth": 0.39, "radius_earth": 0.79, "note": "" },
+        { "name": "TRAPPIST-1 e", "status": "confirmed", "a_au": 0.0293, "period_d": 6.10, "mass_earth": 0.69, "radius_earth": 0.92, "note": "거주가능영역 안" },
+        { "name": "TRAPPIST-1 f", "status": "confirmed", "a_au": 0.0385, "period_d": 9.21, "mass_earth": 1.04, "radius_earth": 1.05, "note": "거주가능영역 안" },
+        { "name": "TRAPPIST-1 g", "status": "confirmed", "a_au": 0.0468, "period_d": 12.35, "mass_earth": 1.32, "radius_earth": 1.13, "note": "거주가능영역 안" },
+        { "name": "TRAPPIST-1 h", "status": "confirmed", "a_au": 0.0619, "period_d": 18.77, "mass_earth": 0.33, "radius_earth": 0.76, "note": "한랭" }
+      ],
+      "features": ["지구 크기 행성 7개가 공명 사슬로 연결", "이웃 행성 간 거리가 지구–달 거리의 몇 배 수준"],
+      "game_hook": "행성 간 이동이 매우 쉬운 '다행성 문명' 무대 — 한 항성계 안의 7개 도시 국가",
+      "confidence": "high"
+    },
+    {
+      "id": "55_cancri",
+      "ra_deg": 133.15, "dec_deg": 28.33,
+      "name": { "ko": "게자리 55", "en": "55 Cancri" },
+      "category": "notable",
+      "distance_ly": 41,
+      "stars": [
+        { "name": "게자리 55 A", "spectral": "G8V", "mass_sun": 0.91, "luminosity_sun": 0.58, "teff_k": 5200 },
+        { "name": "게자리 55 B", "spectral": "M4.5V", "mass_sun": null, "luminosity_sun": null, "teff_k": null }
+      ],
+      "planets": [
+        { "name": "55 Cancri e", "status": "confirmed", "a_au": null, "period_d": 0.737, "mass_earth": 8, "radius_earth": 1.9, "note": "표면이 녹은 용암 슈퍼지구" }
+      ],
+      "features": ["행성 5개 (외곽에 목성급 거대행성)"],
+      "game_hook": "용암 행성 e = 고온 금속 정련·에너지 기지",
+      "confidence": "medium"
+    },
+    {
+      "id": "lhs_1140",
+      "ra_deg": 11.25, "dec_deg": -15.27,
+      "name": { "ko": "LHS 1140", "en": "LHS 1140" },
+      "category": "notable",
+      "distance_ly": 48.8,
+      "stars": [
+        { "name": "LHS 1140", "spectral": "M4.5V", "mass_sun": 0.18, "luminosity_sun": 0.0038, "teff_k": 3100 }
+      ],
+      "planets": [
+        { "name": "LHS 1140 b", "status": "confirmed", "a_au": null, "period_d": 24.7, "mass_earth": 5.6, "radius_earth": 1.73, "note": "거주가능영역 안, 물 행성(또는 얼음 행성) 가능성" },
+        { "name": "LHS 1140 c", "status": "confirmed", "a_au": null, "period_d": 3.78, "mass_earth": 1.9, "note": "고온" }
+      ],
+      "features": [],
+      "game_hook": "바다 행성 후보 — 해양 도시·수중 거주구 시나리오",
+      "confidence": "medium"
+    },
+    {
+      "id": "51_pegasi",
+      "ra_deg": 344.37, "dec_deg": 20.77,
+      "name": { "ko": "페가수스자리 51", "en": "51 Pegasi" },
+      "category": "notable",
+      "distance_ly": 50.6,
+      "stars": [
+        { "name": "페가수스자리 51", "spectral": "G5V", "mass_sun": 1.11, "luminosity_sun": 1.36, "teff_k": 5770 }
+      ],
+      "planets": [
+        { "name": "51 Pegasi b (디미디움)", "status": "confirmed", "a_au": null, "period_d": 4.23, "mass_earth": null, "note": "목성 질량의 약 절반인 '뜨거운 목성'" }
+      ],
+      "features": ["1995년 발견된, 태양형 별을 도는 최초의 외계행성 (2019년 노벨 물리학상)"],
+      "game_hook": "'최초의 외계행성' 기념비 — 문화 유산 이벤트",
+      "confidence": "high"
+    },
+    {
+      "id": "k2_18",
+      "ra_deg": 172.56, "dec_deg": 7.59,
+      "name": { "ko": "K2-18", "en": "K2-18" },
+      "category": "notable",
+      "distance_ly": 124,
+      "stars": [
+        { "name": "K2-18", "spectral": "M2.5V", "mass_sun": 0.50, "luminosity_sun": 0.024, "teff_k": 3460 }
+      ],
+      "planets": [
+        { "name": "K2-18 b", "status": "confirmed", "a_au": null, "period_d": 32.9, "mass_earth": 8.6, "radius_earth": 2.6, "note": "거주가능영역 안의 미니 해왕성" }
+      ],
+      "features": ["JWST가 대기에서 메탄·이산화탄소 검출 (2023)", "생명 지표 후보(DMS) 검출 주장 — 학계 논쟁 중"],
+      "game_hook": "'생명 신호 논쟁' 이벤트의 원형 — 확증 전에 발표할 것인가?",
+      "confidence": "medium"
+    },
+    {
+      "id": "kepler_452",
+      "ra_deg": 296.00, "dec_deg": 44.28,
+      "name": { "ko": "케플러-452", "en": "Kepler-452" },
+      "category": "notable",
+      "distance_ly": 1800,
+      "stars": [
+        { "name": "케플러-452", "spectral": "G2V", "mass_sun": 1.04, "luminosity_sun": 1.2, "teff_k": 5760 }
+      ],
+      "planets": [
+        { "name": "Kepler-452 b", "status": "confirmed", "a_au": null, "period_d": 385, "mass_earth": null, "radius_earth": 1.6, "note": "태양형 별의 거주가능영역을 도는 슈퍼지구" }
+      ],
+      "features": ["'지구의 사촌'으로 알려짐 (거리 추정치는 약 1,400~1,800광년)"],
+      "game_hook": "원거리 장기 목표 — 성간 시대 후반의 상징적 원정지",
+      "confidence": "medium"
+    },
+    {
+      "id": "tabbys_star",
+      "ra_deg": 301.56, "dec_deg": 44.46,
+      "name": { "ko": "타비의 별 (KIC 8462852)", "en": "Tabby's Star (KIC 8462852)" },
+      "category": "landmark",
+      "distance_ly": 1470,
+      "stars": [
+        { "name": "KIC 8462852", "spectral": "F3V", "mass_sun": 1.43, "luminosity_sun": 4.7, "teff_k": 6750 }
+      ],
+      "planets": [],
+      "features": ["최대 약 22%의 불규칙 감광 — 현재는 먼지 가설이 유력"],
+      "game_hook": "'외계 메가구조물인가?' 조사 이벤트",
+      "confidence": "medium"
+    },
+    {
+      "id": "betelgeuse",
+      "ra_deg": 88.79, "dec_deg": 7.41,
+      "name": { "ko": "베텔게우스", "en": "Betelgeuse" },
+      "category": "landmark",
+      "distance_ly": 550,
+      "stars": [
+        { "name": "베텔게우스", "spectral": "M1-2 Ia-ab (적색 초거성)", "mass_sun": 17, "luminosity_sun": 100000, "teff_k": 3600 }
+      ],
+      "planets": [],
+      "features": ["거리 추정치 약 500~700광년", "2019~2020년 '대감광'(먼지 방출)", "10만 년 안에 초신성이 될 수 있음"],
+      "game_hook": "초신성 관측 이벤트 — 지구엔 무해할 만큼 멀지만 과학 보너스는 막대",
+      "confidence": "medium"
+    },
+    {
+      "id": "sgr_a_star",
+      "ra_deg": 266.42, "dec_deg": -29.01,
+      "name": { "ko": "궁수자리 A* (은하 중심)", "en": "Sagittarius A* (Galactic Center)" },
+      "category": "landmark",
+      "distance_ly": 26000,
+      "stars": [
+        { "name": "궁수자리 A*", "spectral": "초대질량 블랙홀", "mass_sun": 4300000, "luminosity_sun": null, "teff_k": null }
+      ],
+      "planets": [],
+      "features": ["2022년 사건의 지평선 망원경(EHT)이 블랙홀 그림자 촬영"],
+      "game_hook": "엔드게임 목표 — 펜로즈 과정 에너지, '은하 중심 원정'",
+      "confidence": "high"
+    }
+  ]
+}

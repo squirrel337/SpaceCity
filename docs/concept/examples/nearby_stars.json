@@ -5,6 +5,7 @@
     "verify_before_release": "출시 전 SIMBAD, Gaia DR3, NASA Exoplanet Archive로 수치를 교차 검증할 것. status가 candidate/disputed인 행성은 특히 주의.",
     "units": {
       "distance_ly": "광년",
+      "ra_deg/dec_deg": "적경·적위 (도, J2000 적도 좌표, 근사값)",
       "mass_sun": "태양질량",
       "luminosity_sun": "태양광도 (null이면 생성기가 질량으로 추정)",
       "teff_k": "유효온도 K",
@@ -27,6 +28,7 @@
   "systems": [
     {
       "id": "alpha_centauri",
+      "ra_deg": 219.90, "dec_deg": -60.83,
       "name": { "ko": "알파 센타우리 AB", "en": "Alpha Centauri AB" },
       "category": "neighbor",
       "distance_ly": 4.37,
@@ -43,6 +45,7 @@
     },
     {
       "id": "proxima_centauri",
+      "ra_deg": 217.43, "dec_deg": -62.68,
       "name": { "ko": "프록시마 센타우리", "en": "Proxima Centauri" },
       "category": "neighbor",
       "distance_ly": 4.25,
@@ -60,6 +63,7 @@
     },
     {
       "id": "barnards_star",
+      "ra_deg": 269.45, "dec_deg": 4.69,
       "name": { "ko": "바너드 별", "en": "Barnard's Star" },
       "category": "neighbor",
       "distance_ly": 5.96,
@@ -78,6 +82,7 @@
     },
     {
       "id": "wolf_359",
+      "ra_deg": 164.12, "dec_deg": 7.01,
       "name": { "ko": "울프 359", "en": "Wolf 359" },
       "category": "neighbor",
       "distance_ly": 7.86,
@@ -91,6 +96,7 @@
     },
     {
       "id": "lalande_21185",
+      "ra_deg": 165.83, "dec_deg": 35.97,
       "name": { "ko": "랄랑드 21185", "en": "Lalande 21185" },
       "category": "neighbor",
       "distance_ly": 8.31,
@@ -107,6 +113,7 @@
     },
     {
       "id": "sirius",
+      "ra_deg": 101.29, "dec_deg": -16.72,
       "name": { "ko": "시리우스", "en": "Sirius" },
       "category": "neighbor",
       "distance_ly": 8.6,
@@ -121,6 +128,7 @@
     },
     {
       "id": "luyten_726_8",
+      "ra_deg": 24.75, "dec_deg": -17.95,
       "name": { "ko": "루이텐 726-8 (고래자리 BL·UV)", "en": "Luyten 726-8 (BL Ceti & UV Ceti)" },
       "category": "neighbor",
       "distance_ly": 8.7,
@@ -135,6 +143,7 @@
     },
     {
       "id": "ross_248",
+      "ra_deg": 355.48, "dec_deg": 44.17,
       "name": { "ko": "로스 248", "en": "Ross 248" },
       "category": "neighbor",
       "distance_ly": 10.3,
@@ -148,6 +157,7 @@
     },
     {
       "id": "epsilon_eridani",
+      "ra_deg": 53.23, "dec_deg": -9.46,
       "name": { "ko": "에리다누스자리 엡실론 (란)", "en": "Epsilon Eridani (Ran)" },
       "category": "neighbor",
       "distance_ly": 10.5,
@@ -163,6 +173,7 @@
     },
     {
       "id": "lacaille_9352",
+      "ra_deg": 346.47, "dec_deg": -35.85,
       "name": { "ko": "라카유 9352 (GJ 887)", "en": "Lacaille 9352 (GJ 887)" },
       "category": "neighbor",
       "distance_ly": 10.7,
@@ -179,6 +190,7 @@
     },
     {
       "id": "ross_128",
+      "ra_deg": 176.94, "dec_deg": 0.80,
       "name": { "ko": "로스 128", "en": "Ross 128" },
       "category": "neighbor",
       "distance_ly": 11.0,
@@ -194,6 +206,7 @@
     },
     {
       "id": "61_cygni",
+      "ra_deg": 316.73, "dec_deg": 38.75,
       "name": { "ko": "백조자리 61", "en": "61 Cygni" },
       "category": "neighbor",
       "distance_ly": 11.4,
@@ -208,6 +221,7 @@
     },
     {
       "id": "procyon",
+      "ra_deg": 114.83, "dec_deg": 5.22,
       "name": { "ko": "프로키온", "en": "Procyon" },
       "category": "neighbor",
       "distance_ly": 11.46,
@@ -222,6 +236,7 @@
     },
     {
       "id": "epsilon_indi",
+      "ra_deg": 330.84, "dec_deg": -56.79,
       "name": { "ko": "인디언자리 엡실론", "en": "Epsilon Indi" },
       "category": "neighbor",
       "distance_ly": 11.87,
@@ -238,6 +253,7 @@
     },
     {
       "id": "tau_ceti",
+      "ra_deg": 26.02, "dec_deg": -15.94,
       "name": { "ko": "고래자리 타우", "en": "Tau Ceti" },
       "category": "neighbor",
       "distance_ly": 11.9,
@@ -254,6 +270,7 @@
     },
     {
       "id": "gj_1061",
+      "ra_deg": 54.00, "dec_deg": -44.51,
       "name": { "ko": "GJ 1061", "en": "GJ 1061" },
       "category": "neighbor",
       "distance_ly": 12.0,
@@ -271,6 +288,7 @@
     },
     {
       "id": "yz_ceti",
+      "ra_deg": 18.13, "dec_deg": -17.00,
       "name": { "ko": "고래자리 YZ", "en": "YZ Ceti" },
       "category": "neighbor",
       "distance_ly": 12.1,
@@ -288,6 +306,7 @@
     },
     {
       "id": "luytens_star",
+      "ra_deg": 111.85, "dec_deg": 5.23,
       "name": { "ko": "루이텐 별 (GJ 273)", "en": "Luyten's Star (GJ 273)" },
       "category": "neighbor",
       "distance_ly": 12.35,
@@ -304,6 +323,7 @@
     },
     {
       "id": "teegardens_star",
+      "ra_deg": 43.25, "dec_deg": 16.88,
       "name": { "ko": "티가든 별", "en": "Teegarden's Star" },
       "category": "neighbor",
       "distance_ly": 12.5,
@@ -321,6 +341,7 @@
     },
     {
       "id": "kapteyns_star",
+      "ra_deg": 77.92, "dec_deg": -45.02,
       "name": { "ko": "캅테인 별", "en": "Kapteyn's Star" },
       "category": "neighbor",
       "distance_ly": 12.8,
@@ -336,6 +357,7 @@
     },
     {
       "id": "wolf_1061",
+      "ra_deg": 247.58, "dec_deg": -12.67,
       "name": { "ko": "울프 1061", "en": "Wolf 1061" },
       "category": "neighbor",
       "distance_ly": 14.0,
@@ -353,6 +375,7 @@
     },
     {
       "id": "gliese_876",
+      "ra_deg": 343.32, "dec_deg": -14.26,
       "name": { "ko": "글리제 876", "en": "Gliese 876" },
       "category": "neighbor",
       "distance_ly": 15.2,
@@ -371,6 +394,7 @@
     },
     {
       "id": "gliese_581",
+      "ra_deg": 229.86, "dec_deg": -7.72,
       "name": { "ko": "글리제 581", "en": "Gliese 581" },
       "category": "neighbor",
       "distance_ly": 20.5,
@@ -389,6 +413,7 @@
     },
     {
       "id": "gliese_667c",
+      "ra_deg": 259.74, "dec_deg": -34.99,
       "name": { "ko": "글리제 667 C", "en": "Gliese 667 C" },
       "category": "neighbor",
       "distance_ly": 23.6,
@@ -406,6 +431,7 @@
     },
     {
       "id": "trappist_1",
+      "ra_deg": 346.62, "dec_deg": -5.04,
       "name": { "ko": "트라피스트-1", "en": "TRAPPIST-1" },
       "category": "notable",
       "distance_ly": 40.7,
@@ -427,6 +453,7 @@
     },
     {
       "id": "55_cancri",
+      "ra_deg": 133.15, "dec_deg": 28.33,
       "name": { "ko": "게자리 55", "en": "55 Cancri" },
       "category": "notable",
       "distance_ly": 41,
@@ -443,6 +470,7 @@
     },
     {
       "id": "lhs_1140",
+      "ra_deg": 11.25, "dec_deg": -15.27,
       "name": { "ko": "LHS 1140", "en": "LHS 1140" },
       "category": "notable",
       "distance_ly": 48.8,
@@ -459,6 +487,7 @@
     },
     {
       "id": "51_pegasi",
+      "ra_deg": 344.37, "dec_deg": 20.77,
       "name": { "ko": "페가수스자리 51", "en": "51 Pegasi" },
       "category": "notable",
       "distance_ly": 50.6,
@@ -474,6 +503,7 @@
     },
     {
       "id": "k2_18",
+      "ra_deg": 172.56, "dec_deg": 7.59,
       "name": { "ko": "K2-18", "en": "K2-18" },
       "category": "notable",
       "distance_ly": 124,
@@ -489,6 +519,7 @@
     },
     {
       "id": "kepler_452",
+      "ra_deg": 296.00, "dec_deg": 44.28,
       "name": { "ko": "케플러-452", "en": "Kepler-452" },
       "category": "notable",
       "distance_ly": 1800,
@@ -504,6 +535,7 @@
     },
     {
       "id": "tabbys_star",
+      "ra_deg": 301.56, "dec_deg": 44.46,
       "name": { "ko": "타비의 별 (KIC 8462852)", "en": "Tabby's Star (KIC 8462852)" },
       "category": "landmark",
       "distance_ly": 1470,
@@ -517,6 +549,7 @@
     },
     {
       "id": "betelgeuse",
+      "ra_deg": 88.79, "dec_deg": 7.41,
       "name": { "ko": "베텔게우스", "en": "Betelgeuse" },
       "category": "landmark",
       "distance_ly": 550,
@@ -530,6 +563,7 @@
     },
     {
       "id": "sgr_a_star",
+      "ra_deg": 266.42, "dec_deg": -29.01,
       "name": { "ko": "궁수자리 A* (은하 중심)", "en": "Sagittarius A* (Galactic Center)" },
       "category": "landmark",
       "distance_ly": 26000,
