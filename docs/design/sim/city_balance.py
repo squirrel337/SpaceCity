@@ -771,8 +771,8 @@ class City:
     def space_weather(self, day):
         spe = C["spe"]
         activity = solar_activity(self.year())
-        major = spe["major_rate_per_year"][0] + spe["major_rate_per_year"][1] * activity
-        minor = spe["minor_rate_per_year"][0] + spe["minor_rate_per_year"][1] * activity
+        major = spe["major_rate_per_year"]["solar_min"] + spe["major_rate_per_year"]["added_at_solar_max"] * activity
+        minor = spe["minor_rate_per_year"]["solar_min"] + spe["minor_rate_per_year"]["added_at_solar_max"] * activity
         if day == spe["scripted_major_day"] or self.rng.random() < major / 365.25:
             self.solar_storm(spe["major_dose_msv"], "major")
         elif self.rng.random() < minor / 365.25:
@@ -990,15 +990,16 @@ def module_table():
     names = {"habitat": "거주", "life_support": "생명유지", "food": "식량", "power": "전력",
              "thermal": "열", "industry": "산업", "logistics": "물류", "safety": "안전",
              "research": "연구", "social": "사회"}
-    print("| 모듈 | 분류 | 절전 순위 | 필요 기술 | 시작 | 비용 | 건설 (로봇·일) | 전력 (kW) | 인원 | 고장 간격 (일) | 기능 |")
-    print("|---|---|---|---|---|---|---|---|---|---|---|")
+    print("| 모듈 | 분류 | 절전 순위 | 필요 기술 | 시작 | 비용 | 건설 (로봇·일) | 전력 (kW) | 인원 | 고장 간격 (일) "
+          "| 수리 (부품 · 로봇·일) | 기능 |")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|")
     units = (("parts", "부품 {}"), ("regolith_t", "레골리스 {} t"), ("metal_t", "금속 {} t"))
     for m in MODULES.values():
         cost = " + ".join(fmt.format(m["cost"][k]) for k, fmt in units if m["cost"].get(k))
         tech = TECHS[m["tech"]]["name"] if m["tech"] else "–"
         print(f"| {m['name']} | {names[m['category']]} | {m['priority'] or '–'} | {tech} | {m['start'] or '–'} | "
               f"{cost} | {m['build_rd']:g} | {m['power_kw'] or '–'} | {m['crew'] or '–'} | {m['mtbf_days']:,} | "
-              f"{describe(m)} |")
+              f"{m['repair']['parts']} · {m['repair']['rd']:g} | {describe(m)} |")
 
 
 RESOURCE_KO = {"o2_kg": "산소", "h2_kg": "수소", "water_kg": "물", "co2_kg": "CO₂", "ch4_kg": "메탄",

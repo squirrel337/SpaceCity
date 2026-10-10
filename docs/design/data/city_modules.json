@@ -93,14 +93,14 @@
     "spe": {
       "cycle_max_year": 2069,
       "cycle_years": 11,
-      "major_rate_per_year": [
-        0.08,
-        0.5
-      ],
-      "minor_rate_per_year": [
-        1.0,
-        4.0
-      ],
+      "major_rate_per_year": {
+        "solar_min": 0.08,
+        "added_at_solar_max": 0.5
+      },
+      "minor_rate_per_year": {
+        "solar_min": 1.0,
+        "added_at_solar_max": 4.0
+      },
       "major_dose_msv": 300,
       "minor_dose_msv": 20,
       "shelter_factor": 0.02,
@@ -639,7 +639,7 @@
       "provides": {
         "print_t_day": 20
       },
-      "note": "돔·대피소·착륙장처럼 레골리스가 들어가는 구조물은 프린터가 하루 20 t씩 쌓는다"
+      "note": "돔은 프린터가 하루 20 t씩 쌓는다. 대피소·착륙장은 로봇이 레골리스 자루를 쌓아 짓는다"
     },
     {
       "id": "mre_plant",
@@ -768,7 +768,7 @@
         "parts": 2,
         "rd": 2
       },
-      "note": "소결한 착륙장. 없으면 착륙 분사가 먼지를 일으켜 주변 설비 고장률이 오른다",
+      "note": "레골리스를 다지고 자루로 둘레를 쌓은 착륙장. 없으면 착륙 분사가 먼지를 일으켜 주변 설비 고장률이 오른다",
       "provides": {
         "landing_slots": 1
       }

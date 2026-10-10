@@ -44,7 +44,7 @@
   .hyp .bar { position: absolute; left: 12px; right: 12px; bottom: 12px; height: 8px; border-radius: 4px; background: #2a245c; overflow: hidden; }
   .hyp .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); border-radius: 4px; }
   .hyp.lead { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(233,196,106,0.4), 0 0 30px rgba(233,196,106,0.12); }
-  .hyp.out { opacity: 0.45; } .hyp.out .pct { text-decoration: line-through; color: var(--muted); }
+  .hyp.out { opacity: 0.45; } .hyp.out .pct { color: var(--muted); }
   .clues { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .clue { background: #141036; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; position: relative; min-height: 112px; }
   .clue h4 { font-size: 13.5px; } .clue .src { color: var(--muted); font-size: 11.5px; margin: 3px 0 8px; }
@@ -80,7 +80,7 @@
     <div class="stat"><b>41곳</b><i>식민지</i></div>
     <div class="stat"><b>6</b><i>독립한 문명</i></div>
     <div class="stat"><b>7장</b><i>단서</i></div>
-    <div class="stat sig"><b>×2만</b><i>적외선 서명 / 문턱</i></div>
+    <div class="stat sig"><b>×12억</b><i>적외선 서명 / 100광년 문턱</i></div>
     <div class="stat"><b>68</b><i>신뢰</i></div>
   </div>
 </div>
@@ -100,11 +100,11 @@
       <div class="hyp"><h3>초월</h3><small>모두 물리 우주를 떠났다</small><div class="pct">9%</div><div class="bar"><i style="width:9%"></i></div></div>
       <div class="hyp"><h3>동물원</h3><small>지켜보고 있다</small><div class="pct">6%</div><div class="bar"><i style="width:6%"></i></div></div>
       <div class="hyp"><h3>첫 세대</h3><small>우리가 거의 처음이다</small><div class="pct">5%</div><div class="bar"><i style="width:5%"></i></div></div>
-      <div class="hyp out"><h3>희귀 지구</h3><small>배제됨 — 인공 신호가 관측됐다</small><div class="pct">0%</div><div class="bar"><i style="width:0%"></i></div></div>
+      <div class="hyp out"><h3>희귀 지구</h3><small>거의 배제 — 인공 신호가 관측됐다</small><div class="pct">0.2%</div><div class="bar"><i style="width:0%"></i></div></div>
     </div>
     <div class="clues">
       <div class="clue linked"><span class="link">⚠ 연결됨</span><h4>끊긴 신호</h4><div class="src">HD 40307 방향 · 42광년 · 3204년 수신 중단</div>
-        <div class="chips"><span class="chip h">어두운 숲 높음</span><span class="chip h">버서커 높음</span><span class="chip m">필터 중간</span><span class="chip x">희귀 지구 불가능</span></div></div>
+        <div class="chips"><span class="chip h">어두운 숲 높음</span><span class="chip h">버서커 높음</span><span class="chip m">필터 중간</span><span class="chip x">희귀 지구 매우 낮음</span></div></div>
       <div class="clue linked"><span class="link">⚠ 연결됨</span><h4>감마선 섬광</h4><div class="src">HD 40307 방향 · 3219년 관측</div>
         <div class="chips"><span class="chip h">어두운 숲 높음</span><span class="chip m">버서커 중간</span><span class="chip m">필터 중간</span></div></div>
       <div class="clue"><h4>금속 파편 띠</h4><div class="src">글리제 682 · 규칙적인 궤도의 파편</div>
@@ -116,11 +116,11 @@
       <div class="clue"><h4>같은 단계에서 무너진 유적 ×2</h4><div class="src">캅테인 별 · 글리제 667 C</div>
         <div class="chips"><span class="chip h">필터 높음</span><span class="chip m">어두운 숲 중간</span><span class="chip m">버서커 중간</span></div></div>
       <div class="clue"><h4>미생물만 가득한 행성 31곳</h4><div class="src">탐사 단계 4 누적</div>
-        <div class="chips"><span class="chip m">모든 가설 중간</span><span class="chip x">희귀 지구 (배제됨)</span></div></div>
+        <div class="chips"><span class="chip m">모든 가설 중간</span><span class="chip x">희귀 지구 (거의 배제)</span></div></div>
       <div class="clue" style="border-style:dashed;display:grid;place-items:center;color:var(--muted)">단서를 끌어다 놓기</div>
     </div>
     <div class="warn">과신 경고 — '끊긴 신호'와 '감마선 섬광'은 같은 사건(HD 40307)에서 나왔을 수 있다. 둘을 독립으로 세면 어두운 숲의 확률이 과대평가된다. 하나로 묶으면 41%.</div>
-    <div class="calendar"><h3>위협 달력 — 서명이 문턱을 넘은 해 + 빛의 이동 + 상대의 반응 속도</h3><svg id="cal" width="1060" height="130" style="margin-top:10px"></svg></div>
+    <div class="calendar"><h3>위협 달력 — 거리별 문턱을 넘은 해 + 빛의 이동 + 상대의 반응 속도</h3><svg id="cal" width="1060" height="130" style="margin-top:10px"></svg></div>
   </div>
   <div class="side">
     <div class="card">
@@ -157,10 +157,10 @@ el("line", { x1: X0, y1: 52, x2: X1, y2: 52, stroke: "#4a4290", "stroke-width": 
 [2500, 3000, 3500, 4000, 4500, 5000].forEach(y => { el("line", { x1: x(y), y1: 47, x2: x(y), y2: 57, stroke: "#4a4290" }); text(x(y), 74, String(y), { "text-anchor": "middle", fill: "#7c76a3" }); });
 el("rect", { x: x(2300), y: 44, width: x(3612) - x(2300), height: 16, rx: 8, fill: "rgba(242,132,130,0.18)" });
 el("circle", { cx: x(2300), cy: 52, r: 6, fill: "#f28482" });
-text(x(2300) + 10, 22, "2300 적외선 서명 문턱 돌파 (다이슨 스웜 첫 묶음)", { fill: "#ffc9c7" });
+text(x(2300) + 10, 22, "2300 100광년 문턱 (다이슨 스웜 첫 묶음)", { fill: "#ffc9c7" });
 el("line", { x1: x(3612), y1: 30, x2: x(3612), y2: 80, stroke: "#e9c46a", "stroke-width": 2 });
-text(x(3612), 98, "지금 3612 — 탐지 가능 구체 반경 1,312광년", { "text-anchor": "middle", fill: "#f4dc9c", "font-weight": 600 });
-[[3400, "100광년·0.1c", true], [4100, "300광년·0.2c", false], [4467, "500광년·0.3c", false], [5300, "1,000광년·0.5c", false]].forEach(([y, label, past]) => {
+text(x(3612), 98, "지금 3612 — 탐지 가능 구체 반경 약 1,220광년", { "text-anchor": "middle", fill: "#f4dc9c", "font-weight": 600 });
+[[3400, "100광년·0.1c", true], [4142, "300광년·0.2c", false], [4528, "500광년·0.3c", false], [5387, "1,000광년·0.5c", false]].forEach(([y, label, past]) => {
   el("path", { d: `M ${x(y)} 40 l -6 -10 h 12 z`, fill: past ? "#6c6690" : "#f28482" });
   text(x(y), 26, `${label} → ${y}${past ? " (지남)" : ""}`, { "text-anchor": "middle", fill: past ? "#8f89b5" : "#ffc9c7" });
 });
