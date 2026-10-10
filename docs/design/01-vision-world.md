@@ -42,7 +42,7 @@
 
 | 구분 | 누구 | 이 게임에서 얻는 것 |
 |---|---|---|
-| 1차 | 25~45세 PC 전략·시뮬레이션 플레이어 (Frostpunk, Surviving Mars, Stellaris, RimWorld, Oxygen Not Included) | 빠듯한 생존 퍼즐, 장기 계획, 도덕적 딜레마 |
+| 1차 | 25~45세 PC·모바일 전략·시뮬레이션 플레이어 (Frostpunk, Surviving Mars, Stellaris, RimWorld, Oxygen Not Included) | 빠듯한 생존 퍼즐, 장기 계획, 도덕적 딜레마 |
 | 2차 | 하드SF 독자·과학 애호가 (익스팬스, 킴 스탠리 로빈슨의 화성 3부작, 삼체), Kerbal Space Program 플레이어 | 실제 과학으로 굴러가는 규칙, 실제 별과 행성 |
 | 비타깃 | 전투 중심 4X, 실시간 컨트롤을 원하는 플레이어 | — |
 

@@ -1,0 +1,225 @@
+{
+  "_meta": {
+    "description": "시대 0 기술 (밸런스 v0.1). cost는 연구 포인트(RP). plausibility: proven 검증됨 / engineering 공학적 / theoretical 이론적.",
+    "rp_sources": "연구동 연구자 1명당 1 RP/일 + 지구 교신 센터 2 RP/일 + 지구 공동 연구 8 RP/일"
+  },
+  "techs": [
+    {
+      "id": "sintered_construction",
+      "name": "레골리스 소결 건축",
+      "category": "건설",
+      "plausibility": "engineering",
+      "cost": 900,
+      "requires": [],
+      "effect": "레골리스 3D 프린터·레골리스 차폐 돔 해금",
+      "science_note": "레골리스를 마이크로파·레이저로 녹여 붙이는 소결·적층 건축이 지상 시험에서 시연됐다."
+    },
+    {
+      "id": "regenerative_fuel_cell",
+      "name": "재생 연료전지",
+      "category": "에너지",
+      "plausibility": "proven",
+      "cost": 800,
+      "requires": [],
+      "effect": "재생 연료전지(2,000 kWh, 왕복 효율 50%) 해금",
+      "science_note": "물 전기분해기와 연료전지를 묶어 수소·산소로 에너지를 저장한다. 긴 밤을 견디는 고전적 해법."
+    },
+    {
+      "id": "space_weather_forecast",
+      "name": "우주 기상 예보",
+      "category": "과학",
+      "plausibility": "proven",
+      "cost": 600,
+      "requires": [],
+      "effect": "태양 양성자 폭풍 경보 시간 2시간 → 8시간",
+      "science_note": "태양 관측 위성으로 플레어와 코로나 질량 방출을 감시해 고에너지 양성자 도착을 미리 알린다."
+    },
+    {
+      "id": "closed_loop_ls2",
+      "name": "폐쇄형 생명유지 II",
+      "category": "생명유지",
+      "plausibility": "proven",
+      "cost": 1800,
+      "requires": [],
+      "effect": "물 재활용률 90% → 98%",
+      "science_note": "국제우주정거장은 2023년 물 회수율 98%를 달성했다."
+    },
+    {
+      "id": "sunlight_piping",
+      "name": "자연광 도입",
+      "category": "생물",
+      "plausibility": "engineering",
+      "cost": 2000,
+      "requires": [],
+      "effect": "햇빛이 드는 시간에 수경 농장 전력 −40%",
+      "science_note": "집광기와 광섬유로 햇빛을 농장 안으로 끌어온다."
+    },
+    {
+      "id": "algae_bioreactor",
+      "name": "조류 생물반응기",
+      "category": "생물",
+      "plausibility": "proven",
+      "cost": 1500,
+      "requires": [],
+      "effect": "조류 생물반응기 해금",
+      "science_note": "유럽우주국의 MELiSSA 계획은 미생물·조류로 닫힌 생태 순환을 연구해 왔다."
+    },
+    {
+      "id": "autonomous_robots_2",
+      "name": "자율 건설 로봇 II",
+      "category": "로봇",
+      "plausibility": "engineering",
+      "cost": 1800,
+      "requires": [],
+      "effect": "로봇 작업량 ×1.5",
+      "science_note": "지구와의 2.6초 왕복 지연 없이 현장에서 스스로 판단하는 자율 로봇."
+    },
+    {
+      "id": "robot_fabrication",
+      "name": "로봇 자가 제작",
+      "category": "로봇",
+      "plausibility": "engineering",
+      "cost": 6000,
+      "requires": [
+        "autonomous_robots_2"
+      ],
+      "effect": "로봇 정비고에서 부품 5로 로봇 제작",
+      "science_note": "자기복제 공장 구상은 1980년 NASA 여름 연구 '우주 임무의 고도 자동화'에서 다뤄졌다."
+    },
+    {
+      "id": "molten_regolith_electrolysis",
+      "name": "용융 레골리스 전해",
+      "category": "산업",
+      "plausibility": "engineering",
+      "cost": 5000,
+      "requires": [
+        "sintered_construction"
+      ],
+      "effect": "용융 레골리스 전해조 해금 (금속 + 산소)",
+      "science_note": "달 레골리스는 질량의 40% 이상이 산소다. 녹여서 전기분해하면 산소와 금속을 함께 얻는다."
+    },
+    {
+      "id": "local_manufacturing",
+      "name": "현지 부품 제조",
+      "category": "산업",
+      "plausibility": "engineering",
+      "cost": 7000,
+      "requires": [
+        "molten_regolith_electrolysis"
+      ],
+      "effect": "부품 공장 해금 — 지구 의존 탈피의 시작",
+      "science_note": "금속 적층 제조로 펌프·밸브 같은 부품을 현지에서 찍어 낸다."
+    },
+    {
+      "id": "polar_prospecting",
+      "name": "극지 자원 탐사",
+      "category": "과학",
+      "plausibility": "proven",
+      "cost": 1000,
+      "requires": [],
+      "effect": "더 짙은 얼음층 발견 — 얼음 채굴기 생산량 +40%",
+      "science_note": "2009년 LCROSS 충돌 실험은 카베우스 크레이터 분출물에서 질량 약 5.6%의 물을 확인했다."
+    },
+    {
+      "id": "shielding_2",
+      "name": "차폐 대피소 II",
+      "category": "건설",
+      "plausibility": "engineering",
+      "cost": 1500,
+      "requires": [
+        "sintered_construction"
+      ],
+      "effect": "폭풍 대피소 수용 +50%",
+      "science_note": "수소가 많은 물질(물, 폴리에틸렌)과 레골리스를 겹친 다층 차폐."
+    },
+    {
+      "id": "tall_towers",
+      "name": "수직 태양광 타워 II",
+      "category": "에너지",
+      "plausibility": "engineering",
+      "cost": 4000,
+      "requires": [],
+      "effect": "태양광 타워 출력 +20%",
+      "science_note": "극지에서는 높이가 곧 햇빛이다. 수십 m 높이의 돛대는 지형 그림자를 넘어선다."
+    },
+    {
+      "id": "megawatt_fission",
+      "name": "메가와트급 원자로",
+      "category": "에너지",
+      "plausibility": "engineering",
+      "cost": 15000,
+      "requires": [
+        "local_manufacturing"
+      ],
+      "effect": "메가와트급 원자로 해금",
+      "science_note": "1 MW급 표면 원자로는 산업 규모 정착지의 기본 전원으로 연구된다."
+    },
+    {
+      "id": "cryogenic_propellant",
+      "name": "극저온 추진제 생산",
+      "category": "산업",
+      "plausibility": "engineering",
+      "cost": 5000,
+      "requires": [],
+      "effect": "추진제 공장 해금 — 지구 궤도 수출",
+      "science_note": "달 극지의 물은 지구 궤도의 '주유소'가 될 수 있다. 달에서 올리는 편이 지구에서 올리는 것보다 훨씬 싸다."
+    },
+    {
+      "id": "low_g_medicine",
+      "name": "저중력 의학",
+      "category": "의학",
+      "plausibility": "theoretical",
+      "cost": 6000,
+      "requires": [],
+      "effect": "골밀도 감소 완화, '달 출생 허가' 법령의 전제",
+      "science_note": "장기 우주 체류자는 체중을 받치는 뼈의 골밀도를 한 달에 약 1~1.5%씩 잃는다. 0.17 g의 장기 영향은 아직 모른다."
+    },
+    {
+      "id": "seed_distributed",
+      "name": "시드 분산 처리",
+      "category": "AI",
+      "plausibility": "engineering",
+      "cost": 12000,
+      "requires": [],
+      "effect": "두 번째 부지 관리 — 항성계 레이어 준비",
+      "science_note": "시드의 연산을 여러 거점에 나눠, 거점 하나를 잃어도 판단이 멈추지 않게 한다."
+    },
+    {
+      "id": "orbital_assembly",
+      "name": "궤도 조립",
+      "category": "궤도",
+      "plausibility": "engineering",
+      "cost": 25000,
+      "requires": [
+        "megawatt_fission"
+      ],
+      "effect": "궤도 건설 해금",
+      "science_note": "국제우주정거장은 40여 차례의 조립 비행으로 완성됐다."
+    },
+    {
+      "id": "mass_driver",
+      "name": "매스 드라이버",
+      "category": "물류",
+      "plausibility": "engineering",
+      "cost": 30000,
+      "requires": [
+        "megawatt_fission",
+        "local_manufacturing"
+      ],
+      "effect": "매스 드라이버 메가프로젝트 해금 — 추진제 없이 달 물자를 궤도로",
+      "science_note": "1970년대 제라드 오닐은 전자기 가속기로 달 레골리스를 L5로 쏘아 올리는 구상을 내놓았다."
+    },
+    {
+      "id": "rotating_habitat",
+      "name": "회전 거주구",
+      "category": "거주",
+      "plausibility": "engineering",
+      "cost": 40000,
+      "requires": [
+        "orbital_assembly"
+      ],
+      "effect": "아일랜드 원(버날 구) 메가프로젝트 해금 — 시대 1 진입 조건",
+      "science_note": "지름 약 500 m의 구를 분당 약 1.9회 돌리면 적도에서 1g가 된다."
+    }
+  ]
+}

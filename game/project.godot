@@ -1,0 +1,38 @@
+; Engine configuration file.
+; Godot 4.7 — Windows(.exe)와 Android(.apk)로 내보낸다. 내보내기 설정은 export_presets.cfg.
+
+config_version=5
+
+[application]
+
+config/name="SpaceCity"
+config/description="달 남극 기지에서 시작하는 우주 문명 시뮬레이터 — 시대 0 프로토타입"
+config/version="0.1.0"
+run/main_scene="res://ui/main.tscn"
+config/quit_on_go_back=false
+config/features=PackedStringArray("4.7", "GL Compatibility")
+boot_splash/bg_color=Color(0.0588235, 0.0705882, 0.0941176, 1)
+boot_splash/show_image=false
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1600
+window/size/window_height_override=900
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=4
+
+[gui]
+
+theme/custom_font="res://fonts/Pretendard-Regular.otf"
+common/drop_mouse_on_gui_input_disabled=true
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.0588235, 0.0705882, 0.0941176, 1)
+textures/vram_compression/import_etc2_astc=true

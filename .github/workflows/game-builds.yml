@@ -1,0 +1,122 @@
+name: Game builds (Windows · Android)
+
+# game/ 폴더의 Godot 프로젝트를 시험하고 Windows exe와 Android APK로 내보낸다.
+# 빌드는 실행 결과 페이지의 Artifacts에서 받는다. 수동 실행에서 publish를 켜면
+# 'prototype-latest' 프리릴리스에 파일을 올린다 (휴대폰 브라우저로 APK를 바로 받을 수 있다).
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "prototype-latest 프리릴리스에 올리기"
+        type: boolean
+        default: false
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "game/**"
+      - "docs/design/data/**"
+      - "docs/design/sim/**"
+      - ".github/workflows/game-builds.yml"
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-win-android
+
+      - name: Download Godot and export templates
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          mkdir -p ~/godot
+          curl -sSfL -o /tmp/godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d ~/godot
+          curl -sSfL -o /tmp/templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          dest=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mkdir -p "$dest"
+          unzip -q -j /tmp/templates.tpz 'templates/windows_*' 'templates/android_*' 'templates/version.txt' -d "$dest"
+          ls -la "$dest"
+
+      - name: Put Godot on PATH
+        run: |
+          sudo ln -sf ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          godot --version
+
+      - name: Import project
+        run: godot --headless --path game --import
+
+      - name: Data copy matches design docs
+        run: python3 game/tools/sync_data.py
+
+      - name: Same results as the Python balance simulator
+        run: python3 game/tools/parity_check.py --godot godot --seeds 2061 1000 --years 3
+
+      - name: Smoke test
+        run: |
+          godot --headless --path game --script res://tests/smoke_test.gd 2>&1 | tee smoke.log
+          grep -q "smoke: OK" smoke.log
+          ! grep -E "SCRIPT ERROR|Parse Error" smoke.log
+
+      - name: Debug keystore for the APK
+        run: |
+          keytool -genkeypair -keystore "$RUNNER_TEMP/debug.keystore" -storepass android -alias androiddebugkey \
+            -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> "$GITHUB_ENV"
+
+      - name: Export Windows
+        run: |
+          mkdir -p build/windows
+          godot --headless --path game --export-release "Windows Desktop" "$GITHUB_WORKSPACE/build/windows/SpaceCity.exe"
+          test -s build/windows/SpaceCity.exe
+
+      - name: Export Android
+        run: |
+          mkdir -p build/android
+          godot --headless --path game --export-debug "Android" "$GITHUB_WORKSPACE/build/android/SpaceCity.apk"
+          test -s build/android/SpaceCity.apk
+
+      - name: Package
+        run: |
+          cd build
+          (cd windows && zip -q -9 ../SpaceCity-windows-x86_64.zip SpaceCity.exe)
+          cp android/SpaceCity.apk SpaceCity-android.apk
+          ls -la
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SpaceCity-windows-x86_64
+          path: build/SpaceCity-windows-x86_64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SpaceCity-android
+          path: build/SpaceCity-android.apk
+
+      - name: Publish prerelease
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete prototype-latest --yes --cleanup-tag || true
+          gh release create prototype-latest build/SpaceCity-windows-x86_64.zip build/SpaceCity-android.apk \
+            --prerelease --target "$GITHUB_SHA" --title "SpaceCity 프로토타입 (최신 빌드)" \
+            --notes "시대 0 프로토타입. Windows: zip을 풀고 SpaceCity.exe 실행 (서명 없음 — SmartScreen 경고에서 '추가 정보 → 실행'). Android: APK 설치 (출처를 알 수 없는 앱 허용, 디버그 서명). 커밋 ${GITHUB_SHA::7}."

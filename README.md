@@ -6,6 +6,14 @@
 
 현재 상세 컨셉 디자인 단계다. 확정안은 [docs/design](docs/design/README.md)에서 시작한다.
 
+## 실행해 보기 — 시대 0 프로토타입
+
+달 남극 기지의 첫 3년을 직접 운영하는 [Godot 프로토타입](game/README.md)이 있다. **Windows(.exe)와 Android(.apk)** 로 내보낸다.
+
+- 빌드 받기: GitHub Actions의 **Game builds (Windows · Android)** 실행 결과 → Artifacts, 또는 `prototype-latest` 프리릴리스
+- 소스에서 실행: Godot 4.7.2로 `game/` 폴더를 연다
+- 규칙은 디자인 문서의 밸런스 시뮬레이터와 같다 — `python3 game/tools/parity_check.py`가 하루 단위로 확인한다
+
 ## 상세 컨셉 디자인 v1.0
 
 | 문서 | 내용 |
