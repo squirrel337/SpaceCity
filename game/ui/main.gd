@@ -40,8 +40,23 @@ func _ready() -> void:
 	theme = ThemeFactory.build()
 	get_tree().auto_accept_quit = false
 	get_tree().quit_on_go_back = false
+	_fit_window()
 	_build()
 	_show_start()
+
+
+func _fit_window() -> void:
+	## PC: 기본 창(1600×900)이 화면보다 크면 화면의 92%로 줄여 가운데에 둔다
+	if not OS.has_feature("pc") or DisplayServer.get_name() == "headless":
+		return
+	var window := get_window()
+	var screen := DisplayServer.screen_get_usable_rect(window.current_screen)
+	var win := window.size
+	if win.x <= screen.size.x and win.y <= screen.size.y:
+		return
+	var k := minf(screen.size.x * 0.92 / win.x, screen.size.y * 0.92 / win.y)
+	window.size = Vector2i(int(win.x * k), int(win.y * k))
+	window.move_to_center()
 
 
 # ── 화면 구성 ───────────────────────────────────────────────────
@@ -269,6 +284,11 @@ func _set_speed(i: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	## PC 단축키 (디자인 08 §5)
 	if not event is InputEventKey or not event.pressed or event.echo:
+		return
+	if event.keycode == KEY_F11:
+		var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
+		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_ESCAPE:
 		if modal.visible and modal.context in ["menu", "help", "module"]:
