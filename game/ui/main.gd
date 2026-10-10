@@ -23,6 +23,11 @@ var _alarm_day := -100
 var _dirty := true
 
 var city_view: CityView
+var base_map: BaseMap
+var city_area: Control
+var view_buttons := {}
+var zoom_row: HBoxContainer
+var view_mode := "map"
 var forecast: ForecastBar
 var modal: Modal
 var toasts: VBoxContainer
@@ -83,10 +88,20 @@ func _build() -> void:
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_theme_constant_override("separation", 8)
 	body.add_child(left)
+	city_area = Control.new()
+	city_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	city_area.clip_contents = true
+	left.add_child(city_area)
+	base_map = BaseMap.new()
+	base_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	base_map.module_tapped.connect(_on_module_tapped)
+	city_area.add_child(base_map)
 	city_view = CityView.new()
-	city_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	city_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	city_view.module_tapped.connect(_on_module_tapped)
-	left.add_child(city_view)
+	city_view.visible = false
+	city_area.add_child(city_view)
+	city_area.add_child(_build_view_switch())
 	forecast = ForecastBar.new()
 	forecast.custom_minimum_size.y = 46
 	left.add_child(forecast)
@@ -96,7 +111,7 @@ func _build() -> void:
 	toasts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	toasts.add_theme_constant_override("separation", 6)
 	toasts.alignment = BoxContainer.ALIGNMENT_END
-	city_view.add_child(toasts)
+	city_area.add_child(toasts)
 	toasts.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	toasts.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	toasts.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -105,6 +120,64 @@ func _build() -> void:
 	modal = Modal.new()
 	modal.chosen.connect(_on_modal_choice)
 	add_child(modal)
+
+
+func _build_view_switch() -> Control:
+	## 왼쪽 아래: 지도·목록 전환과 확대 단추
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	var group := ButtonGroup.new()
+	for pair in [["map", "지도"], ["list", "목록"]]:
+		var b := Button.new()
+		b.text = pair[1]
+		b.toggle_mode = true
+		b.button_group = group
+		b.custom_minimum_size = Vector2(58, 40)
+		b.pressed.connect(_set_view.bind(pair[0]))
+		row.add_child(b)
+		view_buttons[pair[0]] = b
+	view_buttons["map"].tooltip_text = "기지 지도 — 끌어서 옮기고 휠·두 손가락으로 확대 (M)"
+	view_buttons["list"].tooltip_text = "모듈 목록 (M)"
+	zoom_row = HBoxContainer.new()
+	zoom_row.add_theme_constant_override("separation", 4)
+	row.add_child(zoom_row)
+	var sep := Control.new()
+	sep.custom_minimum_size.x = 8
+	zoom_row.add_child(sep)
+	for pair in [["−", 1.0 / 1.25, "축소"], ["+", 1.25, "확대"]]:
+		var z := Button.new()
+		z.text = pair[0]
+		z.tooltip_text = pair[2]
+		z.custom_minimum_size = Vector2(42, 40)
+		z.pressed.connect(func(): base_map.zoom_by(pair[1]))
+		zoom_row.add_child(z)
+	var fit := Button.new()
+	fit.text = "전체"
+	fit.tooltip_text = "기지 전체 보기"
+	fit.custom_minimum_size = Vector2(54, 40)
+	fit.pressed.connect(func(): base_map.fit())
+	zoom_row.add_child(fit)
+	var core := Button.new()
+	core.text = "거주구"
+	core.tooltip_text = "거주 구역으로"
+	core.custom_minimum_size = Vector2(64, 40)
+	core.pressed.connect(func(): base_map.focus_core())
+	zoom_row.add_child(core)
+	row.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	row.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	row.offset_left = 10
+	row.offset_bottom = -10
+	view_buttons["map"].set_pressed_no_signal(true)
+	return row
+
+
+func _set_view(mode: String) -> void:
+	view_mode = mode
+	base_map.visible = mode == "map"
+	city_view.visible = mode == "list"
+	zoom_row.visible = mode == "map"
+	view_buttons[mode].set_pressed_no_signal(true)
+	city_view.queue_redraw()
 
 
 func _build_top_bar() -> Control:
@@ -222,6 +295,7 @@ func _attach(new_sim: CitySim) -> void:
 	for key in tabs:
 		tabs[key].bind(sim)
 	city_view.sim = sim
+	base_map.set_sim(sim)
 	forecast.sim = sim
 	auto_button.set_pressed_no_signal(sim.autopilot != null)
 	_last_day = sim.current_day()
@@ -276,6 +350,7 @@ func _set_speed(i: int) -> void:
 	if speed > 0:
 		_last_speed = speed
 	speed = i
+	base_map.speed_level = i
 	_jumping = false
 	for k in range(speed_buttons.size()):
 		speed_buttons[k].set_pressed_no_signal(k == i)
@@ -316,6 +391,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_select_tab("research")
 		KEY_L:
 			_select_tab("log")
+		KEY_M:
+			_set_view("list" if view_mode == "map" else "map")
 		_:
 			return
 	get_viewport().set_input_as_handled()

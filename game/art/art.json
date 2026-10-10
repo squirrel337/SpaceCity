@@ -1,0 +1,1091 @@
+{
+ "buildings": {
+  "algae_reactor": {
+   "anchor": [
+    32,
+    40
+   ],
+   "foot": [
+    6,
+    4
+   ],
+   "height": 3.6,
+   "lights": true,
+   "px": [
+    64,
+    58
+   ],
+   "title": "조류 생물반응기"
+  },
+  "battery_bank": {
+   "anchor": [
+    35,
+    34
+   ],
+   "foot": [
+    7,
+    4
+   ],
+   "height": 2.6,
+   "lights": true,
+   "px": [
+    70,
+    54
+   ],
+   "title": "배터리 뱅크"
+  },
+  "co2_scrubber": {
+   "anchor": [
+    29,
+    32
+   ],
+   "foot": [
+    5,
+    4
+   ],
+   "height": 3.4,
+   "lights": true,
+   "px": [
+    58,
+    49
+   ],
+   "title": "CO₂ 제거기"
+  },
+  "comms_center": {
+   "anchor": [
+    44,
+    76
+   ],
+   "foot": [
+    9,
+    7
+   ],
+   "height": 9.0,
+   "lights": true,
+   "px": [
+    88,
+    100
+   ],
+   "title": "지구 교신 센터"
+  },
+  "electrolyzer": {
+   "anchor": [
+    32,
+    40
+   ],
+   "foot": [
+    6,
+    4
+   ],
+   "height": 3.6,
+   "lights": true,
+   "px": [
+    64,
+    58
+   ],
+   "title": "물 전기분해기"
+  },
+  "excavator": {
+   "anchor": [
+    38,
+    30
+   ],
+   "foot": [
+    9,
+    6
+   ],
+   "height": 3.0,
+   "lights": true,
+   "px": [
+    84,
+    51
+   ],
+   "title": "레골리스 굴착기"
+  },
+  "fission_1mw": {
+   "anchor": [
+    64,
+    61
+   ],
+   "foot": [
+    16,
+    12
+   ],
+   "height": 8.5,
+   "lights": true,
+   "px": [
+    140,
+    95
+   ],
+   "title": "메가와트급 원자로"
+  },
+  "fission_40kw": {
+   "anchor": [
+    33,
+    57
+   ],
+   "foot": [
+    6,
+    6
+   ],
+   "height": 6.5,
+   "lights": true,
+   "px": [
+    66,
+    75
+   ],
+   "title": "소형 핵분열로"
+  },
+  "food_store": {
+   "anchor": [
+    39,
+    39
+   ],
+   "foot": [
+    7,
+    5
+   ],
+   "height": 2.8,
+   "lights": true,
+   "px": [
+    74,
+    58
+   ],
+   "title": "식량 저장고"
+  },
+  "green_commons": {
+   "anchor": [
+    66,
+    80
+   ],
+   "foot": [
+    16,
+    16
+   ],
+   "height": 7.0,
+   "lights": true,
+   "px": [
+    132,
+    127
+   ],
+   "title": "녹지 공원"
+  },
+  "hab_module": {
+   "anchor": [
+    41,
+    50
+   ],
+   "foot": [
+    10,
+    5
+   ],
+   "height": 4.7,
+   "lights": true,
+   "px": [
+    82,
+    72
+   ],
+   "title": "여압 거주 모듈"
+  },
+  "hab_module_covered": {
+   "anchor": [
+    51,
+    43
+   ],
+   "foot": [
+    13,
+    8
+   ],
+   "height": 4.7,
+   "lights": true,
+   "px": [
+    103,
+    70
+   ],
+   "title": "여압 거주 모듈 (레골리스 피복)"
+  },
+  "hydroponics": {
+   "anchor": [
+    40,
+    60
+   ],
+   "foot": [
+    9,
+    5
+   ],
+   "height": 4.0,
+   "lights": true,
+   "px": [
+    80,
+    82
+   ],
+   "title": "수경 농장"
+  },
+  "ice_miner": {
+   "anchor": [
+    72,
+    58
+   ],
+   "foot": [
+    12,
+    9
+   ],
+   "height": 5.0,
+   "lights": true,
+   "px": [
+    144,
+    103
+   ],
+   "title": "얼음 채굴기"
+  },
+  "landing_pad": {
+   "anchor": [
+    138,
+    77
+   ],
+   "foot": [
+    34,
+    34
+   ],
+   "height": 2.0,
+   "lights": true,
+   "px": [
+    276,
+    148
+   ],
+   "title": "착륙장"
+  },
+  "medical_bay": {
+   "anchor": [
+    39,
+    44
+   ],
+   "foot": [
+    8,
+    6
+   ],
+   "height": 4.0,
+   "lights": true,
+   "px": [
+    78,
+    66
+   ],
+   "title": "의료실"
+  },
+  "mre_plant": {
+   "anchor": [
+    49,
+    60
+   ],
+   "foot": [
+    9,
+    7
+   ],
+   "height": 6.5,
+   "lights": true,
+   "px": [
+    98,
+    87
+   ],
+   "title": "용융 레골리스 전해조"
+  },
+  "parts_fab": {
+   "anchor": [
+    50,
+    53
+   ],
+   "foot": [
+    10,
+    8
+   ],
+   "height": 4.6,
+   "lights": true,
+   "px": [
+    93,
+    79
+   ],
+   "title": "부품 공장"
+  },
+  "propellant_plant": {
+   "anchor": [
+    49,
+    89
+   ],
+   "foot": [
+    9,
+    7
+   ],
+   "height": 9.5,
+   "lights": true,
+   "px": [
+    98,
+    116
+   ],
+   "title": "추진제 공장"
+  },
+  "radiator": {
+   "anchor": [
+    31,
+    59
+   ],
+   "foot": [
+    8,
+    3
+   ],
+   "height": 6.8,
+   "lights": false,
+   "px": [
+    62,
+    77
+   ],
+   "title": "방열판"
+  },
+  "regolith_dome": {
+   "anchor": [
+    62,
+    49
+   ],
+   "foot": [
+    15,
+    13
+   ],
+   "height": 5.2,
+   "lights": true,
+   "px": [
+    124,
+    82
+   ],
+   "title": "레골리스 차폐 돔"
+  },
+  "regolith_printer": {
+   "anchor": [
+    55,
+    79
+   ],
+   "foot": [
+    12,
+    9
+   ],
+   "height": 7.2,
+   "lights": true,
+   "px": [
+    110,
+    109
+   ],
+   "title": "레골리스 3D 프린터"
+  },
+  "research_lab": {
+   "anchor": [
+    44,
+    55
+   ],
+   "foot": [
+    9,
+    7
+   ],
+   "height": 7.5,
+   "lights": true,
+   "px": [
+    88,
+    79
+   ],
+   "title": "연구동"
+  },
+  "rfc_unit": {
+   "anchor": [
+    29,
+    26
+   ],
+   "foot": [
+    5,
+    4
+   ],
+   "height": 2.8,
+   "lights": true,
+   "px": [
+    58,
+    43
+   ],
+   "title": "재생 연료전지"
+  },
+  "robot_bay": {
+   "anchor": [
+    49,
+    40
+   ],
+   "foot": [
+    10,
+    7
+   ],
+   "height": 4.2,
+   "lights": true,
+   "px": [
+    98,
+    67
+   ],
+   "title": "로봇 정비고"
+  },
+  "sabatier": {
+   "anchor": [
+    32,
+    38
+   ],
+   "foot": [
+    6,
+    4
+   ],
+   "height": 3.4,
+   "lights": true,
+   "px": [
+    64,
+    56
+   ],
+   "title": "사바티에 반응기"
+  },
+  "scaffold_l": {
+   "anchor": [
+    78,
+    76
+   ],
+   "foot": [
+    14,
+    12
+   ],
+   "height": 5.0,
+   "lights": true,
+   "px": [
+    156,
+    117
+   ],
+   "title": "공사 중 (큰 건물)"
+  },
+  "scaffold_m": {
+   "anchor": [
+    47,
+    53
+   ],
+   "foot": [
+    9,
+    6
+   ],
+   "height": 4.0,
+   "lights": true,
+   "px": [
+    94,
+    78
+   ],
+   "title": "공사 중 (중간 건물)"
+  },
+  "scaffold_s": {
+   "anchor": [
+    30,
+    38
+   ],
+   "foot": [
+    5,
+    4
+   ],
+   "height": 3.0,
+   "lights": true,
+   "px": [
+    60,
+    55
+   ],
+   "title": "공사 중 (작은 건물)"
+  },
+  "solar_tower": {
+   "anchor": [
+    24,
+    165
+   ],
+   "foot": [
+    7,
+    5
+   ],
+   "height": 22.0,
+   "lights": true,
+   "px": [
+    48,
+    179
+   ],
+   "title": "수직 태양광 타워"
+  },
+  "storm_shelter": {
+   "anchor": [
+    46,
+    59
+   ],
+   "foot": [
+    11,
+    8
+   ],
+   "height": 4.4,
+   "lights": true,
+   "px": [
+    92,
+    84
+   ],
+   "title": "폭풍 대피소"
+  },
+  "tank_farm": {
+   "anchor": [
+    44,
+    39
+   ],
+   "foot": [
+    8,
+    6
+   ],
+   "height": 4.2,
+   "lights": true,
+   "px": [
+    88,
+    63
+   ],
+   "title": "저장 탱크"
+  },
+  "water_recycler": {
+   "anchor": [
+    32,
+    51
+   ],
+   "foot": [
+    6,
+    4
+   ],
+   "height": 5.2,
+   "lights": true,
+   "px": [
+    64,
+    69
+   ],
+   "title": "물 재활용기"
+  }
+ },
+ "projection": "orthographic, azimuth 45°, elevation 30°",
+ "px_per_m": 8.0,
+ "vehicles": {
+  "astronaut": {
+   "dims": [
+    0.8,
+    0.7,
+    1.85
+   ],
+   "flying": false,
+   "group": "people",
+   "title": "우주비행사 (키 1.85 m)",
+   "views": {
+    "ne": {
+     "anchor": [
+      8,
+      17
+     ],
+     "lights": false,
+     "px": [
+      15,
+      23
+     ]
+    },
+    "nw": {
+     "anchor": [
+      7,
+      17
+     ],
+     "lights": false,
+     "px": [
+      15,
+      23
+     ]
+    },
+    "se": {
+     "anchor": [
+      8,
+      17
+     ],
+     "lights": false,
+     "px": [
+      15,
+      23
+     ]
+    },
+    "sw": {
+     "anchor": [
+      7,
+      17
+     ],
+     "lights": false,
+     "px": [
+      15,
+      23
+     ]
+    }
+   },
+   "world": "달"
+  },
+  "builder_robot": {
+   "dims": [
+    6.0,
+    6.0,
+    3.4
+   ],
+   "flying": false,
+   "group": "ground",
+   "title": "건설 로봇",
+   "views": {
+    "ne": {
+     "anchor": [
+      28,
+      33
+     ],
+     "lights": true,
+     "px": [
+      56,
+      49
+     ]
+    },
+    "nw": {
+     "anchor": [
+      28,
+      35
+     ],
+     "lights": true,
+     "px": [
+      56,
+      51
+     ]
+    },
+    "se": {
+     "anchor": [
+      28,
+      33
+     ],
+     "lights": true,
+     "px": [
+      56,
+      49
+     ]
+    },
+    "sw": {
+     "anchor": [
+      28,
+      33
+     ],
+     "lights": true,
+     "px": [
+      56,
+      49
+     ]
+    }
+   },
+   "world": "달"
+  },
+  "cargo_hauler": {
+   "dims": [
+    5.6,
+    2.9,
+    3.1
+   ],
+   "flying": false,
+   "group": "ground",
+   "title": "화물 운반차",
+   "views": {
+    "ne": {
+     "anchor": [
+      26,
+      31
+     ],
+     "lights": true,
+     "px": [
+      55,
+      45
+     ]
+    },
+    "nw": {
+     "anchor": [
+      29,
+      31
+     ],
+     "lights": true,
+     "px": [
+      55,
+      45
+     ]
+    },
+    "se": {
+     "anchor": [
+      26,
+      33
+     ],
+     "lights": true,
+     "px": [
+      55,
+      47
+     ]
+    },
+    "sw": {
+     "anchor": [
+      29,
+      33
+     ],
+     "lights": true,
+     "px": [
+      55,
+      47
+     ]
+    }
+   },
+   "world": "달"
+  },
+  "cargo_lander": {
+   "anchor": [
+    44,
+    48
+   ],
+   "dims": [
+    9.6,
+    9.6,
+    6.2
+   ],
+   "flying": false,
+   "group": "space",
+   "lights": true,
+   "px": [
+    88,
+    72
+   ],
+   "title": "화물 착륙선",
+   "world": "달"
+  },
+  "crew_lander": {
+   "anchor": [
+    49,
+    126
+   ],
+   "dims": [
+    10.0,
+    10.0,
+    16.5
+   ],
+   "flying": false,
+   "group": "space",
+   "lights": true,
+   "px": [
+    98,
+    151
+   ],
+   "title": "유인 착륙선",
+   "world": "달"
+  },
+  "excavator_robot": {
+   "dims": [
+    3.4,
+    2.0,
+    1.8
+   ],
+   "flying": false,
+   "group": "ground",
+   "title": "굴착 로봇",
+   "views": {
+    "ne": {
+     "anchor": [
+      20,
+      19
+     ],
+     "lights": true,
+     "px": [
+      40,
+      29
+     ]
+    },
+    "nw": {
+     "anchor": [
+      20,
+      20
+     ],
+     "lights": true,
+     "px": [
+      40,
+      30
+     ]
+    },
+    "se": {
+     "anchor": [
+      20,
+      19
+     ],
+     "lights": true,
+     "px": [
+      40,
+      29
+     ]
+    },
+    "sw": {
+     "anchor": [
+      20,
+      19
+     ],
+     "lights": true,
+     "px": [
+      40,
+      29
+     ]
+    }
+   },
+   "world": "달"
+  },
+  "hopper": {
+   "anchor": [
+    23,
+    33
+   ],
+   "dims": [
+    4.4,
+    4.4,
+    3.8
+   ],
+   "flying": false,
+   "group": "air",
+   "lights": true,
+   "px": [
+    46,
+    46
+   ],
+   "title": "로켓 호퍼",
+   "world": "달"
+  },
+  "ltv": {
+   "dims": [
+    3.6,
+    2.3,
+    2.2
+   ],
+   "flying": false,
+   "group": "ground",
+   "title": "비가압 로버",
+   "views": {
+    "ne": {
+     "anchor": [
+      20,
+      22
+     ],
+     "lights": true,
+     "px": [
+      44,
+      33
+     ]
+    },
+    "nw": {
+     "anchor": [
+      24,
+      22
+     ],
+     "lights": true,
+     "px": [
+      44,
+      33
+     ]
+    },
+    "se": {
+     "anchor": [
+      20,
+      26
+     ],
+     "lights": true,
+     "px": [
+      44,
+      40
+     ]
+    },
+    "sw": {
+     "anchor": [
+      24,
+      25
+     ],
+     "lights": true,
+     "px": [
+      44,
+      39
+     ]
+    }
+   },
+   "world": "달"
+  },
+  "mars_helicopter": {
+   "anchor": [
+    29,
+    28
+   ],
+   "dims": [
+    6.0,
+    6.0,
+    2.6
+   ],
+   "flying": true,
+   "group": "air",
+   "lights": true,
+   "px": [
+    58,
+    38
+   ],
+   "title": "화성 헬리콥터",
+   "world": "화성"
+  },
+  "mars_plane": {
+   "anchor": [
+    66,
+    39
+   ],
+   "dims": [
+    9.0,
+    22.0,
+    2.0
+   ],
+   "flying": true,
+   "group": "air",
+   "lights": true,
+   "px": [
+    140,
+    74
+   ],
+   "title": "화성 비행기",
+   "world": "화성"
+  },
+  "orbital_tug": {
+   "anchor": [
+    81,
+    42
+   ],
+   "dims": [
+    16.0,
+    26.0,
+    4.0
+   ],
+   "flying": true,
+   "group": "space",
+   "lights": true,
+   "px": [
+    166,
+    87
+   ],
+   "title": "궤도 예인선",
+   "world": "지구-달 궤도"
+  },
+  "pressurized_rover": {
+   "dims": [
+    6.4,
+    3.4,
+    3.5
+   ],
+   "flying": false,
+   "group": "ground",
+   "title": "가압 로버",
+   "views": {
+    "ne": {
+     "anchor": [
+      29,
+      38
+     ],
+     "lights": true,
+     "px": [
+      63,
+      53
+     ]
+    },
+    "nw": {
+     "anchor": [
+      34,
+      42
+     ],
+     "lights": true,
+     "px": [
+      63,
+      57
+     ]
+    },
+    "se": {
+     "anchor": [
+      29,
+      39
+     ],
+     "lights": true,
+     "px": [
+      63,
+      54
+     ]
+    },
+    "sw": {
+     "anchor": [
+      34,
+      39
+     ],
+     "lights": true,
+     "px": [
+      63,
+      54
+     ]
+    }
+   },
+   "world": "달"
+  },
+  "titan_rotorcraft": {
+   "anchor": [
+    33,
+    33
+   ],
+   "dims": [
+    6.0,
+    5.0,
+    2.8
+   ],
+   "flying": true,
+   "group": "air",
+   "lights": true,
+   "px": [
+    65,
+    44
+   ],
+   "title": "타이탄 회전익기",
+   "world": "타이탄"
+  },
+  "transport_ship": {
+   "anchor": [
+    223,
+    128
+   ],
+   "dims": [
+    60.0,
+    30.0,
+    16.0
+   ],
+   "flying": true,
+   "group": "space",
+   "lights": true,
+   "px": [
+    373,
+    246
+   ],
+   "title": "행성간 수송선",
+   "world": "태양계"
+  },
+  "venus_airship": {
+   "anchor": [
+    103,
+    109
+   ],
+   "dims": [
+    32.0,
+    10.0,
+    10.0
+   ],
+   "flying": true,
+   "group": "air",
+   "lights": true,
+   "px": [
+    195,
+    124
+   ],
+   "title": "금성 비행선",
+   "world": "금성"
+  }
+ }
+}

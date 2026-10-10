@@ -66,6 +66,9 @@ jobs:
       - name: Data copy matches design docs
         run: python3 game/tools/sync_data.py
 
+      - name: Art matches its generator
+        run: python3 game/tools/art/make_art.py --check
+
       - name: Same results as the Python balance simulator
         run: python3 game/tools/parity_check.py --godot godot --seeds 2061 1000 --years 3
 

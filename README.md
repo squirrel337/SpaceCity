@@ -13,6 +13,7 @@
 - 빌드 받기: GitHub Actions의 **Game builds (Windows · Android)** 실행 결과 → Artifacts, 또는 `prototype-latest` 프리릴리스
 - 소스에서 실행: Godot 4.7.2로 `game/` 폴더를 연다
 - 규칙은 디자인 문서의 밸런스 시뮬레이터와 같다 — `python3 game/tools/parity_check.py`가 하루 단위로 확인한다
+- 기지 지도: 건물 29종과 로버·로봇·착륙선이 아이소메트릭으로 움직인다. 그림은 [game/tools/art](game/tools/art/make_art.py) 생성기가 만든다
 
 ## 상세 컨셉 디자인 v1.0
 

@@ -39,6 +39,7 @@ func _process(_delta: float) -> bool:
 		var built: int = main.sim.stats.get("built", 0)
 		_check(built > 0, "자동 운영이 아무것도 짓지 않았다")
 		_save_roundtrip()
+		_map_check()
 		main._on_module_tapped("hab_module")
 		main._show_help()
 		main._show_report()
@@ -82,6 +83,43 @@ func _save_roundtrip() -> void:
 		main.sim.advance_hour()
 	_check(absf(restored.stock["o2_kg"] - main.sim.stock["o2_kg"]) < 1e-6, "불러온 뒤 10일의 결과가 다르다")
 	_check(restored.rng.random() == main.sim.rng.random(), "난수 상태가 이어지지 않았다")
+
+
+func _map_check() -> void:
+	## 기지 지도: 건물 자리, 공사 현장으로 가는 로봇, 착륙선 사건, 지도·목록 전환
+	var m: BaseMap = main.base_map
+	_check(m.layout.capacity("hab_module") >= 30, "거주 모듈 자리가 모자란다")
+	_check(m.layout.capacity("solar_tower") == 38, "태양광 타워 자리가 능선 칸(8+10+20)과 다르다")
+	for kind in main.sim.M:
+		_check(m.layout.capacity(kind) > 0, "지도에 자리가 없는 건물: " + kind)
+		_check(ArtLib.texture(ArtLib.info("buildings", kind)["file"]) != null, "그림이 없는 건물: " + kind)
+	main.sim.enqueue("medical_bay", "", 0.0)
+	var sites := m._sites()
+	_check(not sites.is_empty(), "공사 현장이 지도에 없다")
+	for _i in range(900):
+		m.traffic.update(0.1, main.sim, sites)
+	var working := 0
+	for a in m.traffic.agents:
+		if a["role"] == "robot" and a["state"] == "work":
+			working += 1
+		var info := ArtLib.info("vehicles", a["id"], a["heading"])
+		_check(not info.is_empty() and ArtLib.texture(info["file"]) != null, "그림이 없는 탈것: " + a["id"])
+	_check(working > 0, "로봇이 공사 현장에 가지 않았다")
+	var before := int(main.sim.stats.get("arrived", 0))
+	main.sim.stats["arrived"] = before + 1
+	m.traffic.update(0.1, main.sim, sites)
+	_check(m.traffic.agents.any(func(a): return a["role"] == "lander"), "유인 착륙선이 나타나지 않았다")
+	for _i in range(200):
+		m.traffic.update(0.1, main.sim, sites)
+	_check(not m.traffic.agents.any(func(a): return a["role"] == "lander"), "착륙선이 떠나지 않았다")
+	main.sim.stats["arrived"] = before
+	m.traffic.reset(main.sim)
+	main._set_view("list")
+	_check(main.city_view.visible and not m.visible, "목록으로 바뀌지 않았다")
+	main._set_view("map")
+	m.zoom_by(1.5)
+	m.fit()
+	print("smoke: map %d robots working, %d agents" % [working, m.traffic.agents.size()])
 
 
 func _check(ok: bool, message: String) -> void:
