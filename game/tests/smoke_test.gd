@@ -92,7 +92,15 @@ func _map_check() -> void:
 	_check(m.layout.capacity("solar_tower") == 38, "태양광 타워 자리가 능선 칸(8+10+20)과 다르다")
 	for kind in main.sim.M:
 		_check(m.layout.capacity(kind) > 0, "지도에 자리가 없는 건물: " + kind)
-		_check(ArtLib.texture(ArtLib.info("buildings", kind)["file"]) != null, "그림이 없는 건물: " + kind)
+		_check(ArtLib.variants(kind) == 5, "변형이 5가지가 아닌 건물: " + kind)
+		for v in range(ArtLib.variants(kind)):
+			_check(ArtLib.texture(ArtLib.building(kind, v)["file"]) != null, "그림이 없는 건물: %s v%d" % [kind, v])
+	for v in range(5):
+		_check(ArtLib.texture(ArtLib.building("hab_module_covered", v)["file"]) != null, "피복 거주 모듈 그림이 없다")
+	var seen := {}
+	for i in range(5):
+		seen[BaseMap.variant_of("hab_module", i)] = true
+	_check(seen.size() == 5, "이웃한 자리 다섯 곳의 변형이 겹친다")
 	main.sim.enqueue("medical_bay", "", 0.0)
 	var sites := m._sites()
 	_check(not sites.is_empty(), "공사 현장이 지도에 없다")

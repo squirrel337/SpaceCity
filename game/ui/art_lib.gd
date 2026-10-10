@@ -57,6 +57,30 @@ static func info(group: String, id: String, heading: String = "se") -> Dictionar
 	}
 
 
+## 건물 그림 정보 (변형 v: 0~4). 변형마다 크기·높이가 다르다
+static func building(id: String, v: int = 0) -> Dictionary:
+	var m: Dictionary = meta().get("buildings", {}).get(id, {})
+	if m.is_empty():
+		return {}
+	if not m.has("variants"):
+		return info("buildings", id)
+	var vs: Array = m["variants"]
+	var vi := clampi(v, 0, vs.size() - 1)
+	var e: Dictionary = vs[vi]
+	return {
+		"file": "buildings/%s" % id if vi == 0 else "buildings/%s_v%d" % [id, vi],
+		"px": Vector2(e["px"][0], e["px"][1]),
+		"anchor": Vector2(e["anchor"][0], e["anchor"][1]),
+		"lights": bool(e.get("lights", false)),
+		"height": float(e.get("height", m.get("height", 4.0))),
+	}
+
+
+static func variants(id: String) -> int:
+	var m: Dictionary = meta().get("buildings", {}).get(id, {})
+	return m["variants"].size() if m.has("variants") else 1
+
+
 ## 건물 바닥 크기 [가로(x), 세로(y)] m와 대표 높이
 static func footprint(id: String) -> Vector2:
 	var m: Dictionary = meta().get("buildings", {}).get(id, {})

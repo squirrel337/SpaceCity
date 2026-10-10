@@ -18,6 +18,7 @@ sys.path.insert(0, str(HERE))
 
 import iso  # noqa: E402
 from buildings import BUILDINGS  # noqa: E402
+import building_variants  # noqa: E402,F401  (BUILDINGS에 변형을 더한다)
 
 try:
     from vehicles import VEHICLES  # noqa: E402
@@ -35,7 +36,27 @@ def render(group: str, registry: dict) -> tuple[dict[str, str], dict]:
     meta: dict = {}
     for sid, spec in registry.items():
         headings = spec.get("headings", ["se"])
-        extra = {k: v for k, v in spec.items() if k not in ("fn", "headings")}
+        extra = {k: v for k, v in spec.items() if k not in ("fn", "headings", "variants")}
+        if spec.get("variants"):
+            # 건물 변형: v0은 기본 설계(<id>.svg), v1~ 은 <id>_v1.svg ...
+            vlist = []
+            for v in range(1 + max(spec["variants"])):
+                vs = spec["variants"].get(v) if v else {"fn": spec["fn"], "height": spec.get("height")}
+                if vs is None:
+                    continue
+                iso.set_heading(0.0)
+                sp = iso.Sprite(sid)
+                vs["fn"](sp)
+                vb = sp.viewbox()
+                name = sid if v == 0 else "%s_v%d" % (sid, v)
+                files["%s/%s.svg" % (group, name)] = sp.svg("body", vb)
+                if sp.light:
+                    files["%s/%s_lights.svg" % (group, name)] = sp.svg("light", vb)
+                vm = sp.meta()
+                vm["height"] = vs.get("height") or spec.get("height")
+                vlist.append(vm)
+            meta[sid] = dict(extra, variants=vlist)
+            continue
         views = {}
         for hd in headings:
             iso.set_heading(HEADING_DEG[hd])

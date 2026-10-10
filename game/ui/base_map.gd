@@ -339,7 +339,8 @@ func _collect() -> Array:
 				sprite = "hab_module_covered"
 			var pos := layout.slot(kind, i)
 			items.append({"kind": "b", "id": kind, "sprite": sprite, "pos": pos, "depth": pos.x + pos.y,
-				"broken": i >= shown - broken, "more": (n - cap) if (i == shown - 1 and n > cap) else 0})
+				"variant": variant_of(kind, i), "broken": i >= shown - broken,
+				"more": (n - cap) if (i == shown - 1 and n > cap) else 0})
 		for k in range(q):
 			var i := n + k
 			if i >= cap:
@@ -347,11 +348,16 @@ func _collect() -> Array:
 			var pos := layout.slot(kind, i)
 			var item := _queue_item(kind, k)
 			items.append({"kind": "b", "id": kind, "sprite": _scaffold_for(kind), "pos": pos, "depth": pos.x + pos.y,
-				"building": true, "progress": item, "broken": false, "more": 0})
+				"variant": 0, "building": true, "progress": item, "broken": false, "more": 0})
 	for a in traffic.agents:
 		var p: Vector3 = a["pos"]
 		items.append({"kind": "v", "agent": a, "pos": p, "depth": p.x + p.y + 0.5})
 	return items
+
+
+## 자리마다 고정된 변형 (0~4). 같은 종류가 나란히 서도 이웃끼리 모양이 다르다
+static func variant_of(kind: String, i: int) -> int:
+	return (absi(kind.hash()) + i * 3) % 5
 
 
 func _queue_item(kind: String, k: int) -> float:
@@ -432,10 +438,12 @@ func _draw_shadows(items: Array) -> void:
 		if it["sprite"] in NO_SHADOW:
 			continue
 		var p: Vector3 = it["pos"]
-		var boxes: Array = CASTERS.get(it["sprite"], [])
+		var v: int = it.get("variant", 0)
+		var boxes: Array = CASTERS.get(it["sprite"], []) if (v == 0 or it["sprite"] == "solar_tower") else []
 		if boxes.is_empty():
 			var f := ArtLib.footprint(it["sprite"]) * 0.8
-			var h := ArtLib.height(it["sprite"]) * (0.5 if it.get("building", false) else 1.0)
+			var h := float(ArtLib.building(it["sprite"], v).get("height", ArtLib.height(it["sprite"])))
+			h *= 0.5 if it.get("building", false) else 1.0
 			boxes = [[0, 0, f.x, f.y, 0, h]]
 		for bx in boxes:
 			var c := Vector2(p.x + bx[0], p.y + bx[1])
@@ -455,7 +463,7 @@ func _draw_shadows(items: Array) -> void:
 
 # ── 건물 ────────────────────────────────────────────────────────
 func _draw_building(it: Dictionary, dim: Color) -> void:
-	var info := ArtLib.info("buildings", it["sprite"])
+	var info := ArtLib.building(it["sprite"], it.get("variant", 0))
 	if info.is_empty():
 		return
 	var tex := ArtLib.texture(info["file"])
@@ -472,7 +480,7 @@ func _draw_building(it: Dictionary, dim: Color) -> void:
 		_lights_list.append([ArtLib.texture(info["file"], true), rect])
 	# 누를 자리: 바닥 크기 × 높이의 상자
 	var f := ArtLib.footprint(it["sprite"]) * 0.5
-	var h := ArtLib.height(it["sprite"])
+	var h: float = info.get("height", ArtLib.height(it["sprite"]))
 	var hex := PackedVector2Array([
 		ArtLib.project(p + Vector3(-f.x, -f.y, h)), ArtLib.project(p + Vector3(f.x, -f.y, h)),
 		ArtLib.project(p + Vector3(f.x, -f.y, 0)), ArtLib.project(p + Vector3(f.x, f.y, 0)),

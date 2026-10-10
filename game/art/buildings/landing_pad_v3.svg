@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="274" height="136" viewBox="-137 -66 274 136">
+<polygon points="28.99,53.75 -79.2,39.25 -108.18,-14.84 -28.99,-54.44 79.2,-39.94 108.18,14.15" fill="#776a5d" stroke="#49423a" stroke-width="0.5" stroke-linejoin="round"/>
+<path d="M-3.94,-27.86 L-24.03,-25.17 L-38.74,-32.52 L-33.36,-42.57 L-13.27,-45.26 L1.44,-37.91 L-3.94,-27.86" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M-29.42,-15.12 L-49.51,-12.43 L-64.21,-19.79 L-58.83,-29.83 L-38.74,-32.52 L-24.03,-25.17 L-29.42,-15.12" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M-54.89,-2.39 L-74.98,0.31 L-89.69,-7.05 L-84.31,-17.09 L-64.21,-19.79 L-49.51,-12.43 L-54.89,-2.39" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M30.86,-23.2 L10.77,-20.51 L-3.94,-27.86 L1.44,-37.91 L21.53,-40.6 L36.24,-33.24 L30.86,-23.2" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M5.38,-10.46 L-14.71,-7.77 L-29.42,-15.12 L-24.03,-25.17 L-3.94,-27.86 L10.77,-20.51 L5.38,-10.46" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M-20.09,2.28 L-40.18,4.97 L-54.89,-2.39 L-49.51,-12.43 L-29.42,-15.12 L-14.71,-7.77 L-20.09,2.28" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M-45.57,15.01 L-65.66,17.71 L-80.37,10.35 L-74.98,0.31 L-54.89,-2.39 L-40.18,4.97 L-45.57,15.01" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M65.66,-18.54 L45.57,-15.84 L30.86,-23.2 L36.24,-33.24 L56.33,-35.94 L71.04,-28.58 L65.66,-18.54" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M40.18,-5.8 L20.09,-3.11 L5.38,-10.46 L10.77,-20.51 L30.86,-23.2 L45.57,-15.84 L40.18,-5.8" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M14.71,6.94 L-5.38,9.63 L-20.09,2.28 L-14.71,-7.77 L5.38,-10.46 L20.09,-3.11 L14.71,6.94" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M-10.77,19.68 L-30.86,22.37 L-45.57,15.01 L-40.18,4.97 L-20.09,2.28 L-5.38,9.63 L-10.77,19.68" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M-36.24,32.41 L-56.33,35.1 L-71.04,27.75 L-65.66,17.71 L-45.57,15.01 L-30.86,22.37 L-36.24,32.41" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M74.98,-1.14 L54.89,1.55 L40.18,-5.8 L45.57,-15.84 L65.66,-18.54 L80.37,-11.18 L74.98,-1.14" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M49.51,11.6 L29.42,14.29 L14.71,6.94 L20.09,-3.11 L40.18,-5.8 L54.89,1.55 L49.51,11.6" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M24.03,24.34 L3.94,27.03 L-10.77,19.68 L-5.38,9.63 L14.71,6.94 L29.42,14.29 L24.03,24.34" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M-1.44,37.08 L-21.53,39.77 L-36.24,32.41 L-30.86,22.37 L-10.77,19.68 L3.94,27.03 L-1.44,37.08" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M84.31,16.26 L64.21,18.95 L49.51,11.6 L54.89,1.55 L74.98,-1.14 L89.69,6.22 L84.31,16.26" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M58.83,29 L38.74,31.69 L24.03,24.34 L29.42,14.29 L49.51,11.6 L64.21,18.95 L58.83,29" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M33.36,41.74 L13.27,44.43 L-1.44,37.08 L3.94,27.03 L24.03,24.34 L38.74,31.69 L33.36,41.74" fill="none" stroke="#8a7c68" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+<path d="M-13.58,6.3 L-15.23,5.36 L-16.63,4.32 L-17.74,3.19 L-18.55,2 L-19.04,0.77 L-19.2,-0.48 L-19.04,-1.74 L-18.55,-2.97 L-17.74,-4.16 L-16.63,-5.28 L-15.23,-6.33 L-13.58,-7.27 L-11.69,-8.1 L-9.6,-8.8 L-7.35,-9.35 L-4.97,-9.76 L-2.51,-10 L0,-10.08 L2.51,-10 L4.97,-9.76 L7.35,-9.35 L9.6,-8.8 L11.69,-8.1 L13.58,-7.27 L15.23,-6.33 L16.63,-5.28 L17.74,-4.16 L18.55,-2.97 L19.04,-1.74 L19.2,-0.48 L19.04,0.77 L18.55,2 L17.74,3.19 L16.63,4.32 L15.23,5.36 L13.58,6.3 L11.69,7.13 L9.6,7.83 L7.35,8.38 L4.97,8.79 L2.51,9.03 L0,9.12 L-2.51,9.03 L-4.97,8.79 L-7.35,8.38 L-9.6,7.83 L-11.69,7.13 L-13.58,6.3" fill="none" stroke="#E9C24A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+<polygon points="27.22,50.88 29.02,50.88 29.02,52.68 27.22,52.68" fill="#fff2d0"/>
+<polygon points="-77.72,36.82 -75.92,36.82 -75.92,38.62 -77.72,38.62" fill="#fff2d0"/>
+<polygon points="-105.84,-15.65 -104.04,-15.65 -104.04,-13.85 -105.84,-13.85" fill="#fff2d0"/>
+<polygon points="-29.02,-54.06 -27.22,-54.06 -27.22,-52.26 -29.02,-52.26" fill="#fff2d0"/>
+<polygon points="75.92,-40 77.72,-40 77.72,-38.2 75.92,-38.2" fill="#fff2d0"/>
+<polygon points="104.04,12.47 105.84,12.47 105.84,14.27 104.04,14.27" fill="#fff2d0"/>
+<polygon points="-131.66,8.67 -132.8,0 -125.6,-8.31 -124.53,-0.12" fill="#8c7c6b"/>
+<polygon points="-118.4,0 -117.39,7.73 -124.53,-0.12 -125.6,-8.31" fill="#2b2e38"/>
+<polygon points="132.8,0 131.66,8.67 124.53,-0.12 125.6,-8.31" fill="#2d303b"/>
+<polygon points="117.39,7.73 118.4,0 125.6,-8.31 124.53,-0.12" fill="#897869"/>
+<polygon points="131.66,8.67 128.27,17.19 121.32,7.94 124.53,-0.12" fill="#2e323d"/>
+<polygon points="114.37,15.32 117.39,7.73 124.53,-0.12 121.32,7.94" fill="#847465"/>
+<polygon points="-128.27,17.19 -131.66,8.67 -124.53,-0.12 -121.32,7.94" fill="#8f7e6d"/>
+<polygon points="-117.39,7.73 -114.37,15.32 -121.32,7.94 -124.53,-0.12" fill="#292c36"/>
+<polygon points="128.27,17.19 122.69,25.41 116.04,15.72 121.32,7.94" fill="#2f333f"/>
+<polygon points="109.39,22.65 114.37,15.32 121.32,7.94 116.04,15.72" fill="#7d6f61"/>
+<polygon points="-122.69,25.41 -128.27,17.19 -121.32,7.94 -116.04,15.72" fill="#8f7e6d"/>
+<polygon points="-114.37,15.32 -109.39,22.65 -116.04,15.72 -121.32,7.94" fill="#272a33"/>
+<polygon points="122.69,25.41 115.01,33.2 108.77,23.09 116.04,15.72" fill="#303440"/>
+<polygon points="-115.01,33.2 -122.69,25.41 -116.04,15.72 -108.77,23.09" fill="#91806f"/>
+<polygon points="115.01,33.2 105.36,40.42 99.65,29.92 108.77,23.09" fill="#313541"/>
+<polygon points="-105.36,40.42 -115.01,33.2 -108.77,23.09 -99.65,29.92" fill="#918171"/>
+<polygon points="-93.9,46.95 -105.36,40.42 -99.65,29.92 -88.81,36.09" fill="#908072"/>
+<polygon points="105.36,40.42 93.9,46.95 88.81,36.09 99.65,29.92" fill="#313642"/>
+<polygon points="93.9,46.95 80.84,52.68 76.46,41.51 88.81,36.09" fill="#323743"/>
+<polygon points="-80.84,52.68 -93.9,46.95 -88.81,36.09 -76.46,41.51" fill="#8d7f72"/>
+<polygon points="80.84,52.68 66.4,57.5 62.8,46.07 76.46,41.51" fill="#3d3f49"/>
+<polygon points="-66.4,57.5 -80.84,52.68 -76.46,41.51 -62.8,46.07" fill="#897c71"/>
+<polygon points="66.4,57.5 50.82,61.35 48.07,49.71 62.8,46.07" fill="#474850"/>
+<polygon points="-50.82,61.35 -66.4,57.5 -62.8,46.07 -48.07,49.71" fill="#847870"/>
+<polygon points="50.82,61.35 34.37,64.14 32.51,52.35 48.07,49.71" fill="#525156"/>
+<polygon points="-34.37,64.14 -50.82,61.35 -48.07,49.71 -32.51,52.35" fill="#7e746d"/>
+<polygon points="34.37,64.14 17.33,65.83 16.39,53.95 32.51,52.35" fill="#5c595c"/>
+<polygon points="-17.33,65.83 -34.37,64.14 -32.51,52.35 -16.39,53.95" fill="#766e6a"/>
+<polygon points="17.33,65.83 0,66.4 0,54.49 16.39,53.95" fill="#656161"/>
+<polygon points="0,66.4 -17.33,65.83 -16.39,53.95 0,54.49" fill="#6e6866"/>
+</svg>
