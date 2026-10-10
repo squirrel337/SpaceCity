@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>SpaceCity 목업 — 성간 레이어</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  :root {
+    --bg: #05070a; --panel: #0f1218; --panel2: #151922; --line: #252a35;
+    --text: #f5f3e7; --muted: #8e93a0; --ring: #c86bfa; --amber: #f2a541; --teal: #3fb8af;
+    --red: #e4572e; --yellow: #e9c46a; --blue: #4cc9f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px; height: 900px; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", sans-serif; font-size: 14px;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  }
+  .top { height: 56px; display: flex; align-items: center; gap: 18px; padding: 0 18px;
+    background: linear-gradient(#0b0d12, #080a0e); border-bottom: 1px solid var(--line); }
+  .brand { font-weight: 700; }
+  .brand small { display: block; font-weight: 500; color: var(--muted); font-size: 11px; }
+  .date { font-size: 18px; font-weight: 600; padding-left: 14px; border-left: 1px solid var(--line); }
+  .speed { display: flex; gap: 4px; }
+  .speed span { width: 30px; height: 26px; border-radius: 6px; display: grid; place-items: center;
+    background: var(--panel2); color: var(--muted); font-size: 12px; border: 1px solid var(--line); }
+  .speed span.on { background: var(--ring); color: #16061f; border-color: var(--ring); font-weight: 700; }
+  .k { padding: 4px 12px; border-radius: 8px; border: 1px solid #5b3f73; background: rgba(200,107,250,0.08); line-height: 1.1; }
+  .k b { font-size: 18px; } .k i { font-style: normal; display: block; font-size: 11px; color: var(--muted); }
+  .stats { display: flex; gap: 6px; }
+  .stat { padding: 5px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); line-height: 1.15; }
+  .stat b { display: block; font-size: 15px; font-weight: 650; }
+  .stat i { font-style: normal; font-size: 11px; color: var(--muted); }
+  .stat.warn b { color: var(--yellow); }
+  .main { display: grid; grid-template-columns: 76px 1fr 420px; height: 844px; }
+  .rail { border-right: 1px solid var(--line); padding: 12px 8px; display: flex; flex-direction: column; gap: 8px; }
+  .layer { height: 70px; border-radius: 10px; display: grid; place-items: center; text-align: center; font-size: 12px;
+    color: var(--muted); border: 1px solid var(--line); background: var(--panel); }
+  .layer .ico { font-size: 22px; display: block; }
+  .layer.on { color: var(--text); border-color: var(--ring); box-shadow: inset 0 0 0 1px var(--ring); }
+  .layer.dim { opacity: 0.6; }
+  .view { position: relative; overflow: hidden; }
+  svg { position: absolute; inset: 0; }
+  .legend { position: absolute; left: 20px; top: 16px; display: flex; gap: 6px; }
+  .legend span { padding: 5px 10px; border-radius: 999px; font-size: 12px; background: rgba(15,18,24,0.9); border: 1px solid var(--line); color: var(--muted); }
+  .legend span i { display: inline-block; width: 18px; height: 2px; vertical-align: middle; margin-right: 6px; }
+  .composer { position: absolute; left: 20px; right: 20px; bottom: 18px; background: rgba(15,18,24,0.96); border: 1px solid #3a2d4a;
+    border-radius: 12px; padding: 14px 16px; display: grid; grid-template-columns: 1fr 250px; gap: 14px; }
+  .composer h3 { font-size: 15px; margin-bottom: 6px; }
+  .composer p { color: #cfd2db; font-size: 13px; line-height: 1.55; }
+  .composer code { font-family: ui-monospace, monospace; font-size: 12px; color: #e3c6fb; }
+  .eta { border-left: 1px solid var(--line); padding-left: 14px; font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .eta b { color: var(--text); font-size: 15px; }
+  .send { margin-top: 6px; display: inline-block; padding: 7px 14px; border-radius: 8px; background: var(--ring); color: #16061f; font-weight: 700; }
+  .side { border-left: 1px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 12px; overflow: hidden; background: #07090d; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .card h2 { font-size: 16px; }
+  .card .meta { color: var(--muted); font-size: 12px; margin: 3px 0 10px; }
+  .age { display: inline-block; padding: 3px 9px; border-radius: 999px; background: rgba(200,107,250,0.14); color: #e3c6fb; font-size: 12px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 11.5px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  td { padding: 6px 0; border-bottom: 1px solid #1b1f29; }
+  td.old { color: #b9bccb; opacity: 0.75; }
+  td.est b { font-weight: 650; } td.est i { font-style: normal; color: var(--muted); font-size: 12px; }
+  .orders { margin-top: 8px; font-size: 12.5px; line-height: 1.6; }
+  .orders div { display: flex; justify-content: space-between; border-bottom: 1px dashed #222735; padding: 3px 0; }
+  .orders span:last-child { color: var(--muted); }
+  .warnbox { font-size: 12.5px; padding: 8px 10px; border-radius: 8px; background: rgba(233,196,106,0.08); border: 1px solid rgba(233,196,106,0.4); color: #f1dfaa; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="brand">SpaceCity<small>성간 · 위임 3단계 · 문명 관리자</small></div>
+  <div class="date">2702.06.14</div>
+  <div class="speed"><span>❚❚</span><span>1×</span><span class="on">3×</span><span>10×</span><span>⏭</span></div>
+  <div class="k"><b>K 1.66</b><i>카르다쇼프 지수</i></div>
+  <div class="stats">
+    <div class="stat"><b>2곳</b><i>식민지</i></div>
+    <div class="stat"><b>2척</b><i>항해 중</i></div>
+    <div class="stat"><b>5통</b><i>빛 속을 나는 메시지</i></div>
+    <div class="stat warn"><b>1.31</b><i>평균 문화 거리</i></div>
+    <div class="stat"><b>77</b><i>신뢰</i></div>
+  </div>
+</div>
+<div class="main">
+  <div class="rail">
+    <div class="layer"><div><span class="ico">⬢</span>도시</div></div>
+    <div class="layer"><div><span class="ico">◎</span>항성계</div></div>
+    <div class="layer on"><div><span class="ico">✦</span>성간</div></div>
+    <div class="layer dim"><div><span class="ico">◌</span>은하<br><small>미리보기</small></div></div>
+  </div>
+  <div class="view">
+    <svg id="map" width="1104" height="844" viewBox="0 0 1104 844"></svg>
+    <div class="legend">
+      <span><i style="background:#c86bfa"></i>보낸 메시지</span>
+      <span><i style="background:#4cc9f0"></i>받는 중인 보고</span>
+      <span><i style="background:#f2a541;height:0;border-top:2px dashed #f2a541"></i>항해 경로</span>
+      <span>●●●○ 탐사 단계</span>
+    </div>
+    <div class="composer">
+      <div>
+        <h3>새 메시지 → 프록시마의 시드 · 표준 지침 개정</h3>
+        <p><code>- when: alien_signal_detected</code> 의 행동을 <code>report_and_wait</code> → <code>joint_analysis</code> 로 바꾼다.<br>
+           시드 예측: 정렬도 0.86이면 수락 확률 약 80%. 거절하면 헌장 개정 협상 이벤트가 열린다.</p>
+      </div>
+      <div class="eta">도착 <b>2706년 9월</b><br>답장은 빨라야 <b>2710년 12월</b><br><span class="send">빛으로 보내기</span></div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="card">
+      <h2>프록시마 b · 터미네이터 시티</h2>
+      <div class="meta">자치령 · 2565년 정착 · 딸 시드 '프록시마의 시드' 정렬도 0.86</div>
+      <span class="age">정보 연령 4.2년 — 2698.03 발신</span>
+      <table style="margin-top:10px">
+        <tr><th>항목</th><th>마지막 보고</th><th>시드 추정 (지금)</th></tr>
+        <tr><td>인구</td><td class="old">18,400</td><td class="est"><b>19,600</b> <i>± 900</i></td></tr>
+        <tr><td>안정도</td><td class="old">71</td><td class="est"><b>64</b> <i>± 12</i></td></tr>
+        <tr><td>문화 거리</td><td class="old">1.30</td><td class="est"><b>1.40</b> <i>± 0.2</i></td></tr>
+        <tr><td>자급률</td><td class="old">94%</td><td class="est"><b>96%</b> <i>± 3</i></td></tr>
+        <tr><td>진행 중 지령</td><td class="old" colspan="2">"제2 대피소 증설" → 2704.06 도착 예정</td></tr>
+      </table>
+      <div class="orders">
+        <div><span>표준 지침 6 / 8</span><span>시험 운전 ▸</span></div>
+        <div><span>1 · 외계 신호 → 보고 후 대기</span><span>우선 1</span></div>
+        <div><span>1 · 플레어 경보 → 전원 대피</span><span>우선 1</span></div>
+        <div><span>2 · 독립 투표 요청 → 자치령 유지 제안</span><span>우선 2</span></div>
+        <div><span>3 · 인구 5만 & 자급 90% → 2차 정착</span><span>우선 3</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>바너드 별 · 롱 패스 정착지</h2>
+      <div class="meta">직할 · 2595년 도착 · '바너드의 시드' 정렬도 0.71</div>
+      <span class="age">정보 연령 6.0년 — 2696.06 발신</span>
+      <div class="warnbox" style="margin-top:10px">문화 거리 1.62 — 경고선 1.5를 넘었다. 124년의 항해 동안 자란 2·3세대가 '본국'을 모른다.
+        자치령 승격, 문화 패킷 증설, 헌장 자유도 상향 중 하나를 권한다.</div>
+    </div>
+  </div>
+</div>
+<script>
+const svg = document.getElementById("map");
+const NS = "http://www.w3.org/2000/svg";
+const NOW = 2702.45, SCALE = 29, CX = 470, CY = 345;
+const el = (tag, attrs, parent = svg) => {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  parent.appendChild(e);
+  return e;
+};
+const text = (x, y, s, attrs = {}) => { const t = el("text", { x, y, ...attrs }); t.textContent = s; return t; };
+// 적경(도)과 거리(광년)로 그린 근거리 항성 — 실제 배치를 평면에 투영한 개념도
+// [이름, 적경(도), 거리(광년), 색, 탐사 단계, 라벨 방향(1 오른쪽 / -1 왼쪽), 라벨 세로 이동]
+const stars = [
+  ["알파 센타우리", 220, 4.37, "#ffe9a8", 3, -1, -16], ["프록시마", 217, 4.25, "#ff8a65", 4, 1, -10],
+  ["바너드 별", 269, 5.96, "#ff8a65", 4, -1, -14], ["울프 359", 164, 7.86, "#ff8a65", 2, 1, -6],
+  ["랄랑드 21185", 166, 8.31, "#ff8a65", 2, -1, 8], ["시리우스", 101, 8.6, "#cfe3ff", 2, 1, 0],
+  ["루이텐 726-8", 25, 8.7, "#ff8a65", 1, 1, 0], ["로스 248", 355, 10.3, "#ff8a65", 1, 1, 0],
+  ["엡실론 에리다니", 53, 10.5, "#ffd38a", 3, 1, 0], ["로스 128", 177, 11.0, "#ff8a65", 3, 1, 6],
+  ["백조자리 61", 317, 11.4, "#ffc078", 1, -1, 0], ["프로키온", 115, 11.46, "#fff6d8", 1, -1, 10],
+  ["고래자리 타우", 26, 11.9, "#ffe2a0", 2, 1, 0], ["루이텐 별", 112, 12.35, "#ff8a65", 2, 1, -8],
+  ["티가든 별", 43, 12.5, "#ff8a65", 2, 1, 0],
+];
+const pos = (ra, d) => [CX + Math.cos((ra - 90) * Math.PI / 180) * d * SCALE, CY + Math.sin((ra - 90) * Math.PI / 180) * d * SCALE];
+el("defs", {}).innerHTML = `
+  <radialGradient id="sol" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff6d8"/><stop offset="1" stop-color="#f2a541" stop-opacity="0"/></radialGradient>
+  <radialGradient id="neb" cx="0.3" cy="0.4" r="0.8"><stop offset="0" stop-color="#1b1446" stop-opacity="0.55"/><stop offset="1" stop-color="#05070a" stop-opacity="0"/></radialGradient>`;
+el("rect", { x: 0, y: 0, width: 1104, height: 844, fill: "url(#neb)" });
+for (let i = 0; i < 260; i++) el("circle", { cx: (i * 389) % 1104, cy: (i * 233) % 844, r: i % 9 === 0 ? 1.1 : 0.5, fill: "#9aa3b8", opacity: 0.25 + (i % 4) * 0.08 });
+// 거리 눈금
+[4, 8, 12].forEach(r => {
+  el("circle", { cx: CX, cy: CY, r: r * SCALE, fill: "none", stroke: "#1c2130", "stroke-dasharray": "2 6" });
+  text(CX + r * SCALE + 4, CY - 4, `${r}광년`, { fill: "#4a5266", "font-size": 11 });
+});
+// 빛의 고리: [출발지, 보낸 해, 색, 설명]
+const rings = [
+  [[CX, CY], 2700.2, "#c86bfa", "본국 → 프록시마 지령 (2700.2 발신)"],
+  [pos(217, 4.25), 2698.2, "#4cc9f0", "프록시마 보고 — 방금 도착"],
+  [pos(269, 5.96), 2696.5, "#4cc9f0", "바너드 보고 — 방금 도착"],
+  [[CX, CY], 2697.0, "#c86bfa", "본국 → 바너드 문화 패킷"],
+];
+rings.forEach(([[x, y], sent, color, label]) => {
+  const r = (NOW - sent) * SCALE;
+  el("circle", { cx: x, cy: y, r, fill: "none", stroke: color, "stroke-width": 1.6, opacity: 0.75 });
+  el("circle", { cx: x, cy: y, r: r - 5, fill: "none", stroke: color, "stroke-width": 0.8, opacity: 0.25 });
+});
+// 항해 경로: 롱 패스는 도착했고, '늦은 편지'가 로스 128로 가는 중
+const [rx, ry] = pos(177, 11.0);
+el("line", { x1: CX, y1: CY, x2: rx, y2: ry, stroke: "#f2a541", "stroke-width": 1.5, "stroke-dasharray": "6 6", opacity: 0.85 });
+const f = (NOW - 2611) / 225;
+const sx = CX + (rx - CX) * f, sy = CY + (ry - CY) * f;
+el("polygon", { points: `${sx},${sy - 7} ${sx + 6},${sy + 5} ${sx - 6},${sy + 5}`, fill: "#f2a541" });
+text(sx + 12, sy + 4, "세대우주선 '늦은 편지' · 0.05c · 도착 2836", { fill: "#f6c27a", "font-size": 12, "font-weight": 600 });
+const [ex, ey] = pos(53, 10.5);
+el("line", { x1: CX, y1: CY, x2: ex, y2: ey, stroke: "#4cc9f0", "stroke-width": 1, "stroke-dasharray": "2 5", opacity: 0.7 });
+text(ex - 10, ey + 34, "레이저 돛 탐사선 — 5개월 뒤 통과 · 결과 수신 2713", { fill: "#9fdcf2", "font-size": 12, "text-anchor": "middle" });
+// 태양과 별
+el("circle", { cx: CX, cy: CY, r: 26, fill: "url(#sol)" });
+el("circle", { cx: CX, cy: CY, r: 6, fill: "#fff6d8" });
+text(CX + 12, CY + 22, "태양계 · 본국", { fill: "#f5f3e7", "font-size": 13, "font-weight": 700 });
+stars.forEach(([name, ra, d, color, stage, side, dy]) => {
+  const [x, y] = pos(ra, d);
+  el("circle", { cx: x, cy: y, r: 9, fill: color, opacity: 0.18 });
+  el("circle", { cx: x, cy: y, r: 3.6, fill: color });
+  const anchor = side < 0 ? "end" : "start";
+  const lx = x + (side < 0 ? -12 : 16);
+  text(lx, y - 4 + dy, name, { fill: "#e8e6dc", "font-size": 12.5, "font-weight": 600, "text-anchor": anchor });
+  text(lx, y + 11 + dy, `${d} ly  ${"●".repeat(stage)}${"○".repeat(4 - stage)}`, { fill: "#7d8496", "font-size": 11, "text-anchor": anchor });
+});
+// 식민지 표시
+[[217, 4.25, "터미네이터 시티 · 자치령"], [269, 5.96, "롱 패스 정착지 · 직할"]].forEach(([ra, d, label]) => {
+  const [x, y] = pos(ra, d);
+  el("circle", { cx: x, cy: y, r: 13, fill: "none", stroke: "#3fb8af", "stroke-width": 2 });
+  text(x, y + 30, label, { fill: "#8fe0d8", "font-size": 12, "font-weight": 600, "text-anchor": "middle" });
+});
+</script>
+</body>
+</html>

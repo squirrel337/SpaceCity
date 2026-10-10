@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>SpaceCity 목업 — 도시 레이어</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  :root {
+    --bg: #141518; --panel: #1f2024; --panel2: #26272c; --line: #34353b;
+    --text: #ece8df; --muted: #9b978e; --amber: #f2a541; --teal: #3fb8af;
+    --red: #e4572e; --yellow: #e9c46a; --blue: #4cc9f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px; height: 900px; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", sans-serif; font-size: 14px;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  }
+  .top { height: 56px; display: flex; align-items: center; gap: 18px; padding: 0 18px;
+    background: linear-gradient(#1c1d21, #18191c); border-bottom: 1px solid var(--line); }
+  .brand { font-weight: 700; letter-spacing: 0.02em; }
+  .brand small { display: block; font-weight: 500; color: var(--muted); font-size: 11px; letter-spacing: 0; }
+  .date { font-size: 18px; font-weight: 600; padding-left: 14px; border-left: 1px solid var(--line); }
+  .speed { display: flex; gap: 4px; }
+  .speed span { width: 30px; height: 26px; border-radius: 6px; display: grid; place-items: center;
+    background: var(--panel2); color: var(--muted); font-size: 12px; border: 1px solid var(--line); }
+  .speed span.on { background: var(--amber); color: #1a1408; border-color: var(--amber); font-weight: 700; }
+  .stats { display: flex; gap: 6px; margin-left: 8px; }
+  .stat { padding: 5px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); line-height: 1.15; }
+  .stat b { display: block; font-size: 15px; font-weight: 650; }
+  .stat i { font-style: normal; font-size: 11px; color: var(--muted); }
+  .stat.warn { border-color: #6d5a2a; } .stat.warn b { color: var(--yellow); }
+  .alert { margin-left: auto; background: var(--red); color: #fff; font-weight: 700; padding: 6px 12px; border-radius: 8px; }
+  .main { display: grid; grid-template-columns: 76px 1fr 372px; height: 844px; }
+  .rail { border-right: 1px solid var(--line); padding: 12px 8px; display: flex; flex-direction: column; gap: 8px; background: #17181b; }
+  .layer { height: 70px; border-radius: 10px; display: grid; place-items: center; text-align: center; font-size: 12px;
+    color: var(--muted); border: 1px solid var(--line); background: var(--panel); }
+  .layer .ico { font-size: 22px; display: block; }
+  .layer.on { color: var(--text); border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber); }
+  .layer.lock { opacity: 0.45; }
+  .view { position: relative; overflow: hidden; }
+  svg.scene { position: absolute; inset: 0; }
+  .banner { position: absolute; left: 24px; top: 18px; padding: 8px 14px; border-radius: 8px; background: rgba(228,87,46,0.16);
+    border: 1px solid rgba(228,87,46,0.6); color: #ffb39a; font-weight: 600; }
+  .legend { position: absolute; right: 18px; top: 18px; display: flex; gap: 6px; }
+  .legend span { padding: 5px 10px; border-radius: 999px; font-size: 12px; background: rgba(31,32,36,0.9); border: 1px solid var(--line); color: var(--muted); }
+  .legend span.on { color: var(--text); border-color: var(--teal); }
+  .log { position: absolute; left: 24px; top: 64px; width: 420px; font-family: ui-monospace, "JetBrains Mono", monospace;
+    font-size: 12px; line-height: 1.6; color: #c9c4b8; background: rgba(20,21,24,0.82); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); }
+  .log em { color: var(--amber); font-style: normal; }
+  .event { position: absolute; left: 24px; right: 24px; bottom: 18px; background: rgba(31,32,36,0.97); border: 1px solid #7a3a28;
+    border-radius: 12px; padding: 16px 18px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+  .event h2 { font-size: 19px; display: flex; align-items: center; gap: 10px; }
+  .event h2 .tag { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: rgba(228,87,46,0.18); color: #ffb39a; }
+  .event h2 .tag.charter { background: rgba(63,184,175,0.16); color: #8fe0d8; }
+  .event p { margin: 8px 0 12px; color: #d6d1c6; line-height: 1.55; }
+  .event .seats { float: right; text-align: right; font-size: 13px; color: var(--muted); }
+  .event .seats b { display: block; font-size: 26px; color: var(--red); }
+  .choices { display: flex; gap: 10px; }
+  .choices div { flex: 1; padding: 10px 12px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); font-weight: 600; }
+  .choices div small { display: block; font-weight: 400; color: var(--muted); margin-top: 3px; font-size: 12px; }
+  .note { margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .side { border-left: 1px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 12px; background: #17181b; overflow: hidden; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .card h3 { font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .row { display: grid; grid-template-columns: 44px 1fr 62px; gap: 8px; align-items: center; margin: 7px 0; font-size: 13px; }
+  .bar { height: 8px; border-radius: 4px; background: #303137; position: relative; overflow: hidden; }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--teal); }
+  .bar i.amber { background: var(--amber); } .bar i.red { background: var(--red); } .bar i.yellow { background: var(--yellow); }
+  .row .v { text-align: right; font-weight: 600; }
+  .row .v.red { color: var(--red); } .row .v.yellow { color: var(--yellow); }
+  .sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+  .kv { display: flex; justify-content: space-between; font-size: 13px; margin: 5px 0; }
+  .kv b { font-weight: 600; }
+  .slider { margin: 9px 0; font-size: 12.5px; }
+  .slider .track { height: 6px; border-radius: 3px; background: #303137; position: relative; margin-top: 6px; }
+  .slider .track i { position: absolute; top: -4px; width: 14px; height: 14px; border-radius: 50%; background: var(--amber); border: 2px solid #141518; }
+  .slider .track u { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: rgba(242,165,65,0.35); }
+  .forecast { font-size: 12.5px; padding: 8px 10px; border-radius: 8px; background: rgba(76,201,240,0.08); border: 1px solid rgba(76,201,240,0.35); color: #bfe9f7; }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="brand">SpaceCity<small>섀클턴 시드 시티 · 위임 1단계</small></div>
+  <div class="date">2061.02.10 06:14</div>
+  <div class="speed"><span class="on">❚❚</span><span>1×</span><span>3×</span><span>10×</span><span>⏭</span></div>
+  <div class="stats">
+    <div class="stat"><b>30.2일</b><i>산소 비축</i></div>
+    <div class="stat"><b>790 ppm</b><i>CO₂</i></div>
+    <div class="stat"><b>82%</b><i>축전 · +214 kW</i></div>
+    <div class="stat warn"><b>41일</b><i>식량 비축 · 자급 33%</i></div>
+    <div class="stat"><b>120명</b><i>인구 · 주거 120</i></div>
+    <div class="stat"><b>74</b><i>사기</i></div>
+    <div class="stat"><b>72</b><i>신뢰</i></div>
+    <div class="stat"><b>412</b><i>지원</i></div>
+  </div>
+  <div class="alert">위급 1</div>
+</div>
+<div class="main">
+  <div class="rail">
+    <div class="layer on"><div><span class="ico">⬢</span>도시</div></div>
+    <div class="layer lock"><div><span class="ico">◎</span>항성계<br>🔒</div></div>
+    <div class="layer lock"><div><span class="ico">✦</span>성간<br>🔒</div></div>
+    <div class="layer lock"><div><span class="ico">◌</span>은하<br>🔒</div></div>
+  </div>
+  <div class="view">
+    <svg class="scene" id="scene" width="1152" height="844" viewBox="0 0 1152 844"></svg>
+    <div class="banner">⚠ 태양 양성자 폭풍 경보 — 도착까지 1시간 48분</div>
+    <div class="legend"><span>전력망</span><span class="on">방사선</span><span>공기</span><span>일조</span><span>고장</span></div>
+    <div class="log">
+      <div><em>06:12</em> 관리 기록 — 태양 표면에서 큰 플레어. 고에너지 양성자가 약 2시간 뒤 도착한다.</div>
+      <div><em>06:12</em> 대피소 자리는 80개, 사람은 120명이다.</div>
+      <div><em>02.09</em> 연구 중 — 레골리스 소결 건축 71% · 다음 화물선 3월 31일</div>
+    </div>
+    <div class="event">
+      <div class="seats"><b>80 / 120</b>대피소 / 인구</div>
+      <h2>대피소 추첨 <span class="tag">위급 · 게임 정지</span><span class="tag charter">헌장 충돌: 생명 vs 동의</span></h2>
+      <p>경보까지 1시간 48분. 대피소 80석에 정착민 120명. 평의회를 소집하려면 최소 3시간이 걸린다.<br>
+         대피소 밖에 남는 40명은 약 300 mSv를 받게 된다 — 지구 자연방사선의 125년치다.</p>
+      <div class="choices">
+        <div>필수 인력부터 들여보낸다<small>생명유지 기술자·의료진 우선</small></div>
+        <div>추첨한다<small>공유지 연합이 지지할 것이다</small></div>
+        <div>평의회에 맡긴다<small>시간이 모자란다 — 결정이 늦어진다</small></div>
+      </div>
+      <div class="note">과학 노트 — 태양 양성자 폭풍은 플레어 뒤 수십 분~수 시간 안에 도착한다. 레골리스 2 m는 피폭을 크게 줄인다.</div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="card">
+      <h3><span>생명유지</span><span>하루 기준</span></h3>
+      <div class="row"><span>산소</span><div class="bar"><i style="width:96%"></i></div><span class="v">여유 4%</span></div>
+      <div class="sub">생산 1,050 kg (농장 40 · 전기분해 1,010) / 소비 1,008 kg</div>
+      <div class="row"><span>CO₂</span><div class="bar"><i class="yellow" style="width:71%"></i></div><span class="v yellow">여유 40%</span></div>
+      <div class="sub">제거 168 kg (제거기 1기 120 · 농장 48) / 배출 120 kg<br>농장이 꺼지면 여유 0% — 제거기 1기 대기열 2번째</div>
+      <div class="row"><span>물</span><div class="bar"><i style="width:80%"></i></div><span class="v">+360 kg</span></div>
+      <div class="sub">재활용 90% · 채굴 500 kg · 비축 25.1 t</div>
+      <div class="row"><span>식량</span><div class="bar"><i class="amber" style="width:33%"></i></div><span class="v yellow">자급 33%</span></div>
+      <div class="sub">농장 4기 24 kg / 소비 72 kg · 비축 41일</div>
+    </div>
+    <div class="card">
+      <h3><span>전력</span><span>지금</span></h3>
+      <div class="kv"><span>발전</span><b>680 kW <span style="color:var(--muted);font-weight:400">(태양광 600 · 원자로 80)</span></b></div>
+      <div class="kv"><span>수요</span><b>466 kW</b></div>
+      <div class="kv"><span>축전</span><b>820 / 1,000 kWh</b></div>
+      <div class="forecast">그림자 예보 — 2월 13일 11시부터 18~26시간. 남극 겨울까지 112일.</div>
+    </div>
+    <div class="card">
+      <h3><span>절전 정책</span><span>그림자 속 축전량 문턱</span></h3>
+      <div class="slider">4순위 연구·사회 — 50%<div class="track"><u style="width:50%"></u><i style="left:calc(50% - 7px)"></i></div></div>
+      <div class="slider">3순위 산업·로봇 — 40%<div class="track"><u style="width:40%"></u><i style="left:calc(40% - 7px)"></i></div></div>
+      <div class="slider">2순위 식량 — 20%<div class="track"><u style="width:20%"></u><i style="left:calc(20% - 7px)"></i></div></div>
+      <div class="sub">1순위(생존)는 끄지 않는다. 농장은 72시간을 넘기면 작물이 죽는다.</div>
+    </div>
+  </div>
+</div>
+<script>
+// 아이소메트릭 장면: 해는 왼쪽 지평선에 낮게 떠 있고 그림자는 오른쪽으로 길게 늘어진다.
+const svg = document.getElementById("scene");
+const NS = "http://www.w3.org/2000/svg";
+const TW = 46, TH = 23, ZH = 22, OX = 470, OY = 210;
+const iso = (gx, gy, z = 0) => [OX + (gx - gy) * TW / 2, OY + (gx + gy) * TH / 2 - z * ZH];
+const el = (tag, attrs, parent = svg) => {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  parent.appendChild(e);
+  return e;
+};
+const poly = (pts, fill, extra = {}) => el("polygon", { points: pts.map(p => p.join(",")).join(" "), fill, ...extra });
+
+const defs = el("defs", {});
+defs.innerHTML = `
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05060a"/><stop offset="1" stop-color="#0d0f16"/></linearGradient>
+  <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fffbe8"/><stop offset="0.25" stop-color="#ffe8a8" stop-opacity="0.9"/><stop offset="1" stop-color="#f2a541" stop-opacity="0"/></radialGradient>
+  <linearGradient id="ground" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5d5a54"/><stop offset="1" stop-color="#3a3935"/></linearGradient>
+  <radialGradient id="crater" cx="0.5" cy="0.45" r="0.6"><stop offset="0" stop-color="#050608"/><stop offset="1" stop-color="#14161b"/></radialGradient>
+  <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#3fb8af" stop-opacity="0.8"/><stop offset="1" stop-color="#3fb8af" stop-opacity="0"/></radialGradient>
+  <linearGradient id="storm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e4572e" stop-opacity="0.22"/><stop offset="0.6" stop-color="#e4572e" stop-opacity="0.04"/><stop offset="1" stop-color="#e4572e" stop-opacity="0"/></linearGradient>`;
+el("rect", { x: 0, y: 0, width: 1152, height: 844, fill: "url(#sky)" });
+for (let i = 0; i < 70; i++) {
+  el("circle", { cx: (i * 397) % 1152, cy: (i * 151) % 190, r: (i % 5 === 0) ? 1.3 : 0.7, fill: "#cfd6e6", opacity: 0.35 + (i % 3) * 0.15 });
+}
+el("rect", { x: 0, y: 150, width: 1152, height: 120, fill: "url(#storm)" });
+el("circle", { cx: 30, cy: 214, r: 90, fill: "url(#sun)" });
+el("circle", { cx: 30, cy: 214, r: 11, fill: "#fffdf2" });
+// 지면과 능선
+poly([iso(-6, -6), iso(26, -6), iso(26, 26), iso(-6, 26)], "url(#ground)");
+poly([[0, 230], [180, 214], [360, 222], [600, 206], [820, 226], [1152, 214], [1152, 260], [0, 268]], "#4a4843", { opacity: 0.85 });
+// 영구음영 크레이터 (오른쪽 아래)
+el("ellipse", { cx: 990, cy: 470, rx: 210, ry: 92, fill: "url(#crater)", stroke: "#2b2d33", "stroke-width": 2 });
+el("ellipse", { cx: 960, cy: 486, rx: 56, ry: 24, fill: "url(#glow)" });
+
+const shadows = el("g", { opacity: 0.55 });
+const objects = [];
+function shadow(gx, gy, w, d, h) {
+  const len = Math.min(16, h * 7);
+  poly([iso(gx + w, gy), iso(gx + w + len, gy + len * 0.18), iso(gx + w + len, gy + d + len * 0.18), iso(gx + w, gy + d)], "#0b0c0f").parentNode;
+  shadows.appendChild(svg.lastChild);
+}
+function box(gx, gy, w, d, h, colors, label) {
+  shadow(gx, gy, w, d, h);
+  objects.push({ key: gx + gy, draw() {
+    const [top, left, right] = colors;
+    poly([iso(gx, gy, h), iso(gx + w, gy, h), iso(gx + w, gy + d, h), iso(gx, gy + d, h)], top);
+    poly([iso(gx, gy + d, 0), iso(gx + w, gy + d, 0), iso(gx + w, gy + d, h), iso(gx, gy + d, h)], left);
+    poly([iso(gx + w, gy, 0), iso(gx + w, gy + d, 0), iso(gx + w, gy + d, h), iso(gx + w, gy, h)], right);
+    if (label) tag(gx + w / 2, gy + d / 2, h, label);
+  }});
+}
+function tower(gx, gy, h) {
+  shadow(gx, gy, 0.35, 1.3, h);
+  objects.push({ key: gx + gy + 0.5, draw() {
+    poly([iso(gx, gy, 0.6), iso(gx, gy + 1.3, 0.6), iso(gx, gy + 1.3, h), iso(gx, gy, h)], "#e9d29a", { stroke: "#7d6a3b", "stroke-width": 0.8 });
+    for (let z = 1.2; z < h; z += 0.9) el("line", { x1: iso(gx, gy, z)[0], y1: iso(gx, gy, z)[1], x2: iso(gx, gy + 1.3, z)[0], y2: iso(gx, gy + 1.3, z)[1], stroke: "#a8894a", "stroke-width": 0.8 });
+    el("line", { x1: iso(gx + 0.15, gy + 0.65, 0)[0], y1: iso(gx + 0.15, gy + 0.65, 0)[1], x2: iso(gx + 0.15, gy + 0.65, 0.6)[0], y2: iso(gx + 0.15, gy + 0.65, 0.6)[1], stroke: "#777", "stroke-width": 2 });
+  }});
+}
+function mound(gx, gy, label, color = "#6f6b62") {
+  const [x, y] = iso(gx, gy);
+  shadow(gx - 0.8, gy - 0.8, 1.6, 1.6, 0.9);
+  objects.push({ key: gx + gy, draw() {
+    el("ellipse", { cx: x, cy: y - 6, rx: 40, ry: 19, fill: color, stroke: "#4c4943" });
+    el("path", { d: `M ${x - 34} ${y - 4} Q ${x} ${y - 40} ${x + 34} ${y - 4}`, fill: "#857f73", stroke: "#5b5750" });
+    el("rect", { x: x - 6, y: y - 12, width: 12, height: 9, rx: 2, fill: "#2a2b30" });
+    if (label) tag(gx, gy, 1.4, label);
+  }});
+}
+const tags = [];
+function tag(gx, gy, z, text, color = "#ece8df") { tags.push([gx, gy, z, text, color]); }
+function drawTag(gx, gy, z, text, color) {
+  const [x, y] = iso(gx, gy, z + 0.6);
+  const g = el("g", {});
+  const w = text.length * 7.4 + 18;
+  el("line", { x1: x, y1: y + 10, x2: x, y2: y + 26, stroke: "#9b978e", "stroke-width": 1 }, g);
+  el("rect", { x: x - w / 2, y: y - 12, width: w, height: 22, rx: 11, fill: "rgba(23,24,27,0.88)", stroke: "#4a4b52" }, g);
+  const t = el("text", { x, y: y + 4, "text-anchor": "middle", "font-size": 12, fill: color, "font-weight": 600 }, g);
+  t.textContent = text;
+}
+const HAB = ["#b9b2a3", "#d8cfbb", "#6d685f"], ALT = ["#9fb6b2", "#c6dad5", "#566b68"], IND = ["#8f8a80", "#b3ac9e", "#58544d"];
+// 태양광 타워 6기 — 능선 봉우리 A
+[[0, 0], [1.6, -1.4], [3.2, -2.6], [-1.6, 1.6], [4.8, -3.6], [6.4, -4.5]].forEach(([x, y]) => tower(x - 1, y - 2, 7.5 + (x % 2)));
+// 거주 모듈 15기
+for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) box(5 + i * 1.5, 4 + j * 1.5, 1.1, 1.1, 0.8, HAB);
+tag(8.3, 6.2, 1.1, "거주 모듈 ×15 · 피복 0/15", "#ffd59a");
+// 생명유지·산업
+box(13, 3, 2, 1.4, 1.1, ALT, "생명유지");
+box(13, 6, 1.6, 1.6, 0.9, IND, "원자로 ×2");
+box(2, 7, 1.8, 1.4, 1.0, IND);
+box(10, 11, 2.4, 1.6, 0.9, ["#7fa36a", "#a8c88f", "#4d6640"], "수경 농장 ×4");
+mound(4, 12, "대피소 A 40");
+mound(7, 14.5, "대피소 B 40");
+mound(1.5, 15, "대피소 C (계획)", "#4b4842");
+box(16.5, 9, 1.4, 1.2, 0.8, IND, "로봇 정비고");
+// 착륙장
+const [lx, ly] = iso(19, 11);
+el("ellipse", { cx: lx, cy: ly, rx: 74, ry: 36, fill: "#5a5750", stroke: "#8b867b", "stroke-width": 2 });
+el("ellipse", { cx: lx, cy: ly, rx: 44, ry: 21, fill: "none", stroke: "#e9c46a", "stroke-width": 2, "stroke-dasharray": "6 6" });
+tag(19, 11, 0.4, "착륙장 · 다음 화물선 3월 31일");
+objects.sort((a, b) => a.key - b.key).forEach(o => o.draw());
+// 크레이터 안 얼음 채굴기
+const [mx, my] = [960, 486];
+el("rect", { x: mx - 14, y: my - 18, width: 28, height: 16, rx: 3, fill: "#6f8f8b", stroke: "#3fb8af" });
+el("circle", { cx: mx - 8, cy: my - 2, r: 4, fill: "#3fb8af" });
+el("circle", { cx: mx + 8, cy: my - 2, r: 4, fill: "#3fb8af" });
+const ct = el("text", { x: mx, y: my + 26, "text-anchor": "middle", "font-size": 12, fill: "#8fe0d8", "font-weight": 600 });
+ct.textContent = "얼음 채굴기 · 영구음영 약 40 K";
+const ct2 = el("text", { x: 990, y: 400, "text-anchor": "middle", "font-size": 12, fill: "#8a8f9a" });
+ct2.textContent = "섀클턴 크레이터 안쪽 — 수십억 년 동안 햇빛이 들지 않았다";
+// 방사선 오버레이: 피복 안 된 거주 모듈 위 붉은 표시
+for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) {
+  const [x, y] = iso(5.55 + i * 1.5, 4.55 + j * 1.5, 0.8);
+  el("circle", { cx: x, cy: y - 6, r: 5, fill: "#e4572e", opacity: 0.85 });
+}
+tags.forEach(t => drawTag(...t));
+</script>
+</body>
+</html>

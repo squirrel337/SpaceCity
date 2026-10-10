@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>SpaceCity 목업 — 가설 보드</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  :root {
+    --bg: #0d0a24; --panel: #17133a; --panel2: #1e1948; --line: #2e2862;
+    --text: #f3efe2; --muted: #9a94bd; --gold: #e9c46a; --sig: #f28482; --teal: #3fb8af; --red: #e4572e; --violet: #c86bfa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px; height: 900px; overflow: hidden; color: var(--text);
+    background: radial-gradient(1200px 700px at 30% 20%, #1b1446, #0b0820 70%);
+    font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", sans-serif; font-size: 14px;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  }
+  .top { height: 56px; display: flex; align-items: center; gap: 18px; padding: 0 18px; background: rgba(10,8,30,0.85); border-bottom: 1px solid var(--line); }
+  .brand { font-weight: 700; } .brand small { display: block; font-weight: 500; color: var(--muted); font-size: 11px; }
+  .date { font-size: 18px; font-weight: 600; padding-left: 14px; border-left: 1px solid var(--line); }
+  .speed { display: flex; gap: 4px; }
+  .speed span { width: 30px; height: 26px; border-radius: 6px; display: grid; place-items: center; background: var(--panel2); color: var(--muted); font-size: 12px; border: 1px solid var(--line); }
+  .speed span.on { background: var(--gold); color: #241a05; border-color: var(--gold); font-weight: 700; }
+  .k { padding: 4px 12px; border-radius: 8px; border: 1px solid #6b5a2c; background: rgba(233,196,106,0.08); line-height: 1.1; }
+  .k b { font-size: 18px; } .k i { font-style: normal; display: block; font-size: 11px; color: var(--muted); }
+  .stats { display: flex; gap: 6px; }
+  .stat { padding: 5px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); line-height: 1.15; }
+  .stat b { display: block; font-size: 15px; font-weight: 650; } .stat i { font-style: normal; font-size: 11px; color: var(--muted); }
+  .stat.sig b { color: var(--sig); }
+  .main { display: grid; grid-template-columns: 76px 1fr 380px; height: 844px; }
+  .rail { border-right: 1px solid var(--line); padding: 12px 8px; display: flex; flex-direction: column; gap: 8px; }
+  .layer { height: 70px; border-radius: 10px; display: grid; place-items: center; text-align: center; font-size: 12px; color: var(--muted); border: 1px solid var(--line); background: var(--panel); }
+  .layer .ico { font-size: 22px; display: block; }
+  .layer.on { color: var(--text); border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+  .board { padding: 18px 20px; display: flex; flex-direction: column; gap: 18px; overflow: hidden; }
+  .title { display: flex; align-items: baseline; gap: 12px; }
+  .title h1 { font-size: 22px; }
+  .title span { color: var(--muted); font-size: 13px; }
+  .hyps { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+  .hyp { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 12px; position: relative; height: 200px; }
+  .hyp h3 { font-size: 14px; } .hyp small { color: var(--muted); font-size: 11.5px; display: block; margin-top: 2px; line-height: 1.35; height: 30px; }
+  .hyp .pct { font-size: 28px; font-weight: 700; margin-top: 8px; }
+  .hyp .bar { position: absolute; left: 12px; right: 12px; bottom: 12px; height: 8px; border-radius: 4px; background: #2a245c; overflow: hidden; }
+  .hyp .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); border-radius: 4px; }
+  .hyp.lead { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(233,196,106,0.4), 0 0 30px rgba(233,196,106,0.12); }
+  .hyp.out { opacity: 0.45; } .hyp.out .pct { text-decoration: line-through; color: var(--muted); }
+  .clues { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .clue { background: #141036; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; position: relative; min-height: 112px; }
+  .clue h4 { font-size: 13.5px; } .clue .src { color: var(--muted); font-size: 11.5px; margin: 3px 0 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: #cfc9ec; }
+  .chip.h { background: rgba(233,196,106,0.16); border-color: rgba(233,196,106,0.5); color: #f4dc9c; }
+  .chip.m { background: rgba(154,148,189,0.12); }
+  .chip.x { background: rgba(228,87,46,0.14); border-color: rgba(228,87,46,0.5); color: #ffb39a; }
+  .clue.linked { border-color: rgba(242,132,130,0.8); }
+  .clue .link { position: absolute; right: 10px; top: 10px; font-size: 11px; color: var(--sig); font-weight: 600; }
+  .warn { font-size: 12.5px; padding: 8px 12px; border-radius: 8px; background: rgba(242,132,130,0.1); border: 1px solid rgba(242,132,130,0.45); color: #ffc9c7; }
+  .calendar { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px 14px; position: relative; height: 176px; }
+  .calendar h3 { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .side { border-left: 1px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 12px; background: rgba(10,8,30,0.6); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .card h2 { font-size: 15px; margin-bottom: 8px; }
+  .cond { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #251f55; }
+  .ok { color: var(--teal); font-weight: 600; } .no { color: var(--sig); font-weight: 600; }
+  .btn { margin-top: 12px; padding: 10px; border-radius: 8px; text-align: center; font-weight: 700; background: #2a245c; color: var(--muted); border: 1px dashed #4a4290; }
+  .pol { font-size: 12.5px; color: #d7d1f0; line-height: 1.65; }
+  .fac { display: flex; justify-content: space-between; font-size: 12.5px; padding: 4px 0; }
+  .log { font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.6; color: #d4cdf2; }
+  .log em { color: var(--gold); font-style: normal; }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="brand">SpaceCity<small>은하 · 위임 3단계 · 문명 관리자</small></div>
+  <div class="date">3612.03.01</div>
+  <div class="speed"><span class="on">❚❚</span><span>1×</span><span>3×</span><span>10×</span><span>⏭</span></div>
+  <div class="k"><b>K 2.07</b><i>카르다쇼프 지수</i></div>
+  <div class="stats">
+    <div class="stat"><b>41곳</b><i>식민지</i></div>
+    <div class="stat"><b>6</b><i>독립한 문명</i></div>
+    <div class="stat"><b>7장</b><i>단서</i></div>
+    <div class="stat sig"><b>×2만</b><i>적외선 서명 / 문턱</i></div>
+    <div class="stat"><b>68</b><i>신뢰</i></div>
+  </div>
+</div>
+<div class="main">
+  <div class="rail">
+    <div class="layer"><div><span class="ico">⬢</span>도시</div></div>
+    <div class="layer"><div><span class="ico">◎</span>항성계</div></div>
+    <div class="layer"><div><span class="ico">✦</span>성간</div></div>
+    <div class="layer on"><div><span class="ico">◌</span>은하</div></div>
+  </div>
+  <div class="board">
+    <div class="title"><h1>가설 보드 — 은하는 왜 조용한가</h1><span>시드의 베이즈 추정 · 사전 확률은 캠페인 설정의 드레이크 파라미터</span></div>
+    <div class="hyps">
+      <div class="hyp lead"><h3>어두운 숲</h3><small>모두 숨어 있고, 발견하면 지운다</small><div class="pct">46%</div><div class="bar"><i style="width:46%"></i></div></div>
+      <div class="hyp"><h3>버서커</h3><small>오래된 기계가 신호를 쫓는다</small><div class="pct">21%</div><div class="bar"><i style="width:21%"></i></div></div>
+      <div class="hyp"><h3>위대한 필터</h3><small>모두 같은 단계에서 무너졌다</small><div class="pct">13%</div><div class="bar"><i style="width:13%"></i></div></div>
+      <div class="hyp"><h3>초월</h3><small>모두 물리 우주를 떠났다</small><div class="pct">9%</div><div class="bar"><i style="width:9%"></i></div></div>
+      <div class="hyp"><h3>동물원</h3><small>지켜보고 있다</small><div class="pct">6%</div><div class="bar"><i style="width:6%"></i></div></div>
+      <div class="hyp"><h3>첫 세대</h3><small>우리가 거의 처음이다</small><div class="pct">5%</div><div class="bar"><i style="width:5%"></i></div></div>
+      <div class="hyp out"><h3>희귀 지구</h3><small>배제됨 — 인공 신호가 관측됐다</small><div class="pct">0%</div><div class="bar"><i style="width:0%"></i></div></div>
+    </div>
+    <div class="clues">
+      <div class="clue linked"><span class="link">⚠ 연결됨</span><h4>끊긴 신호</h4><div class="src">HD 40307 방향 · 42광년 · 3204년 수신 중단</div>
+        <div class="chips"><span class="chip h">어두운 숲 높음</span><span class="chip h">버서커 높음</span><span class="chip m">필터 중간</span><span class="chip x">희귀 지구 불가능</span></div></div>
+      <div class="clue linked"><span class="link">⚠ 연결됨</span><h4>감마선 섬광</h4><div class="src">HD 40307 방향 · 3219년 관측</div>
+        <div class="chips"><span class="chip h">어두운 숲 높음</span><span class="chip m">버서커 중간</span><span class="chip m">필터 중간</span></div></div>
+      <div class="clue"><h4>금속 파편 띠</h4><div class="src">글리제 682 · 규칙적인 궤도의 파편</div>
+        <div class="chips"><span class="chip h">버서커 높음</span><span class="chip m">어두운 숲 중간</span><span class="chip">필터 낮음</span></div></div>
+      <div class="clue"><h4>텅 빈 거대 구조물</h4><div class="src">케플러-1229 방향 · 적외선 초과</div>
+        <div class="chips"><span class="chip h">초월 높음</span><span class="chip m">필터 중간</span><span class="chip m">버서커 중간</span></div></div>
+      <div class="clue"><h4>답이 없는 송신</h4><div class="src">2470년대 송신 이후 1,100년</div>
+        <div class="chips"><span class="chip h">어두운 숲 높음</span><span class="chip h">동물원 높음</span><span class="chip m">필터 중간</span></div></div>
+      <div class="clue"><h4>같은 단계에서 무너진 유적 ×2</h4><div class="src">캅테인 별 · 글리제 667 C</div>
+        <div class="chips"><span class="chip h">필터 높음</span><span class="chip m">어두운 숲 중간</span><span class="chip m">버서커 중간</span></div></div>
+      <div class="clue"><h4>미생물만 가득한 행성 31곳</h4><div class="src">탐사 단계 4 누적</div>
+        <div class="chips"><span class="chip m">모든 가설 중간</span><span class="chip x">희귀 지구 (배제됨)</span></div></div>
+      <div class="clue" style="border-style:dashed;display:grid;place-items:center;color:var(--muted)">단서를 끌어다 놓기</div>
+    </div>
+    <div class="warn">과신 경고 — '끊긴 신호'와 '감마선 섬광'은 같은 사건(HD 40307)에서 나왔을 수 있다. 둘을 독립으로 세면 어두운 숲의 확률이 과대평가된다. 하나로 묶으면 41%.</div>
+    <div class="calendar"><h3>위협 달력 — 서명이 문턱을 넘은 해 + 빛의 이동 + 상대의 반응 속도</h3><svg id="cal" width="1060" height="130" style="margin-top:10px"></svg></div>
+  </div>
+  <div class="side">
+    <div class="card">
+      <h2>선언 조건</h2>
+      <div class="cond"><span>한 가설의 확률 70% 이상</span><span class="no">46% — 미충족</span></div>
+      <div class="cond"><span>독립 단서 5장 이상</span><span class="ok">6장 — 충족</span></div>
+      <div class="cond"><span>평의회 표결</span><span>침묵파·귀향파 찬성 예상</span></div>
+      <div class="btn">어두운 숲 선언 — 조건 미충족</div>
+    </div>
+    <div class="card">
+      <h2>선언하면</h2>
+      <div class="pol">· 전파 침묵 의무화, 방열 은폐, 분산 거주<br>· 식민지 41곳에 지침 개정 발송 — 가장 먼 곳까지 286년<br>· 틀렸을 때: 동물원이라면 시험에서 '공포'로 평가된다</div>
+    </div>
+    <div class="card">
+      <h2>세력의 입장</h2>
+      <div class="fac"><span>침묵파</span><span class="ok">강하게 찬성</span></div>
+      <div class="fac"><span>응답파</span><span class="no">반대 — "말을 걸어야 안다"</span></div>
+      <div class="fac"><span>초월파</span><span>보류 — 구조물 조사 먼저</span></div>
+      <div class="fac"><span>확산파</span><span>조건부 — 분산 거주는 찬성</span></div>
+    </div>
+    <div class="card">
+      <div class="log"><em>3612.03.01</em> 관리 기록 — 증거는 어두운 숲을 가리킨다. 하지만 버서커의 파편도 같은 모양으로 보일 수 있다. 나는 아직 46%다. 46%로 41개의 세계를 침묵시킬 수는 없다.</div>
+    </div>
+  </div>
+</div>
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("cal");
+const el = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); svg.appendChild(e); return e; };
+const text = (x, y, s, attrs = {}) => { const t = el("text", { x, y, "font-size": 11.5, fill: "#cfc9ec", ...attrs }); t.textContent = s; return t; };
+const X0 = 20, X1 = 1040, Y0 = 2300, Y1 = 5600;
+const x = y => X0 + (y - Y0) / (Y1 - Y0) * (X1 - X0);
+el("line", { x1: X0, y1: 52, x2: X1, y2: 52, stroke: "#4a4290", "stroke-width": 2 });
+[2500, 3000, 3500, 4000, 4500, 5000].forEach(y => { el("line", { x1: x(y), y1: 47, x2: x(y), y2: 57, stroke: "#4a4290" }); text(x(y), 74, String(y), { "text-anchor": "middle", fill: "#7c76a3" }); });
+el("rect", { x: x(2300), y: 44, width: x(3612) - x(2300), height: 16, rx: 8, fill: "rgba(242,132,130,0.18)" });
+el("circle", { cx: x(2300), cy: 52, r: 6, fill: "#f28482" });
+text(x(2300) + 10, 22, "2300 적외선 서명 문턱 돌파 (다이슨 스웜 첫 묶음)", { fill: "#ffc9c7" });
+el("line", { x1: x(3612), y1: 30, x2: x(3612), y2: 80, stroke: "#e9c46a", "stroke-width": 2 });
+text(x(3612), 98, "지금 3612 — 탐지 가능 구체 반경 1,312광년", { "text-anchor": "middle", fill: "#f4dc9c", "font-weight": 600 });
+[[3400, "100광년·0.1c", true], [4100, "300광년·0.2c", false], [4467, "500광년·0.3c", false], [5300, "1,000광년·0.5c", false]].forEach(([y, label, past]) => {
+  el("path", { d: `M ${x(y)} 40 l -6 -10 h 12 z`, fill: past ? "#6c6690" : "#f28482" });
+  text(x(y), 26, `${label} → ${y}${past ? " (지남)" : ""}`, { "text-anchor": "middle", fill: past ? "#8f89b5" : "#ffc9c7" });
+});
+</script>
+</body>
+</html>

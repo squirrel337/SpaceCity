@@ -1,0 +1,900 @@
+{
+  "_meta": {
+    "description": "시대 0 도시 레이어 데이터 — 모듈과 기본 상수 (밸런스 v0.1). 문서 03-city-layer.md와 sim/city_balance.py가 함께 쓰는 단일 출처.",
+    "units": {
+      "parts": "부품 단위 (1단위 = 지구에서 보낸 정밀 부품 약 100 kg)",
+      "regolith_t": "레골리스 (t)",
+      "metal_t": "금속 (t)",
+      "build_rd": "건설 작업량 (로봇·일)",
+      "power_kw": "최대 가동 시 소비 전력 (kW)",
+      "crew": "운영 인원 (명)",
+      "mtbf_days": "평균 고장 간격 (일)",
+      "recipe": "최대 가동 시 하루 입출력"
+    },
+    "priority": {
+      "1": "생존 — 마지막까지 유지",
+      "2": "식량 — 축전량이 바닥나기 전 마지막으로 끊음",
+      "3": "산업·로봇",
+      "4": "연구·사회 — 가장 먼저 끊음"
+    },
+    "day_numbering": "시뮬레이터의 day는 0부터 센다. day 40 = 41일차 = 2061년 2월 10일."
+  },
+  "constants": {
+    "per_person_day": {
+      "o2_kg": 0.84,
+      "co2_kg": 1.0,
+      "water_use_kg": 8.0,
+      "food_kg": 0.6
+    },
+    "workforce_share": 0.7,
+    "air_kg_per_housing": 120,
+    "co2_ppm": {
+      "floor": 800,
+      "warn": 2500,
+      "bad": 5000,
+      "danger": 20000,
+      "lethal": 40000
+    },
+    "crops": {
+      "dead_after_unpowered_h": 72,
+      "regrow_days": 30
+    },
+    "regolith_cover": {
+      "regolith_t": 50,
+      "build_rd": 5
+    },
+    "dose_msv_day": {
+      "bare_hab": 1.0,
+      "covered_hab": 0.45,
+      "dome": 0.25
+    },
+    "career_dose_limit_msv": 600,
+    "robots": {
+      "start": 8,
+      "power_kw": 1,
+      "mtbf_days": 300,
+      "repair_parts": 1,
+      "earth_units": 5,
+      "local_parts": 5,
+      "local_rd": 4
+    },
+    "illumination": {
+      "winter_day_of_year": [
+        150,
+        240
+      ],
+      "normal_gap_h": [
+        280,
+        420
+      ],
+      "normal_dark_h": [
+        6,
+        30
+      ],
+      "winter_gap_h": [
+        150,
+        260
+      ],
+      "winter_dark_h": [
+        20,
+        90
+      ],
+      "tiles": {
+        "A": 8,
+        "B": 10,
+        "C": 20
+      },
+      "tile_factor": {
+        "A": 1.0,
+        "B": 0.85,
+        "C": 0.7
+      }
+    },
+    "spe": {
+      "cycle_max_year": 2069,
+      "cycle_years": 11,
+      "major_rate_per_year": [
+        0.08,
+        0.5
+      ],
+      "minor_rate_per_year": [
+        1.0,
+        4.0
+      ],
+      "major_dose_msv": 300,
+      "minor_dose_msv": 20,
+      "shelter_factor": 0.02,
+      "warning_h": 2,
+      "warning_h_with_forecast": 8,
+      "scripted_major_day": 40
+    },
+    "earth": {
+      "cargo_first_day": 29,
+      "cargo_interval_days": 60,
+      "cargo_capacity_units": 200,
+      "cargo_cost_support": 150,
+      "crewed_first_day": 89,
+      "crewed_interval_days": 120,
+      "crewed_seats": 24,
+      "crewed_cost_support": 200,
+      "delay_chance": 0.1,
+      "delay_days": [
+        10,
+        30
+      ],
+      "loss_chance": 0.03,
+      "support_start": 300,
+      "support_per_month": 80,
+      "support_per_rp": 0.1,
+      "food_units_per_t": 10,
+      "earth_rp_day": 8,
+      "express_cost_support": 300,
+      "express_days": 7,
+      "express_capacity_units": 100
+    },
+    "start": {
+      "date": "2061-01-01",
+      "population": 120,
+      "morale": 70,
+      "trust": 60,
+      "stocks": {
+        "o2_kg": 3000,
+        "water_kg": 25000,
+        "food_kg": 6000,
+        "h2_kg": 100,
+        "ch4_kg": 0,
+        "regolith_t": 200,
+        "metal_t": 0,
+        "parts": 300
+      },
+      "solar_tiles_used": {
+        "A": 6,
+        "B": 0,
+        "C": 0
+      }
+    },
+    "rationing": {
+      "consumption_factor": 0.7,
+      "morale_penalty": 10
+    },
+    "starvation_grace_days": 14
+  },
+  "modules": [
+    {
+      "id": "hab_module",
+      "name": "여압 거주 모듈",
+      "category": "habitat",
+      "priority": 1,
+      "tech": null,
+      "start": 15,
+      "cost": {
+        "parts": 60
+      },
+      "build_rd": 20,
+      "power_kw": 4,
+      "crew": 0,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "housing": 8
+      },
+      "note": "지구에서 보내는 팽창식 모듈. 레골리스 피복 전에는 방사선에 약하다"
+    },
+    {
+      "id": "regolith_dome",
+      "name": "레골리스 차폐 돔",
+      "category": "habitat",
+      "priority": 1,
+      "tech": "sintered_construction",
+      "start": 0,
+      "cost": {
+        "parts": 40,
+        "regolith_t": 400
+      },
+      "build_rd": 60,
+      "power_kw": 25,
+      "crew": 0,
+      "mtbf_days": 6000,
+      "repair": {
+        "parts": 4,
+        "rd": 3
+      },
+      "provides": {
+        "housing": 60,
+        "shelter": 60
+      },
+      "note": "두꺼운 소결 레골리스 껍질. 거주자 전원이 태양 양성자 폭풍에서도 보호된다"
+    },
+    {
+      "id": "electrolyzer",
+      "name": "물 전기분해기",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 2,
+      "cost": {
+        "parts": 15
+      },
+      "build_rd": 6,
+      "power_kw": 26,
+      "crew": 0,
+      "mtbf_days": 500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "water_kg": 112.5
+        },
+        "out": {
+          "o2_kg": 100,
+          "h2_kg": 12.5
+        }
+      },
+      "note": "필요한 만큼만 가동되고 전력도 가동률에 비례한다"
+    },
+    {
+      "id": "co2_scrubber",
+      "name": "CO₂ 제거기",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 1,
+      "cost": {
+        "parts": 5
+      },
+      "build_rd": 3,
+      "power_kw": 5,
+      "crew": 0,
+      "mtbf_days": 300,
+      "repair": {
+        "parts": 1,
+        "rd": 0.5
+      },
+      "provides": {
+        "co2_kg_day": 120
+      },
+      "note": "가장 자주 고장 나는 생명유지 장치. 여분이 생명선이다"
+    },
+    {
+      "id": "sabatier",
+      "name": "사바티에 반응기",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 1,
+      "cost": {
+        "parts": 10
+      },
+      "build_rd": 4,
+      "power_kw": 3,
+      "crew": 0,
+      "mtbf_days": 600,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 110,
+          "h2_kg": 20
+        },
+        "out": {
+          "ch4_kg": 40,
+          "water_kg": 90
+        }
+      },
+      "note": "수소가 모자라면 CO₂를 다 되살리지 못한다 — 루프는 완전히 닫히지 않는다"
+    },
+    {
+      "id": "water_recycler",
+      "name": "물 재활용기",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 1,
+      "cost": {
+        "parts": 15
+      },
+      "build_rd": 6,
+      "power_kw": 10,
+      "crew": 0,
+      "mtbf_days": 400,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "wastewater_kg_day": 1000,
+        "recovery": 0.9
+      },
+      "note": "폐쇄형 생명유지 II 연구 후 회수율 98%"
+    },
+    {
+      "id": "tank_farm",
+      "name": "저장 탱크",
+      "category": "life_support",
+      "priority": 1,
+      "tech": null,
+      "start": 2,
+      "cost": {
+        "parts": 10
+      },
+      "build_rd": 4,
+      "power_kw": 1,
+      "crew": 0,
+      "mtbf_days": 5000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "storage": {
+          "o2_kg": 2000,
+          "water_kg": 20000,
+          "h2_kg": 300,
+          "ch4_kg": 1000,
+          "wastewater_kg": 3000,
+          "co2_kg": 1000
+        }
+      }
+    },
+    {
+      "id": "hydroponics",
+      "name": "수경 농장",
+      "category": "food",
+      "priority": 2,
+      "tech": null,
+      "start": 4,
+      "cost": {
+        "parts": 30
+      },
+      "build_rd": 10,
+      "power_kw": 60,
+      "crew": 2,
+      "mtbf_days": 800,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 12,
+          "water_kg": 2
+        },
+        "out": {
+          "food_kg": 6,
+          "o2_kg": 10
+        }
+      },
+      "note": "10명분 식량. 전력을 72시간 넘게 못 받으면 작물이 죽고 30일간 다시 길러야 한다"
+    },
+    {
+      "id": "algae_reactor",
+      "name": "조류 생물반응기",
+      "category": "food",
+      "priority": 2,
+      "tech": "algae_bioreactor",
+      "start": 0,
+      "cost": {
+        "parts": 15
+      },
+      "build_rd": 6,
+      "power_kw": 15,
+      "crew": 1,
+      "mtbf_days": 600,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 27,
+          "water_kg": 1
+        },
+        "out": {
+          "o2_kg": 20,
+          "food_kg": 2
+        }
+      },
+      "note": "효율은 좋지만 식단의 25%를 넘으면 사기가 떨어진다"
+    },
+    {
+      "id": "food_store",
+      "name": "식량 저장고",
+      "category": "food",
+      "priority": 2,
+      "tech": null,
+      "start": 1,
+      "cost": {
+        "parts": 5
+      },
+      "build_rd": 3,
+      "power_kw": 1,
+      "crew": 0,
+      "mtbf_days": 5000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "storage": {
+          "food_kg": 10000
+        }
+      }
+    },
+    {
+      "id": "solar_tower",
+      "name": "수직 태양광 타워",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 6,
+      "cost": {
+        "parts": 25
+      },
+      "build_rd": 12,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 1500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "generation_kw": 100
+      },
+      "note": "극지의 낮은 햇빛을 받도록 세운 패널. 봉우리 A·B·C 타일에만 설치, 출력은 일조와 타일 등급에 따라 다르다"
+    },
+    {
+      "id": "fission_40kw",
+      "name": "소형 핵분열로",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 2,
+      "cost": {
+        "parts": 60
+      },
+      "build_rd": 30,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 4000,
+      "repair": {
+        "parts": 5,
+        "rd": 3
+      },
+      "provides": {
+        "generation_kw": 40
+      },
+      "note": "밤에도 일정한 40 kW. 비싸지만 어둠을 모른다"
+    },
+    {
+      "id": "fission_1mw",
+      "name": "메가와트급 원자로",
+      "category": "power",
+      "priority": null,
+      "tech": "megawatt_fission",
+      "start": 0,
+      "cost": {
+        "parts": 250,
+        "regolith_t": 100,
+        "metal_t": 5
+      },
+      "build_rd": 120,
+      "power_kw": 0,
+      "crew": 2,
+      "mtbf_days": 5000,
+      "repair": {
+        "parts": 10,
+        "rd": 5
+      },
+      "provides": {
+        "generation_kw": 1000
+      }
+    },
+    {
+      "id": "battery_bank",
+      "name": "배터리 뱅크",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 2,
+      "cost": {
+        "parts": 30
+      },
+      "build_rd": 6,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "storage_kwh": 500,
+        "efficiency": 0.9
+      }
+    },
+    {
+      "id": "rfc_unit",
+      "name": "재생 연료전지",
+      "category": "power",
+      "priority": null,
+      "tech": "regenerative_fuel_cell",
+      "start": 0,
+      "cost": {
+        "parts": 20
+      },
+      "build_rd": 10,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 1500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "storage_kwh": 2000,
+        "efficiency": 0.5
+      },
+      "note": "남는 전기로 물을 쪼개 두었다가 밤에 다시 합친다. 싸고 크지만 절반을 잃는다"
+    },
+    {
+      "id": "radiator",
+      "name": "방열판",
+      "category": "thermal",
+      "priority": null,
+      "tech": null,
+      "start": 3,
+      "cost": {
+        "parts": 10
+      },
+      "build_rd": 4,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 5000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "heat_kw": 250
+      },
+      "note": "쓴 전력은 모두 열이 된다. 방열 용량을 넘으면 산업 모듈부터 감속한다"
+    },
+    {
+      "id": "ice_miner",
+      "name": "얼음 채굴기",
+      "category": "industry",
+      "priority": 3,
+      "tech": null,
+      "start": 1,
+      "cost": {
+        "parts": 40
+      },
+      "build_rd": 15,
+      "power_kw": 50,
+      "crew": 1,
+      "mtbf_days": 250,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "recipe": {
+        "in": {},
+        "out": {
+          "water_kg": 500
+        }
+      },
+      "note": "영구음영 크레이터의 얼음 섞인 레골리스(물 약 5%)를 하루 10 t 처리"
+    },
+    {
+      "id": "excavator",
+      "name": "레골리스 굴착기",
+      "category": "industry",
+      "priority": 3,
+      "tech": null,
+      "start": 1,
+      "cost": {
+        "parts": 30
+      },
+      "build_rd": 10,
+      "power_kw": 20,
+      "crew": 0,
+      "mtbf_days": 300,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {},
+        "out": {
+          "regolith_t": 50
+        }
+      }
+    },
+    {
+      "id": "regolith_printer",
+      "name": "레골리스 3D 프린터",
+      "category": "industry",
+      "priority": 3,
+      "tech": "sintered_construction",
+      "start": 0,
+      "cost": {
+        "parts": 50
+      },
+      "build_rd": 15,
+      "power_kw": 30,
+      "crew": 1,
+      "mtbf_days": 400,
+      "repair": {
+        "parts": 3,
+        "rd": 1
+      },
+      "provides": {
+        "print_t_day": 20
+      },
+      "note": "돔·대피소·착륙장처럼 레골리스가 들어가는 구조물은 프린터가 하루 20 t씩 쌓는다"
+    },
+    {
+      "id": "mre_plant",
+      "name": "용융 레골리스 전해조",
+      "category": "industry",
+      "priority": 3,
+      "tech": "molten_regolith_electrolysis",
+      "start": 0,
+      "cost": {
+        "parts": 80
+      },
+      "build_rd": 40,
+      "power_kw": 200,
+      "crew": 3,
+      "mtbf_days": 400,
+      "repair": {
+        "parts": 4,
+        "rd": 2
+      },
+      "recipe": {
+        "in": {
+          "regolith_t": 2
+        },
+        "out": {
+          "metal_t": 0.6,
+          "o2_kg": 500
+        }
+      }
+    },
+    {
+      "id": "parts_fab",
+      "name": "부품 공장",
+      "category": "industry",
+      "priority": 3,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 60,
+        "metal_t": 2
+      },
+      "build_rd": 30,
+      "power_kw": 40,
+      "crew": 4,
+      "mtbf_days": 500,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "recipe": {
+        "in": {
+          "metal_t": 0.25
+        },
+        "out": {
+          "parts": 2
+        }
+      }
+    },
+    {
+      "id": "robot_bay",
+      "name": "로봇 정비고",
+      "category": "industry",
+      "priority": 3,
+      "tech": null,
+      "start": 1,
+      "cost": {
+        "parts": 20
+      },
+      "build_rd": 20,
+      "power_kw": 10,
+      "crew": 2,
+      "mtbf_days": 2000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "robot_slots": 12
+      },
+      "note": "로봇 충전·정비 거점. '로봇 자가 제작' 연구 후 부품으로 로봇을 만든다"
+    },
+    {
+      "id": "propellant_plant",
+      "name": "추진제 공장",
+      "category": "industry",
+      "priority": 3,
+      "tech": "cryogenic_propellant",
+      "start": 0,
+      "cost": {
+        "parts": 40
+      },
+      "build_rd": 20,
+      "power_kw": 90,
+      "crew": 2,
+      "mtbf_days": 500,
+      "repair": {
+        "parts": 3,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {
+          "o2_kg": 857,
+          "h2_kg": 143
+        },
+        "out": {
+          "propellant_t": 1
+        }
+      },
+      "note": "액체 산소·수소 1 t/일. 지구 궤도로 수출하면 지원 점수를 번다"
+    },
+    {
+      "id": "landing_pad",
+      "name": "착륙장",
+      "category": "logistics",
+      "priority": 3,
+      "tech": null,
+      "start": 1,
+      "cost": {
+        "parts": 10,
+        "regolith_t": 200
+      },
+      "build_rd": 20,
+      "power_kw": 2,
+      "crew": 0,
+      "mtbf_days": 8000,
+      "repair": {
+        "parts": 2,
+        "rd": 2
+      },
+      "note": "소결한 착륙장. 없으면 착륙 분사가 먼지를 일으켜 주변 설비 고장률이 오른다",
+      "provides": {
+        "landing_slots": 1
+      }
+    },
+    {
+      "id": "storm_shelter",
+      "name": "폭풍 대피소",
+      "category": "safety",
+      "priority": 1,
+      "tech": null,
+      "start": 2,
+      "cost": {
+        "parts": 10,
+        "regolith_t": 150
+      },
+      "build_rd": 15,
+      "power_kw": 2,
+      "crew": 0,
+      "mtbf_days": 8000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "shelter": 40
+      },
+      "note": "레골리스 2 m 아래 묻은 대피실. 태양 양성자 폭풍 경보 때 들어간다"
+    },
+    {
+      "id": "medical_bay",
+      "name": "의료실",
+      "category": "safety",
+      "priority": 1,
+      "tech": null,
+      "start": 1,
+      "cost": {
+        "parts": 20
+      },
+      "build_rd": 10,
+      "power_kw": 10,
+      "crew": 3,
+      "mtbf_days": 2000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "care": 150
+      }
+    },
+    {
+      "id": "research_lab",
+      "name": "연구동",
+      "category": "research",
+      "priority": 4,
+      "tech": null,
+      "start": 1,
+      "cost": {
+        "parts": 25
+      },
+      "build_rd": 15,
+      "power_kw": 15,
+      "crew": 6,
+      "mtbf_days": 1500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "rp_day": 6
+      },
+      "note": "연구자 1명당 하루 1 연구 포인트"
+    },
+    {
+      "id": "green_commons",
+      "name": "녹지 공원",
+      "category": "social",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 20
+      },
+      "build_rd": 15,
+      "power_kw": 20,
+      "crew": 1,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 5
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 2
+        },
+        "out": {
+          "o2_kg": 2
+        }
+      }
+    },
+    {
+      "id": "comms_center",
+      "name": "지구 교신 센터",
+      "category": "social",
+      "priority": 4,
+      "tech": null,
+      "start": 1,
+      "cost": {
+        "parts": 10
+      },
+      "build_rd": 6,
+      "power_kw": 5,
+      "crew": 1,
+      "mtbf_days": 2000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 5,
+        "rp_day": 2
+      },
+      "note": "가족과의 영상 통화. 지구까지 왕복 2.6초"
+    }
+  ]
+}
