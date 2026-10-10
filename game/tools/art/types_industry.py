@@ -749,11 +749,9 @@ def solar_sinterer(sp: Sprite, v: int):
                 a = math.pi * k / 3 + 0.3
                 rim = add(c, mul(add(mul(u, math.cos(a)), mul(w, math.sin(a))), r * 0.92))
                 sp.line(rim, p, 0.05, "#fff1c4", 0.28)
-    for p in spots:
+    for p in spots:          # 햇빛이 모일 때만 뜨겁다 — 밤에는 빛나지 않는다
         sp.disc(add(p, (0, 0, 0.01)), (0, 0, 1), 0.42, Mat("#E88A3C", 0.4))
-        sp.mark_light(HOT)
         sp.disc(add(p, (0, 0, 0.02)), (0, 0, 1), 0.2, Mat("#FFF0C0", 0.6))
-        sp.glow(add(p, (0, 0, 0.1)), 16, "#ffd27a", 0.95)
     # 조종함
     hxx, hyy = (3.2, -2.6) if v != 4 else (3.0, -1.0)
     sp.box(hxx - 0.6, hyy - 0.5, 0, 1.2, 1.0, 1.4, WHITE, top=SILVER)

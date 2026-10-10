@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="60" viewBox="-43 -40 80 60">
+<defs><radialGradient id="r4" gradientUnits="userSpaceOnUse" cx="-13.58" cy="-9.03" r="26"><stop offset="0" stop-color="#FF8A3A" stop-opacity="0.45"/><stop offset="0.35" stop-color="#FF8A3A" stop-opacity="0.2"/><stop offset="1" stop-color="#FF8A3A" stop-opacity="0"/></radialGradient><radialGradient id="r13" gradientUnits="userSpaceOnUse" cx="-0.57" cy="-7.23" r="8"><stop offset="0" stop-color="#F2A541" stop-opacity="0.9"/><stop offset="0.35" stop-color="#F2A541" stop-opacity="0.41"/><stop offset="1" stop-color="#F2A541" stop-opacity="0"/></radialGradient></defs>
+<polygon points="-3.17,-2.55 -8.55,-5.24 -8.55,-7.79 -3.17,-5.1" fill="#FF8A3A" opacity="0.95"/>
+<polygon points="-10.11,-6.02 -15.48,-8.71 -15.48,-11.26 -10.11,-8.57" fill="#FF8A3A" opacity="0.95"/>
+<polygon points="-17.05,-9.49 -22.42,-12.18 -22.42,-14.73 -17.05,-12.04" fill="#FF8A3A" opacity="0.95"/>
+<polygon points="13.69,-8.38 5.54,-4.3 5.54,-6.85 13.69,-10.93" fill="#FF8A3A" opacity="0.95"/>
+<polygon points="12.42,-9.03 11.15,-1 7.46,6.25 1.71,12 -5.54,15.7 -13.58,16.97 -21.61,15.7 -28.86,12 -34.61,6.25 -38.3,-1 -39.58,-9.03 -38.3,-17.06 -34.61,-24.31 -28.86,-30.06 -21.61,-33.76 -13.58,-35.03 -5.54,-33.76 1.71,-30.06 7.46,-24.31 11.15,-17.06" fill="url(#r4)"/>
+<polygon points="6.62,4.25 4.13,3.01 4.13,0.93 6.62,2.18" fill="#FF8A3A" opacity="0.95"/>
+<polygon points="7.43,-7.23 7.04,-4.76 5.91,-2.53 4.14,-0.76 1.91,0.38 -0.57,0.77 -3.04,0.38 -5.27,-0.76 -7.04,-2.53 -8.17,-4.76 -8.57,-7.23 -8.17,-9.7 -7.04,-11.93 -5.27,-13.7 -3.04,-14.84 -0.57,-15.23 1.91,-14.84 4.14,-13.7 5.91,-11.93 7.04,-9.7" fill="url(#r13)"/>
+</svg>

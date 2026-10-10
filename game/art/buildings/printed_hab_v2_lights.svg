@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="110" height="100" viewBox="-53 -72 110 100">
+<defs><radialGradient id="r34" gradientUnits="userSpaceOnUse" cx="44.69" cy="1.9" r="9"><stop offset="0" stop-color="#F2A541" stop-opacity="0.9"/><stop offset="0.35" stop-color="#F2A541" stop-opacity="0.41"/><stop offset="1" stop-color="#F2A541" stop-opacity="0"/></radialGradient><radialGradient id="r35" gradientUnits="userSpaceOnUse" cx="-11.88" cy="-62.92" r="6"><stop offset="0" stop-color="#ff5a3c" stop-opacity="0.9"/><stop offset="0.35" stop-color="#ff5a3c" stop-opacity="0.41"/><stop offset="1" stop-color="#ff5a3c" stop-opacity="0"/></radialGradient><radialGradient id="r36" gradientUnits="userSpaceOnUse" cx="39.6" cy="4.5" r="9"><stop offset="0" stop-color="#F2A541" stop-opacity="0.9"/><stop offset="0.35" stop-color="#F2A541" stop-opacity="0.41"/><stop offset="1" stop-color="#F2A541" stop-opacity="0"/></radialGradient></defs>
+<polygon points="-6.06,-14.65 -11.08,-14.3 -11.15,-20.63 -6.59,-20.95" fill="#FFC56E" opacity="0.95"/>
+<polygon points="-25.1,-16.26 -29.03,-17.85 -27.47,-23.87 -23.9,-22.41" fill="#FFC56E" opacity="0.95"/>
+<polygon points="-16.42,-26.62 -19.65,-27.16 -18.64,-32.06 -15.83,-31.59" fill="#FFC56E" opacity="0.95"/>
+<polygon points="12.02,1.83 8.58,0.89 9.54,-3.78 12.67,-2.93" fill="#FFC56E" opacity="0.95"/>
+<polygon points="-22.14,4.45 -25.75,3.89 -25.1,-0.64 -21.83,-0.14" fill="#FFC56E" opacity="0.95"/>
+<polygon points="53.69,1.9 53.25,4.68 51.97,7.19 49.98,9.18 47.47,10.46 44.69,10.9 41.91,10.46 39.4,9.18 37.41,7.19 36.13,4.68 35.69,1.9 36.13,-0.88 37.41,-3.39 39.4,-5.38 41.91,-6.66 44.69,-7.1 47.47,-6.66 49.98,-5.38 51.97,-3.39 53.25,-0.88" fill="url(#r34)"/>
+<polygon points="35.83,8.94 33.18,7.62 33.18,3.98 35.83,5.31" fill="#FFC56E" opacity="0.95"/>
+<polygon points="-5.88,-62.92 -6.17,-61.07 -7.03,-59.4 -8.35,-58.07 -10.03,-57.22 -11.88,-56.92 -13.73,-57.22 -15.41,-58.07 -16.73,-59.4 -17.59,-61.07 -17.88,-62.92 -17.59,-64.78 -16.73,-66.45 -15.41,-67.78 -13.73,-68.63 -11.88,-68.92 -10.03,-68.63 -8.35,-67.78 -7.03,-66.45 -6.17,-64.78" fill="url(#r35)"/>
+<polygon points="48.6,4.5 48.16,7.28 46.88,9.79 44.89,11.78 42.38,13.06 39.6,13.5 36.82,13.06 34.31,11.78 32.32,9.79 31.04,7.28 30.6,4.5 31.04,1.72 32.32,-0.79 34.31,-2.78 36.82,-4.06 39.6,-4.5 42.38,-4.06 44.89,-2.78 46.88,-0.79 48.16,1.72" fill="url(#r36)"/>
+</svg>

@@ -70,13 +70,13 @@ func _process(_delta: float) -> bool:
 		main._set_speed(0)
 		main._set_view("world")
 		_steps = [
-			["types_core", func(): _look_at_xy(w, _center_of(["hab_module", "regolith_dome", "storm_shelter"]), 0.32, 58.0)],
-			["types_life", func(): _look_at_xy(w, _center_of(["electrolyzer", "co2_scrubber", "sabatier", "water_recycler", "tank_farm"]), 0.26, 58.0)],
-			["types_farm", func(): _look_at_xy(w, _center_of(["hydroponics", "algae_reactor", "food_store"]), 0.28, 58.0)],
-			["types_power", func(): _look_at_xy(w, _center_of(["fission_40kw", "fission_1mw", "battery_bank", "rfc_unit", "radiator"]), 0.4, 58.0)],
-			["types_industry", func(): _look_at_xy(w, _center_of(["excavator", "regolith_printer", "mre_plant", "parts_fab", "robot_bay", "propellant_plant"]), 0.36, 58.0)],
-			["types_civic", func(): _look_at_xy(w, _center_of(["research_lab", "green_commons", "comms_center", "medical_bay"]), 0.32, 58.0)],
-			["types_ridge", func(): _look_at_xy(w, _center_of(["solar_tower"]) + Vector2(70, 70), 0.45, 62.0, Vector3(-1.0, -1.0, 0.0))],
+			["types_core", func(): _look_at_xy(w, _center_of(["hab_module", "regolith_dome", "storm_shelter"]), 0.15, 55.0)],
+			["types_life", func(): _look_at_xy(w, _center_of(["electrolyzer", "co2_scrubber", "sabatier", "water_recycler", "tank_farm"]), 0.13, 55.0)],
+			["types_farm", func(): _look_at_xy(w, _center_of(["hydroponics", "algae_reactor", "food_store"]), 0.13, 55.0)],
+			["types_power", func(): _look_at_xy(w, _center_of(["fission_40kw", "fission_1mw", "battery_bank", "rfc_unit", "radiator"]), 0.2, 55.0)],
+			["types_industry", func(): _look_at_xy(w, _center_of(["excavator", "regolith_printer", "mre_plant", "parts_fab", "robot_bay", "propellant_plant"]), 0.16, 55.0)],
+			["types_civic", func(): _look_at_xy(w, _center_of(["research_lab", "green_commons", "comms_center", "medical_bay"]), 0.15, 55.0)],
+			["types_ridge", func(): _look_at_xy(w, _center_of(["solar_tower"]) + Vector2(70, 70), 0.3, 60.0, Vector3(-1.0, -1.0, 0.0))],
 			["types_map", func():
 				main._set_view("map")
 				main.base_map.fit()],

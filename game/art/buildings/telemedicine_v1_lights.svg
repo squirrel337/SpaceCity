@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="61" height="57" viewBox="-32 -41 61 57">
+<defs><radialGradient id="r4" gradientUnits="userSpaceOnUse" cx="11.94" cy="-10.78" r="9"><stop offset="0" stop-color="#F2A541" stop-opacity="0.9"/><stop offset="0.35" stop-color="#F2A541" stop-opacity="0.41"/><stop offset="1" stop-color="#F2A541" stop-opacity="0"/></radialGradient><radialGradient id="r9" gradientUnits="userSpaceOnUse" cx="2.26" cy="-5.88" r="7"><stop offset="0" stop-color="#7FE3DA" stop-opacity="0.9"/><stop offset="0.35" stop-color="#7FE3DA" stop-opacity="0.41"/><stop offset="1" stop-color="#7FE3DA" stop-opacity="0"/></radialGradient></defs>
+<polygon points="-2.09,3.47 -18.05,-4.51 -18.05,-14.21 -2.09,-6.23" fill="#ffd9a0" opacity="0.5"/>
+<polygon points="-3.11,0.35 -6.2,-1.19 -6.2,-3.96 -3.11,-2.42" fill="#7FC8FF" opacity="0.9"/>
+<polygon points="-3.11,-2.94 -6.2,-4.48 -6.2,-7.25 -3.11,-5.71" fill="#7FC8FF" opacity="0.9"/>
+<polygon points="-6.84,-1.51 -9.92,-3.05 -9.92,-5.82 -6.84,-4.28" fill="#7FC8FF" opacity="0.9"/>
+<polygon points="-6.84,-4.8 -9.92,-6.34 -9.92,-9.11 -6.84,-7.57" fill="#7FC8FF" opacity="0.9"/>
+<polygon points="-10.56,-3.37 -13.64,-4.91 -13.64,-7.68 -10.56,-6.14" fill="#7FC8FF" opacity="0.9"/>
+<polygon points="-10.56,-6.66 -13.64,-8.2 -13.64,-10.97 -10.56,-9.43" fill="#7FC8FF" opacity="0.9"/>
+<polygon points="-14.28,-5.23 -17.36,-6.77 -17.36,-9.54 -14.28,-8" fill="#7FC8FF" opacity="0.9"/>
+<polygon points="-14.28,-8.52 -17.36,-10.06 -17.36,-12.83 -14.28,-11.29" fill="#7FC8FF" opacity="0.9"/>
+<polygon points="-21.15,-8.77 -22.5,-9.45 -22.5,-14.65 -21.15,-13.97" fill="#7FE3DA" opacity="0.8"/>
+<polygon points="-19.7,-9.82 -23.95,-11.94 -23.95,-13.6 -19.7,-11.48" fill="#7FE3DA" opacity="0.8"/>
+<polygon points="20.94,-10.78 20.5,-8 19.22,-5.49 17.23,-3.5 14.72,-2.22 11.94,-1.78 9.15,-2.22 6.65,-3.5 4.65,-5.49 3.38,-8 2.94,-10.78 3.38,-13.56 4.65,-16.07 6.65,-18.06 9.15,-19.34 11.94,-19.78 14.72,-19.34 17.23,-18.06 19.22,-16.07 20.5,-13.56" fill="url(#r4)"/>
+<polygon points="9.26,-5.88 8.92,-3.72 7.93,-1.77 6.38,-0.22 4.43,0.78 2.26,1.12 0.1,0.78 -1.85,-0.22 -3.4,-1.77 -4.39,-3.72 -4.74,-5.88 -4.39,-8.04 -3.4,-9.99 -1.85,-11.54 0.1,-12.54 2.26,-12.88 4.43,-12.54 6.38,-11.54 7.93,-9.99 8.92,-8.04" fill="url(#r9)"/>
+</svg>
