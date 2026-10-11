@@ -3,7 +3,9 @@
     "title": "도시 부지 — 달 남극 시드 시티와 다른 천체의 식민지 후보",
     "source": "04-system-layer.md §2 전이·발사 창, §3 부지 보정값 / concept 03 §1 태양계 도시 부지",
     "rules": "rules = 시뮬레이션 보정(1이면 달과 같다): sun_k 태양광 출력, ice_k 얼음 채굴, heat_k 방열 능력, build_k 로봇 작업량, contact_k 지구 교신의 사기, co2_air 대기의 CO2로 사바티에가 돈다, dust 먼지 폭풍. constants = 도시 상수(city_modules.json의 constants)에 덮어쓰는 값 (사전은 깊게 합친다).",
-    "expedition": "requires = 필요한 기술, cost = 출발하는 식민지가 내는 비용(support = 지구 지원 점수), transfer_days = 전이 기간, window_from = 발사 창을 정하는 천체(위성은 모행성)"
+    "expedition": "requires = 필요한 기술, cost = 출발하는 식민지가 내는 비용(support = 지구 지원 점수), transfer_days = 전이 기간, window_from = 발사 창을 정하는 천체(위성은 모행성). local = 같은 천체의 도시에서 떠날 때 (로버 행렬·호퍼·비행): requires, cost, speed_km_day, prep_days — 발사 창이 없다",
+    "inherit": "base = 다른 부지의 값을 물려받는다 (사전은 깊게 합치고, 이 부지의 값이 이긴다). default_city = 게임을 시작할 때 이미 있는 도시 (물려받지 않는다)",
+    "open_air": "rules.open_air = 바깥 공기를 마신다 (지구): 산소를 쓰지 않고 내쉰 CO₂는 환기로 나간다. rules.supply_days = 시장·상수도가 날마다 그 일수만큼의 비축을 채운다"
   },
   "sites": [
     {
@@ -17,7 +19,9 @@
       "layout": "ridge",
       "summary": "달 남극 섀클턴 크레이터 가장자리. 거의 늘 해가 드는 능선과 영구음영 얼음이 맞붙어 있다. 시대 0의 시작 부지.",
       "env": {"sun": "능선 일조 — 그림자는 짧고 드물다 (겨울엔 최대 90시간)", "day": "그림자 일정 (태음일 29.5일)", "dose": "하루 약 1 mSv (거주 모듈)", "resources": "물 얼음, 레골리스, 헬륨-3", "rule": "남극 겨울의 긴 그림자"},
+      "default_city": true,
       "rules": {},
+      "expedition": {"local": {"requires": [], "cost": {"parts": 200, "support": 300}, "speed_km_day": 500, "prep_days": 3}},
       "constants": {}
     },
     {
@@ -33,8 +37,10 @@
       "env": {"sun": "지구의 43% (대기·먼지로 36%)", "day": "1솔 24시간 39분, 밤 절반", "dose": "하루 약 0.5 mSv — 대기가 막는다", "resources": "CO₂ 대기, 지하 얼음, 철", "rule": "먼지 폭풍이 몇 주씩 태양광을 25%로 깎는다"},
       "rules": {"sun_k": 0.36, "ice_k": 1.2, "heat_k": 1.15, "build_k": 1.0, "contact_k": 0.5, "co2_air": true,
         "dust": {"rate_per_year": 0.6, "days": [15, 50], "sun_factor": 0.25}},
+      "default_city": true,
       "expedition": {"requires": ["seed_distributed", "cryogenic_propellant"], "cost": {"parts": 200, "support": 600},
-        "transfer_days": 259, "window_from": "mars"},
+        "transfer_days": 259, "window_from": "mars",
+        "local": {"requires": [], "cost": {"parts": 180, "support": 250}, "speed_km_day": 400, "prep_days": 3}},
       "constants": {
         "illumination": {"model": "rotation", "day_h": 24.66, "light_frac": 0.5, "tiles": {"A": 40, "B": 0, "C": 0}, "tile_factor": {"A": 1.0}},
         "dose_msv_day": {"bare_hab": 0.5, "covered_hab": 0.22, "dome": 0.12},
@@ -65,8 +71,10 @@
       "summary": "수성 북극 프로코피예프 크레이터. 영구음영 바닥의 얼음과 거의 늘 해가 드는 가장자리가 맞붙은 달 남극의 쌍둥이 — 다만 햇빛은 지구의 약 6.7배다. 태양광은 넘치고, 열을 버리는 것이 퍼즐이다.",
       "env": {"sun": "지구의 670% (패널이 달아 450%)", "day": "능선 일조 — 태양일 176일, 그림자는 드물다", "dose": "하루 약 1.2 mSv, 태양 폭풍이 잦고 세다", "resources": "금속, 규산염, 영구음영 얼음", "rule": "방열판이 달의 절반만 버린다"},
       "rules": {"sun_k": 4.5, "ice_k": 0.8, "heat_k": 0.5, "build_k": 1.0, "contact_k": 0.6},
+      "default_city": true,
       "expedition": {"requires": ["seed_distributed", "cryogenic_propellant"], "cost": {"parts": 250, "support": 700},
-        "transfer_days": 105, "window_from": "mercury"},
+        "transfer_days": 105, "window_from": "mercury",
+        "local": {"requires": [], "cost": {"parts": 200, "support": 300}, "speed_km_day": 400, "prep_days": 3}},
       "constants": {
         "illumination": {"winter_day_of_year": [0, 0], "normal_gap_h": [500, 900], "normal_dark_h": [10, 60],
           "tiles": {"A": 6, "B": 8, "C": 12}},
@@ -98,8 +106,10 @@
       "summary": "소행성대의 수도가 될 왜행성. 오카토르 크레이터의 밝은 염류 곁, 얼음이 넘치는 땅이다. 중력이 지구의 3%라 로봇의 건설은 빠르지만 햇빛은 13%뿐이고, 하루는 9시간이다.",
       "env": {"sun": "지구의 13%", "day": "하루 9시간 4분, 밤 절반", "dose": "하루 약 1 mSv — 자기장도 대기도 없다", "resources": "물 얼음이 넘친다, 탄산염, 유기물", "rule": "저중력 — 로봇 작업량 +25%, 얼음 채굴 2배"},
       "rules": {"sun_k": 0.13, "ice_k": 2.0, "heat_k": 1.0, "build_k": 1.25, "contact_k": 0.45},
+      "default_city": true,
       "expedition": {"requires": ["seed_distributed", "cryogenic_propellant"], "cost": {"parts": 300, "metal_t": 5, "support": 800},
-        "transfer_days": 472, "window_from": "ceres"},
+        "transfer_days": 472, "window_from": "ceres",
+        "local": {"requires": [], "cost": {"parts": 150, "support": 250}, "speed_km_day": 600, "prep_days": 2}},
       "constants": {
         "illumination": {"model": "rotation", "day_h": 9.07, "light_frac": 0.5, "tiles": {"A": 40, "B": 0, "C": 0}, "tile_factor": {"A": 1.0}},
         "spe": {"major_rate_per_year": {"solar_min": 0.03, "added_at_solar_max": 0.2}, "minor_rate_per_year": {"solar_min": 0.4, "added_at_solar_max": 1.6},
@@ -129,8 +139,10 @@
       "summary": "목성의 네 번째 큰 위성, 거대한 충돌 분지 발할라. 목성의 주 방사선대 바깥이라 하루 선량이 약 0.1 mSv 남짓이다. 햇빛은 3.7%뿐이라 원자로가 전력의 전부다. 목성계를 오가는 함대의 거점 (NASA HOPE 연구, 2003).",
       "env": {"sun": "지구의 3.7% — 쓸모없다", "day": "목성에 묶여 하루 16.7일", "dose": "하루 약 0.1 mSv", "resources": "물 얼음, 암석", "rule": "원자로만으로 산다, 보급은 13개월마다, 길은 2.7년"},
       "rules": {"sun_k": 0.037, "ice_k": 2.5, "heat_k": 1.0, "build_k": 1.1, "contact_k": 0.3},
+      "default_city": true,
       "expedition": {"requires": ["seed_distributed", "megawatt_fission"], "cost": {"parts": 400, "metal_t": 10, "support": 1000},
-        "transfer_days": 998, "window_from": "jupiter"},
+        "transfer_days": 998, "window_from": "jupiter",
+        "local": {"requires": [], "cost": {"parts": 220, "support": 300}, "speed_km_day": 400, "prep_days": 3}},
       "constants": {
         "illumination": {"model": "rotation", "day_h": 400.5, "light_frac": 0.5, "tiles": {"A": 40, "B": 0, "C": 0}, "tile_factor": {"A": 1.0}},
         "dose_msv_day": {"bare_hab": 0.1, "covered_hab": 0.05, "dome": 0.03},
@@ -161,8 +173,10 @@
       "summary": "하위헌스 탐사선이 내린 아디리 평원. 1.5기압의 질소 대기, −179 °C. 여압복 없이 방한복과 산소만으로 밖에 나간다. 햇빛은 지구의 0.1%로 태양광은 쓸모가 없고, 두꺼운 대기가 방사선을 거의 다 막는다. 차가운 대기가 열을 잘 가져간다.",
       "env": {"sun": "지구의 0.1% — 쓸모없다", "day": "하루 16일", "dose": "거의 없다 — 두꺼운 대기", "resources": "질소 대기, 메탄 호수, 물 얼음 기반암", "rule": "방열 2.5배, 여압복 없이 일한다, 보급 길이 6년"},
       "rules": {"sun_k": 0.001, "ice_k": 1.5, "heat_k": 2.5, "build_k": 1.15, "contact_k": 0.25},
+      "default_city": true,
       "expedition": {"requires": ["seed_distributed", "orbital_assembly"], "cost": {"parts": 500, "metal_t": 15, "support": 1200},
-        "transfer_days": 2228, "window_from": "saturn"},
+        "transfer_days": 2228, "window_from": "saturn",
+        "local": {"requires": [], "cost": {"parts": 220, "support": 300}, "speed_km_day": 600, "prep_days": 3}},
       "constants": {
         "illumination": {"model": "rotation", "day_h": 382.7, "light_frac": 0.5, "tiles": {"A": 40, "B": 0, "C": 0}, "tile_factor": {"A": 1.0}},
         "dose_msv_day": {"bare_hab": 0.01, "covered_hab": 0.005, "dome": 0.003},
@@ -179,6 +193,270 @@
             "hydroponics": 2, "food_store": 2, "fission_40kw": 7, "battery_bank": 2, "radiator": 1,
             "ice_miner": 1, "excavator": 1, "robot_bay": 1, "landing_pad": 1, "storm_shelter": 1, "medical_bay": 1,
             "research_lab": 1, "comms_center": 1}}
+      }
+    },
+    {
+      "id": "moon_peary",
+      "base": "moon_shackleton",
+      "body": "moon",
+      "name": "피어리 북극 기지",
+      "short": "피어리",
+      "lat": 89.2,
+      "lon": 33.0,
+      "layout": "ridge",
+      "summary": "달 북극 피어리 크레이터의 가장자리. 남극처럼 거의 늘 해가 드는 능선과 영구 그늘의 얼음이 이웃한다. 섀클턴에서 극을 건너는 로버 행렬로 닿는다 (약 5,500 km).",
+      "env": {"day": "그림자 일정 (북극 겨울은 연초)", "rule": "북극 겨울의 긴 그림자, 섀클턴보다 작게 시작"},
+      "constants": {
+        "illumination": {"winter_day_of_year": [0, 80]},
+        "spe": {"scripted_major_day": -1},
+        "robots": {"start": 6},
+        "start": {"population": 30,
+          "stocks": {"o2_kg": 2000, "water_kg": 15000, "food_kg": 6000, "h2_kg": 100, "ch4_kg": 0, "regolith_t": 100, "metal_t": 0, "parts": 700},
+          "solar_tiles_used": {"A": 3, "B": 0, "C": 0},
+          "counts": {"hab_module": 5, "electrolyzer": 1, "co2_scrubber": 1, "sabatier": 1, "water_recycler": 1, "tank_farm": 1,
+            "hydroponics": 2, "food_store": 1, "solar_tower": 3, "fission_40kw": 1, "battery_bank": 2, "radiator": 2,
+            "ice_miner": 1, "excavator": 1, "robot_bay": 1, "landing_pad": 1, "storm_shelter": 1, "medical_bay": 1,
+            "research_lab": 1, "comms_center": 1}}
+      }
+    },
+    {
+      "id": "moon_marius",
+      "base": "moon_shackleton",
+      "body": "moon",
+      "name": "마리우스 언덕 용암동굴 기지",
+      "short": "마리우스",
+      "lat": 14.1,
+      "lon": -56.8,
+      "layout": "open",
+      "summary": "폭풍의 대양 서쪽, 마리우스 언덕의 용암동굴 천창. 동굴을 덮은 바위 수십 m가 방사선과 운석을 막는다. 대신 적도라 밤이 14일씩 이어져 태양광은 반쪽이고, 얼음이 귀하다.",
+      "env": {"sun": "지구와 같다 — 단 14일 낮, 14일 밤", "day": "한 달(29.5일)에 낮과 밤 한 번", "dose": "하루 약 0.1 mSv — 용암동굴", "resources": "현무암 레골리스, 티타늄, 동굴", "rule": "14일 밤 — 원자로와 축전으로 버틴다, 얼음 채굴 40%"},
+      "rules": {"sun_k": 1.0, "ice_k": 0.4},
+      "constants": {
+        "illumination": {"model": "rotation", "day_h": 708.7, "light_frac": 0.5, "tiles": {"A": 40, "B": 0, "C": 0}, "tile_factor": {"A": 1.0}},
+        "dose_msv_day": {"bare_hab": 0.12, "covered_hab": 0.06, "dome": 0.04},
+        "spe": {"major_dose_msv": 15, "minor_dose_msv": 1, "scripted_major_day": -1},
+        "robots": {"start": 8},
+        "start": {"population": 30,
+          "stocks": {"o2_kg": 2500, "water_kg": 20000, "food_kg": 8000, "h2_kg": 100, "ch4_kg": 0, "regolith_t": 100, "metal_t": 0, "parts": 900},
+          "solar_tiles_used": {"A": 4, "B": 0, "C": 0},
+          "counts": {"hab_module": 5, "electrolyzer": 1, "co2_scrubber": 1, "sabatier": 1, "water_recycler": 1, "tank_farm": 2,
+            "hydroponics": 2, "food_store": 2, "solar_tower": 4, "fission_40kw": 6, "battery_bank": 3, "radiator": 3,
+            "ice_miner": 2, "excavator": 1, "robot_bay": 1, "landing_pad": 1, "storm_shelter": 1, "medical_bay": 1,
+            "research_lab": 1, "comms_center": 1}}
+      }
+    },
+    {
+      "id": "mars_jezero",
+      "base": "mars_hellas",
+      "body": "mars",
+      "name": "예제로 크레이터 기지",
+      "short": "예제로",
+      "lat": 18.4,
+      "lon": 77.5,
+      "summary": "옛 강과 호수의 삼각주가 남은 예제로 크레이터. 퍼서비어런스가 생명의 흔적을 찾던 곳이다. 헬라스보다 공기가 얇아 방사선이 조금 세지만, 적도에 가까워 햇빛이 많고 얼음은 적다.",
+      "env": {"sun": "지구의 43% (대기·먼지로 40%)", "dose": "하루 약 0.6 mSv", "resources": "점토·탄산염, 옛 삼각주 퇴적층, 지하 얼음(적다)", "rule": "얼음 채굴 0.8배, 먼지 폭풍"},
+      "rules": {"sun_k": 0.4, "ice_k": 0.8},
+      "constants": {
+        "dose_msv_day": {"bare_hab": 0.6, "covered_hab": 0.26, "dome": 0.14},
+        "start": {"population": 30,
+          "stocks": {"o2_kg": 2000, "water_kg": 22000, "food_kg": 11000, "h2_kg": 300, "ch4_kg": 0, "regolith_t": 100, "metal_t": 5, "parts": 1200},
+          "solar_tiles_used": {"A": 6},
+          "counts": {"hab_module": 5, "electrolyzer": 1, "co2_scrubber": 1, "sabatier": 1, "water_recycler": 1, "tank_farm": 2,
+            "hydroponics": 2, "food_store": 2, "solar_tower": 6, "fission_40kw": 3, "battery_bank": 3, "radiator": 2,
+            "ice_miner": 2, "excavator": 1, "robot_bay": 1, "landing_pad": 1, "storm_shelter": 1, "medical_bay": 1,
+            "research_lab": 1, "comms_center": 1}}
+      }
+    },
+    {
+      "id": "mars_arcadia",
+      "base": "mars_hellas",
+      "body": "mars",
+      "name": "아르카디아 평원 기지",
+      "short": "아르카디아",
+      "lat": 46.0,
+      "lon": -163.0,
+      "summary": "북반구 아르카디아 평원. 지표 바로 아래 두꺼운 얼음층이 넓게 깔려 물이 가장 쉬운 화성 부지다. 위도가 높아 햇빛은 적고 겨울이 길다.",
+      "env": {"sun": "지구의 43% (위도·대기로 32%)", "dose": "하루 약 0.55 mSv", "resources": "지표 아래 얼음층, CO₂ 대기", "rule": "얼음 채굴 2배, 햇빛 32%, 먼지 폭풍"},
+      "rules": {"sun_k": 0.32, "ice_k": 2.0},
+      "constants": {
+        "dose_msv_day": {"bare_hab": 0.55, "covered_hab": 0.24, "dome": 0.13},
+        "start": {"population": 30,
+          "stocks": {"o2_kg": 2000, "water_kg": 20000, "food_kg": 11000, "h2_kg": 300, "ch4_kg": 0, "regolith_t": 100, "metal_t": 5, "parts": 1200},
+          "solar_tiles_used": {"A": 6},
+          "counts": {"hab_module": 5, "electrolyzer": 1, "co2_scrubber": 1, "sabatier": 1, "water_recycler": 1, "tank_farm": 2,
+            "hydroponics": 2, "food_store": 2, "solar_tower": 6, "fission_40kw": 3, "battery_bank": 3, "radiator": 2,
+            "ice_miner": 1, "excavator": 1, "robot_bay": 1, "landing_pad": 1, "storm_shelter": 1, "medical_bay": 1,
+            "research_lab": 1, "comms_center": 1}}
+      }
+    },
+    {
+      "id": "mercury_chao",
+      "base": "mercury_prokofiev",
+      "body": "mercury",
+      "name": "수성 남극 차오멍푸 기지",
+      "short": "차오멍푸",
+      "lat": -87.3,
+      "lon": -132.0,
+      "summary": "수성 남극의 차오멍푸 크레이터 가장자리. 북극 프로코피예프와 마찬가지로 영구 그늘의 얼음과 햇빛이 넘치는 능선이 맞붙어 있다. 북극에서 행성 반 바퀴를 건너야 한다.",
+      "env": {"rule": "방열판이 달의 절반만 버린다, 프로코피예프보다 작게 시작"},
+      "constants": {
+        "start": {"population": 30,
+          "stocks": {"o2_kg": 2000, "water_kg": 16000, "food_kg": 7000, "h2_kg": 200, "ch4_kg": 0, "regolith_t": 120, "metal_t": 5, "parts": 600},
+          "solar_tiles_used": {"A": 2},
+          "counts": {"hab_module": 5, "electrolyzer": 1, "co2_scrubber": 1, "sabatier": 1, "water_recycler": 1, "tank_farm": 2,
+            "hydroponics": 2, "food_store": 1, "solar_tower": 2, "fission_40kw": 1, "battery_bank": 2, "radiator": 6,
+            "ice_miner": 1, "excavator": 1, "robot_bay": 1, "landing_pad": 1, "storm_shelter": 2, "medical_bay": 1,
+            "research_lab": 1, "comms_center": 1}}
+      }
+    },
+    {
+      "id": "ceres_ahuna",
+      "base": "ceres_occator",
+      "body": "ceres",
+      "name": "아후나 산 기지",
+      "short": "아후나",
+      "lat": -10.5,
+      "lon": -44.0,
+      "summary": "세레스에 홀로 솟은 얼음 화산 아후나 산(높이 약 4 km)의 기슭. 소금물이 얼어붙은 비탈에서 물과 염류를 함께 캔다.",
+      "env": {"resources": "얼음 화산의 소금물 얼음, 탄산염", "rule": "저중력, 얼음 채굴 2.5배"},
+      "rules": {"ice_k": 2.5},
+      "constants": {
+        "start": {"population": 24,
+          "stocks": {"o2_kg": 2000, "water_kg": 25000, "food_kg": 12000, "h2_kg": 300, "ch4_kg": 0, "regolith_t": 100, "metal_t": 5, "parts": 1000},
+          "counts": {"hab_module": 4, "electrolyzer": 1, "co2_scrubber": 1, "sabatier": 1, "water_recycler": 1, "tank_farm": 2,
+            "hydroponics": 2, "food_store": 2, "fission_40kw": 5, "battery_bank": 2, "radiator": 2,
+            "ice_miner": 1, "excavator": 1, "robot_bay": 1, "landing_pad": 1, "storm_shelter": 1, "medical_bay": 1,
+            "research_lab": 1, "comms_center": 1}}
+      }
+    },
+    {
+      "id": "callisto_asgard",
+      "base": "callisto_valhalla",
+      "body": "callisto",
+      "name": "아스가르드 기지",
+      "short": "아스가르드",
+      "lat": 32.0,
+      "lon": -140.0,
+      "summary": "칼리스토의 두 번째로 큰 여러 고리 분지 아스가르드. 오래된 얼음 절벽이 고리처럼 겹겹이 둘러싼다. 발할라에서 반 바퀴 떨어져 있다.",
+      "env": {"rule": "원자로만으로 산다, 발할라보다 작게 시작"},
+      "constants": {
+        "start": {"population": 24,
+          "stocks": {"o2_kg": 2500, "water_kg": 25000, "food_kg": 14000, "h2_kg": 300, "ch4_kg": 0, "regolith_t": 120, "metal_t": 10, "parts": 1200},
+          "counts": {"hab_module": 4, "electrolyzer": 1, "co2_scrubber": 1, "sabatier": 1, "water_recycler": 1, "tank_farm": 2,
+            "hydroponics": 2, "food_store": 2, "fission_40kw": 6, "battery_bank": 2, "radiator": 2,
+            "ice_miner": 1, "excavator": 1, "robot_bay": 1, "landing_pad": 1, "storm_shelter": 1, "medical_bay": 1,
+            "research_lab": 1, "comms_center": 1}}
+      }
+    },
+    {
+      "id": "titan_kraken",
+      "base": "titan_adiri",
+      "body": "titan",
+      "name": "크라켄 해 연안 기지",
+      "short": "크라켄",
+      "lat": 68.0,
+      "lon": 50.0,
+      "summary": "타이탄 최대의 메탄·에탄 바다 크라켄 해의 해안. 액체 탄화수소가 파도치는 바닷가에 서는 첫 도시다. 바다 자체가 연료 원료고, 북극권이라 더 춥다.",
+      "env": {"day": "하루 16일 (북극권 — 계절에 따라 긴 밤)", "resources": "액체 메탄·에탄 바다, 질소 대기, 물 얼음 기반암", "rule": "방열 2.7배, 바닷가"},
+      "rules": {"ice_k": 1.2, "heat_k": 2.7},
+      "constants": {
+        "start": {"population": 20,
+          "stocks": {"o2_kg": 2500, "water_kg": 20000, "food_kg": 14000, "h2_kg": 300, "ch4_kg": 0, "regolith_t": 120, "metal_t": 10, "parts": 1400},
+          "counts": {"hab_module": 4, "electrolyzer": 1, "co2_scrubber": 1, "sabatier": 1, "water_recycler": 1, "tank_farm": 2,
+            "hydroponics": 2, "food_store": 2, "fission_40kw": 6, "battery_bank": 2, "radiator": 1,
+            "ice_miner": 1, "excavator": 1, "robot_bay": 1, "landing_pad": 1, "storm_shelter": 1, "medical_bay": 1,
+            "research_lab": 1, "comms_center": 1}}
+      }
+    },
+    {
+      "id": "titan_selk",
+      "base": "titan_adiri",
+      "body": "titan",
+      "name": "셀크 크레이터 기지",
+      "short": "셀크",
+      "lat": 7.0,
+      "lon": 161.0,
+      "summary": "적도 모래 언덕 바다 가운데의 셀크 충돌 크레이터. 녹은 얼음과 유기물이 섞였던 곳이라 드래곤플라이가 생명의 재료를 찾으러 날아간 곳이다.",
+      "env": {"resources": "유기물 모래, 물 얼음, 질소 대기", "rule": "방열 2.5배, 모래 언덕"},
+      "constants": {
+        "start": {"population": 20,
+          "stocks": {"o2_kg": 2500, "water_kg": 20000, "food_kg": 14000, "h2_kg": 300, "ch4_kg": 0, "regolith_t": 120, "metal_t": 10, "parts": 1400},
+          "counts": {"hab_module": 4, "electrolyzer": 1, "co2_scrubber": 1, "sabatier": 1, "water_recycler": 1, "tank_farm": 2,
+            "hydroponics": 2, "food_store": 2, "fission_40kw": 6, "battery_bank": 2, "radiator": 1,
+            "ice_miner": 1, "excavator": 1, "robot_bay": 1, "landing_pad": 1, "storm_shelter": 1, "medical_bay": 1,
+            "research_lab": 1, "comms_center": 1}}
+      }
+    },
+    {
+      "id": "earth_naro",
+      "body": "earth",
+      "name": "나로 우주항",
+      "short": "나로",
+      "lat": 34.4316,
+      "lon": 127.535,
+      "gravity_g": 1.0,
+      "layout": "open",
+      "summary": "고흥 외나로도의 나로우주센터가 자란 우주항 도시. 달과 화성으로 가는 화물과 사람이 여기서 떠난다. 숨 쉬는 공기와 상수도·시장이 있어 생명유지는 걱정이 없다 — 대신 도시를 키우고, 연구로 우주의 식민지를 돕는다.",
+      "env": {"sun": "지구 (구름·밤을 합쳐 약 50%)", "day": "하루 24시간", "dose": "하루 약 0.007 mSv — 대기와 자기장이 막는다", "resources": "공기, 물, 시장, 바다", "rule": "생명유지가 필요 없다 — 공기는 바깥에서, 물·식량·산소 30일치를 시장이 늘 채운다"},
+      "default_city": true,
+      "rules": {"sun_k": 0.5, "ice_k": 1.0, "heat_k": 2.0, "build_k": 1.4, "contact_k": 1.0, "open_air": true,
+        "supply_days": {"o2_kg": 30, "water_kg": 30, "food_kg": 30}},
+      "expedition": {"local": {"requires": [], "cost": {"parts": 120, "support": 200}, "speed_km_day": 8000, "prep_days": 2}},
+      "constants": {
+        "illumination": {"model": "rotation", "day_h": 24.0, "light_frac": 0.5, "tiles": {"A": 60, "B": 0, "C": 0}, "tile_factor": {"A": 1.0}},
+        "dose_msv_day": {"bare_hab": 0.007, "covered_hab": 0.007, "dome": 0.007},
+        "spe": {"major_rate_per_year": {"solar_min": 0.0, "added_at_solar_max": 0.0}, "minor_rate_per_year": {"solar_min": 0.0, "added_at_solar_max": 0.0},
+          "major_dose_msv": 0, "minor_dose_msv": 0, "scripted_major_day": -1},
+        "earth": {"cargo_first_day": 14, "cargo_interval_days": 30, "cargo_capacity_units": 400, "cargo_cost_support": 100,
+          "crewed_first_day": 30, "crewed_interval_days": 60, "crewed_seats": 40, "crewed_cost_support": 100,
+          "support_start": 2000, "support_per_month": 300, "earth_rp_day": 30, "express_cost_support": 200, "express_days": 2},
+        "robots": {"start": 12},
+        "start": {"population": 200, "morale": 75, "trust": 65,
+          "stocks": {"o2_kg": 6000, "water_kg": 60000, "food_kg": 30000, "h2_kg": 0, "ch4_kg": 0, "regolith_t": 0, "metal_t": 40, "parts": 2500},
+          "solar_tiles_used": {"A": 10},
+          "counts": {"hab_module": 14, "tank_farm": 1, "food_store": 3, "solar_tower": 10, "fission_40kw": 4, "battery_bank": 4, "radiator": 2,
+            "excavator": 1, "parts_fab": 1, "robot_bay": 1, "propellant_plant": 1, "landing_pad": 2, "medical_bay": 2,
+            "research_lab": 3, "green_commons": 2, "comms_center": 1}}
+      }
+    },
+    {
+      "id": "earth_kourou",
+      "base": "earth_naro",
+      "body": "earth",
+      "name": "쿠루 적도 우주항",
+      "short": "쿠루",
+      "lat": 5.236,
+      "lon": -52.769,
+      "summary": "남아메리카 기아나의 적도 해안. 지구 자전의 덕을 가장 많이 받는 발사장이라 정지궤도와 달로 가는 무거운 짐이 여기서 오른다. 열대 우림과 대서양 사이에 선다.",
+      "env": {"sun": "지구 (적도 — 구름이 많아 약 55%)", "resources": "공기, 물, 시장, 바다, 열대 우림"},
+      "rules": {"sun_k": 0.55},
+      "constants": {
+        "start": {"population": 100,
+          "stocks": {"o2_kg": 3000, "water_kg": 30000, "food_kg": 15000, "h2_kg": 0, "ch4_kg": 0, "regolith_t": 0, "metal_t": 20, "parts": 1500},
+          "solar_tiles_used": {"A": 6},
+          "counts": {"hab_module": 7, "tank_farm": 1, "food_store": 2, "solar_tower": 6, "fission_40kw": 2, "battery_bank": 2, "radiator": 1,
+            "excavator": 1, "parts_fab": 0, "robot_bay": 1, "propellant_plant": 1, "landing_pad": 2, "medical_bay": 1,
+            "research_lab": 1, "green_commons": 1, "comms_center": 1}}
+      }
+    },
+    {
+      "id": "earth_baikonur",
+      "base": "earth_naro",
+      "body": "earth",
+      "name": "바이코누르 우주항",
+      "short": "바이코누르",
+      "lat": 45.965,
+      "lon": 63.305,
+      "summary": "카자흐 초원 한가운데, 인류가 처음 사람을 우주로 보낸 발사장. 바다에서 멀고 맑은 날이 많다. 여름은 뜨겁고 겨울은 몹시 춥다.",
+      "env": {"sun": "지구 (맑은 초원 — 약 55%)", "resources": "공기, 물(시르다리야 강), 시장, 초원", "rule": "생명유지가 필요 없다, 방열이 조금 어렵다"},
+      "rules": {"sun_k": 0.55, "heat_k": 1.6},
+      "constants": {
+        "start": {"population": 100,
+          "stocks": {"o2_kg": 3000, "water_kg": 30000, "food_kg": 15000, "h2_kg": 0, "ch4_kg": 0, "regolith_t": 0, "metal_t": 20, "parts": 1500},
+          "solar_tiles_used": {"A": 6},
+          "counts": {"hab_module": 7, "tank_farm": 1, "food_store": 2, "solar_tower": 6, "fission_40kw": 2, "battery_bank": 2, "radiator": 1,
+            "excavator": 1, "parts_fab": 0, "robot_bay": 1, "propellant_plant": 1, "landing_pad": 2, "medical_bay": 1,
+            "research_lab": 1, "green_commons": 1, "comms_center": 1}}
       }
     }
   ]

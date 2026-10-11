@@ -77,6 +77,10 @@ func radius_km() -> float:
 	return R_KM
 
 
+func patch_radius_m() -> float:
+	return PATCH_M
+
+
 # ── 지형 모형 ───────────────────────────────────────────────────
 func _build_terrain_model() -> void:
 	var m: Dictionary = Astro.sky.get("moon", {})

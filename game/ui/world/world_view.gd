@@ -18,6 +18,7 @@ signal module_tapped(mid: String)
 signal focus_changed(id: String)
 signal colony_picked(index: int)
 signal colony_entered(index: int)          # 고르지 않은 도시 가까이로 직접 줌인했다 — 그 도시를 고른다
+signal site_picked(site_id: String)        # 후보 부지의 점을 눌렀다
 
 const BG := Color(0.0, 0.0, 0.0)
 const SHELL_K := 0.32               # 먼 천체를 껍질에 줄여 넣는 로그 기울기
@@ -50,8 +51,10 @@ var _rings: MeshInstance3D
 var moon: MoonSurface
 var city: City3D                     # 지금 고른 식민지의 자세한 도시 (하나뿐)
 var ground: SiteGround               # 그 도시가 앉은 땅
-var grounds := {}                    # 천체 id → SiteGround (달은 늘, 다른 천체는 처음 고를 때 만든다)
-var colonies: Array = []             # [{name, site, body, dir: 몸체 고정 Vector3, pop, active}] — 점과 이름표
+var grounds := {}                    # 부지 id → SiteGround (달 섀클턴은 늘, 다른 부지는 처음 고를 때 만든다)
+var colonies: Array = []             # [{name, site, body, dir: 몸체 고정 Vector3, pop, active, candidate?, transit?}] — 점과 이름표
+var _fine_sphere := {}               # 천체 id → 지형 조각과 맞닿게 구 메시를 곱게 바꿨나
+var _sphere_touched := {}            # ShaderMaterial → true: 고른 도시 둘레의 빛·연무·구멍을 넣은 천체 구
 var _descent := {}                   # 식민지로 날아간 뒤 내려앉기
 var _enter_cool := 0.0
 
@@ -131,21 +134,32 @@ func set_sim(new_sim: CitySim, p_plan: CityPlan = null, p_tool: PlaceTool = null
 		_ready_done = true
 
 
-## 부지의 땅 (없으면 만든다). 같은 천체의 식민지는 한 땅을 쓴다 (부지가 천체마다 하나)
+## 부지의 땅 (없으면 만든다). 도시마다 제 땅이 있고, 자세한 지형 조각은 고른 도시의 것만 그린다
 func ground_for(site_id: String) -> SiteGround:
+	if grounds.has(site_id):
+		return grounds[site_id]
 	var site := GameData.site(site_id)
 	var body := String(site.get("body", "moon"))
-	if grounds.has(body):
-		return grounds[body]
-	if not _bodies.has(body):
+	if site_id == GameData.HOME_SITE or site.is_empty() or not _bodies.has(body):
 		return moon
 	var node: MeshInstance3D = _bodies[body]["node"]
-	node.mesh = SkyBuilder.sphere(256, 128)          # 지형 조각과 맞닿게 구를 곱게
+	if not _fine_sphere.has(body) and body != "moon":
+		node.mesh = SkyBuilder.sphere(256, 128)          # 지형 조각과 맞닿게 구를 곱게
+		_fine_sphere[body] = true
 	var g := SiteSurface.new()
 	_space.add_child(g)
 	g.setup(body, site, node, float(_bodies[body]["radius"]))
-	grounds[body] = g
+	grounds[site_id] = g
 	return g
+
+
+## 그 천체에서 지형을 그리는 땅: 고른 도시의 땅이 그 천체에 있으면 그것, 달이면 섀클턴, 아니면 없다
+func _ground_on(body: String) -> SiteGround:
+	if ground != null and ground.body == body:
+		return ground
+	if body == "moon":
+		return moon
+	return null
 
 
 ## 자세한 도시를 이 땅에 세운다 (다른 땅의 도시는 없앤다)
@@ -154,8 +168,8 @@ func _mount_city(g: SiteGround) -> void:
 		city.get_parent().remove_child(city)
 		city.queue_free()
 		city = null
-	for b in grounds:
-		(grounds[b] as SiteGround).active = grounds[b] == g
+	for k in grounds:
+		(grounds[k] as SiteGround).active = grounds[k] == g
 	ground = g
 	city = City3D.new()
 	g.city_root.add_child(city)
@@ -216,7 +230,7 @@ func _build_scene() -> void:
 	moon = MoonSurface.new()
 	_space.add_child(moon)
 	moon.setup(_bodies["moon"]["node"])
-	grounds["moon"] = moon
+	grounds[GameData.HOME_SITE] = moon
 	_mount_city(moon)
 
 
@@ -328,9 +342,12 @@ func _chain(id: String) -> Array:
 	return [["sun", a * 0.25, a * 3.0]]
 
 
+## 천체 고정 방향의 지형 높이 (km): 그 자리를 덮는 땅(고른 도시의 지형 조각, 달 남극)이 있으면 그 값
 func _terrain_km(id: String, dir_b: Vector3) -> float:
-	if grounds.has(id):
-		return (grounds[id] as SiteGround).height_km(dir_b)
+	if ground != null and ground.body == id and ground.covers(dir_b):
+		return ground.height_km(dir_b)
+	if id == "moon" and moon:
+		return moon.height_km(dir_b)
 	return 0.0
 
 
@@ -432,10 +449,10 @@ func _place_all() -> void:
 	var near_info := _info(near_id)
 	var r: float = near_info["radius"]
 	var h := near_gap
-	if grounds.has(near_id):
+	if _ground_on(near_id) != null:
 		var rel := Astro.sub3(cam.pos, near_info["center"])
 		var dir_b: Vector3 = (near_info["frame"] as Basis).inverse() * Astro.vec(Astro.norm3(rel))
-		h = Astro.len3(rel) - r - (grounds[near_id] as SiteGround).height_km(dir_b)
+		h = Astro.len3(rel) - r - _terrain_km(near_id, dir_b)
 	h = maxf(h, 0.0015)
 	var horizon := sqrt(h * (2.0 * r + h))
 	_local = maxf(horizon * 1.25, cam.dist * 3.0)
@@ -469,8 +486,9 @@ func _place_all() -> void:
 	_place_sun(sun_c)
 	_place_light(near_id, sun_c)
 	_place_sky()
-	for b in grounds:
-		(grounds[b] as SiteGround).update_frame(self, _info(b), sun_c)
+	for k in grounds:
+		var gk: SiteGround = grounds[k]
+		gk.update_frame(self, _info(gk.body), sun_c)
 
 
 static func g_basis_cam(b: Basis) -> Basis:
@@ -493,7 +511,7 @@ func _place_sun(sun_c: PackedFloat64Array) -> void:
 func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 	var c: PackedFloat64Array = _info(near_id)["center"]
 	var dir := g_vec(Astro.vec(Astro.norm3(Astro.sub3(c, sun_c))))    # 빛이 나아가는 방향
-	var g: SiteGround = grounds.get(near_id)
+	var g: SiteGround = _ground_on(near_id)
 	if g:
 		dir = g.adjust_light(dir, self)
 	var up := Vector3.UP if absf(dir.y) < 0.95 else Vector3.RIGHT
@@ -517,15 +535,15 @@ func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 			_fill_light.global_transform = Transform3D(Basis.looking_at(fill_dir, up_r if absf(fill_dir.dot(up_r)) < 0.95 else Vector3.RIGHT), Vector3.ZERO)
 	_fill_light.light_energy = 0.32 * near_base * (0.35 if energy < 0.5 else 1.0)
 	_env.ambient_light_energy = lerpf(0.1, 0.2, near_base)
-	# 다른 천체의 구도 땅 조각과 같은 빛을 받는다 (가까이서는 올린 해, 그 땅의 밤이면 어둡게, 주변광·반사광까지)
-	for b in grounds:
-		var sg := grounds[b] as SiteSurface
-		if sg == null or sg.sphere_mat == null:
-			continue
-		var near_k := 1.0 - smoothstep(30.0, 600.0, sg.cam_alt_km()) if b == near_id else 0.0
+	# 고른 도시가 다른 천체에 있으면 그 구도 땅 조각과 같은 빛을 받는다
+	# (가까이서는 올린 해, 그 땅의 밤이면 어둡게, 주변광·반사광까지). 고르지 않은 천체의 구는 기본값으로
+	var now := {}
+	var sg := ground as SiteSurface
+	if sg != null and sg.sphere_mat != null:
+		var near_k := 1.0 - smoothstep(30.0, 600.0, sg.cam_alt_km()) if sg.body == near_id else 0.0
 		sg.sphere_mat.set_shader_parameter("lit_k", sg.local_light_factor() * lerpf(1.0, 1.6 / 1.75, near_k))
 		sg.sphere_mat.set_shader_parameter("rim_k", smoothstep(0.03, 0.4, sg.cam_alt_km() / sg.radius_km()))
-		if b == near_id:
+		if sg.body == near_id:
 			sg.sphere_mat.set_shader_parameter("sun_dir", -dir)
 		var amb := Vector3.ZERO
 		var fill := Vector3.ZERO
@@ -539,7 +557,23 @@ func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 			sg.sphere_mat.set_shader_parameter("fill_dir", _fill_light.global_transform.basis.z)
 		sg.sphere_mat.set_shader_parameter("amb_light", amb)
 		sg.sphere_mat.set_shader_parameter("fill_light", fill)
+		now[sg.sphere_mat] = true
+	for m in _sphere_touched:
+		if not now.has(m):
+			_reset_sphere(m)
+	_sphere_touched = now
 	_place_air(g, energy)
+
+
+## 고른 도시가 떠난 천체의 구: 땅 둘레 값을 지운다
+static func _reset_sphere(m: ShaderMaterial) -> void:
+	m.set_shader_parameter("lit_k", 1.0)
+	m.set_shader_parameter("rim_k", 1.0)
+	m.set_shader_parameter("sun_col", Vector3.ONE)
+	m.set_shader_parameter("amb_light", Vector3.ZERO)
+	m.set_shader_parameter("fill_light", Vector3.ZERO)
+	m.set_shader_parameter("air", Color(0, 0, 0, 0))
+	m.set_shader_parameter("hole_chord", 0.0)
 
 
 ## 대기가 있는 천체(화성·타이탄)의 땅 가까이: 낮에는 하늘이 그 색으로 밝고, 먼 땅은 연무에 잠긴다
@@ -549,10 +583,9 @@ func _place_air(g: SiteGround, energy: float) -> void:
 	if g is SiteSurface and cam.mode == "body" and cam.focus == g.body:
 		sky = (g as SiteSurface).sky_color()
 		k = (1.0 - smoothstep(6.0, 90.0, g.cam_alt_km())) * clampf(energy / 1.6, 0.0, 1.0)
-	for b in grounds:
-		var sg := grounds[b] as SiteSurface
-		if sg != null and sg.sphere_mat != null and (sg != g or sky.a <= 0.0 or k <= 0.001):
-			sg.sphere_mat.set_shader_parameter("air", Color(0, 0, 0, 0))
+	var sg := ground as SiteSurface
+	if sg != null and sg.sphere_mat != null and (sg != g or sky.a <= 0.0 or k <= 0.001):
+		sg.sphere_mat.set_shader_parameter("air", Color(0, 0, 0, 0))
 	if sky.a <= 0.0 or k <= 0.001:
 		_env.background_color = BG
 		_env.fog_enabled = false
@@ -646,7 +679,8 @@ func _check_enter(delta: float) -> void:
 	var t := Astro.vec(cam.t_dir)
 	for i in colonies.size():
 		var c: Dictionary = colonies[i]
-		if c.get("active", false) or c.get("transit", false) or String(c.get("body", "")) != cam.focus:
+		if c.get("active", false) or c.get("transit", false) or c.get("candidate", false) \
+				or String(c.get("body", "")) != cam.focus:
 			continue
 		var d: Vector3 = c.get("dir", Vector3.ZERO)
 		if t.dot(d.normalized()) > cos(minf(80.0 / maxf(r, 1.0), 0.5)):
@@ -908,6 +942,8 @@ func _click(p: Vector2, touch: bool = false, keep: bool = false) -> void:
 		if rect.grow(6.0).has_point(p):
 			if String(item[1]).begins_with("colony:"):
 				colony_picked.emit(int(String(item[1]).substr(7)))
+			elif String(item[1]).begins_with("site:"):
+				site_picked.emit(String(item[1]).substr(5))
 			else:
 				_fly_to_label(item[1])
 			return
@@ -1042,7 +1078,7 @@ func _label_body(id: String, font: Font, placed: Array) -> void:
 	var text: String = String(b["name"])
 	var n_col := 0
 	for col_d in colonies:
-		if String(col_d.get("body", "")) == id:
+		if String(col_d.get("body", "")) == id and not col_d.get("candidate", false) and not col_d.get("transit", false):
 			n_col += 1
 	if n_col > 0 and rad_px < 9.0:
 		text += "  · 도시 %d" % n_col
@@ -1072,7 +1108,7 @@ func _label_colony(i: int, font: Font, placed: Array) -> void:
 	var c: PackedFloat64Array = info["center"]
 	var r: float = info["radius"]
 	var dir: Vector3 = col_d.get("dir", Vector3(0, 0, -1))
-	var h := float(_terrain_km(body, dir)) if grounds.has(body) else 0.0
+	var h := _terrain_km(body, dir)
 	var p := Astro.add3(c, Astro.bmul(info["frame"], Astro.scale3(Astro.dvec(dir), r + h)))
 	# 천체 뒤편 (지평선 너머)
 	var out := Astro.norm3(Astro.sub3(p, c))
@@ -1097,8 +1133,12 @@ func _label_colony(i: int, font: Font, placed: Array) -> void:
 	var id := String(col_d.get("id", "colony:%d" % i))
 	var hot := _hover_label == id
 	var accent := Color(1.0, 0.72, 0.3) if active else Color(0.55, 0.85, 1.0)
+	var candidate: bool = col_d.get("candidate", false)
 	if col_d.get("transit", false):
 		accent = Color(0.62, 0.66, 0.74)
+	if candidate:
+		accent = Color(0.7, 0.74, 0.8)
+		alpha *= 0.85
 	if hot:
 		accent = Color(1.0, 0.86, 0.55)
 	var text := String(col_d.get("name", ""))
@@ -1111,9 +1151,13 @@ func _label_colony(i: int, font: Font, placed: Array) -> void:
 		if (other as Rect2).intersects(rect):
 			return
 	placed.append(rect)
-	_overlay.draw_circle(pos2, 7.5, Color(0, 0, 0, 0.55 * alpha))
-	_overlay.draw_arc(pos2, 7.0, 0.0, TAU, 24, Color(accent, alpha), 2.0, true)
-	_overlay.draw_circle(pos2, 3.2, Color(accent, alpha))
+	if candidate:
+		_overlay.draw_arc(pos2, 5.0, 0.0, TAU, 20, Color(0, 0, 0, 0.5 * alpha), 3.0, true)
+		_overlay.draw_arc(pos2, 5.0, 0.0, TAU, 20, Color(accent, alpha), 1.4, true)
+	else:
+		_overlay.draw_circle(pos2, 7.5, Color(0, 0, 0, 0.55 * alpha))
+		_overlay.draw_arc(pos2, 7.0, 0.0, TAU, 24, Color(accent, alpha), 2.0, true)
+		_overlay.draw_circle(pos2, 3.2, Color(accent, alpha))
 	_overlay.draw_string(font, pos2 + off + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT + 1,
 		Color(0, 0, 0, 0.75 * alpha))
 	_overlay.draw_string(font, pos2 + off, text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT + 1, Color(accent, alpha))
@@ -1215,9 +1259,9 @@ func _draw_readout(font: Font) -> void:
 	if cam.mode == "body" and not info.is_empty():
 		var rel := Astro.sub3(cam.pos, info["center"])
 		var alt := Astro.len3(rel) - float(info["radius"])
-		if grounds.has(cam.focus):
+		if _ground_on(cam.focus) != null:
 			var dir_b: Vector3 = (info["frame"] as Basis).inverse() * Astro.vec(Astro.norm3(rel))
-			alt -= (grounds[cam.focus] as SiteGround).height_km(dir_b)
+			alt -= _terrain_km(cam.focus, dir_b)
 		text = "%s 위 고도 %s" % [String(Astro.bodies[cam.focus]["name"]), Fmt.distance_km(alt)]
 	else:
 		var name := String(Astro.bodies[cam.focus]["name"]) if Astro.bodies.has(cam.focus) else _star_name(cam.focus)

@@ -38,6 +38,16 @@ func plateau_km() -> float:
 	return _plateau_m / 1000.0
 
 
+## 지형 조각의 반지름 (m) — 그 안의 높이는 height_km이 안다
+func patch_radius_m() -> float:
+	return 0.0
+
+
+## 천체 고정 방향이 이 땅의 지형 조각 안인가
+func covers(dir_b: Vector3) -> bool:
+	return (dir_b.normalized() - _site).length() * radius_m() < patch_radius_m()
+
+
 ## 기지 둘레의 높이 (m, 기지 평지 기준, 모형 좌표 x, y)
 func local_height_m(_p: Vector2) -> float:
 	return 0.0

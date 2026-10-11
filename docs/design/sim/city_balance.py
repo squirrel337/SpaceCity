@@ -35,8 +35,8 @@ MODULES = {m["id"]: m for m in _DATA["modules"]}
 TECHS = {t["id"]: t for t in
          json.loads((DATA_DIR / "city_techs.json").read_text(encoding="utf-8"))["techs"]}
 
-SITES = {s["id"]: s for s in
-         json.loads((DATA_DIR / "city_sites.json").read_text(encoding="utf-8"))["sites"]}
+_RAW_SITES = {s["id"]: s for s in
+              json.loads((DATA_DIR / "city_sites.json").read_text(encoding="utf-8"))["sites"]}
 HOME_SITE = "moon_shackleton"
 
 PER = C["per_person_day"]
@@ -92,6 +92,21 @@ def merged(base, over):
     for k, v in over.items():
         out[k] = merged(base[k], v) if isinstance(v, dict) and isinstance(base.get(k), dict) else v
     return out
+
+
+def _resolve_site(sid):
+    """부지 하나: base 부지의 값을 물려받고(사전은 깊게) 이 부지의 값이 이긴다. id·default_city·base는 물려받지 않는다."""
+    s = _RAW_SITES[sid]
+    base = s.get("base")
+    if not base or base not in _RAW_SITES:
+        return s
+    parent = {k: v for k, v in _resolve_site(base).items() if k not in ("id", "default_city", "base")}
+    return merged(parent, s)
+
+
+SITES = {_sid: _resolve_site(_sid) for _sid in _RAW_SITES}
+# 시장·상수도가 채우는 비축 → 한 사람이 하루에 쓰는 양의 열쇠
+SUPPLY_PER = {"o2_kg": "o2_kg", "water_kg": "water_use_kg", "food_kg": "food_kg"}
 
 
 def site_constants(site):
@@ -184,6 +199,8 @@ class City:
         self.build_k = rules.get("build_k", 1.0)      # 로봇 작업량
         self.contact_k = rules.get("contact_k", 1.0)  # 지구 교신의 사기
         self.air_co2 = rules.get("co2_air", False)    # 대기의 CO₂로 사바티에가 돈다
+        self.open_air = rules.get("open_air", False)  # 바깥 공기를 마신다 (지구): 산소를 쓰지 않고 CO₂는 환기로
+        self.supply = rules.get("supply_days", {})     # 시장·상수도가 날마다 채우는 비축 (일수)
         # 자동 운영이 남겨 두는 부품 — 보급이 드문 부지일수록 많이 (달 40)
         self.reserve = 40 * max(1.0, self.C["earth"]["cargo_interval_days"] / 60)
         self.start_date = start_date or date.fromisoformat(self.C["start"]["date"])
@@ -193,6 +210,8 @@ class City:
         self.days = int(round(365.25 * years))
         il = self.C["illumination"]
         hours = self.days * 24 + 48
+        # 자전하는 천체의 밤 길이 (시) — 72시간보다 길면 자동 운영이 태양광 대신 원자로·긴 축전을 고른다
+        self.night_h = il["day_h"] * (1 - il["light_frac"]) if il.get("model") == "rotation" else 0.0
         if il.get("model") == "rotation":
             self.dark = rotation_schedule(hours, il)
         else:
@@ -373,7 +392,7 @@ class City:
                   + (hr["o2_algae"] if self.prev[2] else 0.0)
                   + (hr["o2_green"] if self.prev[4] else 0.0)
                   + (hr["o2_mre"] if self.prev[3] else 0.0))
-        want = pop * PER["o2_kg"] - bio_o2 + max(0.0, 0.95 * self.caps["o2_kg"] - s["o2_kg"])
+        want = (0.0 if self.open_air else pop * PER["o2_kg"]) - bio_o2 + max(0.0, 0.95 * self.caps["o2_kg"] - s["o2_kg"])
         e_cap = hr["e_o2"]
         u_elec = min(1.0, max(0.0, want) / e_cap) if e_cap else 0.0
         water_need = hr["e_water"] * u_elec * h
@@ -440,9 +459,10 @@ class City:
         if not on[2]:
             self.day["p2_off_h"] += 1
 
-        # 사람
-        s["o2_kg"] -= pop * PER["o2_kg"] * h
-        self.co2_air += pop * PER["co2_kg"] * h
+        # 사람 (바깥 공기를 마시면 산소를 쓰지 않고, 내쉰 CO₂는 환기로 나간다)
+        if not self.open_air:
+            s["o2_kg"] -= pop * PER["o2_kg"] * h
+            self.co2_air += pop * PER["co2_kg"] * h
         use = pop * PER["water_use_kg"] * h
         s["water_kg"] -= use
         s["wastewater_kg"] += use
@@ -527,6 +547,11 @@ class City:
                 if key == "wastewater_kg":
                     self.stats["wastewater_lost_kg"] += s[key] - caps[key]
                 s[key] = caps[key]
+        # 시장·상수도: 정해진 일수만큼의 비축을 늘 채운다 (저장 한도와 상관없이 — 바깥에 있다)
+        for key, days in self.supply.items():
+            floor_kg = pop * PER[SUPPLY_PER[key]] * days
+            if s[key] < floor_kg:
+                s[key] = floor_kg
 
         # 작물: 72시간 넘게 전력을 못 받으면 고사
         self.farm_dark_h = 0 if (on[2] or not hr["hydro_n"]) else self.farm_dark_h + 1
@@ -708,16 +733,18 @@ class City:
         cap = self.planned_cap
         build = self.build
 
-        # 생명유지: 추천 정책은 여유분을, 준비 없는 정책은 문제가 터진 뒤에 짓는다
-        if prepared or self.co2_ppm() > self.C["co2_ppm"]["bad"]:
+        # 생명유지: 추천 정책은 여유분을, 준비 없는 정책은 문제가 터진 뒤에 짓는다 (바깥 공기·상수도가 있으면 짓지 않는다)
+        open_air = self.open_air
+        if not open_air and (prepared or self.co2_ppm() > self.C["co2_ppm"]["bad"]):
             if cap(lambda m: family(m) == "co2_scrubber", lambda m: provided(m, "co2_kg_day")) < 1.3 * pop_next * PER["co2_kg"]:
                 build("co2_scrubber")
-        if cap(lambda m: family(m) == "electrolyzer", lambda m: recipe(m, "out", "o2_kg")) < 1.2 * pop_next * PER["o2_kg"]:
+        if not open_air and cap(lambda m: family(m) == "electrolyzer", lambda m: recipe(m, "out", "o2_kg")) < 1.2 * pop_next * PER["o2_kg"]:
             build("electrolyzer")
-        if (cap(lambda m: family(m) == "water_recycler", lambda m: provided(m, "wastewater_kg_day"))
+        if ("water_kg" not in self.supply
+                and cap(lambda m: family(m) == "water_recycler", lambda m: provided(m, "wastewater_kg_day"))
                 < 1.15 * pop_next * PER["water_use_kg"]):
             build("water_recycler")
-        if prepared:
+        if prepared and not open_air:           # 지구에는 태양 양성자 폭풍이 닿지 않는다
             bonus = 1.5 if "shielding_2" in self.techs else 1.0
             shelter = cap(lambda m: provided(m, "shelter"),
                           lambda m: provided(m, "shelter") * (bonus if family(m) == "storm_shelter" else 1.0))
@@ -731,7 +758,8 @@ class City:
         fission = cap(lambda m: provided(m, "generation_kw") and family(m) != "solar_tower",
                       lambda m: provided(m, "generation_kw"))
         storage_planned = cap(lambda m: family(m) in ("battery_bank", "rfc_unit"), lambda m: provided(m, "storage_kwh"))
-        if prepared and storage_planned < max(0.0, p1p2 * 0.7 - fission) * 48:
+        store_h = max(48.0, self.night_h)          # 긴 밤(달 적도 354시간, 칼리스토 200시간)은 밤 내내
+        if prepared and storage_planned < max(0.0, p1p2 * 0.7 - fission) * store_h:
             if not build("rfc_unit") and "regenerative_fuel_cell" not in self.techs:
                 build("battery_bank")
 
@@ -739,10 +767,14 @@ class City:
         avg_load = 0.85 * sum(spec(m, "power_kw") * self.planned(m) for m in MODULES if spec(m, "priority"))
         tile_factor = self.C["illumination"]["tile_factor"]
         towers_gen = sum(tile_factor[t] * n for t, n in self.tiles.items()) * 100 * 0.9 * self.sun_k
+        long_night = self.night_h > 72                # 밤이 사흘보다 길면 타워를 믿지 않는다
+        if long_night:
+            towers_gen = 0.0
         if towers_gen + fission < (1.25 if prepared else 1.05) * avg_load:
             tile = self.free_tile()
-            # 햇빛이 약한 부지(세레스·목성·토성계)는 타워 대신 원자로
-            if tile and self.sun_k >= 0.2 and not (prepared and tile == "C" and "megawatt_fission" in self.techs):
+            # 햇빛이 약하거나 밤이 긴 부지(세레스·목성·토성계·달 적도)는 타워 대신 원자로
+            if (tile and self.sun_k >= 0.2 and not long_night
+                    and not (prepared and tile == "C" and "megawatt_fission" in self.techs)):
                 build("solar_tower", tile)
             elif not build("fission_1mw"):
                 build("fission_40kw")
@@ -764,18 +796,20 @@ class City:
         target = self.policy.food_targets[year_index]
         food_of = lambda m: recipe(m, "out", "food_kg")  # noqa: E731
         need = target * pop * PER["food_kg"] - cap(lambda m: family(m) == "algae_reactor", food_of)
-        if cap(lambda m: family(m) == "hydroponics", food_of) < need:
+        if "food_kg" not in self.supply and cap(lambda m: family(m) == "hydroponics", food_of) < need:
             build("hydroponics")
         if not prepared and "algae_bioreactor" in self.techs and p("algae_reactor") < pop / 60:
             build("algae_reactor")
-        if self.caps["food_kg"] < pop * PER["food_kg"] * 120 and not self.fam_queued("food_store"):
+        if ("food_kg" not in self.supply and self.caps["food_kg"] < pop * PER["food_kg"] * 120
+                and not self.fam_queued("food_store")):
             build("food_store")
-        if self.caps["o2_kg"] < pop * PER["o2_kg"] * 25 and not self.fam_queued("tank_farm"):
+        if not open_air and self.caps["o2_kg"] < pop * PER["o2_kg"] * 25 and not self.fam_queued("tank_farm"):
             build("tank_farm")
 
         # 물: 하루 순손실을 얼음 채굴이 넉넉히 덮도록
         loss = pop * PER["water_use_kg"] * (1 - self.recovery) + pop * PER["o2_kg"] * 0.6 * 1.125
-        if (cap(lambda m: family(m) == "ice_miner", lambda m: recipe(m, "out", "water_kg")) * self.mining * 0.8
+        if ("water_kg" not in self.supply
+                and cap(lambda m: family(m) == "ice_miner", lambda m: recipe(m, "out", "water_kg")) * self.mining * 0.8
                 < loss + 150):
             build("ice_miner")
 
@@ -896,7 +930,7 @@ class City:
                 self.stats["crewed_skipped"] += 1
                 return
             seats = min(earth["crewed_seats"], int(self.housing_cap - self.pop))
-            if self.policy.prepared:
+            if self.policy.prepared and not self.open_air:     # 바깥 공기를 마시면 제거기가 좌석을 막지 않는다
                 scrub = self.fam_sum("co2_scrubber", lambda m: provided(m, "co2_kg_day"))
                 seats = min(seats, int(scrub / PER["co2_kg"] / 1.1 - self.pop))
             if seats > 0:
@@ -1017,7 +1051,7 @@ class City:
             target -= 5
         pop = self.pop
         if pop:
-            if self.stock["o2_kg"] / (pop * PER["o2_kg"]) < 3:
+            if not self.open_air and self.stock["o2_kg"] / (pop * PER["o2_kg"]) < 3:
                 target -= 10
             if self.stock["food_kg"] / (pop * PER["food_kg"]) < 10:
                 target -= 10

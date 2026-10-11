@@ -41,9 +41,25 @@ static func load_all() -> void:
 	for t in techs_json["techs"]:
 		TECHS[t["id"]] = t
 	var sites_json: Dictionary = _read(SITES_PATH)
+	var raw := {}
 	for s in sites_json.get("sites", []):
-		SITES[s["id"]] = s
+		raw[s["id"]] = s
+	for id in raw:
+		SITES[id] = _resolve_site(raw, id)
 	_loaded = true
+
+
+## 부지 하나: base 부지의 값을 물려받고(사전은 깊게) 이 부지의 값이 이긴다. id·default_city·base는 물려받지 않는다
+## — 파이썬 _resolve_site와 같다
+static func _resolve_site(raw: Dictionary, id: String) -> Dictionary:
+	var s: Dictionary = raw[id]
+	var base := String(s.get("base", ""))
+	if base == "" or not raw.has(base):
+		return s
+	var parent := _resolve_site(raw, base).duplicate()
+	for k in ["id", "default_city", "base"]:
+		parent.erase(k)
+	return merged(parent, s)
 
 
 ## 부지의 도시 상수: 기본 상수에 부지 값을 깊게 덮어쓴 것 (달 시드 시티는 기본 상수 그대로) — 파이썬 site_constants와 같다

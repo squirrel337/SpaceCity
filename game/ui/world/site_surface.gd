@@ -90,6 +90,10 @@ func radius_km() -> float:
 	return _r_km
 
 
+func patch_radius_m() -> float:
+	return PATCH_M
+
+
 ## 대기의 하늘색 (없으면 투명)
 func sky_color() -> Color:
 	return SKY.get(body, Color(0, 0, 0, 0))
@@ -297,10 +301,11 @@ func update_frame(view: WorldView, info: Dictionary, _sun_c: PackedFloat64Array)
 	var t := _site_transform(view, info)
 	city_root.global_transform = t
 	patch.global_transform = t
-	var show_patch := _cam_alt_km < 2500.0 and _near_site(view, info)
+	# 자세한 지형 조각은 고른 도시의 것만 (다른 도시는 행성 단위의 점뿐)
+	var show_patch := active and _cam_alt_km < 2500.0 and _near_site(view, info)
 	patch.visible = show_patch
 	city_root.visible = show_patch and _cam_alt_km < 400.0
-	if sphere_mat:
+	if sphere_mat and active:
 		sphere_mat.set_shader_parameter("hole_dir", _site)
 		sphere_mat.set_shader_parameter("hole_chord", (PATCH_M - 600.0) / (_r_km * 1000.0) if show_patch else 0.0)
 	_follow_dark(view)

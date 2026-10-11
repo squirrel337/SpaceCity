@@ -51,15 +51,16 @@ func decide(sim: CitySim, day: int) -> void:
 	@warning_ignore("integer_division")
 	var year_index := mini(2, day / 365)
 
-	# 생명유지: 추천 운영은 여유분을, 준비 없는 운영은 문제가 터진 뒤에 짓는다
-	if prepared or sim.co2_ppm() > C["co2_ppm"]["bad"]:
+	# 생명유지: 추천 운영은 여유분을, 준비 없는 운영은 문제가 터진 뒤에 짓는다 (바깥 공기·상수도가 있으면 짓지 않는다)
+	var open_air := sim.open_air
+	if not open_air and (prepared or sim.co2_ppm() > C["co2_ppm"]["bad"]):
 		if _cap(sim, "co2_scrubber", "prov", "co2_kg_day") < 1.3 * pop_next * PER["co2_kg"]:
 			build(sim, "co2_scrubber")
-	if _cap(sim, "electrolyzer", "out", "o2_kg") < 1.2 * pop_next * PER["o2_kg"]:
+	if not open_air and _cap(sim, "electrolyzer", "out", "o2_kg") < 1.2 * pop_next * PER["o2_kg"]:
 		build(sim, "electrolyzer")
-	if _cap(sim, "water_recycler", "prov", "wastewater_kg_day") < 1.15 * pop_next * PER["water_use_kg"]:
+	if not sim.supply.has("water_kg") and _cap(sim, "water_recycler", "prov", "wastewater_kg_day") < 1.15 * pop_next * PER["water_use_kg"]:
 		build(sim, "water_recycler")
-	if prepared:
+	if prepared and not open_air:           # 지구에는 태양 양성자 폭풍이 닿지 않는다
 		var bonus := 1.5 if sim.techs.has("shielding_2") else 1.0
 		var shelter := 0.0
 		for m in sim.with_prov("shelter"):
@@ -85,7 +86,8 @@ func decide(sim: CitySim, day: int) -> void:
 	for m in sim.with_prov("storage_kwh"):
 		if sim.family(m) in ["battery_bank", "rfc_unit"]:
 			storage_planned += sim.planned(m) * float(sim.prov(m, "storage_kwh"))
-	if prepared and storage_planned < maxf(0.0, p1p2 * 0.7 - fission) * 48:
+	var store_h := maxf(48.0, sim.night_h)          # 긴 밤(달 적도 354시간, 칼리스토 200시간)은 밤 내내
+	if prepared and storage_planned < maxf(0.0, p1p2 * 0.7 - fission) * store_h:
 		if not build(sim, "rfc_unit") and not sim.techs.has("regenerative_fuel_cell"):
 			build(sim, "battery_bank")
 
@@ -100,10 +102,14 @@ func decide(sim: CitySim, day: int) -> void:
 	for t in sim.tiles:
 		tower_parts.append(float(tile_factor[t]) * int(sim.tiles[t]))
 	var towers_gen := PyCompat.fsum(tower_parts) * 100 * 0.9 * sim.sun_k
+	var long_night := sim.night_h > 72                # 밤이 사흘보다 길면 타워를 믿지 않는다
+	if long_night:
+		towers_gen = 0.0
 	if towers_gen + fission < (1.25 if prepared else 1.05) * avg_load:
 		var tile := sim.free_tile()
-		# 햇빛이 약한 부지(세레스·목성·토성계)는 타워 대신 원자로
-		if tile != "" and sim.sun_k >= 0.2 and not (prepared and tile == "C" and sim.techs.has("megawatt_fission")):
+		# 햇빛이 약하거나 밤이 긴 부지(세레스·목성·토성계·달 적도)는 타워 대신 원자로
+		if (tile != "" and sim.sun_k >= 0.2 and not long_night
+				and not (prepared and tile == "C" and sim.techs.has("megawatt_fission"))):
 			build(sim, "solar_tower", tile)
 		elif not build(sim, "fission_1mw"):
 			build(sim, "fission_40kw")
@@ -131,18 +137,18 @@ func decide(sim: CitySim, day: int) -> void:
 	# 식량 자급률 목표
 	var target: float = food_targets[year_index]
 	var need: float = target * pop * PER["food_kg"] - _cap(sim, "algae_reactor", "out", "food_kg")
-	if _cap(sim, "hydroponics", "out", "food_kg") < need:
+	if not sim.supply.has("food_kg") and _cap(sim, "hydroponics", "out", "food_kg") < need:
 		build(sim, "hydroponics")
 	if not prepared and sim.techs.has("algae_bioreactor") and fam_planned(sim, "algae_reactor") < pop / 60:
 		build(sim, "algae_reactor")
-	if sim.caps["food_kg"] < pop * PER["food_kg"] * 120 and not fam_queued(sim, "food_store"):
+	if not sim.supply.has("food_kg") and sim.caps["food_kg"] < pop * PER["food_kg"] * 120 and not fam_queued(sim, "food_store"):
 		build(sim, "food_store")
-	if sim.caps["o2_kg"] < pop * PER["o2_kg"] * 25 and not fam_queued(sim, "tank_farm"):
+	if not open_air and sim.caps["o2_kg"] < pop * PER["o2_kg"] * 25 and not fam_queued(sim, "tank_farm"):
 		build(sim, "tank_farm")
 
 	# 물: 하루 순손실을 얼음 채굴이 넉넉히 덮도록
 	var loss: float = pop * PER["water_use_kg"] * (1 - sim.recovery) + pop * PER["o2_kg"] * 0.6 * 1.125
-	if _cap(sim, "ice_miner", "out", "water_kg") * sim.mining * 0.8 < loss + 150:
+	if not sim.supply.has("water_kg") and _cap(sim, "ice_miner", "out", "water_kg") * sim.mining * 0.8 < loss + 150:
 		build(sim, "ice_miner")
 
 	# 사회·연구·산업

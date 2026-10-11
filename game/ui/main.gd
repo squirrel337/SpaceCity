@@ -114,6 +114,7 @@ func _build() -> void:
 	world.module_tapped.connect(_on_module_tapped)
 	world.colony_picked.connect(_on_colony_view)
 	world.colony_entered.connect(_on_colony_entered)
+	world.site_picked.connect(_on_site_picked)
 	city_area.add_child(world)
 	city_area.add_child(_build_view_switch())
 	city_area.add_child(_build_place_bar())
@@ -530,6 +531,15 @@ func _on_colony_entered(index: int) -> void:
 	_toast("%s — 이 도시를 본다" % colonies.list[index]["name"], "info")
 
 
+## 3D 지도에서 후보 부지의 점을 눌렀다: 개척 탭에서 그 부지 카드를 펼친다
+func _on_site_picked(site_id: String) -> void:
+	_select_tab("colony")
+	var card: Control = tabs["colony"].focus_site(site_id)
+	if card != null:
+		await get_tree().process_frame
+		panel_scroll.ensure_control_visible(card)
+
+
 ## 식민지 고르기 단추·3D 지도의 점·개척 탭을 맞춘다
 func _update_colony_ui() -> void:
 	colony_button.clear()
@@ -544,8 +554,8 @@ func _update_colony_ui() -> void:
 
 func _update_markers() -> void:
 	var dirs := {}
-	for b in world.grounds:
-		dirs[b] = (world.grounds[b] as SiteGround).site_dir()
+	for k in world.grounds:
+		dirs[k] = (world.grounds[k] as SiteGround).site_dir()
 	world.set_colonies(colonies.markers(active, dirs))
 
 
@@ -752,7 +762,7 @@ func _on_new_day(day: int) -> void:
 		return
 	var o2_days: float = sim.stock["o2_kg"] / (pop * sim.PER["o2_kg"])
 	var food_days: float = sim.stock["food_kg"] / (pop * sim.PER["food_kg"])
-	if (o2_days < 3 or food_days < 3) and day - _alarm_day > 2:
+	if ((o2_days < 3 and not sim.open_air) or food_days < 3) and day - _alarm_day > 2:
 		_alarm_day = day
 		_set_speed(0)
 		_toast("위급 — %s%s 비축이 3일 아래다" % [_colony_tag(sim), "산소" if o2_days < 3 else "식량"], "critical")

@@ -1,27 +1,31 @@
 class_name Colonies
 extends RefCounted
-## 여러 천체의 식민지 — 함께 흐르는 시계, 원정(발사 창·전이·도착), 기술 공유, 저장.
+## 여러 천체의 도시 — 함께 흐르는 시계, 새 도시 세우기(원정), 기술 공유, 저장.
 ##
-## 식민지마다 도시 시뮬레이션(CitySim)과 배치 계획(CityPlan)이 하나씩이다. 모든 식민지가 같은 시계로 한 시간씩 흐른다.
-## 첫 식민지(섀클턴)가 고향이다: 원정은 고향에서 떠나고, 비용(부품·금속·지구 지원 점수)도 고향이 낸다.
-## 발사 창은 지구와 목적지 행성의 실제 위치(천문력)로 정한다 — 호만 전이의 위상각
-##   φ = 180° − (목적지 평균 운동) × 전이 일수
-## 이 맞는 날을 가운데로 앞뒤 며칠(회합 주기의 4%, 6~21일)이 열린다.
-## 새 식민지는 시드가 자동 운영으로 세운다. 그 식민지를 골라 '자동 운영'을 끄면 넘겨받는다.
-## 기술은 하루에 한 번 모든 식민지가 나눠 갖는다 (지식은 전파로 건너간다).
+## 도시마다 시뮬레이션(CitySim)과 배치 계획(CityPlan)이 하나씩이다. 모든 도시가 같은 시계로 한 시간씩 흐른다.
+## 게임은 천체마다 기본 도시 하나로 시작한다 (부지 자료의 default_city — 달 섀클턴이 고향, 나머지는 시드의 자동 운영).
+## 새 도시는 후보 부지로 원정대를 보내 세운다:
+##   같은 천체에 도시가 있으면 그 도시(가장 큰 곳)에서 로버 행렬·호퍼·비행기로 간다 — 발사 창이 없고 며칠~몇 주.
+##   없으면 고향에서 행성 사이를 건너간다. 발사 창은 지구와 목적지 행성의 실제 위치(천문력)로 정한다 — 호만 전이의 위상각
+##     φ = 180° − (목적지 평균 운동) × 전이 일수
+##   이 맞는 날을 가운데로 앞뒤 며칠(회합 주기의 4%, 6~21일)이 열린다.
+## 비용은 떠나는 도시가 낸다. 새 도시는 시드가 자동 운영으로 세우고, 그 도시를 골라 '자동 운영'을 끄면 넘겨받는다.
+## 기술은 하루에 한 번 모든 도시가 나눠 갖는다 (지식은 전파로 건너간다).
 
 const SAVE_VERSION := 2
-const ORIGIN := "earth"            # 원정이 떠나는 행성 (고향 달 기지는 지구 곁)
+const ORIGIN := "earth"            # 행성 사이 원정이 떠나는 행성 (고향 달 기지는 지구 곁)
+## 개척 탭과 도시 고르기에서 천체를 늘어놓는 순서
+const BODY_ORDER := ["moon", "earth", "mars", "mercury", "ceres", "callisto", "titan"]
 
-var list: Array = []               # 식민지 [{name, site, sim, plan, founded}] — founded: 게임 시각(시)
-var expeditions: Array = []        # 이동 중 [{site, depart, arrive, seed}] — 게임 시각(시)
+var list: Array = []               # 도시 [{name, short, site, body, sim, plan, founded}] — founded: 게임 시각(시)
+var expeditions: Array = []        # 이동 중 [{site, depart, arrive, seed, mode, from}] — 게임 시각(시), from: 떠난 부지
 var hour := 0                      # 게임 시작부터 흐른 시간 (= 고향의 시간)
 var start_unix := 0                # 게임을 시작한 시각
 var seed_value := 2061
 var _windows := {}                 # 부지 → {best, start, end} (게임 일) — 창이 지나면 다시 셈한다
 
 
-## 새 게임: 고향 식민지 하나로 시작한다
+## 새 게임: 고향 도시와 천체마다의 기본 도시로 시작한다
 func start(sim: CitySim, plan: CityPlan) -> void:
 	list = [_entry(sim, plan, 0)]
 	expeditions = []
@@ -29,12 +33,41 @@ func start(sim: CitySim, plan: CityPlan) -> void:
 	start_unix = sim.start_unix
 	seed_value = sim.seed_value
 	_windows.clear()
+	found_defaults()
+
+
+## 아직 없는 기본 도시를 지금 시각에 세운다 (새 게임, 기본 도시가 없던 옛 저장)
+func found_defaults() -> Array:
+	var made := []
+	for id in GameData.SITES:
+		var s: Dictionary = GameData.SITES[id]
+		if not s.get("default_city", false) or index_of_site(id) >= 0 or not in_transit(id).is_empty():
+			continue
+		var c := _found_at(String(id), hour, _seed_for(String(id)))
+		c["sim"].note("관리 기록 — %s 가동. 정착민 %d명. 시드가 자동 운영으로 돌본다." % [c["name"], int(c["sim"].population())], "info")
+		made.append(list.size() - 1)
+	return made
+
+
+func _seed_for(site_id: String) -> int:
+	return seed_value * 31 + absi(site_id.hash()) % 9973 + list.size()
 
 
 func _entry(sim: CitySim, plan: CityPlan, founded: int) -> Dictionary:
 	var site := GameData.site(sim.site_id)
 	return {"name": String(site.get("name", sim.site_id)), "short": String(site.get("short", site.get("name", ""))),
 		"site": sim.site_id, "body": String(site.get("body", "moon")), "sim": sim, "plan": plan, "founded": founded}
+
+
+func _found_at(site_id: String, at_hour: int, seed: int) -> Dictionary:
+	var site := GameData.site(site_id)
+	var s := CitySim.new(seed, 40.0, "good", site_id, unix_at(float(at_hour)))
+	for t in known_techs():
+		s.techs[t] = true
+	var plan := CityPlan.create(s, BaseLayout.new(_layout_of(site_id)))
+	var c := _entry(s, plan, at_hour)
+	list.append(c)
+	return c
 
 
 func home() -> Dictionary:
@@ -65,6 +98,27 @@ func in_transit(site_id: String) -> Dictionary:
 	return {}
 
 
+## 그 천체에서 가장 큰 도시의 번호 (없으면 −1)
+func largest_on(body: String) -> int:
+	var best := -1
+	var best_pop := -1.0
+	for i in list.size():
+		if String(list[i]["body"]) == body:
+			var p := (list[i]["sim"] as CitySim).population()
+			if p > best_pop:
+				best_pop = p
+				best = i
+	return best
+
+
+func count_on(body: String) -> int:
+	var n := 0
+	for c in list:
+		if String(c["body"]) == body:
+			n += 1
+	return n
+
+
 func unix_at(game_hour: float) -> int:
 	return start_unix + int(game_hour * 3600.0)
 
@@ -75,7 +129,7 @@ func date_text(game_hour: float) -> String:
 
 
 # ── 시간 ────────────────────────────────────────────────────────
-## 한 시간: 모든 식민지가 함께 흐른다. 도착한 원정대는 새 식민지가 된다 — 그 번호들을 돌려준다
+## 한 시간: 모든 도시가 함께 흐른다. 도착한 원정대는 새 도시가 된다 — 그 번호들을 돌려준다
 func step() -> Array:
 	hour += 1
 	for c in list:
@@ -90,14 +144,11 @@ func step() -> Array:
 	return arrived
 
 
-## 기술 나누기: 어느 식민지든 알아낸 기술은 모두가 안다
+## 기술 나누기: 어느 도시든 알아낸 기술은 모두가 안다
 func share_techs() -> void:
 	if list.size() < 2:
 		return
-	var known := {}
-	for c in list:
-		for t in (c["sim"] as CitySim).techs:
-			known[t] = true
+	var known := known_techs()
 	for c in list:
 		var s: CitySim = c["sim"]
 		for t in known:
@@ -105,19 +156,14 @@ func share_techs() -> void:
 
 
 func _found(e: Dictionary) -> int:
-	var site_id := String(e["site"])
-	var site := GameData.site(site_id)
-	var s := CitySim.new(int(e["seed"]), 40.0, "good", site_id, unix_at(float(e["arrive"])))
-	for t in known_techs():
-		s.techs[t] = true
-	var plan := CityPlan.create(s, BaseLayout.new(String(site.get("layout", "open"))))
-	s.note("관리 기록 — %s 도착. 정착민 %d명이 내렸다. 시드가 자동 운영으로 기지를 세운다." % [
-		String(site["name"]), int(s.population())], "info")
-	list.append(_entry(s, plan, int(e["arrive"])))
+	var c := _found_at(String(e["site"]), int(e["arrive"]), int(e["seed"]))
+	var s: CitySim = c["sim"]
+	s.note("관리 기록 — %s 도착. 정착민 %d명이 내렸다. 시드가 자동 운영으로 기지를 세운다." % [c["name"], int(s.population())],
+		"info")
 	return list.size() - 1
 
 
-## 식민지를 잃었다 (절멸·시드 정지) — 목록에서 뺀다. 그 부지는 다시 원정할 수 있다
+## 도시를 잃었다 (절멸·시드 정지) — 목록에서 뺀다. 그 부지는 다시 원정할 수 있다
 func remove(index: int) -> Dictionary:
 	var c: Dictionary = list[index]
 	list.remove_at(index)
@@ -125,17 +171,62 @@ func remove(index: int) -> Dictionary:
 
 
 # ── 원정 ────────────────────────────────────────────────────────
+## 새 도시를 세울 수 있는 부지 (원정 자료가 있는 곳) — 천체 순서대로
 func candidates() -> Array:
 	GameData.load_all()
 	var out := []
-	for id in GameData.SITES:
-		if (GameData.SITES[id] as Dictionary).has("expedition"):
-			out.append(String(id))
+	for body in BODY_ORDER:
+		for id in GameData.SITES:
+			var s: Dictionary = GameData.SITES[id]
+			if String(s.get("body", "")) == body and s.has("expedition"):
+				out.append(String(id))
 	return out
 
 
 func expedition(site_id: String) -> Dictionary:
 	return GameData.site(site_id).get("expedition", {})
+
+
+## 가는 길: {mode: "local"(같은 천체의 도시에서) | "space"(고향에서 행성 사이) | "", from: 떠나는 도시 번호}
+func route(site_id: String) -> Dictionary:
+	var site := GameData.site(site_id)
+	var body := String(site.get("body", ""))
+	var ex := expedition(site_id)
+	var near := largest_on(body)
+	if near >= 0 and ex.has("local"):
+		return {"mode": "local", "from": near}
+	var h := index_of_site(GameData.HOME_SITE)
+	if h >= 0 and String(list[h]["body"]) != body and ex.has("transfer_days"):
+		return {"mode": "space", "from": h}
+	return {"mode": "", "from": -1}
+
+
+## 그 길의 원정 자료 (local이면 local 칸, 행성 사이면 원정 자료 그대로)
+func _route_data(site_id: String, r: Dictionary) -> Dictionary:
+	var ex := expedition(site_id)
+	return ex.get("local", {}) if r["mode"] == "local" else ex
+
+
+## 두 부지 사이의 거리 (km, 같은 천체의 대원)
+func surface_km(a_site: String, b_site: String) -> float:
+	var a := GameData.site(a_site)
+	var b := GameData.site(b_site)
+	Astro.load_data()
+	var r := float(Astro.bodies.get(String(a.get("body", "moon")), {}).get("radius_km", 1737.4))
+	var da := Astro.latlon(float(a["lat"]), float(a["lon"]))
+	var db := Astro.latlon(float(b["lat"]), float(b["lon"]))
+	return acos(clampf(da.dot(db), -1.0, 1.0)) * r
+
+
+## 가는 데 걸리는 날 (같은 천체: 준비 + 거리 ÷ 하루 이동, 행성 사이: 전이 일수)
+func travel_days(site_id: String, r: Dictionary = {}) -> float:
+	if r.is_empty():
+		r = route(site_id)
+	if r["mode"] == "local":
+		var d := _route_data(site_id, r)
+		var from_site := String(list[int(r["from"])]["site"])
+		return float(d.get("prep_days", 3)) + surface_km(from_site, site_id) / maxf(1.0, float(d.get("speed_km_day", 400)))
+	return float(expedition(site_id).get("transfer_days", 200))
 
 
 func known_techs() -> Dictionary:
@@ -146,21 +237,24 @@ func known_techs() -> Dictionary:
 	return known
 
 
-func missing_techs(site_id: String) -> Array:
+func missing_techs(site_id: String, r: Dictionary = {}) -> Array:
+	if r.is_empty():
+		r = route(site_id)
 	var known := known_techs()
 	var out := []
-	for t in expedition(site_id).get("requires", []):
+	for t in _route_data(site_id, r).get("requires", []):
 		if not known.has(t):
 			out.append(String(t))
 	return out
 
 
-## 비용 항목: [[이름, 필요, 가진 것]] — 고향이 낸다
-func cost_rows(site_id: String) -> Array:
-	var h := home()
-	var s: CitySim = h.get("sim") if not h.is_empty() else null
+## 비용 항목: [[이름, 필요, 가진 것]] — 떠나는 도시가 낸다
+func cost_rows(site_id: String, r: Dictionary = {}) -> Array:
+	if r.is_empty():
+		r = route(site_id)
+	var s: CitySim = list[int(r["from"])]["sim"] if int(r["from"]) >= 0 else null
 	var out := []
-	var cost: Dictionary = expedition(site_id).get("cost", {})
+	var cost: Dictionary = _route_data(site_id, r).get("cost", {})
 	for k in cost:
 		var have := 0.0
 		if s != null:
@@ -182,47 +276,53 @@ static func cost_name(k: String) -> String:
 
 ## 출발할 수 없는 까닭 ("" = 지금 떠날 수 있다)
 func block_reason(site_id: String) -> String:
-	if home().is_empty():
-		return "고향 기지가 없다"
 	if index_of_site(site_id) >= 0:
-		return "이미 식민지가 있다"
+		return "이미 도시가 있다"
 	if not in_transit(site_id).is_empty():
 		return "원정대가 가는 중이다"
-	var miss := missing_techs(site_id)
+	var r := route(site_id)
+	if r["mode"] == "":
+		return "떠날 도시가 없다"
+	var miss := missing_techs(site_id, r)
 	if not miss.is_empty():
 		var names := []
 		for t in miss:
 			names.append(String(GameData.TECHS[t]["name"]) if GameData.TECHS.has(t) else t)
 		return "기술이 모자란다: " + ", ".join(names)
-	for row in cost_rows(site_id):
+	for row in cost_rows(site_id, r):
 		if float(row[2]) < float(row[1]):
-			return "%s이 모자란다 (%s 필요, %s 있음)" % [cost_name(row[0]), Fmt.n(row[1]), Fmt.n(row[2])]
-	var w := window(site_id)
-	if not w["open"]:
-		return "발사 창이 닫혀 있다 — 다음 창 %s" % date_text(float(w["start"]) * 24.0)
+			return "%s의 %s이 모자란다 (%s 필요, %s 있음)" % [list[int(r["from"])]["short"], cost_name(row[0]),
+				Fmt.n(row[1]), Fmt.n(row[2])]
+	if r["mode"] == "space":
+		var w := window(site_id)
+		if not w["open"]:
+			return "발사 창이 닫혀 있다 — 다음 창 %s" % date_text(float(w["start"]) * 24.0)
 	return ""
 
 
-## 원정대를 보낸다: 고향이 비용을 내고, 전이 일수 뒤에 도착한다
+## 원정대를 보낸다: 떠나는 도시가 비용을 내고, 가는 날만큼 뒤에 도착한다
 func launch(site_id: String) -> bool:
 	if block_reason(site_id) != "":
 		return false
-	var h := home()
-	var s: CitySim = h["sim"]
-	var ex := expedition(site_id)
-	var cost: Dictionary = ex.get("cost", {})
+	var r := route(site_id)
+	var src: Dictionary = list[int(r["from"])]
+	var s: CitySim = src["sim"]
+	var cost: Dictionary = _route_data(site_id, r).get("cost", {})
 	for k in cost:
 		if k == "support":
 			s.support -= float(cost[k])
 		else:
 			s.stock[k] = float(s.stock.get(k, 0.0)) - float(cost[k])
-	var days := float(ex.get("transfer_days", 200))
-	var e := {"site": site_id, "depart": hour, "arrive": hour + int(round(days * 24.0)),
-		"seed": seed_value * 31 + absi(site_id.hash()) % 9973 + list.size()}
+	var days := travel_days(site_id, r)
+	var e := {"site": site_id, "depart": hour, "arrive": hour + maxi(24, int(round(days * 24.0))),
+		"seed": _seed_for(site_id) + expeditions.size(), "mode": r["mode"], "from": String(src["site"])}
 	expeditions.append(e)
 	var site := GameData.site(site_id)
-	s.note("원정대 출발 — %s (%s). %d일 뒤 %s 도착 예정" % [String(site["name"]),
-		String(Astro.bodies.get(site["body"], {}).get("name", site["body"])), int(days), date_text(float(e["arrive"]))], "good")
+	var how := "로버 행렬" if r["mode"] == "local" else "원정선"
+	if r["mode"] == "local" and String(site.get("body", "")) == "earth":
+		how = "비행편"
+	s.note("%s 출발 — %s (%s). %d일 뒤 %s 도착 예정" % [how, String(site["name"]),
+		String(Astro.bodies.get(site["body"], {}).get("name", site["body"])), ceili(days), date_text(float(e["arrive"]))], "good")
 	return true
 
 
@@ -281,21 +381,29 @@ func _find_window(site_id: String, now_d: float) -> Dictionary:
 
 
 # ── 3D 지도의 점 ─────────────────────────────────────────────────
-## [{name, site, body, dir, pop, active, id?, sub?}] — 이동 중인 원정대는 목적지에 '도착 D-n'으로
+## [{name, site, body, dir, pop, active, id?, sub?, transit?, candidate?}]
+## 도시, 이동 중인 원정대(목적지에 '도착 D-n'), 아직 비어 있는 후보 부지(속이 빈 점)
 func markers(active_index: int, site_dirs: Dictionary = {}) -> Array:
 	var out := []
 	for i in list.size():
 		var c: Dictionary = list[i]
 		var site := GameData.site(c["site"])
 		out.append({"name": c["name"], "site": c["site"], "body": c["body"],
-			"dir": site_dirs.get(c["body"], Astro.latlon(float(site["lat"]), float(site["lon"]))),
+			"dir": site_dirs.get(c["site"], Astro.latlon(float(site["lat"]), float(site["lon"]))),
 			"pop": (c["sim"] as CitySim).population(), "active": i == active_index})
 	for e in expeditions:
 		var site2 := GameData.site(e["site"])
 		var left := ceili((float(e["arrive"]) - hour) / 24.0)
 		out.append({"name": String(site2.get("short", site2["name"])), "site": e["site"], "body": site2["body"],
 			"dir": Astro.latlon(float(site2["lat"]), float(site2["lon"])), "pop": 0, "active": false,
-			"id": String(site2["body"]), "sub": "원정대 이동 중 · 도착 D-%d" % left, "transit": true})
+			"id": "site:" + String(e["site"]), "sub": "원정대 이동 중 · 도착 D-%d" % left, "transit": true})
+	for id in candidates():
+		if index_of_site(id) >= 0 or not in_transit(id).is_empty():
+			continue
+		var site3 := GameData.site(id)
+		out.append({"name": String(site3.get("short", site3["name"])), "site": id, "body": site3["body"],
+			"dir": Astro.latlon(float(site3["lat"]), float(site3["lon"])), "pop": 0, "active": false,
+			"id": "site:" + id, "sub": "후보지", "candidate": true})
 	return out
 
 
@@ -306,16 +414,22 @@ func to_save() -> Dictionary:
 		cols.append({"name": c["name"], "site": c["site"], "founded": c["founded"],
 			"sim": (c["sim"] as CitySim).to_save(), "plan": (c["plan"] as CityPlan).to_save()})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
-		"colonies": cols, "expeditions": expeditions}
+		"colonies": cols, "expeditions": expeditions, "defaults": 1}
 
 
-## 저장을 읽는다 (판 1 = 식민지 하나뿐이던 저장). 실패하면 false
+## 저장을 읽는다 (판 1 = 도시 하나뿐이던 저장). 기본 도시가 없던 저장이면 지금 시각에 세운다. 실패하면 false
 func load_save(data: Dictionary) -> bool:
 	var v := int(data.get("version", 0))
 	if v == 1:
 		var s := CitySim.from_save(data)
 		var plan := CityPlan.from_save(data.get("plan"), s, BaseLayout.new(_layout_of(s.site_id)))
-		start(s, plan)
+		list = [_entry(s, plan, 0)]
+		expeditions = []
+		hour = s.hour
+		start_unix = s.start_unix
+		seed_value = s.seed_value
+		_windows.clear()
+		found_defaults()
 		return true
 	if v != SAVE_VERSION or not data.get("colonies") is Array or (data["colonies"] as Array).is_empty():
 		return false
@@ -331,11 +445,13 @@ func load_save(data: Dictionary) -> bool:
 	expeditions = []
 	for e in data.get("expeditions", []):
 		expeditions.append({"site": String(e["site"]), "depart": int(e["depart"]), "arrive": int(e["arrive"]),
-			"seed": int(e["seed"])})
+			"seed": int(e["seed"]), "mode": String(e.get("mode", "space")), "from": String(e.get("from", GameData.HOME_SITE))})
 	hour = int(data.get("hour", 0))
 	start_unix = int(data.get("start_unix", (list[0]["sim"] as CitySim).start_unix))
 	seed_value = int(data.get("seed", 2061))
 	_windows.clear()
+	if not data.has("defaults"):
+		found_defaults()
 	return true
 
 

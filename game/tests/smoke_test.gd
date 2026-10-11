@@ -83,12 +83,13 @@ func _save_roundtrip() -> void:
 	var restored := CitySim.from_save(JSON.parse_string(text))
 	_check(restored.hour == main.sim.hour, "불러온 시각이 다르다")
 	_check(absf(restored.population() - main.sim.population()) < 1e-9, "불러온 인구가 다르다")
-	# 같은 상태에서 같은 결정이면 같은 결과가 나와야 한다
+	# 같은 상태에서 같은 결정이면 같은 결과가 나와야 한다 (같은 저장에서 두 번 되살려 나란히 돌린다)
+	var twin := CitySim.from_save(JSON.parse_string(text))
 	for _i in range(24 * 10):
 		restored.advance_hour()
-		main.colonies.step()          # 식민지 시계와 함께 (식민지는 아직 하나)
-	_check(absf(restored.stock["o2_kg"] - main.sim.stock["o2_kg"]) < 1e-6, "불러온 뒤 10일의 결과가 다르다")
-	_check(restored.rng.random() == main.sim.rng.random(), "난수 상태가 이어지지 않았다")
+		twin.advance_hour()
+	_check(absf(restored.stock["o2_kg"] - twin.stock["o2_kg"]) < 1e-9, "불러온 뒤 10일의 결과가 다르다")
+	_check(restored.rng.random() == twin.rng.random(), "난수 상태가 이어지지 않았다")
 
 
 func _map_check() -> void:
@@ -108,15 +109,19 @@ func _map_check() -> void:
 	_check(seen.size() == 5, "이웃한 자리 다섯 곳의 모양이 겹친다")
 	main.sim.enqueue("medical_bay", "", 0.0)
 	main.plan.sync(main.sim)
+	if main.sim.robots - main.sim.robots_broken <= 0:
+		main.sim.robots_broken = 0          # 시험의 전제: 일하는 로봇이 한 대는 있다 (고장은 운에 달렸다)
 	var sites := BaseScene.sites(main.sim, main.plan)
 	_check(not sites.is_empty(), "공사 현장이 없다")
 	var traffic: BaseTraffic = main.world.city.traffic
-	for _i in range(900):
-		traffic.update(0.1, main.sim, sites)
 	var working := 0
+	for _i in range(6000):               # 공사 현장까지 길로 걸어간다 (최대 10분)
+		traffic.update(0.1, main.sim, sites)
+		if _i % 100 == 99:
+			working = traffic.agents.filter(func(a): return a["role"] == "robot" and a["state"] == "work").size()
+			if working > 0:
+				break
 	for a in traffic.agents:
-		if a["role"] == "robot" and a["state"] == "work":
-			working += 1
 		_check(ModelLib.has("vehicles", a["id"]), "3D 모형이 없는 탈것: " + a["id"])
 	_check(working > 0, "로봇이 공사 현장에 가지 않았다")
 	var before := int(main.sim.stats.get("arrived", 0))
@@ -361,11 +366,27 @@ func _types_check() -> void:
 	print("smoke: types %d mixed built, %d/116 placeable" % [mixed, placed])
 
 
-## 다른 천체의 식민지: 발사 창(천문력)·원정·도착·함께 흐르는 시간·기술 나누기·고르기(3D 땅과 도시)·저장 왕복
+## 여러 천체의 도시: 천체마다 기본 도시, 같은 천체 원정(로버 행렬)·도착·함께 흐르는 시간·기술 나누기,
+## 도시가 없는 천체로의 행성 사이 원정(발사 창), 고르기(도시마다의 3D 땅과 도시), 지구 도시(바깥 공기), 저장 왕복
 func _colony_check() -> void:
 	var col: Colonies = main.colonies
 	var home: CitySim = main.sim
-	_check(col.list.size() == 1 and String(col.list[0]["site"]) == GameData.HOME_SITE, "고향 식민지 하나로 시작하지 않았다")
+	var bodies := {}
+	for c in col.list:
+		bodies[String(c["body"])] = true
+		var cs: CitySim = c["sim"]
+		_check(cs.population() > 0, "%s 도시가 3년을 버티지 못했다" % c["name"])
+		_check(cs.hour == col.hour - int(c["founded"]), "%s의 시계가 맞지 않다" % c["name"])
+	_check(col.list.size() == 7 and bodies.size() == 7, "천체마다 기본 도시가 있어야 한다 (%d곳, 천체 %d)" % [col.list.size(), bodies.size()])
+	_check(String(col.list[0]["site"]) == GameData.HOME_SITE and home == col.list[0]["sim"], "고향이 섀클턴이 아니다")
+	# 지구 도시: 바깥 공기를 마시고(CO₂가 쌓이지 않는다) 시장이 물·식량을 채운다, 3년 동안 자란다
+	var ei := col.index_of_site("earth_naro")
+	_check(ei >= 0, "지구 기본 도시가 없다")
+	if ei >= 0:
+		var es: CitySim = col.list[ei]["sim"]
+		_check(es.open_air and es.co2_ppm() < 850.0, "지구 도시의 공기가 바깥 공기가 아니다 (%.0f ppm)" % es.co2_ppm())
+		_check(es.population() > 400.0, "지구 도시가 자라지 않았다 (%d명)" % int(es.population()))
+		_check(es.stock["water_kg"] >= es.population() * es.PER["water_use_kg"] * 29.0, "지구 도시의 물을 시장이 채우지 않았다")
 	# 천문력으로 찾은 화성 창의 가장 좋은 날: 화성이 지구보다 호만 위상각(약 44°)만큼 앞서야 한다
 	var w: Dictionary = col.window("mars_hellas")
 	var jd := col._jd(float(w["best"]))
@@ -373,21 +394,32 @@ func _colony_check() -> void:
 	_check(absf(phase - 44.3) < 1.5, "화성 발사 창의 위상각이 맞지 않다 (%.1f°)" % phase)
 	_check(float(w["end"]) >= col.hour / 24.0 and float(w["best"]) - col.hour / 24.0 < 800.0, "다음 화성 창이 회합 주기 안에 없다")
 	var window_text := col.date_text(float(w["best"]) * 24.0)
-	# 시험: 기술·비용을 채우고 지금 창을 연다
-	for t in ["seed_distributed", "cryogenic_propellant"]:
-		home.techs[t] = true
-	home.support = maxf(home.support, 5000.0)
-	home.stock["parts"] = maxf(home.stock["parts"], 2000.0)
-	var now_d := col.hour / 24.0
-	col._windows["mars_hellas"] = {"best": now_d, "start": now_d - 1.0, "end": now_d + 1.0, "half": 1.0}
-	var why := col.block_reason("mars_hellas")
-	_check(why == "", "화성으로 떠날 수 없다: " + why)
-	var support_before := home.support
-	_check(col.launch("mars_hellas"), "원정대가 떠나지 못했다")
-	_check(absf(support_before - home.support - 600.0) < 1e-6, "원정 비용을 고향이 내지 않았다")
-	_check(col.block_reason("mars_hellas") != "", "같은 부지로 두 번 떠날 수 있다")
-	_check(int(col.expeditions[0]["arrive"]) - col.hour == 259 * 24, "전이 기간이 259일이 아니다")
-	col.expeditions[0]["arrive"] = col.hour + 24          # 시험: 하루 만에 도착
+	# 도시가 없는 천체로는 고향에서 행성 사이로 (타이탄 도시를 잠시 빼고 본다)
+	var ti := col.index_of_site("titan_adiri")
+	var titan_c: Dictionary = col.list[ti]
+	col.list.remove_at(ti)
+	var rs := col.route("titan_kraken")
+	_check(rs["mode"] == "space" and String(col.list[int(rs["from"])]["site"]) == GameData.HOME_SITE, "도시 없는 천체로 가는 길이 고향이 아니다")
+	_check(col.travel_days("titan_kraken", rs) == 2228.0, "타이탄 전이가 2228일이 아니다")
+	col.list.insert(ti, titan_c)
+	# 같은 천체의 원정: 헬라스에서 예제로로 로버 행렬 — 발사 창 없이
+	var r := col.route("mars_jezero")
+	_check(r["mode"] == "local" and String(col.list[int(r["from"])]["site"]) == "mars_hellas", "예제로로 가는 길이 헬라스 로버 행렬이 아니다")
+	var hellas: CitySim = col.list[int(r["from"])]["sim"]
+	hellas.stock["parts"] = maxf(hellas.stock["parts"], 2000.0)
+	hellas.support = maxf(hellas.support, 3000.0)
+	var why := col.block_reason("mars_jezero")
+	_check(why == "", "예제로로 떠날 수 없다: " + why)
+	var days := col.travel_days("mars_jezero", r)
+	_check(days > 3.0 and days < 30.0, "헬라스→예제로가 %.1f일이다" % days)
+	var parts_before: float = hellas.stock["parts"]
+	_check(col.launch("mars_jezero"), "원정대가 떠나지 못했다")
+	_check(absf(parts_before - hellas.stock["parts"] - 180.0) < 1e-6, "원정 비용을 헬라스가 내지 않았다")
+	_check(col.block_reason("mars_jezero") != "", "같은 부지로 두 번 떠날 수 있다")
+	var e: Dictionary = col.in_transit("mars_jezero")
+	_check(String(e.get("mode", "")) == "local" and int(e["arrive"]) - col.hour == maxi(24, int(round(days * 24.0))),
+		"원정 도착 시각이 거리와 맞지 않다")
+	e["arrive"] = col.hour + 24          # 시험: 하루 만에 도착
 	main._update_colony_ui()
 	main._select_tab("colony")
 	for _i in range(31 * 24):
@@ -398,55 +430,63 @@ func _colony_check() -> void:
 			else:
 				main.modal.visible = false
 		main._step()
-	_check(col.list.size() == 2, "원정대가 도착해 식민지가 서지 않았다")
-	if col.list.size() < 2:
+	var ji := col.index_of_site("mars_jezero")
+	_check(col.list.size() == 8 and ji >= 0, "원정대가 도착해 도시가 서지 않았다")
+	if ji < 0:
 		return
-	var mars: CitySim = col.list[1]["sim"]
-	_check(mars.site_id == "mars_hellas" and mars.hour == col.hour - int(col.list[1]["founded"]), "화성 식민지의 시계가 맞지 않다")
-	_check(mars.date_text() == home.date_text(), "두 식민지의 날짜가 다르다")
-	_check(mars.population() > 0, "화성 식민지가 첫 달을 버티지 못했다")
-	_check(mars.techs.has("seed_distributed") and mars.techs.size() == home.techs.size(), "기술이 나눠지지 않았다")
-	# 고르기: 탭·도구·3D 땅과 도시가 화성을 본다. 다른 도시는 그리지 않는다
-	main._on_colony_view(1)
-	_check(main.sim == mars and main.world.ground.body == "mars", "화성 식민지를 고르지 못했다")
-	_check(main.world.city != null and main.world.city.get_parent() == main.world.ground.city_root, "화성에 3D 도시가 서지 않았다")
-	_check(main.world.moon.city_root.get_child_count() == 0, "고르지 않은 달 도시가 남아 있다")
-	_check(main.plan.layout.kind == "open" and main.tool.sim == mars, "화성의 배치·도구가 맞지 않다")
-	_check(not home.interactive and mars.interactive, "고른 식민지만 결정 카드를 띄워야 한다")
-	var marks: Array = main.world.colonies
-	_check(marks.size() == 2 and bool(marks[1]["active"]) and String(marks[1]["body"]) == "mars", "3D 지도의 식민지 점이 맞지 않다")
+	var jez: CitySim = col.list[ji]["sim"]
+	_check(jez.site_id == "mars_jezero" and jez.hour == col.hour - int(col.list[ji]["founded"]), "예제로의 시계가 맞지 않다")
+	_check(jez.date_text() == home.date_text(), "두 도시의 날짜가 다르다")
+	_check(jez.population() > 0, "예제로가 첫 달을 버티지 못했다")
+	_check(jez.techs.size() == home.techs.size(), "기술이 나눠지지 않았다")
+	# 고르기: 같은 화성의 두 도시는 땅이 따로다. 자세한 도시는 고른 도시 하나만
+	main._on_colony_view(ji)
+	var wv: WorldView = main.world
+	_check(main.sim == jez and wv.ground == wv.grounds.get("mars_jezero") and wv.ground.body == "mars", "예제로를 고르지 못했다")
+	_check(wv.city != null and wv.city.get_parent() == wv.ground.city_root, "예제로에 3D 도시가 서지 않았다")
+	_check(wv.moon.city_root.get_child_count() == 0, "고르지 않은 달 도시가 남아 있다")
+	_check(main.plan.layout.kind == "open" and main.tool.sim == jez, "예제로의 배치·도구가 맞지 않다")
+	_check(not home.interactive and jez.interactive, "고른 도시만 결정 카드를 띄워야 한다")
+	var hi := col.index_of_site("mars_hellas")
+	main._on_colony_view(hi)
+	_check(wv.ground == wv.grounds.get("mars_hellas") and wv.ground != wv.grounds.get("mars_jezero"), "헬라스와 예제로가 땅을 같이 쓴다")
+	_check(not (wv.grounds["mars_jezero"] as SiteGround).active, "고르지 않은 예제로 땅이 아직 고른 땅이다")
+	var marks: Array = wv.colonies
+	var cities := marks.filter(func(m): return not m.get("candidate", false) and not m.get("transit", false))
+	var cands := marks.filter(func(m): return m.get("candidate", false))
+	_check(cities.size() == col.list.size() and bool(cities[hi]["active"]), "3D 지도의 도시 점이 맞지 않다")
+	_check(cands.size() == col.candidates().size() - col.list.size(), "3D 지도의 후보지 점이 맞지 않다 (%d)" % cands.size())
 	for _i in range(24):
 		main._step()
 	main._refresh_live()
-	# 저장 왕복 (판 2: 식민지 둘)
+	# 저장 왕복 (판 2: 도시 여덟)
 	var text := JSON.stringify(col.to_save(), "", false, true)
 	var back := Colonies.new()
-	_check(back.load_save(JSON.parse_string(text)), "식민지 저장을 읽지 못했다")
-	_check(back.list.size() == 2 and back.hour == col.hour, "불러온 식민지·시각이 다르다")
-	if back.list.size() == 2:
-		var mb: CitySim = back.list[1]["sim"]
-		_check(mb.site_id == "mars_hellas" and absf(mb.population() - mars.population()) < 1e-9, "불러온 화성 식민지가 다르다")
-		main.plan.sync(mars)
-		_check((back.list[1]["plan"] as CityPlan).buildings.size() == main.plan.buildings.size(), "불러온 화성 배치가 다르다")
-	# 판 1 저장(식민지 하나)도 읽는다
+	_check(back.load_save(JSON.parse_string(text)), "도시 저장을 읽지 못했다")
+	_check(back.list.size() == col.list.size() and back.hour == col.hour, "불러온 도시·시각이 다르다")
+	if back.list.size() == col.list.size():
+		var jb: CitySim = back.list[ji]["sim"]
+		_check(jb.site_id == "mars_jezero" and absf(jb.population() - jez.population()) < 1e-9, "불러온 예제로가 다르다")
+	# 판 1 저장(도시 하나)은 기본 도시를 채워 읽는다
 	var v1 := home.to_save()
 	v1["plan"] = (col.list[0]["plan"] as CityPlan).to_save()
 	var old := Colonies.new()
-	_check(old.load_save(JSON.parse_string(JSON.stringify(v1, "", false, true))) and old.list.size() == 1, "판 1 저장을 읽지 못했다")
+	_check(old.load_save(JSON.parse_string(JSON.stringify(v1, "", false, true))) and old.list.size() == 7, "판 1 저장을 읽지 못했다")
 	# 고향으로
 	main._on_colony_view(0)
-	_check(main.sim == home and main.world.ground.body == "moon", "고향으로 돌아오지 못했다")
-	# 직접 줌인: 고르지 않은 화성 도시 위로 내려가면 카메라는 그대로, 그 도시를 고른다
-	var wv: WorldView = main.world
+	_check(main.sim == home and wv.ground.body == "moon", "고향으로 돌아오지 못했다")
+	# 직접 줌인: 고르지 않은 화성 헬라스 위로 내려가면 카메라는 그대로, 그 도시를 고른다
 	wv._descent.clear()
 	wv._enter_cool = 0.0
 	wv.cam.look_at_surface("mars", Astro.latlon(-42.4, 70.5), 5.0, 0.5, Vector3(0, 0, 1))
 	wv._check_enter(0.0)
-	_check(main.sim == mars and wv.ground.body == "mars" and wv.cam.focus == "mars", "화성 도시로 줌인해도 그 도시를 고르지 않았다")
+	_check(main.sim == hellas and wv.ground.body == "mars" and wv.cam.focus == "mars", "헬라스로 줌인해도 그 도시를 고르지 않았다")
 	main._on_colony_view(0)
 	_check(main.sim == home, "고향으로 돌아오지 못했다 (줌인 뒤)")
-	print("smoke: colonies %d, mars pop %d day %d, next mars window %s (phase %.1f°)" % [col.list.size(),
-		int(mars.population()), mars.current_day(), window_text, phase])
+	var pops := []
+	for c in col.list:
+		pops.append("%s %d" % [c["short"], int((c["sim"] as CitySim).population())])
+	print("smoke: cities %d (%s), next mars window %s (phase %.1f°)" % [col.list.size(), ", ".join(pops), window_text, phase])
 
 
 func _check(ok: bool, message: String) -> void:

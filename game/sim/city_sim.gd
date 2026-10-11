@@ -6,6 +6,8 @@ extends RefCounted
 
 signal noted(hour: int, text: String, kind: String)
 
+## 시장·상수도가 채우는 비축 → 한 사람이 하루에 쓰는 양의 열쇠 (파이썬 SUPPLY_PER와 같다)
+const SUPPLY_PER := {"o2_kg": "o2_kg", "water_kg": "water_use_kg", "food_kg": "food_kg"}
 const STOCK_KEYS := ["o2_kg", "water_kg", "h2_kg", "ch4_kg", "co2_kg", "wastewater_kg", "food_kg"]
 const VARIABLE := ["electrolyzer", "sabatier", "water_recycler", "hydroponics"]   # 가동률이 시간마다 달라지는 계열
 const CAUSES_KO := {"hypoxia": "산소 결핍", "co2": "이산화탄소 중독", "starvation": "기아"}
@@ -36,6 +38,9 @@ var heat_k := 1.0                # 방열 능력
 var build_k := 1.0               # 로봇 작업량
 var contact_k := 1.0             # 지구 교신의 사기
 var air_co2 := false             # 대기의 CO₂로 사바티에가 돈다 (화성)
+var open_air := false            # 바깥 공기를 마신다 (지구): 산소를 쓰지 않고 내쉰 CO₂는 환기로 나간다
+var supply := {}                 # 시장·상수도가 날마다 채우는 비축 (stock 열쇠 → 일수)
+var night_h := 0.0               # 자전하는 천체의 밤 길이 (시) — 길면 자동 운영이 원자로·긴 축전을 고른다
 var dust := PackedByteArray()    # 먼지 폭풍 시간 (1 = 폭풍)
 var dust_factor := 1.0           # 폭풍 때 태양광 비율
 var auto_reserve := 40.0         # 자동 운영이 남겨 두는 부품 — 보급이 드문 부지일수록 많이
@@ -138,6 +143,8 @@ func _init(p_seed: int = 2061, years: float = 3.0, policy_name: String = "", p_s
 	build_k = float(rules.get("build_k", 1.0))
 	contact_k = float(rules.get("contact_k", 1.0))
 	air_co2 = bool(rules.get("co2_air", false))
+	open_air = bool(rules.get("open_air", false))
+	supply = rules.get("supply_days", {})
 	auto_reserve = 40 * maxf(1.0, float(C["earth"]["cargo_interval_days"]) / 60)
 	var start_date: PackedStringArray = String(C["start"]["date"]).split("-")
 	start_unix = Time.get_unix_time_from_datetime_dict({
@@ -153,6 +160,7 @@ func _init(p_seed: int = 2061, years: float = 3.0, policy_name: String = "", p_s
 	rng = PyRandom.new(p_seed)
 	days = PyCompat.round_half_even(365.25 * years)
 	var il: Dictionary = C["illumination"]
+	night_h = float(il["day_h"]) * (1 - float(il["light_frac"])) if String(il.get("model", "ridge")) == "rotation" else 0.0
 	if String(il.get("model", "ridge")) == "rotation":
 		dark = rotation_schedule(days * 24 + 48, il)
 	else:
@@ -449,7 +457,7 @@ func step_hour(pop: float) -> void:
 		+ (hr["o2_algae"] if prev[2] else 0.0)
 		+ (hr["o2_green"] if prev[4] else 0.0)
 		+ (hr["o2_mre"] if prev[3] else 0.0))
-	var want: float = pop * PER["o2_kg"] - bio_o2 + maxf(0.0, 0.95 * caps["o2_kg"] - s["o2_kg"])
+	var want: float = (0.0 if open_air else pop * PER["o2_kg"]) - bio_o2 + maxf(0.0, 0.95 * caps["o2_kg"] - s["o2_kg"])
 	var e_cap: float = hr["e_o2"]
 	var u_elec := 0.0
 	if e_cap:
@@ -521,9 +529,10 @@ func step_hour(pop: float) -> void:
 		_add(today, "p2_off_h", 1)
 	last_power = {"gen": gen, "load": loads, "on": on, "frac1": frac1, "soc": soc, "lit": lit > 0}
 
-	# 사람
-	s["o2_kg"] -= pop * PER["o2_kg"] * h
-	co2_air += pop * PER["co2_kg"] * h
+	# 사람 (바깥 공기를 마시면 산소를 쓰지 않고, 내쉰 CO₂는 환기로 나간다)
+	if not open_air:
+		s["o2_kg"] -= pop * PER["o2_kg"] * h
+		co2_air += pop * PER["co2_kg"] * h
 	var use: float = pop * PER["water_use_kg"] * h
 	s["water_kg"] -= use
 	s["wastewater_kg"] += use
@@ -607,6 +616,11 @@ func step_hour(pop: float) -> void:
 			if key == "wastewater_kg":
 				_add(stats, "wastewater_lost_kg", s[key] - caps[key])
 			s[key] = caps[key]
+	# 시장·상수도: 정해진 일수만큼의 비축을 늘 채운다 (저장 한도와 상관없이 — 바깥에 있다)
+	for key in supply:
+		var floor_kg: float = pop * PER[SUPPLY_PER[key]] * float(supply[key])
+		if s[key] < floor_kg:
+			s[key] = floor_kg
 
 	# 작물: 72시간 넘게 전력을 못 받으면 고사
 	farm_dark_h = 0 if (on[2] or not hr["hydro_n"]) else farm_dark_h + 1
@@ -950,7 +964,7 @@ func earth(d: int) -> void:
 			note("지원 점수 부족 — 유인선이 오지 않았다", "warn")
 			return
 		var seats: int = mini(int(e["crewed_seats"]), int(housing_cap - population()))
-		if seat_limit_by_scrubbers:
+		if seat_limit_by_scrubbers and not open_air:      # 바깥 공기를 마시면 제거기가 좌석을 막지 않는다
 			var scrub: float = fam_prov("co2_scrubber", "co2_kg_day")
 			seats = mini(seats, int(scrub / PER["co2_kg"] / 1.1 - population()))
 		if seats > 0:
@@ -1145,7 +1159,7 @@ func update_morale() -> void:
 		target -= 5
 	var pop := population()
 	if pop:
-		if stock["o2_kg"] / (pop * PER["o2_kg"]) < 3:
+		if not open_air and stock["o2_kg"] / (pop * PER["o2_kg"]) < 3:
 			target -= 10
 		if stock["food_kg"] / (pop * PER["food_kg"]) < 10:
 			target -= 10
