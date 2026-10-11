@@ -8,8 +8,6 @@ extends RefCounted
 ## space 모드 — 천체 반지름의 4배보다 멀 때: 목표는 천체 중심에서 상위 계(지구, 태양)로 옮겨 가고,
 ##   카메라는 황도 북쪽을 위로 하는 회전대(yaw·pitch)로 돈다.
 ## fly — 다른 천체·별로 날아간다 (멀어졌다가 다가간다).
-## plan — 평면도: body 모드에서 똑바로 내려다보는 직교 투영. 보이는 범위(plan_km)로 확대하고,
-##   방향(fwd = 화면 위)은 고정이며 카메라는 건물보다 높이 둔다.
 
 signal focus_changed(id: String)
 
@@ -18,8 +16,6 @@ const SPACE_TO_BODY := 3.0
 const MIN_DIST_KM := 0.025
 const MAX_DIST_KM := 4.0e17         # 약 4만 광년
 const FOV_DEG := 50.0
-const PLAN_MIN_KM := 0.04           # 평면도에 보이는 세로 범위
-const PLAN_MAX_KM := 2.5
 
 var focus := "moon"
 var mode := "body"
@@ -28,9 +24,6 @@ var t_dir := PackedFloat64Array([0, 0, -1])   # 목표 지점: 천체 고정 좌
 var fwd := Vector3(1, 0, 0)                   # 목표 지점에서 카메라가 바라보는 수평 방향 (천체 고정)
 var tilt := 0.0
 var dist := 1.0
-## 평면도
-var plan := false
-var plan_km := 0.6
 ## space 모드
 var yaw := 0.0
 var pitch := 0.6
@@ -62,7 +55,6 @@ func radius_of(id: String) -> float:
 func look_at_surface(id: String, dir_body: Vector3, distance_km: float, tilt_rad: float, heading_fwd: Vector3) -> void:
 	focus = id
 	mode = "body"
-	plan = false
 	t_dir = Astro.dvec(dir_body.normalized())
 	fwd = _tangent(dir_body.normalized(), heading_fwd)
 	tilt = tilt_rad
@@ -75,31 +67,11 @@ func look_at_surface(id: String, dir_body: Vector3, distance_km: float, tilt_rad
 func look_from_space(id: String, distance_km: float, yaw_rad: float, pitch_rad: float) -> void:
 	focus = id
 	mode = "space"
-	plan = false
 	dist = clampf(distance_km, MIN_DIST_KM, MAX_DIST_KM)
 	yaw = yaw_rad
 	pitch = clampf(pitch_rad, -1.55, 1.55)
 	_fly.clear()
 	focus_changed.emit(focus)
-
-
-## 평면도로 본다: 천체 표면의 한 점을 가운데에, up_fwd(천체 고정 수평 방향)를 화면 위로
-func look_plan(id: String, dir_body: Vector3, up_fwd: Vector3, view_km: float) -> void:
-	focus = id
-	mode = "body"
-	plan = true
-	t_dir = Astro.dvec(dir_body.normalized())
-	fwd = _tangent(dir_body.normalized(), up_fwd)
-	tilt = 0.0
-	plan_km = clampf(view_km, PLAN_MIN_KM, PLAN_MAX_KM)
-	dist = plan_height()
-	_fly.clear()
-	focus_changed.emit(focus)
-
-
-## 평면도의 카메라 높이 (km): 보이는 범위와 상관없이 가장 높은 건물·능선보다 위
-func plan_height() -> float:
-	return maxf(0.6, plan_km * 1.2)
 
 
 func flying() -> bool:
@@ -111,7 +83,6 @@ func fly_to(id: String, end_dist_km: float, seconds: float = 2.6) -> void:
 	var b := _body(id)
 	if b.is_empty():
 		return
-	plan = false
 	var to_center: PackedFloat64Array = b["center"]
 	var v0 := Astro.norm3(Astro.sub3(pos, target))
 	# 지금 보는 쪽에서 다가가되 해가 비추는 쪽으로 기운다 (밤쪽에서 도착하지 않게)
@@ -137,13 +108,6 @@ func drag(dx: float, dy: float, view_h: float) -> void:
 		var k := deg_to_rad(0.25)
 		yaw -= dx * k
 		pitch = clampf(pitch + dy * k, -1.55, 1.55)
-		return
-	if plan:
-		# 평면도: 화면 1 px = plan_km / 화면 높이. 잡은 땅이 손가락을 따라온다
-		var px_km := plan_km / maxf(view_h, 1.0)
-		var up0 := Astro.vec(t_dir)
-		var right0 := fwd.cross(up0).normalized()
-		_pan((right0 * -dx + fwd * dy) * px_km / maxf(radius_of(focus), 1e-6))
 		return
 	var r := radius_of(focus)
 	var w := _center_weight(dist, r)
@@ -187,8 +151,8 @@ static func _rot_d(v: PackedFloat64Array, axis: Vector3, ang: float) -> PackedFl
 
 ## 오른쪽 끌기·두 손가락 비틀기: 방위와 기울기
 func rotate_view(d_heading: float, d_tilt: float) -> void:
-	if flying() or plan:
-		return          # 평면도는 방향이 고정이다
+	if flying():
+		return
 	if mode == "space":
 		yaw -= d_heading
 		pitch = clampf(pitch - d_tilt, -1.55, 1.55)
@@ -207,18 +171,6 @@ func max_tilt() -> float:
 ## 확대·축소 (k < 1이면 다가감). toward: body 모드에서 다가갈 표면 점(천체 고정 방향), 없으면 목표 그대로
 func zoom(k: float, toward: Vector3 = Vector3.ZERO) -> void:
 	if flying():
-		return
-	if plan:
-		# 평면도: 보이는 범위를 바꾸고, 커서 아래 점은 화면에서 제자리에 둔다 (확대·축소 모두)
-		var old_km := plan_km
-		plan_km = clampf(plan_km * k, PLAN_MIN_KM, PLAN_MAX_KM)
-		dist = plan_height()
-		if toward != Vector3.ZERO:
-			var up0 := Astro.vec(t_dir)
-			var tgt0 := toward.normalized()
-			var ang0 := up0.angle_to(tgt0)
-			if ang0 > 1e-12:
-				_pan((tgt0 - up0 * up0.dot(tgt0)).normalized() * ang0 * (1.0 - plan_km / old_km))
 		return
 	var old := dist
 	dist = clampf(dist * k, MIN_DIST_KM, MAX_DIST_KM)
@@ -244,9 +196,6 @@ func update(delta: float, p_jd: float) -> void:
 	if b.is_empty():
 		return
 	var r: float = b["radius"]
-	if plan:
-		tilt = 0.0
-		dist = plan_height()
 	if mode == "body" and dist > BODY_TO_SPACE * r:
 		_to_space()
 	elif mode == "space" and dist < SPACE_TO_BODY * r and b.get("surface", true):

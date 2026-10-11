@@ -33,9 +33,7 @@ var place_buttons := {}
 var road_button: Button
 var city_area: Control
 var view_buttons := {}
-var zoom_pair: HBoxContainer       # 확대·축소 (3D·지도)
-var zoom_row: HBoxContainer        # 지도만: 전체·거주구
-var world_row: HBoxContainer       # 3D만: 기지·달·지구·달·태양계·별
+var world_row: HBoxContainer       # 3D: 확대·축소, 기지·달·지구·달·태양계·별
 var view_mode := "world"
 var forecast: ForecastBar
 var modal: Modal
@@ -135,11 +133,11 @@ func _build() -> void:
 
 
 func _build_view_switch() -> Control:
-	## 왼쪽 아래: 3D·지도·목록 전환과 확대 단추
+	## 왼쪽 아래: 3D·목록 전환과 확대 단추
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
 	var group := ButtonGroup.new()
-	for pair in [["world", "3D"], ["map", "지도"], ["list", "목록"]]:
+	for pair in [["world", "3D"], ["list", "목록"]]:
 		var b := Button.new()
 		b.text = pair[1]
 		b.toggle_mode = true
@@ -160,25 +158,15 @@ func _build_view_switch() -> Control:
 			tool.stop())
 	row.add_child(road_button)
 	view_buttons["world"].tooltip_text = "달 위의 도시 — 끌어서 돌리고, 휠·두 손가락으로 확대해 행성과 별까지 (M)"
-	view_buttons["map"].tooltip_text = "기지 평면도 — 3D 장면을 바로 위에서 내려다본 지도. 끌어서 옮기고 휠·두 손가락으로 확대 (M)"
 	view_buttons["list"].tooltip_text = "모듈 목록 (M)"
-	zoom_pair = HBoxContainer.new()
-	zoom_pair.add_theme_constant_override("separation", 4)
-	row.add_child(zoom_pair)
-	var gap := Control.new()
-	gap.custom_minimum_size.x = 8
-	zoom_pair.add_child(gap)
-	for spec in [["−", "축소", 1.6], ["+", "확대", 1.0 / 1.6]]:
-		var zb := Button.new()
-		zb.text = spec[0]
-		zb.tooltip_text = spec[1]
-		zb.custom_minimum_size = Vector2(42, 40)
-		zb.pressed.connect(func(): world.zoom_by(spec[2] if view_mode == "world" else sqrt(spec[2])))
-		zoom_pair.add_child(zb)
 	world_row = HBoxContainer.new()
 	world_row.add_theme_constant_override("separation", 4)
 	row.add_child(world_row)
-	for spec in [["기지", "기지 위로 (H)", func(): world.home()], ["달", "달 전체", func(): world.show_moon()],
+	var gap := Control.new()
+	gap.custom_minimum_size.x = 8
+	world_row.add_child(gap)
+	for spec in [["−", "축소", func(): world.zoom_by(1.6)], ["+", "확대", func(): world.zoom_by(1.0 / 1.6)],
+			["기지", "기지 위로 (H)", func(): world.home()], ["달", "달 전체", func(): world.show_moon()],
 			["지구·달", "지구와 달", func(): world.show_earth_moon()], ["태양계", "태양계", func(): world.show_solar_system()],
 			["별", "이웃 별 (25광년)", func(): world.show_neighbors()]]:
 		var wb := Button.new()
@@ -187,27 +175,11 @@ func _build_view_switch() -> Control:
 		wb.custom_minimum_size = Vector2(42 if spec[0].length() == 1 else 54, 40)
 		wb.pressed.connect(spec[2])
 		world_row.add_child(wb)
-	zoom_row = HBoxContainer.new()
-	zoom_row.add_theme_constant_override("separation", 4)
-	row.add_child(zoom_row)
-	var fit := Button.new()
-	fit.text = "전체"
-	fit.tooltip_text = "기지 전체 보기 (H)"
-	fit.custom_minimum_size = Vector2(54, 40)
-	fit.pressed.connect(func(): world.plan_fit())
-	zoom_row.add_child(fit)
-	var core := Button.new()
-	core.text = "거주구"
-	core.tooltip_text = "거주 구역으로"
-	core.custom_minimum_size = Vector2(64, 40)
-	core.pressed.connect(func(): world.plan_core())
-	zoom_row.add_child(core)
 	row.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	row.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	row.offset_left = 10
 	row.offset_bottom = -10
 	view_buttons["world"].set_pressed_no_signal(true)
-	zoom_row.visible = false
 	return row
 
 
@@ -335,11 +307,8 @@ func _on_placed(kind: String, ok: bool, text: String) -> void:
 
 func _set_view(mode: String) -> void:
 	view_mode = mode
-	world.visible = mode != "list"
-	world.set_plan_view(mode == "map")
+	world.visible = mode == "world"
 	city_view.visible = mode == "list"
-	zoom_pair.visible = mode != "list"
-	zoom_row.visible = mode == "map"
 	world_row.visible = mode == "world"
 	for k in view_buttons:
 		view_buttons[k].set_pressed_no_signal(k == mode)
@@ -595,7 +564,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_L:
 			_select_tab("log")
 		KEY_M:
-			_set_view({"world": "map", "map": "list", "list": "world"}[view_mode])
+			_set_view("list" if view_mode == "world" else "world")
 		_:
 			return
 	get_viewport().set_input_as_handled()

@@ -89,7 +89,7 @@ func _save_roundtrip() -> void:
 
 
 func _map_check() -> void:
-	## 기지 배치·교통·평면도: 건물 자리, 공사 현장으로 가는 로봇, 착륙선 사건, 평면도·목록 전환
+	## 기지 배치·교통: 건물 자리, 공사 현장으로 가는 로봇, 착륙선 사건, 3D·목록 전환
 	var layout: BaseLayout = main.plan.layout
 	_check(layout.capacity("hab_module") >= 30, "거주 모듈 자리가 모자란다")
 	_check(layout.capacity("solar_tower") == 38, "태양광 타워 자리가 능선 칸(8+10+20)과 다르다")
@@ -128,45 +128,16 @@ func _map_check() -> void:
 	var w: WorldView = main.world
 	main._set_view("list")
 	_check(main.city_view.visible and not w.visible, "목록으로 바뀌지 않았다")
-	# 평면도: 같은 3D 장면을 위에서 직교 투영으로
-	main._set_view("map")
-	w._process(0.016)
-	_check(w.visible and w.plan_view and w.cam.plan, "지도가 평면도로 바뀌지 않았다")
-	_check(w._camera.projection == Camera3D.PROJECTION_ORTHOGONAL and w._camera.size > 0.0, "평면도가 직교 투영이 아니다")
-	var up := w.cam.basis.z.dot(Astro.vec(Astro.norm3(Astro.sub3(w.cam.pos, w._info("moon")["center"]))))
-	_check(up > 0.999, "평면도가 똑바로 내려다보지 않는다")
-	var km0 := w.cam.plan_km
-	w.zoom_by(1.5)
-	_check(w.cam.plan_km > km0 * 1.4, "평면도가 축소되지 않았다")
-	w.plan_core()
-	w._process(0.016)
-	_check(absf(w.cam.plan_km - WorldView.PLAN_CORE_KM) < 1e-9, "평면도 '거주구'의 범위가 다르다")
-	var g: Variant = w.city.ground_at(w, w.size * 0.5)
-	_check(g != null, "평면도에서 땅을 고를 수 없다")
-	var core := BaseLayout.uv_to_xy(BaseLayout.DISTRICTS["core"]["uv"])
-	_check(g != null and (g as Vector2).distance_to(core) < 2.0, "평면도 가운데가 거주구가 아니다")
-	var picked := ""
-	for b in w.city._boxes:
-		var sp: Variant = w.screen_of(w.city.global_transform * (b[0] as AABB).get_center())
-		if sp != null and Rect2(Vector2.ZERO, w.size).has_point(sp):
-			picked = w.city.pick(w, sp)
-			if picked != "":
-				break
-	_check(picked != "", "평면도에서 건물을 고를 수 없다")
-	w.plan_fit()
-	w._process(0.016)
 	main._set_view("world")
-	w._process(0.016)
-	_check(not w.plan_view and not w.cam.plan and w._camera.projection == Camera3D.PROJECTION_PERSPECTIVE,
-		"3D로 돌아오지 않았다")
-	print("smoke: map %d robots working, %d agents, plan view picked %s" % [working, traffic.agents.size(), picked])
+	_check(w.visible and main.view_buttons.size() == 2, "보기가 3D·목록 둘이 아니다")
+	print("smoke: base %d robots working, %d agents" % [working, traffic.agents.size()])
 
 
 func _world_check() -> void:
 	## 3D 우주 보기: 모형, 천체 위치, 구글 어스식 조작(끌기·휠·날기), 축척 공간, 3D 도시
 	var w: WorldView = main.world
 	main._set_view("world")
-	_check(w.visible and not w.plan_view, "3D 보기로 바뀌지 않았다")
+	_check(w.visible, "3D 보기로 바뀌지 않았다")
 	for kind in main.sim.M:
 		_check(ModelLib.variants(kind) == 5, "3D 모형 변형이 5가지가 아닌 건물: " + kind)
 		for v in range(5):

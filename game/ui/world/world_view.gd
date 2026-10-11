@@ -9,10 +9,6 @@ extends Control
 ##
 ## 조작: 끌기 = 지면을 잡아 옮기기(멀면 지구본 돌리기), 오른쪽 끌기·두 손가락 비틀기 = 방위·기울기,
 ## 휠·두 손가락 벌리기 = 확대·축소(커서 쪽으로), 두 번 누르기 = 그곳으로 다가가기, 이름표 누르기 = 날아가기.
-##
-## 평면도(지도): 같은 장면을 기지 바로 위에서 직교 투영으로 내려다본다 — 길이 화면 축과 나란하다.
-## 끌기 = 옮기기, 휠·두 손가락 = 확대·축소. 3D와 같은 모형·땅·그림자를 쓰므로 둘이 늘 맞는다.
-## 남극의 해는 지평선에 걸려 있어 그림자가 수백 m라, 평면도에서는 해를 40° 높이로 올려 비춘다 (방위는 그대로).
 
 signal module_tapped(mid: String)
 signal focus_changed(id: String)
@@ -22,10 +18,6 @@ const SHELL_K := 0.32               # 먼 천체를 껍질에 줄여 넣는 로�
 const LABEL_FONT := 14
 const SKY_STARS := 5200
 const VIEW_SPEED := [0.0, 1.0, 1.0, 1.0]
-const PLAN_FIT_KM := 0.56           # 평면도 '전체' (계획이 없을 때)
-const PLAN_SUN_ELEV_DEG := 40.0     # 평면도의 해 높이
-const PLAN_CORE_KM := 0.2           # 평면도 '거주구'
-const PLAN_RANGE_KM := 1.6          # 평면도 가운데가 기지에서 벗어날 수 있는 거리
 
 var sim: CitySim
 var speed_level := 0
@@ -71,8 +63,6 @@ var _clock := 0.0
 var _ready_done := false
 var plan: CityPlan
 var tool: PlaceTool
-var plan_view := false               # 평면도 (위에서 내려다본 직교 투영)
-var _saved_3d := {}                  # 평면도로 바꾸기 전의 3D 시점
 
 
 func _init() -> void:
@@ -283,8 +273,6 @@ func _process(delta: float) -> void:
 	_clock += delta
 	_update_time(delta)
 	_frame.clear()
-	if plan_view:
-		_clamp_plan()
 	cam.update(delta, jd)
 	_place_all()
 	if city and sim:
@@ -371,12 +359,6 @@ func _place_all() -> void:
 	_unit = near_km / 150.0
 	_camera.near = 150.0
 	_camera.far = _compress(1.0e19) / _unit * 1.05
-	if plan_view:
-		# 직교 투영: 세로로 plan_km가 보인다. 깊이는 건물 꼭대기 위부터 땅 조금 아래까지만 (깊이 정밀도·그림자)
-		var s_km := _near_s / _unit
-		_camera.size = cam.plan_km * s_km
-		_camera.near = maxf(cam.dist - 0.25, 0.05) * s_km
-		_camera.far = (cam.dist + 0.35) * s_km
 	_camera.global_transform = Transform3D(g_basis_cam(cam.basis), Vector3.ZERO)
 	# 천체
 	var sun_c: PackedFloat64Array = _info("sun")["center"]
@@ -425,8 +407,6 @@ func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 	var dir := g_vec(Astro.vec(Astro.norm3(Astro.sub3(c, sun_c))))    # 빛이 나아가는 방향
 	if near_id == "moon" and moon:
 		dir = moon.adjust_light(dir, self)
-		if plan_view:
-			dir = _raise_light(dir, deg_to_rad(PLAN_SUN_ELEV_DEG))
 	var up := Vector3.UP if absf(dir.y) < 0.95 else Vector3.RIGHT
 	_sun_light.global_transform = Transform3D(Basis.looking_at(dir, up), Vector3.ZERO)
 	var energy := 1.6
@@ -437,13 +417,6 @@ func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 	_sun_light.light_energy = energy
 	var shadow_km := clampf(cam.dist * 5.0, 0.2, 60.0)
 	_sun_light.directional_shadow_max_distance = shadow_km * _near_s / _unit
-	if plan_view:
-		# 평면도: 그림자 한 장을 보이는 상자(건물 꼭대기~땅)에 맞춘다
-		_sun_light.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-		_sun_light.directional_shadow_max_distance = _camera.far
-	else:
-		_sun_light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if quality_hi \
-			else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	_sun_light.shadow_enabled = near_base > 0.05 and cam.mode == "body" and not OS.has_environment("WORLD_NO_SHADOW")
 	# 반사광: 해의 방위 반대쪽, 높이 25°
 	if near_base > 0.01:
@@ -457,24 +430,7 @@ func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 	_env.ambient_light_energy = lerpf(0.1, 0.2, near_base)
 
 
-## 빛의 방위는 두고 높이만 elev_min 이상으로 (평면도)
-func _raise_light(dir: Vector3, elev_min: float) -> Vector3:
-	var f: Basis = _info("moon")["frame"]
-	var up := g_vec(f * moon.site_dir())
-	var to_sun := -dir
-	var horiz := to_sun - up * to_sun.dot(up)
-	if horiz.length_squared() < 1e-10:
-		return dir
-	var e := maxf(asin(clampf(to_sun.dot(up), -1.0, 1.0)), elev_min)
-	return -(horiz.normalized() * cos(e) + up * sin(e)).normalized()
-
-
 func _place_sky() -> void:
-	# 평면도는 땅만 내려다본다 — 하늘(별·은하수·해 번짐)은 끈다
-	for n in [_milky, _sky_stars, _near_stars, _sun_glow]:
-		(n as Node3D).visible = not plan_view
-	if plan_view:
-		return
 	var r := _camera.far * 0.9
 	_milky.global_transform = Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * r), Vector3.ZERO)
 	_sky_stars.global_transform = Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * r * 0.97), Vector3.ZERO)
@@ -498,9 +454,6 @@ func _place_sky() -> void:
 ## 기지 위 (처음 화면)
 func home(animate: bool = true) -> void:
 	if moon == null:
-		return
-	if plan_view:
-		plan_fit()
 		return
 	# 해를 등지고 (35° 비껴) 바라본다 — 건물의 해 받는 면이 보이게
 	var sun_m := moon.sun_in_site(self)
@@ -530,87 +483,6 @@ func show_neighbors() -> void:
 
 func _go(id: String, d: float) -> void:
 	cam.fly_to(id, d)
-
-
-# ── 평면도 ──────────────────────────────────────────────────────
-## 평면도(위에서 내려다본 지도)를 켜고 끈다. 끄면 3D는 평면도에서 보던 곳을 같은 각도로 본다
-func set_plan_view(on: bool) -> void:
-	if on == plan_view or moon == null:
-		return
-	plan_view = on
-	if on:
-		_saved_3d = {"focus": cam.focus, "mode": cam.mode, "fwd": cam.fwd, "tilt": cam.tilt, "dist": cam.dist}
-		if cam.focus == "moon" and cam.mode == "body" and cam.dist < 3.0 and not cam.flying():
-			# 3D에서 보던 곳을 비슷한 범위로
-			var km := clampf(2.0 * cam.dist * tan(deg_to_rad(OrbitCam.FOV_DEG) * 0.5), PLAN_CORE_KM, PLAN_FIT_KM)
-			cam.look_plan("moon", Astro.vec(cam.t_dir), _plan_up(), km)
-			_clamp_plan()
-		else:
-			plan_fit()
-		_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	else:
-		var center2 := Astro.vec(cam.t_dir)
-		cam.plan = false
-		_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-		if _saved_3d.get("focus", "") == "moon" and _saved_3d.get("mode", "") == "body" and float(_saved_3d["dist"]) < 3.0:
-			cam.look_at_surface("moon", center2, _saved_3d["dist"], _saved_3d["tilt"], _saved_3d["fwd"])
-		else:
-			home(false)
-
-
-## 평면도의 화면 위: 기지 모형 좌표의 −y (화면 오른쪽은 −x). 길이 x·y 축을 따르므로 화면 축과 나란해진다
-func _plan_up() -> Vector3:
-	return moon.site_frame() * Vector3(0.0, -1.0, 0.0)
-
-
-## 기지 모형 좌표(m) → 달 고정 방향
-func _site_point(xy: Vector2) -> Vector3:
-	return (moon.site_dir() * MoonSurface.R_KM * 1000.0 + moon.site_frame() * Vector3(xy.x, xy.y, 0.0)).normalized()
-
-
-## 평면도: 기지 전체 (건물과 길이 모두 들어오게)
-func plan_fit() -> void:
-	if plan == null or plan.buildings.is_empty():
-		plan_look(BaseLayout.uv_to_xy(BaseLayout.BOUNDS_UV.get_center()), PLAN_FIT_KM)
-		return
-	var box := Rect2(Vector2(plan.buildings[0]["x"], plan.buildings[0]["y"]), Vector2.ZERO)
-	for e in plan.buildings:
-		box = box.expand(Vector2(e["x"], e["y"]))
-	for n in plan.nodes:
-		box = box.expand(n)
-	box = box.grow(25.0)
-	# 화면 가로 = x, 세로 = y
-	var aspect := size.x / maxf(size.y, 1.0) if size.y > 0.0 else 1.5
-	var km := maxf(box.size.y, box.size.x / maxf(aspect, 0.2)) / 1000.0
-	plan_look(box.get_center(), clampf(km, PLAN_CORE_KM, OrbitCam.PLAN_MAX_KM))
-
-
-## 평면도: 모형 좌표 xy를 가운데에, 세로 view_km
-func plan_look(xy: Vector2, view_km: float) -> void:
-	if not plan_view:
-		set_plan_view(true)
-	cam.look_plan("moon", _site_point(xy), _plan_up(), view_km)
-
-
-## 평면도: 거주 구역
-func plan_core() -> void:
-	plan_look(BaseLayout.uv_to_xy(BaseLayout.DISTRICTS["core"]["uv"]), PLAN_CORE_KM)
-
-
-## 평면도 가운데가 기지에서 너무 멀어지지 않게
-func _clamp_plan() -> void:
-	var site := moon.site_dir()
-	var d := Astro.vec(cam.t_dir)
-	var lim := PLAN_RANGE_KM / MoonSurface.R_KM
-	var ang := site.angle_to(d)
-	if ang <= lim:
-		return
-	var axis := site.cross(d)
-	if axis.length_squared() < 1e-20:
-		return
-	var nd := site.rotated(axis.normalized(), lim)
-	cam.t_dir = Astro.dvec(nd)
-	cam.fwd = OrbitCam._tangent(nd, cam.fwd)
 
 
 func zoom_by(k: float) -> void:
@@ -659,7 +531,7 @@ func _gui_input(event: InputEvent) -> void:
 			if not _dragging and mm.position.distance_to(_press) > 4.0:
 				_dragging = true
 			if _dragging:
-				if plan_view or (_drag_button == MOUSE_BUTTON_LEFT and not Input.is_key_pressed(KEY_SHIFT)):
+				if _drag_button == MOUSE_BUTTON_LEFT and not Input.is_key_pressed(KEY_SHIFT):
 					cam.drag(mm.relative.x, mm.relative.y, size.y)
 				else:
 					cam.rotate_view(mm.relative.x * 0.006, mm.relative.y * 0.006)
@@ -757,7 +629,7 @@ func _touch_drag(ev: InputEventScreenDrag) -> void:
 
 func _zoom_at(p: Vector2, k: float) -> void:
 	var toward := Vector3.ZERO
-	if cam.mode == "body" and (k < 1.0 or plan_view):
+	if cam.mode == "body" and k < 1.0:
 		var hit := pick_surface(p)
 		if hit != Vector3.ZERO:
 			toward = hit
@@ -805,8 +677,6 @@ func _tool_back() -> void:
 
 ## 도구를 쓰려면 기지가 보여야 한다: 멀리 있으면 기지 위로 돌아온다
 func ensure_near_base() -> void:
-	if plan_view:
-		return
 	if cam.focus != "moon" or cam.mode != "body" or cam.dist > 3.0:
 		home()
 
@@ -874,18 +744,17 @@ func screen_of(rp: Vector3) -> Variant:
 func _draw_overlay() -> void:
 	_labels.clear()
 	var font := ThemeFactory.regular if ThemeFactory.regular else get_theme_default_font()
-	if not plan_view:
-		_draw_orbits()
-		var placed: Array = []
-		# 태양계 천체
-		var order := ["sun", "earth", "moon", "mars", "venus", "mercury", "jupiter", "saturn", "uranus", "neptune",
-			"pluto", "io", "europa", "ganymede", "callisto", "titan", "triton", "phobos", "deimos", "charon"]
-		for id in order:
-			_label_body(id, font, placed)
-		# 이웃 별
-		if cam.dist > 2.0e9 or not Astro.bodies.has(cam.focus):
-			for s in Astro.systems:
-				_label_star(s, font, placed)
+	_draw_orbits()
+	var placed: Array = []
+	# 태양계 천체
+	var order := ["sun", "earth", "moon", "mars", "venus", "mercury", "jupiter", "saturn", "uranus", "neptune",
+		"pluto", "io", "europa", "ganymede", "callisto", "titan", "triton", "phobos", "deimos", "charon"]
+	for id in order:
+		_label_body(id, font, placed)
+	# 이웃 별
+	if cam.dist > 2.0e9 or not Astro.bodies.has(cam.focus):
+		for s in Astro.systems:
+			_label_star(s, font, placed)
 	if city and city.visible_now():
 		city.draw_overlay(self, _overlay, font)
 	_draw_readout(font)
@@ -1053,9 +922,7 @@ func _orbit_line(id: String, origin: PackedFloat64Array, col: Color) -> void:
 func _draw_readout(font: Font) -> void:
 	var text := ""
 	var info := _info(cam.focus)
-	if plan_view:
-		_draw_scale_bar(font)
-	elif cam.mode == "body" and not info.is_empty():
+	if cam.mode == "body" and not info.is_empty():
 		var rel := Astro.sub3(cam.pos, info["center"])
 		var alt := Astro.len3(rel) - float(info["radius"])
 		if cam.focus == "moon" and moon:
@@ -1066,9 +933,8 @@ func _draw_readout(font: Font) -> void:
 		var name := String(Astro.bodies[cam.focus]["name"]) if Astro.bodies.has(cam.focus) else _star_name(cam.focus)
 		text = "%s에서 %s" % [name, Fmt.distance_km(cam.dist)]
 	var pos2 := Vector2(14, size.y - 66)
-	if text != "":
-		_overlay.draw_string(font, pos2 + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0, 0, 0, 0.7))
-		_overlay.draw_string(font, pos2, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.85, 0.88, 0.92, 0.9))
+	_overlay.draw_string(font, pos2 + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0, 0, 0, 0.7))
+	_overlay.draw_string(font, pos2, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.85, 0.88, 0.92, 0.9))
 	var hd := cam.heading_deg()
 	if not is_nan(hd):
 		# 나침반: 북쪽(N) 화살표
@@ -1079,26 +945,6 @@ func _draw_readout(font: Font) -> void:
 		var tip := c + Vector2(cos(a), sin(a)) * 14.0
 		_overlay.draw_line(c, tip, Color(0.95, 0.45, 0.35), 2.4, true)
 		_overlay.draw_string(font, tip + Vector2(-4, -4), "N", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 1, 1, 0.8))
-
-
-## 평면도의 축척 막대 (왼쪽 아래)
-func _draw_scale_bar(font: Font) -> void:
-	var px_per_m := size.y / maxf(cam.plan_km * 1000.0, 1.0)
-	var len_m := 10.0
-	for m in [10.0, 20.0, 50.0, 100.0, 200.0, 500.0]:
-		len_m = m
-		if m * px_per_m >= 70.0:
-			break
-	var w := len_m * px_per_m
-	var a := Vector2(16, size.y - 70)
-	var ink := Color(0.92, 0.9, 0.84, 0.95)
-	_overlay.draw_rect(Rect2(a - Vector2(2, 5), Vector2(w + 4, 9)), Color(0, 0, 0, 0.45))
-	_overlay.draw_line(a, a + Vector2(w, 0), ink, 2.0)
-	for x in [0.0, w * 0.5, w]:
-		_overlay.draw_line(a + Vector2(x, -4), a + Vector2(x, 3), ink, 1.5)
-	var label := "%d m" % int(len_m)
-	_overlay.draw_string(font, a + Vector2(w + 9, 5), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0, 0, 0, 0.7))
-	_overlay.draw_string(font, a + Vector2(w + 8, 4), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ink)
 
 
 func _star_name(id: String) -> String:

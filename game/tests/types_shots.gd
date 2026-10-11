@@ -1,5 +1,5 @@
 extends SceneTree
-## 건물 145종 스크린숏 — 새 종류를 한 기씩 세운 기지를 3D와 지도로 찍는다 (디스플레이가 필요하다).
+## 건물 145종 스크린숏 — 새 종류를 한 기씩 세운 기지를 3D로 찍는다 (디스플레이가 필요하다).
 ##   xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 \
 ##     --script res://tests/types_shots.gd -- --out /tmp/shots
 
@@ -77,11 +77,6 @@ func _process(_delta: float) -> bool:
 			["types_industry", func(): _look_at_xy(w, _center_of(["excavator", "regolith_printer", "mre_plant", "parts_fab", "robot_bay", "propellant_plant"]), 0.16, 55.0)],
 			["types_civic", func(): _look_at_xy(w, _center_of(["research_lab", "green_commons", "comms_center", "medical_bay"]), 0.15, 55.0)],
 			["types_ridge", func(): _look_at_xy(w, _center_of(["solar_tower"]) + Vector2(70, 70), 0.3, 60.0, Vector3(-1.0, -1.0, 0.0))],
-			["types_map", func():
-				main._set_view("map")
-				w.plan_fit()],
-			["types_map_core", func():
-				w.plan_look(main.plan.hub(), 0.22)],
 		]
 		_wait = 40
 		return false

@@ -132,18 +132,6 @@ func _process(_delta: float) -> bool:
 				main.tool.click(a)
 				main.tool.click(a + Vector2(40, 0))
 				main.tool.hover(a + Vector2(40, 34))],
-			["map_place", func():
-				main.tool.stop()
-				main._set_view("map")
-				var spot: Dictionary = main.plan.suggest("hydroponics")
-				w.plan_look(spot["at"], 0.16)
-				main._begin_place("hydroponics")
-				main.tool.hover(spot["at"])],
-			["map_tower", func():
-				main._begin_place("solar_tower")
-				var c := BaseLayout.uv_to_xy((BaseLayout.ZONES["A"][0] as Rect2).get_center())
-				w.plan_look(c + Vector2(25, 25), 0.32)
-				main.tool.hover(c + Vector2(30, -20))],
 			["night", func():
 				main.tool.stop()
 				main._set_view("world")
