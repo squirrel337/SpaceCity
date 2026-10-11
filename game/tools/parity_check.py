@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """파이썬 밸런스 시뮬레이터와 Godot(GDScript) 이식본이 같은 결과를 내는지 하루 단위로 비교한다.
 
-    python3 game/tools/parity_check.py --godot godot                 # 시드 2061·1000, 세 정책, 3년
+    python3 game/tools/parity_check.py --godot godot                 # 시드 2061·1000, 세 정책, 3년 + 다른 부지 5곳
     python3 game/tools/parity_check.py --godot godot --seeds 7 --years 1
+    python3 game/tools/parity_check.py --godot godot --sites mars_hellas --site-policies good naive
+
+달 시드 시티는 모든 시드·정책으로, 다른 부지(city_sites.json)는 첫 시드와 --site-policies로 비교한다.
 
 두 시뮬레이터의 일별 원시 상태(반올림 전)를 모두 비교한다. 상대 오차 1e-9를 넘는 값이 하나라도 있으면 실패다.
 """
@@ -37,11 +40,12 @@ def snapshot(c, day):
         "deaths": sum(c.deaths.values()), "next_cargo": c.next_cargo, "next_crewed": c.next_crewed,
         "dose_sum": sum(x[0] * x[1] for x in c.cohorts), "rationing": int(c.rationing), "seq": c.seq,
         "type_mix": sum((i + 1) * c.counts[m] for i, m in enumerate(cb.MODULES)),
+        "solar_kw": c.solar_kw, "heat_cap": c.heat_cap, "dark_h": sum(c.dark[day * 24:(day + 1) * 24]),
     }
 
 
-def python_rows(seed, policy, years):
-    city = cb.City(seed=seed, policy=policy, years=years)
+def python_rows(seed, policy, years, site=cb.HOME_SITE):
+    city = cb.City(seed=seed, policy=policy, years=years, site=site)
     rows = []
     for day in range(city.days):
         pop = city.pop
@@ -52,11 +56,11 @@ def python_rows(seed, policy, years):
     return rows
 
 
-def godot_rows(godot, seed, policy, years):
+def godot_rows(godot, seed, policy, years, site=cb.HOME_SITE):
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "dump.jsonl"
         cmd = [godot, "--headless", "--path", str(ROOT / "game"), "--script", "res://tests/parity_dump.gd", "--",
-               "--seed", str(seed), "--policy", policy, "--years", str(years), "--out", str(out)]
+               "--seed", str(seed), "--policy", policy, "--years", str(years), "--site", site, "--out", str(out)]
         done = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
         if done.returncode != 0 or not out.exists():
             print(done.stdout[-3000:], done.stderr[-3000:], sep="\n")
@@ -92,18 +96,22 @@ def main():
     parser.add_argument("--seeds", type=int, nargs="+", default=[2061, 1000])
     parser.add_argument("--policies", nargs="+", default=["good", "naive", "variety"])
     parser.add_argument("--years", type=float, default=3)
+    parser.add_argument("--sites", nargs="*", default=[s for s in cb.SITES if s != cb.HOME_SITE],
+                        help="다른 부지 (기본: 달 시드 시티 말고 전부, 빈 값이면 건너뛴다)")
+    parser.add_argument("--site-policies", nargs="+", default=["good"])
     args = parser.parse_args()
+    runs = [(cb.HOME_SITE, seed, policy) for seed in args.seeds for policy in args.policies]
+    runs += [(site, args.seeds[0], policy) for site in args.sites for policy in args.site_policies]
     failed = False
-    for seed in args.seeds:
-        for policy in args.policies:
-            py = python_rows(seed, policy, args.years)
-            gd = godot_rows(args.godot, seed, policy, args.years)
-            problem, (worst, where) = compare(py, gd)
-            status = "실패" if problem else "일치"
-            print(f"시드 {seed:>5} · {policy:<7} · {len(py)}일: {status} (최대 상대 오차 {worst:.1e})")
-            if problem:
-                print("  " + problem)
-                failed = True
+    for site, seed, policy in runs:
+        py = python_rows(seed, policy, args.years, site)
+        gd = godot_rows(args.godot, seed, policy, args.years, site)
+        problem, (worst, where) = compare(py, gd)
+        status = "실패" if problem else "일치"
+        print(f"{site:<18} · 시드 {seed:>5} · {policy:<7} · {len(py)}일: {status} (최대 상대 오차 {worst:.1e})")
+        if problem:
+            print("  " + problem)
+            failed = True
     sys.exit(1 if failed else 0)
 
 

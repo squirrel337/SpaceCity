@@ -99,10 +99,11 @@ func decide(sim: CitySim, day: int) -> void:
 	var tower_parts := []
 	for t in sim.tiles:
 		tower_parts.append(float(tile_factor[t]) * int(sim.tiles[t]))
-	var towers_gen := PyCompat.fsum(tower_parts) * 100 * 0.9
+	var towers_gen := PyCompat.fsum(tower_parts) * 100 * 0.9 * sim.sun_k
 	if towers_gen + fission < (1.25 if prepared else 1.05) * avg_load:
 		var tile := sim.free_tile()
-		if tile != "" and not (prepared and tile == "C" and sim.techs.has("megawatt_fission")):
+		# 햇빛이 약한 부지(세레스·목성·토성계)는 타워 대신 원자로
+		if tile != "" and sim.sun_k >= 0.2 and not (prepared and tile == "C" and sim.techs.has("megawatt_fission")):
 			build(sim, "solar_tower", tile)
 		elif not build(sim, "fission_1mw"):
 			build(sim, "fission_40kw")
@@ -163,7 +164,7 @@ func decide(sim: CitySim, day: int) -> void:
 	if sim.techs.has("local_manufacturing") and fam_planned(sim, "parts_fab") < 2 * maxi(1, fam_planned(sim, "mre_plant")):
 		build(sim, "parts_fab")
 	if sim.robots + sim.queued("robot") < 8 + pop / 40:
-		sim.enqueue_special("robot")
+		sim.enqueue_special("robot", sim.auto_reserve)
 
 
 ## 계열의 계획 수량 (완공 + 대기)
@@ -193,15 +194,15 @@ static func _cap(sim: CitySim, fam: String, side: String, key: String) -> float:
 ## 정책의 건설: 보통은 계열의 기본 모듈. 'variety'는 계열의 종류를 돌아가며 고르고, 못 지으면 기본 모듈
 func build(sim: CitySim, fam: String, tile: String = "") -> bool:
 	if not variety:
-		return sim.enqueue(fam, tile)
+		return sim.enqueue(fam, tile, sim.auto_reserve)
 	var options := []
 	for m in GameData.FAMILY[fam]:
 		if sim.M[m]["tech"] == null or sim.techs.has(sim.M[m]["tech"]):
 			options.append(m)
 	if options.is_empty():
-		return sim.enqueue(fam, tile)
+		return sim.enqueue(fam, tile, sim.auto_reserve)
 	var pick: String = options[sim.variety_turn % options.size()]
 	sim.variety_turn += 1
-	if pick != fam and sim.enqueue(pick, tile):
+	if pick != fam and sim.enqueue(pick, tile, sim.auto_reserve):
 		return true
-	return sim.enqueue(fam, tile)
+	return sim.enqueue(fam, tile, sim.auto_reserve)

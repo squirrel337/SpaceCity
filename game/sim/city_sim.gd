@@ -25,6 +25,20 @@ var M: Dictionary
 var T: Dictionary
 var PER: Dictionary
 var start_unix := 0
+var start_year := 2061.0         # 시작 날짜 (연, 소수) — 태양 활동 주기에 쓴다
+
+## 부지 (data/city_sites.json): 도시 상수(C)에 덮어쓴 값과 시뮬레이션 보정. 달 시드 시티는 보정이 모두 1이다
+var site_id := GameData.HOME_SITE
+var site := {}
+var sun_k := 1.0                 # 태양광 출력
+var ice_k := 1.0                 # 얼음 채굴
+var heat_k := 1.0                # 방열 능력
+var build_k := 1.0               # 로봇 작업량
+var contact_k := 1.0             # 지구 교신의 사기
+var air_co2 := false             # 대기의 CO₂로 사바티에가 돈다 (화성)
+var dust := PackedByteArray()    # 먼지 폭풍 시간 (1 = 폭풍)
+var dust_factor := 1.0           # 폭풍 때 태양광 비율
+var auto_reserve := 40.0         # 자동 운영이 남겨 두는 부품 — 보급이 드문 부지일수록 많이
 
 var seed_value := 2061
 var rng: PyRandom
@@ -108,25 +122,54 @@ var trust_low_days := 0
 var _day_pop := 0.0
 
 
-func _init(p_seed: int = 2061, years: float = 3.0, policy_name: String = "") -> void:
+func _init(p_seed: int = 2061, years: float = 3.0, policy_name: String = "", p_site: String = "",
+		p_start_unix: int = -1) -> void:
 	GameData.load_all()
-	C = GameData.C
+	site_id = p_site if p_site != "" else GameData.HOME_SITE
+	site = GameData.site(site_id)
+	var rules: Dictionary = site.get("rules", {})
+	C = GameData.site_constants(site_id)
 	M = GameData.MODULES
 	T = GameData.TECHS
 	PER = C["per_person_day"]
+	sun_k = float(rules.get("sun_k", 1.0))
+	ice_k = float(rules.get("ice_k", 1.0))
+	heat_k = float(rules.get("heat_k", 1.0))
+	build_k = float(rules.get("build_k", 1.0))
+	contact_k = float(rules.get("contact_k", 1.0))
+	air_co2 = bool(rules.get("co2_air", false))
+	auto_reserve = 40 * maxf(1.0, float(C["earth"]["cargo_interval_days"]) / 60)
 	var start_date: PackedStringArray = String(C["start"]["date"]).split("-")
 	start_unix = Time.get_unix_time_from_datetime_dict({
 		"year": int(start_date[0]), "month": int(start_date[1]), "day": int(start_date[2]),
 		"hour": 0, "minute": 0, "second": 0})
+	if p_start_unix >= 0:
+		start_unix = p_start_unix          # 식민지: 원정대가 도착한 날
+	var sd := Time.get_datetime_dict_from_unix_time(start_unix)
+	var jan1 := Time.get_unix_time_from_datetime_dict({"year": sd["year"], "month": 1, "day": 1, "hour": 0, "minute": 0, "second": 0})
+	@warning_ignore("integer_division")
+	start_year = sd["year"] + ((start_unix - jan1) / 86400) / 365.25
 	seed_value = p_seed
 	rng = PyRandom.new(p_seed)
 	days = PyCompat.round_half_even(365.25 * years)
-	dark = illumination_schedule(PyRandom.new(p_seed * 7919 + 1), days * 24 + 48, C["illumination"])
+	var il: Dictionary = C["illumination"]
+	if String(il.get("model", "ridge")) == "rotation":
+		dark = rotation_schedule(days * 24 + 48, il)
+	else:
+		dark = illumination_schedule(PyRandom.new(p_seed * 7919 + 1), days * 24 + 48, il)
+	if rules.has("dust"):
+		dust = dust_schedule(PyRandom.new(p_seed * 104729 + 7), days * 24 + 48, rules["dust"])
+		dust_factor = float(rules["dust"]["sun_factor"])
 	var start: Dictionary = C["start"]
-	for mid in M:
-		var n := int(M[mid]["start"])
-		if n:
-			counts[mid] = n
+	if start.has("counts"):
+		for mid in start["counts"]:
+			if int(start["counts"][mid]):
+				counts[mid] = int(start["counts"][mid])
+	else:
+		for mid in M:
+			var n := int(M[mid]["start"])
+			if n:
+				counts[mid] = n
 	for t in start["solar_tiles_used"]:
 		tiles[t] = int(start["solar_tiles_used"][t])
 	robots = int(C["robots"]["start"])
@@ -162,6 +205,33 @@ static func illumination_schedule(r: PyRandom, hours: int, il: Dictionary) -> Pa
 		t += r.uniform(gap[0], gap[1])
 		var dark_h: Array = il["winter_dark_h"] if winter else il["normal_dark_h"]
 		var length := r.uniform(dark_h[0], dark_h[1])
+		for hh in range(int(t), mini(hours, int(t + length))):
+			d[hh] = 1
+		t += length
+	return d
+
+
+## 자전하는 천체의 낮과 밤 (1 = 어두움): 하루(day_h)의 앞 light_frac이 낮이고, 아침에 시작한다 — 파이썬과 같다
+static func rotation_schedule(hours: int, il: Dictionary) -> PackedByteArray:
+	var d := PackedByteArray()
+	d.resize(hours)
+	var day_h := float(il["day_h"])
+	var light := float(il["light_frac"])
+	for hh in hours:
+		d[hh] = 1 if fposmod((hh + 0.5) / day_h + 0.02, 1.0) >= light else 0
+	return d
+
+
+## 먼지 폭풍 시간 (1 = 폭풍): 해마다 rate_per_year번쯤, 한 번에 days[0]~days[1]일
+static func dust_schedule(r: PyRandom, hours: int, dust_rule: Dictionary) -> PackedByteArray:
+	var d := PackedByteArray()
+	d.resize(hours)
+	d.fill(0)
+	var mean_gap_h := 8766.0 / float(dust_rule["rate_per_year"])
+	var t := 0.0
+	while t < hours:
+		t += r.uniform(0.5 * mean_gap_h, 1.5 * mean_gap_h)
+		var length := r.uniform(float(dust_rule["days"][0]), float(dust_rule["days"][1])) * 24.0
 		for hh in range(int(t), mini(hours, int(t + length))):
 			d[hh] = 1
 		t += length
@@ -278,7 +348,7 @@ func refresh() -> void:
 		parts.append(float(tile_factor[t]) * int(tiles[t]))
 	var factor := PyCompat.fsum(parts) / towers if towers else 0.0
 	var boost := 1.2 if techs.has("tall_towers") else 1.0
-	solar_kw = fam_prov("solar_tower", "generation_kw") * factor * boost
+	solar_kw = fam_prov("solar_tower", "generation_kw") * factor * boost * sun_k
 	fission_kw = 0.0           # 일조와 상관없이 늘 같은 출력 (핵분열·동위원소·핵융합)
 	for mid in with_prov("generation_kw"):
 		if family(mid) != "solar_tower":
@@ -287,6 +357,7 @@ func refresh() -> void:
 	for mid in with_prov("heat_kw"):
 		if prov(mid, "heat_kw"):
 			heat_cap += float(prov(mid, "heat_kw")) * wk[mid]
+	heat_cap *= heat_k
 	var printing := false
 	for item in queue:
 		if item["print_t"] > 0:
@@ -314,7 +385,7 @@ func refresh() -> void:
 		loads[p] += kw
 	static_load = loads
 	recovery = 0.98 if techs.has("closed_loop_ls2") else float(prov("water_recycler", "recovery"))
-	mining = 1.4 if techs.has("polar_prospecting") else 1.0
+	mining = (1.4 if techs.has("polar_prospecting") else 1.0) * ice_k
 
 
 func ppm_to_kg(ppm: float) -> float:
@@ -333,7 +404,7 @@ func population() -> float:
 
 
 func year() -> float:
-	return 2061 + hour / 8766.0
+	return start_year + hour / 8766.0
 
 
 func queued(mid: String) -> int:
@@ -360,6 +431,8 @@ func is_dark(h: int = -1) -> bool:
 # ── 1시간 ──────────────────────────────────────────────────────
 func step_hour(pop: float) -> void:
 	var lit: float = 1.0 - (dark[hour] if hour < dark.size() else 0)
+	if hour < dust.size() and dust[hour]:
+		lit *= dust_factor
 	var s := stock
 	var h := 1.0 / 24.0
 
@@ -382,7 +455,9 @@ func step_hour(pop: float) -> void:
 		u_elec = 0.0
 	var n_sab: int = hr["sab_n"]
 	var u_sab := 0.0
-	if n_sab:
+	if n_sab and air_co2:
+		u_sab = maxf(0.0, minf(1.0, s["h2_kg"] / (hr["sab_h2"] * h)))     # CO₂는 대기에서
+	elif n_sab:
 		u_sab = maxf(0.0, minf(1.0, minf(s["h2_kg"] / (hr["sab_h2"] * h), s["co2_kg"] / (hr["sab_co2"] * h))))
 	var rec_rate: float = hr["rec_day"] * h
 	var u_rec := 0.0
@@ -494,7 +569,8 @@ func step_hour(pop: float) -> void:
 		s["h2_kg"] += n_e * recipe(m, "out", "h2_kg")
 	for m in active["sabatier"]:
 		var n_s: float = wk[m] * u_sab * k
-		s["co2_kg"] -= n_s * recipe(m, "in", "co2_kg")
+		if not air_co2:
+			s["co2_kg"] -= n_s * recipe(m, "in", "co2_kg")
 		s["h2_kg"] -= n_s * recipe(m, "in", "h2_kg")
 		s["ch4_kg"] += n_s * recipe(m, "out", "ch4_kg")
 		s["water_kg"] += n_s * recipe(m, "out", "water_kg")
@@ -654,7 +730,7 @@ func _queue_order(a: Dictionary, b: Dictionary) -> bool:
 func work_robots() -> void:
 	var s := stock
 	var speed := 1.5 if techs.has("autonomous_robots_2") else 1.0
-	var rd: float = (robots - robots_broken) * speed
+	var rd: float = (robots - robots_broken) * speed * build_k
 	var repair_parts := float(C["robots"]["repair_parts"])
 	while robots_broken and s["parts"] >= repair_parts and rd >= 0.5:
 		robots_broken -= 1
@@ -799,6 +875,11 @@ func research() -> void:
 	rp_bank += rp
 	support += rp * C["earth"]["support_per_rp"]
 	for _i in range(research_queue.size()):
+		if research_queue.is_empty():
+			break
+		if techs.has(research_queue[0]):          # 다른 식민지에서 이미 알아냈다
+			research_queue.pop_front()
+			continue
 		var tech: Dictionary = T[research_queue[0]]
 		var missing := false
 		for r in tech["requires"]:
@@ -1084,7 +1165,7 @@ func update_morale() -> void:
 	for m in GameData.FAMILY["comms_center"]:
 		if wk[m] and float(prov(m, "morale")) > contact:
 			contact = float(prov(m, "morale"))
-	target += contact
+	target += contact * contact_k     # 지연이 길면 영상 통화가 안 된다
 	p4_off_week.append(int(today.get("p4_off_h", 0)))
 	if p4_off_week.size() > 7:
 		p4_off_week = p4_off_week.slice(p4_off_week.size() - 7)
@@ -1232,7 +1313,7 @@ const SAVE_FIELDS := ["seed_value", "days", "hour", "counts", "broken", "tiles",
 
 func to_save() -> Dictionary:
 	var data := {"version": 1, "rng": rng.get_state(),
-		"autopilot": autopilot.name if autopilot != null else ""}
+		"autopilot": autopilot.name if autopilot != null else "", "site_id": site_id, "start_unix": start_unix}
 	for f in SAVE_FIELDS:
 		data[f] = get(f)
 	return data
@@ -1240,7 +1321,8 @@ func to_save() -> Dictionary:
 
 static func from_save(data: Dictionary) -> CitySim:
 	var years: float = float(data["days"]) / 365.25
-	var sim := CitySim.new(int(data["seed_value"]), years)
+	var sim := CitySim.new(int(data["seed_value"]), years, "", String(data.get("site_id", GameData.HOME_SITE)),
+		int(data.get("start_unix", -1)))
 	for f in SAVE_FIELDS:
 		if data.has(f):
 			sim.set(f, data[f])

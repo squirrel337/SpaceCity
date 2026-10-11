@@ -1,6 +1,6 @@
 extends SceneTree
 ## 파이썬 시뮬레이터와 비교할 일별 원시 상태를 JSON Lines로 쓴다. tools/parity_check.py가 부른다.
-##   godot --headless --path game --script res://tests/parity_dump.gd -- --seed 2061 --policy good --years 3 --out out.jsonl
+##   godot --headless --path game --script res://tests/parity_dump.gd -- --seed 2061 --policy good --years 3 [--site mars_hellas] --out out.jsonl
 
 
 func _initialize() -> void:
@@ -8,7 +8,8 @@ func _initialize() -> void:
 	var user_args := OS.get_cmdline_user_args()
 	for i in range(0, user_args.size() - 1, 2):
 		args[user_args[i].trim_prefix("--")] = user_args[i + 1]
-	var sim := CitySim.new(int(args.get("seed", "2061")), float(args.get("years", "3")), String(args.get("policy", "good")))
+	var sim := CitySim.new(int(args.get("seed", "2061")), float(args.get("years", "3")), String(args.get("policy", "good")),
+		String(args.get("site", GameData.HOME_SITE)))
 	var out := FileAccess.open(String(args["out"]), FileAccess.WRITE)
 	for d in range(sim.days):
 		var pop := sim.population()
@@ -34,6 +35,10 @@ static func snapshot(sim: CitySim, d: int) -> Dictionary:
 	var dose_sum := 0.0
 	for c in sim.cohorts:
 		dose_sum += c[0] * c[1]
+	var dark_h := 0            # 그날의 그림자 시간
+	for hh in range(d * 24, (d + 1) * 24):
+		if hh < sim.dark.size():
+			dark_h += sim.dark[hh]
 	var type_mix := 0          # 어떤 종류를 몇 기 지었나 (데이터 순서 가중 합)
 	var i := 0
 	for m in sim.M:
@@ -52,4 +57,5 @@ static func snapshot(sim: CitySim, d: int) -> Dictionary:
 		"exposed": sim.stats.get("exposed_person_events", 0), "departed_dose": sim.stats.get("departed_dose", 0),
 		"deaths": deaths, "next_cargo": sim.next_cargo, "next_crewed": sim.next_crewed, "dose_sum": dose_sum,
 		"rationing": 1 if sim.rationing else 0, "seq": sim.seq, "type_mix": type_mix,
+		"solar_kw": sim.solar_kw, "heat_cap": sim.heat_cap, "dark_h": dark_h,
 	}

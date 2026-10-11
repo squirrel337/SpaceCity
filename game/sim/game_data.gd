@@ -4,6 +4,8 @@ class_name GameData
 
 const MODULES_PATH := "res://data/city_modules.json"
 const TECHS_PATH := "res://data/city_techs.json"
+const SITES_PATH := "res://data/city_sites.json"
+const HOME_SITE := "moon_shackleton"           # 시대 0의 시작 부지
 
 static var C: Dictionary = {}
 static var MODULES: Dictionary = {}   # id -> 모듈 (JSON 순서 유지)
@@ -11,6 +13,8 @@ static var TECHS: Dictionary = {}     # id -> 기술 (JSON 순서 유지)
 static var FAMILY: Dictionary = {}    # 계열(기본 모듈 id) -> [모듈 id] (데이터 순서, 기본 모듈이 맨 앞)
 static var FAM_OF: Dictionary = {}    # 모듈 id -> 계열
 static var WITH: Dictionary = {}      # provides 열쇠 -> 그 값이 0이 아닌 모듈 id (데이터 순서) — 시뮬레이션의 합을 빨리
+static var SITES: Dictionary = {}     # 부지 id -> 부지 (JSON 순서: 달 시드 시티가 맨 앞)
+static var _site_c: Dictionary = {}   # 부지 id -> 합친 도시 상수
 static var _loaded := false
 
 
@@ -36,7 +40,37 @@ static func load_all() -> void:
 	var techs_json: Dictionary = _read(TECHS_PATH)
 	for t in techs_json["techs"]:
 		TECHS[t["id"]] = t
+	var sites_json: Dictionary = _read(SITES_PATH)
+	for s in sites_json.get("sites", []):
+		SITES[s["id"]] = s
 	_loaded = true
+
+
+## 부지의 도시 상수: 기본 상수에 부지 값을 깊게 덮어쓴 것 (달 시드 시티는 기본 상수 그대로) — 파이썬 site_constants와 같다
+static func site_constants(site_id: String) -> Dictionary:
+	load_all()
+	var over: Dictionary = SITES.get(site_id, {}).get("constants", {})
+	if over.is_empty():
+		return C
+	if not _site_c.has(site_id):
+		_site_c[site_id] = merged(C, over)
+	return _site_c[site_id]
+
+
+## 사전을 깊게 합친다 (over가 이긴다, 열쇠 순서는 base 다음 새 열쇠) — 파이썬 merged와 같다
+static func merged(base: Dictionary, over: Dictionary) -> Dictionary:
+	var out := base.duplicate()
+	for k in over:
+		if over[k] is Dictionary and base.get(k) is Dictionary:
+			out[k] = merged(base[k], over[k])
+		else:
+			out[k] = over[k]
+	return out
+
+
+static func site(site_id: String) -> Dictionary:
+	load_all()
+	return SITES.get(site_id, {})
 
 
 static func _read(path: String) -> Dictionary:

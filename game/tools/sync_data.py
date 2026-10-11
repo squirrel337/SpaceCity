@@ -15,6 +15,7 @@ TARGET = ROOT / "game" / "data"
 SOURCES = {
     "city_modules.json": ROOT / "docs" / "design" / "data" / "city_modules.json",
     "city_techs.json": ROOT / "docs" / "design" / "data" / "city_techs.json",
+    "city_sites.json": ROOT / "docs" / "design" / "data" / "city_sites.json",
     "sky.json": ROOT / "docs" / "design" / "data" / "sky.json",
     "nearby_stars.json": ROOT / "docs" / "concept" / "examples" / "nearby_stars.json",
 }

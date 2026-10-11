@@ -12,6 +12,7 @@
     python3 city_balance.py --module-catalog     # 전체 모듈 표 (29계열 145종)
     python3 city_balance.py --policy variety     # 계열의 여러 종류를 섞어 짓는 시험 정책
     python3 city_balance.py --csv daily.csv      # 일별 기록 (차트용)
+    python3 city_balance.py --site mars_hellas   # 다른 부지 (../data/city_sites.json)
 
 표준 라이브러리만 사용한다. 같은 시드·정책은 언제나 같은 결과를 낸다.
 """
@@ -33,6 +34,10 @@ C = _DATA["constants"]
 MODULES = {m["id"]: m for m in _DATA["modules"]}
 TECHS = {t["id"]: t for t in
          json.loads((DATA_DIR / "city_techs.json").read_text(encoding="utf-8"))["techs"]}
+
+SITES = {s["id"]: s for s in
+         json.loads((DATA_DIR / "city_sites.json").read_text(encoding="utf-8"))["sites"]}
+HOME_SITE = "moon_shackleton"
 
 PER = C["per_person_day"]
 START = date.fromisoformat(C["start"]["date"])
@@ -81,9 +86,22 @@ def recipe(mid, side, key):
     return MODULES[mid].get("recipe", {}).get(side, {}).get(key, 0.0)
 
 
-def illumination_schedule(rng, hours):
+def merged(base, over):
+    """사전을 깊게 합친다 (over가 이긴다). 원본은 건드리지 않는다."""
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = merged(base[k], v) if isinstance(v, dict) and isinstance(base.get(k), dict) else v
+    return out
+
+
+def site_constants(site):
+    """부지의 도시 상수: 기본 상수에 부지 값을 덮어쓴 것 (달 시드 시티는 기본 상수 그대로)."""
+    over = SITES.get(site, {}).get("constants", {})
+    return merged(C, over) if over else C
+
+
+def illumination_schedule(rng, hours, il):
     """시간별 그림자 여부(1 = 어두움). 평소엔 드물고 짧게, 남극 겨울엔 잦고 길게."""
-    il = C["illumination"]
     dark = bytearray(hours)
     t = 0.0
     while t < hours:
@@ -95,6 +113,26 @@ def illumination_schedule(rng, hours):
             dark[hour] = 1
         t += length
     return dark
+
+
+def rotation_schedule(hours, il):
+    """자전하는 천체의 낮과 밤 (1 = 어두움): 하루(day_h)의 앞 light_frac이 낮이고, 아침에 시작한다."""
+    day_h, light = il["day_h"], il["light_frac"]
+    return bytearray(1 if ((hour + 0.5) / day_h + 0.02) % 1.0 >= light else 0 for hour in range(hours))
+
+
+def dust_schedule(rng, hours, dust):
+    """먼지 폭풍 시간(1 = 폭풍): 해마다 rate_per_year번쯤, 한 번에 days[0]~days[1]일."""
+    storm = bytearray(hours)
+    mean_gap_h = 8766.0 / dust["rate_per_year"]
+    t = 0.0
+    while t < hours:
+        t += rng.uniform(0.5 * mean_gap_h, 1.5 * mean_gap_h)
+        length = rng.uniform(dust["days"][0], dust["days"][1]) * 24.0
+        for hour in range(int(t), min(hours, int(t + length))):
+            storm[hour] = 1
+        t += length
+    return storm
 
 
 def solar_activity(year):
@@ -134,18 +172,44 @@ class Policy:
 
 
 class City:
-    def __init__(self, seed=2061, policy="good", years=3):
+    def __init__(self, seed=2061, policy="good", years=3, site=HOME_SITE, start_date=None):
+        # 부지: 도시 상수(덮어쓴 값)와 시뮬레이션 보정. 달 시드 시티는 보정이 모두 1이다
+        self.site_id = site
+        self.site = SITES.get(site, {})
+        rules = self.site.get("rules", {})
+        self.C = site_constants(site)
+        self.sun_k = rules.get("sun_k", 1.0)          # 태양광 출력
+        self.ice_k = rules.get("ice_k", 1.0)          # 얼음 채굴
+        self.heat_k = rules.get("heat_k", 1.0)        # 방열 능력
+        self.build_k = rules.get("build_k", 1.0)      # 로봇 작업량
+        self.contact_k = rules.get("contact_k", 1.0)  # 지구 교신의 사기
+        self.air_co2 = rules.get("co2_air", False)    # 대기의 CO₂로 사바티에가 돈다
+        # 자동 운영이 남겨 두는 부품 — 보급이 드문 부지일수록 많이 (달 40)
+        self.reserve = 40 * max(1.0, self.C["earth"]["cargo_interval_days"] / 60)
+        self.start_date = start_date or date.fromisoformat(self.C["start"]["date"])
+        self.start_year = self.start_date.year + (self.start_date.timetuple().tm_yday - 1) / 365.25
         self.rng = random.Random(seed)
         self.policy = Policy(policy)
         self.days = int(round(365.25 * years))
-        self.dark = illumination_schedule(random.Random(seed * 7919 + 1), self.days * 24 + 48)
-        start = C["start"]
+        il = self.C["illumination"]
+        hours = self.days * 24 + 48
+        if il.get("model") == "rotation":
+            self.dark = rotation_schedule(hours, il)
+        else:
+            self.dark = illumination_schedule(random.Random(seed * 7919 + 1), hours, il)
+        dust = rules.get("dust")
+        self.dust = dust_schedule(random.Random(seed * 104729 + 7), hours, dust) if dust else None
+        self.dust_factor = dust["sun_factor"] if dust else 1.0
+        start = self.C["start"]
         self.hour = 0
-        self.counts = Counter({mid: m["start"] for mid, m in MODULES.items() if m["start"]})
+        if "counts" in start:
+            self.counts = Counter({mid: n for mid, n in start["counts"].items() if n})
+        else:
+            self.counts = Counter({mid: m["start"] for mid, m in MODULES.items() if m["start"]})
         self.broken = Counter()
         self.tiles = Counter(start["solar_tiles_used"])
         self.covered_habs = 0
-        self.robots = C["robots"]["start"]
+        self.robots = self.C["robots"]["start"]
         self.robots_broken = 0
         self.queue = []          # 건설 대기열: {"id", "rd", "print_t", "seq"}
         self.seq = 0
@@ -155,7 +219,7 @@ class City:
         self.morale = float(start["morale"])
         self.trust = float(start["trust"])
         self.trust_memory = 0.0  # 사건이 남긴 신뢰의 흔적. 반감기 약 1년
-        self.support = float(C["earth"]["support_start"])
+        self.support = float(self.C["earth"]["support_start"])
         self.techs = set()
         self.rp_bank = 0.0
         self.research_queue = list(self.policy.research)
@@ -163,7 +227,7 @@ class City:
         self.farm_dark_h = 0
         self.crops_dead_until = -1
         self.prev = {2: True, 3: True, 4: True}
-        earth = C["earth"]
+        earth = self.C["earth"]
         self.next_cargo = earth["cargo_first_day"]
         self.next_crewed = earth["crewed_first_day"]
         self.express_eta = None
@@ -209,8 +273,8 @@ class City:
         self.caps = {key: sum(provided(m, "storage", {}).get(key, 0.0) * wk[m] for m in WITH["storage"])
                      for key in STOCK_KEYS}
         self.housing_cap = sum(provided(m, "housing") * self.counts[m] for m in WITH["housing"])
-        self.air = max(1.0, self.housing_cap) * C["air_kg_per_housing"]
-        self.co2_floor = self.ppm_to_kg(C["co2_ppm"]["floor"])
+        self.air = max(1.0, self.housing_cap) * self.C["air_kg_per_housing"]
+        self.co2_floor = self.ppm_to_kg(self.C["co2_ppm"]["floor"])
         bonus = 1.5 if "shielding_2" in self.techs else 1.0
         self.shelter_cap = 0.0
         for m in WITH["shelter"]:
@@ -222,10 +286,10 @@ class City:
         self.bat_cap = self.fam_sum("battery_bank", lambda m: provided(m, "storage_kwh"))
         self.rfc_cap = self.fam_sum("rfc_unit", lambda m: provided(m, "storage_kwh"))
         towers = sum(self.tiles.values())
-        tile_factor = C["illumination"]["tile_factor"]
+        tile_factor = self.C["illumination"]["tile_factor"]
         factor = sum(tile_factor[t] * n for t, n in self.tiles.items()) / towers if towers else 0.0
         boost = 1.2 if "tall_towers" in self.techs else 1.0
-        self.solar_kw = self.fam_sum("solar_tower", lambda m: provided(m, "generation_kw")) * factor * boost
+        self.solar_kw = self.fam_sum("solar_tower", lambda m: provided(m, "generation_kw")) * factor * boost * self.sun_k
         self.fission_kw = 0.0          # 일조와 상관없이 늘 같은 출력 (핵분열·동위원소·핵융합)
         for m in WITH["generation_kw"]:
             if family(m) != "solar_tower":
@@ -234,6 +298,7 @@ class City:
         for m in WITH["heat_kw"]:
             if provided(m, "heat_kw"):
                 self.heat_cap += provided(m, "heat_kw") * wk[m]
+        self.heat_cap *= self.heat_k
         printing = any(item["print_t"] > 0 for item in self.queue)
         s = self.stock
         static = {1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0}
@@ -253,12 +318,12 @@ class City:
             elif fam == "parts_fab" and s.get("metal_t", 0) < recipe(mid, "in", "metal_t"):
                 kw = 0.0
             elif fam == "robot_bay" and not robots_powered:
-                kw += C["robots"]["power_kw"] * (self.robots - self.robots_broken)
+                kw += self.C["robots"]["power_kw"] * (self.robots - self.robots_broken)
                 robots_powered = True       # 로봇 충전은 정비고 계열 한 번만
             static[p] += kw
         self.static_load = static
         self.recovery = 0.98 if "closed_loop_ls2" in self.techs else provided("water_recycler", "recovery")
-        self.mining = 1.4 if "polar_prospecting" in self.techs else 1.0
+        self.mining = (1.4 if "polar_prospecting" in self.techs else 1.0) * self.ice_k
 
     def fam_sum(self, fam, value):
         """계열의 가동 중인 모듈마다 value(모듈)를 곱해 더한다 (데이터 순서, 보통 덧셈)."""
@@ -281,7 +346,7 @@ class City:
         return sum(c[0] for c in self.cohorts)
 
     def year(self):
-        return START.year + self.hour / 8766.0
+        return self.start_year + self.hour / 8766.0
 
     def queued(self, mid):
         return sum(1 for item in self.queue if item["id"] == mid)
@@ -295,6 +360,8 @@ class City:
     # ── 1시간 ──────────────────────────────────────────────────────
     def step_hour(self, pop):
         lit = 1.0 - self.dark[self.hour]
+        if self.dust is not None and self.dust[self.hour]:
+            lit *= self.dust_factor
         s = self.stock
         wk = self.wk
         h = 1.0 / 24.0
@@ -316,7 +383,9 @@ class City:
             u_elec = 0.0
         n_sab = hr["sab_n"]
         u_sab = 0.0
-        if n_sab:
+        if n_sab and self.air_co2:
+            u_sab = max(0.0, min(1.0, s["h2_kg"] / (hr["sab_h2"] * h)))     # CO₂는 대기에서
+        elif n_sab:
             u_sab = max(0.0, min(1.0, s["h2_kg"] / (hr["sab_h2"] * h), s["co2_kg"] / (hr["sab_co2"] * h)))
         rec_rate = hr["rec_day"] * h
         u_rec = min(1.0, s["wastewater_kg"] / rec_rate) if rec_rate else 0.0
@@ -377,7 +446,7 @@ class City:
         use = pop * PER["water_use_kg"] * h
         s["water_kg"] -= use
         s["wastewater_kg"] += use
-        s["food_kg"] -= pop * PER["food_kg"] * h * (C["rationing"]["consumption_factor"] if self.rationing else 1.0)
+        s["food_kg"] -= pop * PER["food_kg"] * h * (self.C["rationing"]["consumption_factor"] if self.rationing else 1.0)
 
         # 식량·생물 (2·4순위)
         bio_removal = 0.0
@@ -425,7 +494,8 @@ class City:
             s["h2_kg"] += n * recipe(m, "out", "h2_kg")
         for m in self.active["sabatier"]:
             n = wk[m] * u_sab * k
-            s["co2_kg"] -= n * recipe(m, "in", "co2_kg")
+            if not self.air_co2:
+                s["co2_kg"] -= n * recipe(m, "in", "co2_kg")
             s["h2_kg"] -= n * recipe(m, "in", "h2_kg")
             s["ch4_kg"] += n * recipe(m, "out", "ch4_kg")
             s["water_kg"] += n * recipe(m, "out", "water_kg")
@@ -460,8 +530,8 @@ class City:
 
         # 작물: 72시간 넘게 전력을 못 받으면 고사
         self.farm_dark_h = 0 if (on[2] or not hr["hydro_n"]) else self.farm_dark_h + 1
-        if self.farm_dark_h >= C["crops"]["dead_after_unpowered_h"] and self.crops_alive():
-            self.crops_dead_until = self.hour + C["crops"]["regrow_days"] * 24
+        if self.farm_dark_h >= self.C["crops"]["dead_after_unpowered_h"] and self.crops_alive():
+            self.crops_dead_until = self.hour + self.C["crops"]["regrow_days"] * 24
             self.stats["crop_losses"] += 1
             self.trust_event(-3)
             self.note("작물 고사 — 수경 농장 전력이 72시간 끊김")
@@ -475,7 +545,7 @@ class City:
         ppm = self.co2_ppm()
         if ppm > self.max_co2:
             self.max_co2 = ppm
-        limits = C["co2_ppm"]
+        limits = self.C["co2_ppm"]
         if ppm > limits["warn"]:
             self.day["co2_warn"] = 1
         if ppm > limits["bad"]:
@@ -541,15 +611,15 @@ class City:
                 self.broken[mid] += failed
                 self.stats["failures"] += failed
         working = self.robots - self.robots_broken
-        self.robots_broken += sum(1 for _ in range(working) if rng.random() < 1.0 / C["robots"]["mtbf_days"])
+        self.robots_broken += sum(1 for _ in range(working) if rng.random() < 1.0 / self.C["robots"]["mtbf_days"])
 
     def work_robots(self):
         s = self.stock
         speed = 1.5 if "autonomous_robots_2" in self.techs else 1.0
-        rd = (self.robots - self.robots_broken) * speed
-        while self.robots_broken and s["parts"] >= C["robots"]["repair_parts"] and rd >= 0.5:
+        rd = (self.robots - self.robots_broken) * speed * self.build_k
+        while self.robots_broken and s["parts"] >= self.C["robots"]["repair_parts"] and rd >= 0.5:
             self.robots_broken -= 1
-            s["parts"] -= C["robots"]["repair_parts"]
+            s["parts"] -= self.C["robots"]["repair_parts"]
             rd -= 0.5
         # 수리: 1순위 모듈 → 발전·저장·방열 → 2·3·4순위
         for mid in sorted(self.broken, key=lambda m: (spec(m, "priority") or 1.5, m)):
@@ -594,7 +664,7 @@ class City:
         m = MODULES[mid]
         if m["tech"] and m["tech"] not in self.techs:
             return False
-        if not self.can_afford(m["cost"]):
+        if not self.can_afford(m["cost"], self.reserve):
             self.day["short_parts"] = 1
             return False
         for key, value in m["cost"].items():
@@ -610,21 +680,21 @@ class City:
         s = self.stock
         self.seq += 1
         if kind == "regolith_cover":
-            need = C["regolith_cover"]
+            need = self.C["regolith_cover"]
             if s["regolith_t"] < need["regolith_t"]:
                 return False
             s["regolith_t"] -= need["regolith_t"]
             self.queue.append({"id": kind, "rd": need["build_rd"], "print_t": 0, "seq": self.seq})
             return True
-        if kind == "robot" and "robot_fabrication" in self.techs and s["parts"] >= C["robots"]["local_parts"] + 40:
-            s["parts"] -= C["robots"]["local_parts"]
-            self.queue.append({"id": "robot", "rd": C["robots"]["local_rd"], "print_t": 0, "seq": self.seq})
+        if kind == "robot" and "robot_fabrication" in self.techs and s["parts"] >= self.C["robots"]["local_parts"] + self.reserve:
+            s["parts"] -= self.C["robots"]["local_parts"]
+            self.queue.append({"id": "robot", "rd": self.C["robots"]["local_rd"], "print_t": 0, "seq": self.seq})
             return True
         return False
 
     def free_tile(self):
         for tile in ("A", "B", "C"):
-            if self.tiles[tile] < C["illumination"]["tiles"][tile]:
+            if self.tiles[tile] < self.C["illumination"]["tiles"][tile]:
                 return tile
         return None
 
@@ -632,14 +702,14 @@ class City:
         """정책이 하루에 한 번 건설을 결정한다. 계획 수량(완공 + 대기)을 기준으로 판단한다."""
         prepared = self.policy.prepared
         pop = self.pop
-        pop_next = pop + C["earth"]["crewed_seats"]
+        pop_next = pop + self.C["earth"]["crewed_seats"]
         year_index = min(2, day // 365)
         p = self.fam_planned
         cap = self.planned_cap
         build = self.build
 
         # 생명유지: 추천 정책은 여유분을, 준비 없는 정책은 문제가 터진 뒤에 짓는다
-        if prepared or self.co2_ppm() > C["co2_ppm"]["bad"]:
+        if prepared or self.co2_ppm() > self.C["co2_ppm"]["bad"]:
             if cap(lambda m: family(m) == "co2_scrubber", lambda m: provided(m, "co2_kg_day")) < 1.3 * pop_next * PER["co2_kg"]:
                 build("co2_scrubber")
         if cap(lambda m: family(m) == "electrolyzer", lambda m: recipe(m, "out", "o2_kg")) < 1.2 * pop_next * PER["o2_kg"]:
@@ -667,11 +737,12 @@ class City:
 
         # 발전: 평균 발전량이 평균 수요의 1.25배(준비 없는 정책은 1.05배)
         avg_load = 0.85 * sum(spec(m, "power_kw") * self.planned(m) for m in MODULES if spec(m, "priority"))
-        tile_factor = C["illumination"]["tile_factor"]
-        towers_gen = sum(tile_factor[t] * n for t, n in self.tiles.items()) * 100 * 0.9
+        tile_factor = self.C["illumination"]["tile_factor"]
+        towers_gen = sum(tile_factor[t] * n for t, n in self.tiles.items()) * 100 * 0.9 * self.sun_k
         if towers_gen + fission < (1.25 if prepared else 1.05) * avg_load:
             tile = self.free_tile()
-            if tile and not (prepared and tile == "C" and "megawatt_fission" in self.techs):
+            # 햇빛이 약한 부지(세레스·목성·토성계)는 타워 대신 원자로
+            if tile and self.sun_k >= 0.2 and not (prepared and tile == "C" and "megawatt_fission" in self.techs):
                 build("solar_tower", tile)
             elif not build("fission_1mw"):
                 build("fission_40kw")
@@ -756,17 +827,22 @@ class City:
         prod = 0.8 + 0.4 * self.morale / 100
         p4_share = 1.0 - self.day["p4_off_h"] / 24.0
         scientists = min(self.fam_sum("research_lab", lambda m: spec(m, "crew")),
-                         self.pop * C["workforce_share"] * 0.3)
+                         self.pop * self.C["workforce_share"] * 0.3)
         rp_direct = 0.0           # 연구원 없이 나오는 연구 (교신·천문대 등)
         for m in WITH["rp_day"]:
             if family(m) != "research_lab":
                 rp_direct += self.wk[m] * provided(m, "rp_day")
         rp = (scientists * prod * p4_share
               + rp_direct * p4_share
-              + C["earth"]["earth_rp_day"])
+              + self.C["earth"]["earth_rp_day"])
         self.rp_bank += rp
-        self.support += rp * C["earth"]["support_per_rp"]
+        self.support += rp * self.C["earth"]["support_per_rp"]
         for _ in range(len(self.research_queue)):
+            if not self.research_queue:
+                break
+            if self.research_queue[0] in self.techs:        # 다른 식민지에서 이미 알아냈다
+                self.research_queue.pop(0)
+                continue
             tech = TECHS[self.research_queue[0]]
             if any(r not in self.techs for r in tech["requires"]):
                 self.research_queue.append(self.research_queue.pop(0))   # 선행 기술이 없으면 뒤로
@@ -780,7 +856,7 @@ class City:
             break
 
     def earth(self, day):
-        earth = C["earth"]
+        earth = self.C["earth"]
         rng = self.rng
         self.support += earth["support_per_month"] / 30.0
         self.food_emergency(day)
@@ -833,7 +909,7 @@ class City:
 
     def food_emergency(self, day):
         """배급과 긴급 보급선. 기아 사망은 식량 없이 14일이 지난 뒤부터 하루 2%."""
-        earth = C["earth"]
+        earth = self.C["earth"]
         s = self.stock
         need = self.pop * PER["food_kg"]
         reserve = s["food_kg"] / need if need else 99.0
@@ -850,7 +926,7 @@ class City:
             self.trust_event(-1)
             self.note("긴급 보급선 요청 (지원 −300)")
         self.hungry_days = self.hungry_days + 1 if self.day["no_food"] else 0
-        if self.hungry_days > C["starvation_grace_days"]:
+        if self.hungry_days > self.C["starvation_grace_days"]:
             self.kill(max(1, round(self.pop * 0.02)), "starvation")
 
     def send_home(self, n):
@@ -863,7 +939,7 @@ class City:
                 break
 
     def deliver_cargo(self):
-        earth = C["earth"]
+        earth = self.C["earth"]
         s = self.stock
         capacity = earth["cargo_capacity_units"]
         horizon = earth["cargo_interval_days"] + 15
@@ -878,12 +954,12 @@ class City:
         capacity -= food_units
         if "robot_fabrication" not in self.techs and self.robots < 8 + self.pop / 40 and capacity >= 10:
             self.robots += 2
-            capacity -= 2 * C["robots"]["earth_units"]
+            capacity -= 2 * self.C["robots"]["earth_units"]
         s["parts"] += capacity
         self.stats["cargo_delivered"] += 1
 
     def space_weather(self, day):
-        spe = C["spe"]
+        spe = self.C["spe"]
         activity = solar_activity(self.year())
         major = spe["major_rate_per_year"]["solar_min"] + spe["major_rate_per_year"]["added_at_solar_max"] * activity
         minor = spe["minor_rate_per_year"]["solar_min"] + spe["minor_rate_per_year"]["added_at_solar_max"] * activity
@@ -895,7 +971,7 @@ class City:
     def solar_storm(self, dose, kind):
         pop = self.pop
         exposed = max(0.0, pop - self.shelter_cap)
-        factor = C["spe"]["shelter_factor"]
+        factor = self.C["spe"]["shelter_factor"]
         exposed_share = exposed / pop if pop else 0.0
         for cohort in self.cohorts:
             cohort[1] += dose * factor + dose * (1 - factor) * exposed_share
@@ -910,7 +986,7 @@ class City:
             self.note(f"태양 양성자 폭풍({'대형' if kind == 'major' else '소형'}) — 전원 대피 완료")
 
     def dose_and_departures(self):
-        rates = C["dose_msv_day"]
+        rates = self.C["dose_msv_day"]
         pop = self.pop
         domes = 0                 # 돔 계열 (두꺼운 차폐)
         covered_more = 0          # 벽 자체가 피복인 거주 (인쇄 거주동 등)
@@ -926,7 +1002,7 @@ class City:
         rate = (in_dome * rates["dome"] + in_covered * rates["covered_hab"] + bare * rates["bare_hab"]) / pop if pop else 0.0
         for cohort in self.cohorts:
             cohort[1] += rate
-            if not cohort[2] and cohort[1] >= C["career_dose_limit_msv"]:
+            if not cohort[2] and cohort[1] >= self.C["career_dose_limit_msv"]:
                 cohort[2] = True
                 self.trust_event(-0.1 * cohort[0])
                 self.note(f"선량 한도 도달 — {cohort[0]:.0f}명이 다음 유인선으로 귀환 예정")
@@ -934,7 +1010,7 @@ class City:
     def update_morale(self):
         target = 70.0
         ppm = self.co2_ppm()
-        limits = C["co2_ppm"]
+        limits = self.C["co2_ppm"]
         if ppm > limits["bad"]:
             target -= 15
         elif ppm > limits["warn"]:
@@ -957,7 +1033,7 @@ class City:
         if self.algae_food_share > 0.25:
             target -= 5
         if self.rationing:
-            target -= C["rationing"]["morale_penalty"]
+            target -= self.C["rationing"]["morale_penalty"]
         leisure = 0.0             # 공원·체육관·주방… (합쳐서 최대 +15)
         for m in WITH["morale"]:
             if family(m) != "comms_center":
@@ -967,7 +1043,7 @@ class City:
         for m in FAMILY["comms_center"]:
             if self.wk[m] and provided(m, "morale") > contact:
                 contact = provided(m, "morale")
-        target += contact
+        target += contact * self.contact_k     # 지연이 길면 영상 통화가 안 된다
         self.p4_off_week = (self.p4_off_week + [self.day["p4_off_h"]])[-7:]
         if sum(self.p4_off_week) > 48:
             target -= 5
@@ -988,7 +1064,7 @@ class City:
         total_cap = self.bat_cap + self.rfc_cap
         self.daily.append({
             "day": day,
-            "date": (START + timedelta(days=day)).isoformat(),
+            "date": (self.start_date + timedelta(days=day)).isoformat(),
             "population": round(pop),
             "o2_reserve_days": round(s["o2_kg"] / (pop * PER["o2_kg"]), 1) if pop else 0,
             "co2_ppm": round(self.co2_ppm()),
@@ -1018,7 +1094,7 @@ class City:
         self.day = Counter()
 
     def note(self, text):
-        self.log.append((START + timedelta(hours=self.hour), text))
+        self.log.append((self.start_date + timedelta(hours=self.hour), text))
 
     def run(self):
         for day in range(self.days):
@@ -1069,7 +1145,7 @@ class City:
 
 # ── 출력 ────────────────────────────────────────────────────────────
 def print_run(city):
-    print(f"정책: {city.policy.name} · {city.days}일 · 시작 {START.isoformat()}")
+    print(f"부지: {city.site.get('name', city.site_id)} · 정책: {city.policy.name} · {city.days}일 · 시작 {city.start_date.isoformat()}")
     print("  분기말        인구 주거 대피  O₂비축  CO₂ppm  식량자급 식량비축 축전kWh  부품 로봇 사기 신뢰 평균선량 기술")
     for d in city.daily[89::91]:
         print(f"  {d['date']}  {d['population']:>4} {d['housing']:>4} {d['shelter']:>4} {d['o2_reserve_days']:>7} "
@@ -1198,6 +1274,7 @@ def main():
     parser.add_argument("--seed", type=int, default=2061)
     parser.add_argument("--policy", choices=("good", "naive", "variety"), default="good")
     parser.add_argument("--years", type=float, default=3)
+    parser.add_argument("--site", choices=list(SITES), default=HOME_SITE, help="부지 (../data/city_sites.json)")
     parser.add_argument("--monte-carlo", type=int, metavar="N", help="두 정책을 N회씩 돌려 비교")
     parser.add_argument("--module-table", action="store_true", help="문서용 모듈 표 출력 (기본 모듈 29종)")
     parser.add_argument("--module-catalog", action="store_true", help="문서용 전체 모듈 표 (29계열 145종)")
@@ -1214,7 +1291,7 @@ def main():
     if args.monte_carlo:
         monte_carlo(args.monte_carlo, args.years)
         return
-    city = City(seed=args.seed, policy=args.policy, years=args.years).run()
+    city = City(seed=args.seed, policy=args.policy, years=args.years, site=args.site).run()
     if args.csv:
         with open(args.csv, "w", newline="", encoding="utf-8") as fh:
             writer = csv.DictWriter(fh, fieldnames=list(city.daily[0]))
