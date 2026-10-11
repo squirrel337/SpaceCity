@@ -216,9 +216,10 @@ func _recheck_road() -> void:
 		reason = plan.road_check(road_from, at)
 
 
-static func _in_bounds(p: Vector2) -> bool:
+func _in_bounds(p: Vector2) -> bool:
 	var uv := BaseLayout.xy_to_uv(p)
-	return BaseLayout.BOUNDS_UV.grow(-1.0).has_point(uv) and uv.y >= BaseLayout.CREST_V - 2.0
+	var crest := plan.layout.crest_v if plan else BaseLayout.CREST_V
+	return BaseLayout.BOUNDS_UV.grow(-1.0).has_point(uv) and uv.y >= crest - 2.0
 
 
 ## 도구 막대에 쓸 글
@@ -228,9 +229,10 @@ func status() -> String:
 			var name := GameData.module_name(kind)
 			var extra := ""
 			if CityPlan.fam(kind) == "solar_tower":
-				extra = " · 능선의 일조 구역에만 (A 100% · B 85% · C 70%)"
+				extra = " · 능선의 일조 구역에만 (A 100% · B 85% · C 70%)" if plan == null or plan.layout.kind == "ridge" \
+					else " · 태양광 단지에만"
 				if tile != "":
-					extra = " · %s 구역" % CityPlan.TILE_NAMES[tile]
+					extra = " · %s" % plan.layout.tile_name(tile)
 			if not has_at:
 				return "%s — 지을 자리를 고른다%s" % [name, extra]
 			return "%s%s" % [name, extra]

@@ -78,8 +78,9 @@ func flying() -> bool:
 	return not _fly.is_empty()
 
 
-## 다른 천체로 날아간다. 끝 거리는 반지름의 몇 배 (별은 km를 직접)
-func fly_to(id: String, end_dist_km: float, seconds: float = 2.6) -> void:
+## 다른 천체로 날아간다. 끝 거리는 반지름의 몇 배 (별은 km를 직접).
+## land_dir(천체 고정 방향)을 주면 그 지점을 똑바로 내려다보며 도착한다 — 식민지로 갈 때
+func fly_to(id: String, end_dist_km: float, seconds: float = 2.6, land_dir: Vector3 = Vector3.ZERO) -> void:
 	var b := _body(id)
 	if b.is_empty():
 		return
@@ -90,11 +91,13 @@ func fly_to(id: String, end_dist_km: float, seconds: float = 2.6) -> void:
 	if Astro.len3(Astro.sub3(pos, to_center)) < 1e-6:
 		v1 = v0
 	var sun := _body("sun")
-	if id != "sun" and not sun.is_empty() and b.get("surface", true):
+	if land_dir != Vector3.ZERO:
+		v1 = Astro.dvec(((b["frame"] as Basis) * land_dir).normalized())
+	elif id != "sun" and not sun.is_empty() and b.get("surface", true):
 		var to_sun := Astro.norm3(Astro.sub3(sun["center"], to_center))
 		v1 = Astro.norm3(Astro.lerp3(v1, to_sun, 0.55))
 	_fly = {"id": id, "t": 0.0, "dur": seconds, "a0": target.duplicate(), "v0": v0, "v1": v1,
-		"d0": dist, "d1": clampf(end_dist_km, MIN_DIST_KM, MAX_DIST_KM)}
+		"d0": dist, "d1": clampf(end_dist_km, MIN_DIST_KM, MAX_DIST_KM), "land": land_dir.normalized()}
 	focus = id
 	focus_changed.emit(focus)
 
@@ -326,6 +329,9 @@ func _step_fly(delta: float) -> void:
 	target = Astro.lerp3(a0, c, e)
 	var v0 := Astro.vec(_fly["v0"])
 	var v1 := Astro.vec(_fly["v1"])
+	var land: Vector3 = _fly["land"]
+	if land != Vector3.ZERO:
+		v1 = ((b["frame"] as Basis) * land).normalized()    # 천체가 도는 동안에도 그 지점 위로
 	var v := v0.slerp(v1, e).normalized() if v0.dot(v1) > -0.999 else v1
 	pos = Astro.add3(target, Astro.scale3(Astro.dvec(v), dist))
 	_set_basis(v, _space_up(v))

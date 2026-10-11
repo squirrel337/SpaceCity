@@ -18,6 +18,7 @@ const KINDS := {
 	"callisto": [12, "#4c463f", "#5f574d", "#c9c2b6", 1.0],
 	"titan": [13, "#d39a4a", "#b8782e", "#e8b870", 1.0],
 	"triton": [14, "#d8c4bf", "#9d8a86", "#eee4e0", 1.0],
+	"ceres": [0, "#5d5a56", "#4a4743", "#6e6a65", 1.0],
 	"rock": [0, "#77706a", "#4f4a45", "#a39c94", 1.0],
 }
 const ATMO := {
@@ -33,7 +34,7 @@ const ATMO := {
 const DOT := {
 	"sun": Color("ffd27a"), "mercury": Color("b9b3aa"), "venus": Color("eedfc0"), "earth": Color("6fa8ff"),
 	"moon": Color("cfcac2"), "mars": Color("e07b4a"), "jupiter": Color("e3c9a0"), "saturn": Color("e9d6a0"),
-	"uranus": Color("a9e0e4"), "neptune": Color("6f8ff0"), "pluto": Color("d8c2a2"),
+	"uranus": Color("a9e0e4"), "neptune": Color("6f8ff0"), "pluto": Color("d8c2a2"), "ceres": Color("bdb8ae"),
 }
 
 static var _land: Texture2D

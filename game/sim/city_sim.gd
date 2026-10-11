@@ -428,6 +428,12 @@ func is_dark(h: int = -1) -> bool:
 	return i < dark.size() and dark[i] == 1
 
 
+## 먼지 폭풍 중인가 (화성)
+func in_dust_storm(h: int = -1) -> bool:
+	var i := hour if h < 0 else h
+	return i < dust.size() and dust[i] == 1
+
+
 # ── 1시간 ──────────────────────────────────────────────────────
 func step_hour(pop: float) -> void:
 	var lit: float = 1.0 - (dark[hour] if hour < dark.size() else 0)

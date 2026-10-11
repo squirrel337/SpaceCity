@@ -1,7 +1,5 @@
 class_name MoonSurface
-extends Node3D
-
-signal terrain_ready
+extends SiteGround
 ## 달: 구(멀리서) + 기지 둘레의 지형 조각(가까이서) + 기지가 앉는 평지.
 ##
 ## 구의 겉모습(밝기·법선)은 시작할 때 GPU로 정육면체 지도에 한 번 굽는다 (바다, 큰 크레이터, 빛줄기,
@@ -22,25 +20,23 @@ var sphere: MeshInstance3D
 var sphere_mat: ShaderMaterial
 var patch: MeshInstance3D
 var patch_mat: ShaderMaterial
-var city_root: Node3D
 var cube: Cubemap
-var layout := BaseLayout.new()
 
-var _site := Vector3(0, 0, -1)          # 기지 평지 중심 (달 고정 단위 벡터)
-var _site_basis := Basis()              # 모형 x, y, z → 달 고정
-var _plateau_m := 0.0                   # 평지 높이 (기준 구 위, m)
 var _pol_c := PackedVector4Array()
 var _pol_p := PackedVector4Array()
 var _loc := PackedVector4Array()
 var _ice := Vector4.ZERO
 var _base_rect := Vector4.ZERO
-var _cam_alt_km := 1e9
 var _view: WorldView
-var _dark_k := 0.0
 var _segs := 192
 var _rings := 0                         # 고리 수 (중심 포함)
 var _grow := 1.0
 var _hgrid := PackedFloat32Array()      # 구운 높이 (기지 평지 기준 m) [고리 × 둘레]
+
+
+func _init() -> void:
+	body = "moon"
+	layout = BaseLayout.new("ridge")
 
 
 func setup(sphere_node: MeshInstance3D) -> void:
@@ -77,16 +73,8 @@ func setup(sphere_node: MeshInstance3D) -> void:
 		_start_bake.call_deferred()
 
 
-func site_dir() -> Vector3:
-	return _site
-
-
-func site_frame() -> Basis:
-	return _site_basis
-
-
-func plateau_km() -> float:
-	return _plateau_m / 1000.0
+func radius_km() -> float:
+	return R_KM
 
 
 # ── 지형 모형 ───────────────────────────────────────────────────
@@ -305,68 +293,16 @@ func _patch_mesh() -> ArrayMesh:
 # ── 매 프레임 배치 ──────────────────────────────────────────────
 func update_frame(view: WorldView, info: Dictionary, _sun_c: PackedFloat64Array) -> void:
 	_view = view
-	var c: PackedFloat64Array = info["center"]
-	var f: Basis = info["frame"]
-	var s := view.body_scale(c)
 	# 기지 평지의 실제 위치 (배정밀도)
-	var site_e := Astro.bmul(f, Astro.dvec(_site))
-	var origin := Astro.add3(c, Astro.scale3(site_e, R_KM + _plateau_m / 1000.0))
-	var rel := Astro.sub3(origin, view.cam.pos)
-	var o := Vector3(rel[0] * s, rel[2] * s, -rel[1] * s)
-	var bs := f * _site_basis
-	var t := Transform3D(WorldView.g_basis(bs).scaled(Vector3.ONE * s * 0.001), o)
+	var t := _site_transform(view, info)
 	city_root.global_transform = t
 	patch.global_transform = t
-	var cam_rel := Astro.sub3(view.cam.pos, c)
-	var cam_d := Astro.len3(cam_rel)
-	_cam_alt_km = cam_d - R_KM - _plateau_m / 1000.0
-	var near_site := (f.inverse() * Astro.vec(Astro.scale3(cam_rel, 1.0 / cam_d))).dot(_site) > cos(0.6)
-	var show_patch := _cam_alt_km < 2500.0 and near_site
+	var show_patch := _cam_alt_km < 2500.0 and _near_site(view, info)
 	patch.visible = show_patch
 	city_root.visible = show_patch and _cam_alt_km < 400.0
 	sphere_mat.set_shader_parameter("hole_km", PATCH_M / 1000.0 - 0.6 if show_patch else 0.0)
-	# 기지 둘레의 어둠 (시뮬레이션의 그늘): 가까울 때만
-	var target := 1.0 if (view.sim and view.sim.is_dark()) else 0.0
-	_dark_k = move_toward(_dark_k, target, get_process_delta_time() / 0.8 if is_inside_tree() else 1.0)
-	ModelLib.set_night(_dark_k)
-
-
-## 기지 가까이에서는 해를 지평선 위 7° 이상으로 올린다 (실제로는 ±1.5°라 땅이 거의 검다)
-func adjust_light(dir: Vector3, view: WorldView) -> Vector3:
-	var k := 1.0 - smoothstep(30.0, 600.0, _cam_alt_km)
-	if k <= 0.0 or view == null:
-		return dir
-	var f: Basis = view._info("moon")["frame"]
-	var up := WorldView.g_vec(f * _site)
-	var to_sun := -dir
-	var elev := asin(clampf(to_sun.dot(up), -1.0, 1.0))
-	var want := maxf(elev, deg_to_rad(7.0))
-	var horiz := (to_sun - up * to_sun.dot(up))
-	if horiz.length_squared() < 1e-10:
-		return dir
-	horiz = horiz.normalized()
-	var adj := (horiz * cos(want) + up * sin(want)).normalized()
-	return -(to_sun.slerp(adj, k)).normalized()
-
-
-## 기지 가까이(고도 40 km 아래)일수록 1 — 그림자·반사광을 켠다
-func near_base_factor() -> float:
-	return 1.0 - smoothstep(12.0, 40.0, _cam_alt_km)
-
-
-## 해의 방향 (기지 모형 좌표: x·y 수평, z 위)
-func sun_in_site(view: WorldView) -> Vector3:
-	var info: Dictionary = view._info("moon")
-	var sun := view._info("sun")
-	var rel := Astro.vec(Astro.norm3(Astro.sub3(sun["center"], info["center"])))
-	var b: Vector3 = (info["frame"] as Basis).inverse() * rel
-	return _site_basis.inverse() * b
-
-
-## 시뮬레이션이 '그늘'이면 기지 가까이에서 햇빛을 끈다 (멀리서 보면 달 전체는 그대로 밝다)
-func local_light_factor() -> float:
-	var k := 1.0 - smoothstep(40.0, 900.0, _cam_alt_km)
-	return lerpf(1.0, 0.03, _dark_k * k)
+	# 기지 둘레의 어둠 (시뮬레이션의 그늘): 가까울 때만, 고른 식민지일 때만
+	_follow_dark(view)
 
 
 # ── 굽기 (GPU, 시작할 때 한 번) ─────────────────────────────────

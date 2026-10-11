@@ -1,23 +1,23 @@
 class_name City3D
 extends Node3D
 ## 3D 기지: 건물(자리마다 다섯 가지 모양), 공사 현장(비계), 길, 탈것, 밤의 불빛, 자리 고르기의 유령 건물.
-## 좌표는 부모(MoonSurface.city_root)의 모형 좌표: 미터, Godot 축 (x, z, -y), 원점 = 기지 평지.
-## 무엇을 어디에 둘지는 2D 지도와 같은 배치 계획(CityPlan)과 규칙(BaseScene, BaseTraffic)을 쓴다.
+## 좌표는 부모(땅 SiteGround.city_root)의 모형 좌표: 미터, Godot 축 (x, z, -y), 원점 = 기지 평지.
+## 무엇을 어디에 둘지는 배치 계획(CityPlan)과 규칙(BaseScene, BaseTraffic)을 쓴다. 달이든 다른 천체든 같다.
 
 signal module_tapped(mid: String)
 
 const VIS_SPEED := [0.0, 1.0, 1.6, 2.4]
-const R_M := 1737400.0
 const HEADING_DEG := {"se": 0.0, "sw": 90.0, "nw": 180.0, "ne": 270.0}
 
 var sim: CitySim
-var moon: MoonSurface
+var ground: SiteGround
 var layout: BaseLayout
 var plan: CityPlan
 var tool: PlaceTool
 var traffic: BaseTraffic
 var hovered := ""
 var hovered_pos := Vector3.ZERO
+var title := "섀클턴 시드 시티"     # 왼쪽 위 이름 (식민지 이름)
 
 var _items: Array = []
 var _sig := ""
@@ -45,15 +45,15 @@ var _pen_mat: ShaderMaterial
 var _zones: MeshInstance3D
 
 
-func setup(p_moon: MoonSurface) -> void:
-	moon = p_moon
-	layout = moon.layout
+func setup(p_ground: SiteGround) -> void:
+	ground = p_ground
+	layout = ground.layout
 	traffic = BaseTraffic.new()
 	_sites_root = Node3D.new()
 	add_child(_sites_root)
 	_agents_root = Node3D.new()
 	add_child(_agents_root)
-	moon.terrain_ready.connect(_on_terrain_ready)
+	ground.terrain_ready.connect(_on_terrain_ready)
 	_make_tool_nodes()
 	_ring = MeshInstance3D.new()
 	_ring.mesh = _ring_mesh()
@@ -103,7 +103,7 @@ func visible_now() -> bool:
 
 ## 모형 좌표 (x, y)와 땅 위 높이 → 부모 로컬 좌표. 땅 높이와 달의 곡률을 넣는다
 func _local(p: Vector2, above: float = 0.0) -> Vector3:
-	var z := moon.local_height_m(p) - p.length_squared() / (2.0 * R_M) + above
+	var z := ground.local_height_m(p) - p.length_squared() / (2.0 * ground.radius_m()) + above
 	return Vector3(p.x, z, -p.y)
 
 
@@ -370,8 +370,8 @@ func _zone_mesh() -> ArrayMesh:
 	var verts := PackedVector3Array()
 	var cols := PackedColorArray()
 	var idx := PackedInt32Array()
-	for t in BaseLayout.ZONES:
-		for r in BaseLayout.ZONES[t]:
+	for t in layout.zones:
+		for r in layout.zones[t]:
 			var rect: Rect2 = r
 			var nu := maxi(2, int(rect.size.x / 6.0))
 			var nv := maxi(2, int(rect.size.y / 6.0))
@@ -577,14 +577,21 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 	_draw_tool_overlay(view, ov, font, bold)
 	# 상태 (왼쪽 위)
 	var lit := not sim.is_dark()
-	var state := "일조 — 태양광 %s kW" % Fmt.n(sim.solar_kw)
+	var ridge := layout.kind == "ridge"
+	var state := "일조" if ridge else "낮"
+	if sim.solar_kw > 0.0:
+		state += " — 태양광 %s kW" % Fmt.n(sim.solar_kw)
 	if not lit:
-		state = "능선 그늘 — 태양광 0 kW, 축전 %s" % Fmt.pct((sim.battery + sim.rfc) / maxf(1.0, sim.bat_cap + sim.rfc_cap))
-	_shadow_text(ov, bold, Vector2(16, 28), "섀클턴 시드 시티", 17, Palette.TEXT)
+		state = "능선 그늘" if ridge else "밤"
+		if sim.bat_cap + sim.rfc_cap > 0.0:
+			state += " — 태양광 0 kW, 축전 %s" % Fmt.pct((sim.battery + sim.rfc) / maxf(1.0, sim.bat_cap + sim.rfc_cap))
+	_shadow_text(ov, bold, Vector2(16, 28), title, 17, Palette.TEXT)
 	_shadow_text(ov, font, Vector2(16, 48), state, 13, Palette.AMBER if lit else Palette.BLUE)
 	var warn := ""
 	if not sim.pending_storm.is_empty():
 		warn = "태양 양성자 폭풍 경보"
+	elif sim.in_dust_storm():
+		warn = "먼지 폭풍 — 햇빛 %s" % Fmt.pct(sim.dust_factor)
 	elif sim.rationing:
 		warn = "식량 배급 중"
 	var brown: float = sim.last_power.get("frac1", 1.0)
@@ -619,14 +626,14 @@ func _draw_tool_overlay(view: WorldView, ov: Control, font: Font, bold: Font) ->
 	if tool == null or not tool.active():
 		return
 	if tool.mode == "build" and CityPlan.fam(tool.kind) == "solar_tower":
-		for t in BaseLayout.ZONES:
+		for t in layout.zones:
 			var used := int(sim.tiles.get(t, 0))
 			var cap := int(sim.C["illumination"]["tiles"][t])
-			for r in BaseLayout.ZONES[t]:
+			for r in layout.zones[t]:
 				var c := BaseLayout.uv_to_xy((r as Rect2).get_center())
 				var sp: Variant = view.screen_of(global_transform * _local(c, 6.0))
 				if sp != null:
-					_shadow_text(ov, bold, (sp as Vector2) - Vector2(40, 0), "%s · %d/%d" % [CityPlan.TILE_NAMES[t], used, cap],
+					_shadow_text(ov, bold, (sp as Vector2) - Vector2(40, 0), "%s · %d/%d" % [layout.tile_name(t), used, cap],
 						13, ZONE_COLORS[t])
 	if tool.has_at and tool.mode in ["build", "road"]:
 		var sp1: Variant = view.screen_of(global_transform * _local(tool.at, 0.0))

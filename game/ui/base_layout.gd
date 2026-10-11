@@ -40,6 +40,11 @@ var hub := Vector3.ZERO
 var roads: Array = []      # Array[PackedVector3Array] — 처음 길 (CityPlan이 길 그물로 바꾼다)
 var tower_slots: Array = []   # [Vector3, "A"|"B"|"C"]
 var ice_center := Vector3.ZERO
+## 부지 종류: "ridge" — 능선의 일조 구역 A·B·C와 얼음 분화구 (달 남극·수성 극지),
+## "open" — 능선이 없는 평지: 일조 구역이 한 덩어리의 태양광 단지(A)이고 얼음 분화구 자리는 얼음 매장지다
+var kind := "ridge"
+var zones := {}                # 일조 구역 이름 → [Rect2 (u, v)]
+var crest_v := CREST_V         # 이 위(v가 더 작은 쪽)로는 지을 수 없다
 
 static var _road_cache: Array = []
 static var _gate_cache: Dictionary = {}
@@ -53,7 +58,13 @@ static func xy_to_uv(xy: Vector2) -> Vector2:
 	return Vector2((xy.x - xy.y) * SQ, (xy.x + xy.y) * SQ)
 
 
-func _init() -> void:
+func _init(p_kind: String = "ridge") -> void:
+	kind = p_kind
+	if kind == "open":
+		zones = {"A": ZONES["A"] + ZONES["B"] + ZONES["C"]}
+		crest_v = BOUNDS_UV.position.y - 40.0
+	else:
+		zones = ZONES
 	for d in DISTRICTS:
 		_pack(d, DISTRICTS[d])
 	var core: Rect2 = rects["core"]
@@ -122,7 +133,22 @@ func _towers() -> void:
 		order.append_array(group)
 	for p in order:
 		var xy := uv_to_xy(p[0])
-		tower_slots.append([Vector3(xy.x, xy.y, 0), p[1]])
+		tower_slots.append([Vector3(xy.x, xy.y, 0), p[1] if kind == "ridge" else "A"])
+
+
+## 일조 구역의 이름 (화면 글)
+func tile_name(t: String) -> String:
+	if kind == "open":
+		return "태양광 단지"
+	return {"A": "A 100%", "B": "B 85%", "C": "C 70%"}.get(t, t)
+
+
+func zone_text() -> String:
+	return "태양광 단지" if kind == "open" else "능선의 일조 구역(A·B·C)"
+
+
+func ice_text() -> String:
+	return "얼음 매장지" if kind == "open" else "얼음 분화구(영구 그늘)"
 
 
 # ── 처음 길 ─────────────────────────────────────────────────────

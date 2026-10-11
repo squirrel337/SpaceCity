@@ -288,10 +288,10 @@ static func snap_center(kind: String, p: Vector2, rot: int) -> Vector2:
 
 
 ## 일조 구역 (태양광 타워 자리) — "A"·"B"·"C" 또는 ""
-static func zone_of(at: Vector2) -> String:
+func zone_of(at: Vector2) -> String:
 	var uv := BaseLayout.xy_to_uv(at)
-	for t in BaseLayout.ZONES:
-		for r in BaseLayout.ZONES[t]:
+	for t in layout.zones:
+		for r in layout.zones[t]:
 			if (r as Rect2).has_point(uv):
 				return t
 	return ""
@@ -303,21 +303,21 @@ func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1) -> St
 	var b := BaseLayout.BOUNDS_UV.grow(-2.0)
 	for corner in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
 		var uv := BaseLayout.xy_to_uv(corner)
-		if not b.has_point(uv) or uv.y < BaseLayout.CREST_V + 2.0:
+		if not b.has_point(uv) or uv.y < layout.crest_v + 2.0:
 			return "기지 밖이다"
 	var zone := zone_of(at)
 	var kfam := fam(kind)
 	if kfam == "solar_tower":
 		if zone == "":
-			return "태양광 타워는 능선의 일조 구역(A·B·C)에만 세운다"
+			return "태양광 타워는 %s에만 세운다" % layout.zone_text()
 	elif zone != "" or _touches_zone(r):
-		return "능선의 일조 구역은 태양광 타워 자리다"
+		return "%s은 태양광 타워 자리다" % layout.zone_text()
 	var ice := Vector2(layout.ice_center.x, layout.ice_center.y)
 	if kfam == "ice_miner":
 		if at.distance_to(ice) > BaseLayout.ICE_CRATER_R:
-			return "얼음 채굴기는 얼음 분화구(영구 그늘) 안에 세운다"
+			return "얼음 채굴기는 %s 안에 세운다" % layout.ice_text()
 	elif _rect_point_dist(r, ice) < BaseLayout.ICE_CRATER_R:
-		return "얼음 분화구 안에는 지을 수 없다"
+		return "%s 안에는 지을 수 없다" % layout.ice_text().split("(")[0]
 	var inner := r.grow(-0.05)
 	for e in buildings:
 		if int(e["uid"]) == ignore_uid:
@@ -353,7 +353,7 @@ func check(kind: String, at: Vector2, rot: int, sim: CitySim) -> Dictionary:
 		if not sim.can_afford(m["cost"], 0.0):
 			return {"reason": "자재 부족", "tile": tile}
 		if tile != "" and int(sim.tiles.get(tile, 0)) >= int(sim.C["illumination"]["tiles"][tile]):
-			return {"reason": "%s 구역이 다 찼다 (%d기)" % [TILE_NAMES[tile], int(sim.C["illumination"]["tiles"][tile])],
+			return {"reason": "%s 구역이 다 찼다 (%d기)" % [layout.tile_name(tile), int(sim.C["illumination"]["tiles"][tile])],
 				"tile": tile}
 	return {"reason": check_spot(kind, at, rot), "tile": tile}
 
@@ -406,7 +406,7 @@ func road_check(a: Vector2, b: Vector2) -> String:
 	var bounds := BaseLayout.BOUNDS_UV.grow(-1.0)
 	for p in [a, b]:
 		var uv := BaseLayout.xy_to_uv(p)
-		if not bounds.has_point(uv) or uv.y < BaseLayout.CREST_V - 2.0:
+		if not bounds.has_point(uv) or uv.y < layout.crest_v - 2.0:
 			return "기지 밖이다"
 	for e in buildings:
 		if _seg_rect_dist(a, b, entry_rect(e).grow(-0.3)) < ROAD_HALF:
