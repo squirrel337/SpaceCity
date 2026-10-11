@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="60" height="56" viewBox="-31 -40 60 56">
-<defs><radialGradient id="r4" gradientUnits="userSpaceOnUse" cx="7.35" cy="-14.68" r="9"><stop offset="0" stop-color="#FFC56E" stop-opacity="0.9"/><stop offset="0.35" stop-color="#FFC56E" stop-opacity="0.41"/><stop offset="1" stop-color="#FFC56E" stop-opacity="0"/></radialGradient></defs>
-<polygon points="-12.9,-6.78 -17.42,-9.04 -17.42,-14.86 -12.9,-12.6" fill="#FFC56E" opacity="0.95"/>
-<polygon points="-18.78,-9.72 -23.31,-11.98 -23.31,-17.8 -18.78,-15.54" fill="#FFC56E" opacity="0.95"/>
-<polygon points="-7.01,-2.61 -8.94,-3.58 -8.94,-10.95 -7.01,-9.98" fill="#ff6a5a" opacity="0.8"/>
-<polygon points="-4.97,-4.1 -10.99,-7.11 -10.99,-9.46 -4.97,-6.45" fill="#ff6a5a" opacity="0.8"/>
-<polygon points="16.35,-14.68 15.91,-11.9 14.64,-9.39 12.64,-7.4 10.14,-6.12 7.35,-5.68 4.57,-6.12 2.06,-7.4 0.07,-9.39 -1.21,-11.9 -1.65,-14.68 -1.21,-17.46 0.07,-19.97 2.06,-21.96 4.57,-23.24 7.35,-23.68 10.14,-23.24 12.64,-21.96 14.64,-19.97 15.91,-17.46" fill="url(#r4)"/>
-</svg>

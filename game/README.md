@@ -18,7 +18,7 @@
 
 - 정착민 120명의 산소·CO₂·물·식량·전력·방사선을 1시간 단위로 굴린다. 41일째에 대형 태양 양성자 폭풍이 온다.
 - 가운데 화면은 **3D 세계**다. 도시는 구 모양의 달 남극(섀클턴 크레이터 가장자리)에 서 있고, 구글 어스처럼 끌어서 돌리고 확대·축소한다. 계속 줌아웃하면 크레이터 → 달 전체 → 지구와 달 → 태양계 → 25광년 안의 이웃 별까지 끊기지 않고 이어진다. 천체는 실제 궤도 요소로 게임 날짜의 자리에 있고(지구 위상·달의 칭동·토성 고리 그림자), 이름표를 누르면 그 천체로 날아간다.
-- **지도** 단추를 누르면 같은 기지가 아이소메트릭 평면 지도로 보인다. 건물마다 모양이 다섯 가지라 같은 모듈이 늘어서도 복사한 것처럼 보이지 않는다. 공사 중이면 비계가 서고 로봇이 가서 일한다. 고장 난 건물에는 붉은 표시가 깜박이고, 화물선·유인선이 오면 착륙선이 내려앉는다. 해는 지평선을 따라 돌며 긴 그림자를 드리우고, 능선 그늘에 들면 밤이 되어 창과 등만 켜진다.
+- **지도** 단추를 누르면 같은 3D 장면을 기지 바로 위에서 내려다본 **평면도**(직교 투영)가 된다. 모형·땅·길·탈것이 3D와 같아서 둘이 늘 맞고, 길이 화면 축과 나란하며 왼쪽 아래에 축척 막대가 있다. 남극의 해는 지평선에 걸려 그림자가 수백 m라, 평면도에서는 해의 방위는 그대로 두고 높이만 40°로 올려 비춘다. 건물마다 모양이 다섯 가지라 같은 모듈이 늘어서도 복사한 것처럼 보이지 않는다. 공사 중이면 비계가 서고 로봇이 가서 일한다. 고장 난 건물에는 붉은 표시가 깜박이고, 화물선·유인선이 오면 착륙선이 내려앉는다. 능선 그늘에 들면 밤이 되어 창과 등만 켜진다.
 - **건물 145종** — 기본 모듈 29종이 계열을 이루고, 계열마다 같은 일을 하는 다른 설계가 4종 더 있다 (값·전력·크기·고장 간격·필요 연구가 다르다). 건설 탭은 계열을 펼쳐 고른다.
 - **건설** 탭의 '짓기'를 누르면 3D 세계(또는 지도)에서 **지을 자리를 고른다**. 유령 건물이 초록이면 놓을 수 있고, 빨강이면 까닭이 함께 뜬다. 90° 돌리기, 같은 기능의 다른 모양 고르기, '빈자리에'(기본 배치에 바로)도 된다. 태양광 타워는 능선의 일조 구역에만 서고, 세운 구역(A 100% · B 85% · C 70%)이 곧 출력이다.
 - **도로** 단추로 길을 원하는 곳에 낸다. 점을 차례로 누르면 이어지고, 다른 길에 닿거나 건너면 교차로가 된다. 로버·로봇·화물차가 이 길을 따라 다닌다.
@@ -32,7 +32,7 @@
 | 시간 | 정지 · 1× · 3× · 10× 버튼, '다음 사건' | 같은 버튼을 누른다 |
 | 3D 세계 | 왼쪽 끌기: 땅을 잡고 돌리기 · 오른쪽 끌기(또는 Shift+끌기): 방향과 기울기 · 휠: 커서 쪽으로 확대·축소 · 더블클릭: 다가가기 · 방향키·Q/E·PgUp/PgDn·+/− · H: 기지로 | 한 손가락 끌기: 돌리기 · 두 손가락 벌리기·모으기: 확대 · 두 손가락 비틀기: 방향 · 두 손가락 위아래: 기울기 · 두 번 누르기: 다가가기 |
 | 보기 바꾸기 | 왼쪽 아래 단추 3D · 지도 · 목록, M으로 순환. 3D에서는 − + 기지 · 달 · 지구·달 · 태양계 · 별 단추 | 같은 단추를 누른다 |
-| 지도 | 끌어서 옮기기, 휠로 확대, 아래 단추(− + 전체 거주구) | 끌어서 옮기기, 두 손가락으로 확대 |
+| 지도(평면도) | 끌어서 옮기기, 휠로 커서 쪽 확대, 아래 단추(− + 전체 거주구), H = 전체 | 끌어서 옮기기, 두 손가락으로 확대 |
 | 모듈 정보·추가 건설 | 3D·지도의 건물이나 목록의 카드를 클릭 | 건물이나 카드를 누른다 |
 | 자리 고르기 | 마우스를 움직여 자리, 클릭으로 짓기 (Shift+클릭: 계속 놓기, Enter), R 돌리기, V 모양, 오른쪽 클릭·Esc 그만두기 | 누른 곳으로 유령이 옮겨 가고 '여기에 짓기' |
 | 길 | '도로' 또는 G, 점을 차례로 클릭, 오른쪽 클릭으로 줄 끝내기, '지우기'를 켜고 길을 클릭 | 점을 차례로 누르고 '끝', '지우기' |
@@ -45,12 +45,12 @@
 | 폴더 | 내용 |
 |---|---|
 | `sim/` | 규칙. 노드·씬을 쓰지 않는 순수 GDScript — `CitySim`(도시), `AutoPolicy`(자동 운영), `PyRandom`(파이썬과 같은 난수), `PyCompat`(파이썬의 반올림·합계 규칙) |
-| `ui/` | 화면. 씬 파일 없이 코드로 만든다 — 상단 바, 기지 지도(`base_map`·`base_traffic`, 3D와 함께 쓰는 `base_scene`), 배치(`city_plan`: 건물마다의 자리·방향·모양과 길 그물·길 찾기·배치 규칙·저장, `base_layout`: 기본 배치와 처음 길, `place_tool`: 자리 고르기 도구), 모듈 목록, 일조 예보, 탭 5개, 결정 카드 |
+| `ui/` | 화면. 씬 파일 없이 코드로 만든다 — 상단 바, 기지의 건물·탈것 목록(`base_scene`·`base_traffic`, 3D와 평면도가 함께 쓴다), 배치(`city_plan`: 건물마다의 자리·방향·모양과 길 그물·길 찾기·배치 규칙·저장, `base_layout`: 기본 배치와 처음 길, `place_tool`: 자리 고르기 도구), 모듈 목록, 일조 예보, 탭 5개, 결정 카드 |
 | `ui/world/` | 3D 세계 — `world_view`(화면·입력·이름표), `orbit_cam`(구글 어스식 카메라), `astro`(천체력: 행성·위성 궤도, 달 자전, 별 목록), `moon_surface`(달 구·남극 지형), `city3d`(달 위의 기지), `model_lib`(그림 생성기의 3D 모델), `sky_builder`·`planet_look`(별·은하수·행성), `shaders/` |
-| `art/` | 건물·탈것 그림 (SVG + `art.json`), 같은 도형의 3D 모델(`models.json`), 지구 땅 지도(`planets/`). 생성기가 만든 결과라 직접 고치지 않는다 |
+| `art/` | 건물·탈것의 3D 모델(`models.json`)과 크기 정보(`art.json`: 바닥 크기·높이·모양 수·이름), 지구 땅 지도(`planets/`). 생성기가 만든 결과라 직접 고치지 않는다 |
 | `data/` | `docs/design/data/`(밝은 별·은하 좌표 `sky.json` 포함)와 근거리 항성(`docs/concept/examples/nearby_stars.json`)의 JSON 사본. 단일 출처는 문서 쪽이다 |
 | `fonts/` | Pretendard (SIL Open Font License 1.1, `Pretendard-LICENSE.txt`) |
-| `tests/` | `parity_dump.gd`(파이썬과 비교할 일별 상태), `smoke_test.gd`(화면을 띄워 자동 운영으로 3년 보고서까지 돌리기, 지도·탈것·3D 카메라·자리 고르기·길 점검), `screenshots.gd`·`map_shots.gd`·`world_shots.gd`(화면 캡처 — 3D는 기지에서 이웃 별까지, 자리 고르기와 길 20장) |
+| `tests/` | `parity_dump.gd`(파이썬과 비교할 일별 상태), `smoke_test.gd`(화면을 띄워 자동 운영으로 3년 보고서까지 돌리기, 배치·탈것·평면도·3D 카메라·자리 고르기·길 점검), `screenshots.gd`·`map_shots.gd`(평면도)·`world_shots.gd`·`types_shots.gd`(화면 캡처 — 3D는 기지에서 이웃 별까지, 자리 고르기와 길, 새 종류 116종) |
 | `tools/` | `parity_check.py`, `sync_data.py`, `art/`(그림 생성기) |
 
 ## 시험
@@ -69,26 +69,27 @@ godot --headless --path game --script res://tests/smoke_test.gd
 
 ## 그림
 
-`tools/art/`의 파이썬 생성기(표준 라이브러리만)가 모든 건물·탈것을 3차원 도형으로 적어 SVG로 그린다 — 빛·축척·투영이 같도록.
+`tools/art/`의 파이썬 생성기(표준 라이브러리만)가 모든 건물·탈것을 3차원 도형으로 적는다. 게임은 이 도형으로 만든 3D 모델만 쓴다 (3D와 평면도).
+같은 그림 코드가 디자인 검토용 아이소메트릭 SVG도 그릴 수 있다 (`--svg`, 게임에는 넣지 않는다).
 규칙은 [디자인 08 §7](../docs/design/08-ux-art-audio.md)에 있다.
 
 | 파일 | 내용 |
 |---|---|
 | `iso.py` | 투영(정사영 30°, 1 m = 8 px), 빛, 도형 — 상자·원기둥·원뿔·구·돔·판·막대, 창(밤 불빛 레이어), 접지 그림자. 그리는 도형을 3차원으로도 기록해서 같은 설계가 3D 모델이 된다 (몸체·유리·불빛 면) |
 | `buildings.py` | 시대 0 기본 모듈 29종의 기본 설계, 피복된 거주 모듈, 공사 비계 3종 |
-| `building_variants.py` | 건물마다 모양이 다른 설계 4가지 더 (`<id>_v1.svg`~`_v4.svg`). 기능은 같고, 지도는 자리마다 하나를 고른다 |
+| `building_variants.py` | 건물마다 모양이 다른 설계 4가지 더 (v1~v4). 기능은 같고, 도시는 자리마다 하나를 고른다 |
 | `types_common.py`, `types_*.py` | 새 종류 116종 (계열마다 4종). `@typed(id, w, d, h, 이름)` 함수 하나가 모양 다섯 가지(v0~v4)를 그린다 — 사람(`people`)·생명유지와 식량(`life`)·전력과 열(`power`)·산업과 물류(`industry`) |
 | `preview_types.py` | 묶음 하나의 그림·3D 모형만 따로 그려 대조표를 만든다 (바닥 칸을 점선으로 겹친다) |
 | `vehicles.py` | 탈것 14종과 우주비행사. 지상 탈것은 네 방향 |
-| `make_art.py` | `game/art/`에 SVG·`art.json`·`models.json`(3D 모델)·지구 땅 지도를 쓰고, 새 그림에는 Godot 가져오기 설정(2배 래스터화, 밉맵)을 둔다 |
+| `make_art.py` | `game/art/`에 `models.json`(3D 모델)·`art.json`(크기 정보)·지구 땅 지도를 쓴다. `--svg DIR`은 디자인 검토용 SVG를 게임 밖에 쓴다 |
 | `planets.py` | 지구 땅 지도(대륙·만년설·사막 다각형을 래스터화한 PNG) |
-| `contact_sheet.gd` | 여러 SVG를 게임과 같은 래스터라이저로 한 장에 모아 본다 |
+| `contact_sheet.gd` | 여러 SVG(`--svg`로 만든 것)를 한 장에 모아 본다 |
 | `model_sheet.gd` | 3D 모델을 게임과 같은 셰이더로 그려 한 장에 모아 본다 (화면이 필요하다 — `xvfb-run`) |
 
 ```bash
-python3 game/tools/art/make_art.py                  # 그림을 다시 만든다
-godot --headless --path game --import               # 새 그림을 가져온다
-godot --headless --path game --script res://tools/art/contact_sheet.gd -- --out sheet.png --scale 2 game/art/buildings/*.svg
+python3 game/tools/art/make_art.py                  # 3D 모델·크기 정보를 다시 만든다
+python3 game/tools/art/make_art.py --svg /tmp/svg   # 디자인 검토용 SVG (게임 밖)
+godot --headless --path game --script res://tools/art/contact_sheet.gd -- --out sheet.png --scale 2 /tmp/svg/buildings/*.svg
 xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 --script res://tests/map_shots.gd -- --out /tmp/shots
 xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 --script res://tests/world_shots.gd -- --out /tmp/world
 xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 --script res://tools/art/model_sheet.gd -- --out /tmp/models.png all

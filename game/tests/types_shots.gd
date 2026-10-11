@@ -79,11 +79,9 @@ func _process(_delta: float) -> bool:
 			["types_ridge", func(): _look_at_xy(w, _center_of(["solar_tower"]) + Vector2(70, 70), 0.3, 60.0, Vector3(-1.0, -1.0, 0.0))],
 			["types_map", func():
 				main._set_view("map")
-				main.base_map.fit()],
+				w.plan_fit()],
 			["types_map_core", func():
-				main.base_map.zoom = 0.75
-				main.base_map.center = ArtLib.project(Vector3(main.plan.hub().x, main.plan.hub().y, 0))
-				main.base_map._clamp()],
+				w.plan_look(main.plan.hub(), 0.22)],
 		]
 		_wait = 40
 		return false

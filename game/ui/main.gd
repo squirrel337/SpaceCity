@@ -23,7 +23,6 @@ var _alarm_day := -100
 var _dirty := true
 
 var city_view: CityView
-var base_map: BaseMap
 var world: WorldView
 var plan: CityPlan
 var tool := PlaceTool.new()
@@ -34,8 +33,9 @@ var place_buttons := {}
 var road_button: Button
 var city_area: Control
 var view_buttons := {}
-var zoom_row: HBoxContainer
-var world_row: HBoxContainer
+var zoom_pair: HBoxContainer       # 확대·축소 (3D·지도)
+var zoom_row: HBoxContainer        # 지도만: 전체·거주구
+var world_row: HBoxContainer       # 3D만: 기지·달·지구·달·태양계·별
 var view_mode := "world"
 var forecast: ForecastBar
 var modal: Modal
@@ -101,10 +101,6 @@ func _build() -> void:
 	city_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	city_area.clip_contents = true
 	left.add_child(city_area)
-	base_map = BaseMap.new()
-	base_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	base_map.module_tapped.connect(_on_module_tapped)
-	city_area.add_child(base_map)
 	city_view = CityView.new()
 	city_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	city_view.module_tapped.connect(_on_module_tapped)
@@ -114,7 +110,6 @@ func _build() -> void:
 	world.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	world.module_tapped.connect(_on_module_tapped)
 	city_area.add_child(world)
-	base_map.visible = false
 	city_area.add_child(_build_view_switch())
 	city_area.add_child(_build_place_bar())
 	tool.changed.connect(_update_place_bar)
@@ -165,16 +160,25 @@ func _build_view_switch() -> Control:
 			tool.stop())
 	row.add_child(road_button)
 	view_buttons["world"].tooltip_text = "달 위의 도시 — 끌어서 돌리고, 휠·두 손가락으로 확대해 행성과 별까지 (M)"
-	view_buttons["map"].tooltip_text = "기지 평면 지도 — 끌어서 옮기고 휠·두 손가락으로 확대 (M)"
+	view_buttons["map"].tooltip_text = "기지 평면도 — 3D 장면을 바로 위에서 내려다본 지도. 끌어서 옮기고 휠·두 손가락으로 확대 (M)"
 	view_buttons["list"].tooltip_text = "모듈 목록 (M)"
+	zoom_pair = HBoxContainer.new()
+	zoom_pair.add_theme_constant_override("separation", 4)
+	row.add_child(zoom_pair)
+	var gap := Control.new()
+	gap.custom_minimum_size.x = 8
+	zoom_pair.add_child(gap)
+	for spec in [["−", "축소", 1.6], ["+", "확대", 1.0 / 1.6]]:
+		var zb := Button.new()
+		zb.text = spec[0]
+		zb.tooltip_text = spec[1]
+		zb.custom_minimum_size = Vector2(42, 40)
+		zb.pressed.connect(func(): world.zoom_by(spec[2] if view_mode == "world" else sqrt(spec[2])))
+		zoom_pair.add_child(zb)
 	world_row = HBoxContainer.new()
 	world_row.add_theme_constant_override("separation", 4)
 	row.add_child(world_row)
-	var gap := Control.new()
-	gap.custom_minimum_size.x = 8
-	world_row.add_child(gap)
-	for spec in [["−", "축소", func(): world.zoom_by(1.6)], ["+", "확대", func(): world.zoom_by(1.0 / 1.6)],
-			["기지", "기지 위로 (H)", func(): world.home()], ["달", "달 전체", func(): world.show_moon()],
+	for spec in [["기지", "기지 위로 (H)", func(): world.home()], ["달", "달 전체", func(): world.show_moon()],
 			["지구·달", "지구와 달", func(): world.show_earth_moon()], ["태양계", "태양계", func(): world.show_solar_system()],
 			["별", "이웃 별 (25광년)", func(): world.show_neighbors()]]:
 		var wb := Button.new()
@@ -186,27 +190,17 @@ func _build_view_switch() -> Control:
 	zoom_row = HBoxContainer.new()
 	zoom_row.add_theme_constant_override("separation", 4)
 	row.add_child(zoom_row)
-	var sep := Control.new()
-	sep.custom_minimum_size.x = 8
-	zoom_row.add_child(sep)
-	for pair in [["−", 1.0 / 1.25, "축소"], ["+", 1.25, "확대"]]:
-		var z := Button.new()
-		z.text = pair[0]
-		z.tooltip_text = pair[2]
-		z.custom_minimum_size = Vector2(42, 40)
-		z.pressed.connect(func(): base_map.zoom_by(pair[1]))
-		zoom_row.add_child(z)
 	var fit := Button.new()
 	fit.text = "전체"
-	fit.tooltip_text = "기지 전체 보기"
+	fit.tooltip_text = "기지 전체 보기 (H)"
 	fit.custom_minimum_size = Vector2(54, 40)
-	fit.pressed.connect(func(): base_map.fit())
+	fit.pressed.connect(func(): world.plan_fit())
 	zoom_row.add_child(fit)
 	var core := Button.new()
 	core.text = "거주구"
 	core.tooltip_text = "거주 구역으로"
 	core.custom_minimum_size = Vector2(64, 40)
-	core.pressed.connect(func(): base_map.focus_core())
+	core.pressed.connect(func(): world.plan_core())
 	zoom_row.add_child(core)
 	row.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	row.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -341,9 +335,10 @@ func _on_placed(kind: String, ok: bool, text: String) -> void:
 
 func _set_view(mode: String) -> void:
 	view_mode = mode
-	world.visible = mode == "world"
-	base_map.visible = mode == "map"
+	world.visible = mode != "list"
+	world.set_plan_view(mode == "map")
 	city_view.visible = mode == "list"
+	zoom_pair.visible = mode != "list"
 	zoom_row.visible = mode == "map"
 	world_row.visible = mode == "world"
 	for k in view_buttons:
@@ -472,7 +467,6 @@ func _attach(new_sim: CitySim, plan_data: Variant = null) -> void:
 	for key in tabs:
 		tabs[key].bind(sim)
 	city_view.sim = sim
-	base_map.set_sim(sim, plan, tool)
 	world.set_sim(sim, plan, tool)
 	forecast.sim = sim
 	auto_button.set_pressed_no_signal(sim.autopilot != null)
@@ -530,7 +524,6 @@ func _set_speed(i: int) -> void:
 	if speed > 0:
 		_last_speed = speed
 	speed = i
-	base_map.speed_level = i
 	world.speed_level = i
 	_jumping = false
 	for k in range(speed_buttons.size()):

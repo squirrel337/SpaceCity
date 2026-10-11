@@ -1,17 +1,11 @@
 class_name ArtLib
 extends RefCounted
-## game/art의 건물·탈것 그림과 크기 정보(art.json).
-## 그림은 tools/art/make_art.py가 1 m = 8 px로 그린 SVG를 Godot가 2배로 래스터화한 것이다.
-## 텍스처는 처음 쓸 때 불러 둔다.
+## 건물·탈것의 크기 정보 (art/art.json): 바닥 크기, 높이, 모양(변형) 수, 이름.
+## 모양 자체는 tools/art/make_art.py가 같은 그림 코드로 적은 3D 모형(art/models.json, ModelLib)이다.
 
 const ROOT := "res://art/"
-const PX_PER_M := 8.0
-const C1 := 0.7071067811865476 * PX_PER_M     # x·y → 화면 가로
-const C2 := 0.35355339059327373 * PX_PER_M    # x·y → 화면 세로 (바닥 2:1)
-const C3 := 0.8660254037844386 * PX_PER_M     # 높이 → 화면 세로
 
 static var _meta: Dictionary = {}
-static var _tex: Dictionary = {}
 
 
 static func meta() -> Dictionary:
@@ -21,67 +15,17 @@ static func meta() -> Dictionary:
 	return _meta
 
 
-## 월드 좌표(m) → 지도 좌표(SVG 1배 px)
-static func project(p: Vector3) -> Vector2:
-	return Vector2((p.x - p.y) * C1, (p.x + p.y) * C2 - p.z * C3)
-
-
-## 지도 좌표 → 바닥(z=0) 월드 좌표
-static func unproject(mp: Vector2) -> Vector3:
-	var a := mp.x / C1          # x - y
-	var b := mp.y / C2          # x + y
-	return Vector3((a + b) * 0.5, (b - a) * 0.5, 0.0)
-
-
 static func has(group: String, id: String) -> bool:
 	return meta().get(group, {}).has(id)
 
 
-## 그림 정보: file(확장자 없는 상대 경로), px(1배 크기), anchor(원점의 위치), lights
-static func info(group: String, id: String, heading: String = "se") -> Dictionary:
-	var m: Dictionary = meta().get(group, {}).get(id, {})
-	if m.is_empty():
-		return {}
-	var v: Dictionary = m
-	var file := "%s/%s" % [group, id]
-	if m.has("views"):
-		var views: Dictionary = m["views"]
-		var hd := heading if views.has(heading) else "se"
-		v = views[hd]
-		file = "%s/%s_%s" % [group, id, hd]
-	return {
-		"file": file,
-		"px": Vector2(v["px"][0], v["px"][1]),
-		"anchor": Vector2(v["anchor"][0], v["anchor"][1]),
-		"lights": bool(v.get("lights", false)),
-	}
-
-
-## 건물 그림 정보 (변형 v: 0~4). 변형마다 크기·높이가 다르다
-static func building(id: String, v: int = 0) -> Dictionary:
-	var m: Dictionary = meta().get("buildings", {}).get(id, {})
-	if m.is_empty():
-		return {}
-	if not m.has("variants"):
-		return info("buildings", id)
-	var vs: Array = m["variants"]
-	var vi := clampi(v, 0, vs.size() - 1)
-	var e: Dictionary = vs[vi]
-	return {
-		"file": "buildings/%s" % id if vi == 0 else "buildings/%s_v%d" % [id, vi],
-		"px": Vector2(e["px"][0], e["px"][1]),
-		"anchor": Vector2(e["anchor"][0], e["anchor"][1]),
-		"lights": bool(e.get("lights", false)),
-		"height": float(e.get("height", m.get("height", 4.0))),
-	}
-
-
+## 모양 수 (건물마다 다섯 가지)
 static func variants(id: String) -> int:
 	var m: Dictionary = meta().get("buildings", {}).get(id, {})
 	return m["variants"].size() if m.has("variants") else 1
 
 
-## 건물 바닥 크기 [가로(x), 세로(y)] m와 대표 높이
+## 건물 바닥 크기 [가로(x), 세로(y)] m
 static func footprint(id: String) -> Vector2:
 	var m: Dictionary = meta().get("buildings", {}).get(id, {})
 	if m.has("foot"):
@@ -89,17 +33,14 @@ static func footprint(id: String) -> Vector2:
 	return Vector2(6, 6)
 
 
-static func height(id: String) -> float:
-	return float(meta().get("buildings", {}).get(id, {}).get("height", 4.0))
+## 대표 높이 (m). v를 주면 그 모양의 높이
+static func height(id: String, v: int = -1) -> float:
+	var m: Dictionary = meta().get("buildings", {}).get(id, {})
+	if v >= 0 and m.has("variants"):
+		var vs: Array = m["variants"]
+		return float(vs[clampi(v, 0, vs.size() - 1)].get("height", m.get("height", 4.0)))
+	return float(m.get("height", 4.0))
 
 
 static func title(group: String, id: String) -> String:
 	return String(meta().get(group, {}).get(id, {}).get("title", id))
-
-
-static func texture(file: String, lights: bool = false) -> Texture2D:
-	var key := file + ("_lights" if lights else "")
-	if not _tex.has(key):
-		var path := ROOT + key + ".svg"
-		_tex[key] = load(path) if ResourceLoader.exists(path) else null
-	return _tex[key]

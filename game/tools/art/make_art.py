@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""건물·탈것 SVG를 만든다.
+"""건물·탈것의 3D 모형과 크기 정보를 만든다 (그림 코드 하나가 3D 모형과 디자인용 SVG를 함께 그린다).
 
-    python3 game/tools/art/make_art.py            # game/art/ 에 쓴다
-    python3 game/tools/art/make_art.py --check    # 저장된 파일이 생성 결과와 같은지만 본다 (CI)
+    python3 game/tools/art/make_art.py              # game/art/ 에 쓴다
+    python3 game/tools/art/make_art.py --check      # 저장된 파일이 생성 결과와 같은지만 본다 (CI)
+    python3 game/tools/art/make_art.py --svg DIR    # 디자인 검토용 아이소메트릭 SVG를 DIR에 (게임에는 넣지 않는다)
 
-결과: game/art/<buildings|vehicles>/<id>.svg (낮), <id>_lights.svg (밤 불빛), game/art/art.json (크기·기준점),
-game/art/models.json (같은 도형을 3차원 그대로 — 게임의 3D 보기가 메시로 만든다),
-game/art/planets/earth_land.png (지구의 땅·얼음·사막 지도, planets.py).
+결과: game/art/models.json (도형을 3차원 그대로 — 게임의 3D 보기와 평면도가 메시로 만든다),
+game/art/art.json (바닥 크기·높이·모양 수·이름), game/art/planets/earth_land.png (지구의 땅·얼음·사막 지도, planets.py).
 """
 from __future__ import annotations
 
@@ -87,46 +87,6 @@ def render(group: str, registry: dict) -> tuple[dict[str, str], dict]:
     return files, meta
 
 
-IMPORT_TEMPLATE = """[remap]
-
-importer="texture"
-type="CompressedTexture2D"
-
-[deps]
-
-source_file="res://art/%s"
-
-[params]
-
-compress/mode=0
-compress/high_quality=false
-compress/lossy_quality=0.7
-compress/uastc_level=0
-compress/rdo_quality_loss=0.0
-compress/hdr_compression=1
-compress/normal_map=0
-compress/channel_pack=0
-mipmaps/generate=true
-mipmaps/limit=-1
-roughness/mode=0
-roughness/src_normal=""
-process/channel_remap/red=0
-process/channel_remap/green=1
-process/channel_remap/blue=2
-process/channel_remap/alpha=3
-process/fix_alpha_border=true
-process/premult_alpha=false
-process/normal_map_invert_y=false
-process/hdr_as_srgb=false
-process/hdr_clamp_exposure=false
-process/size_limit=0
-detect_3d/compress_to=1
-svg/scale=2.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false
-"""
-
-
 PNG_IMPORT = """[remap]
 
 importer="texture"
@@ -165,11 +125,11 @@ detect_3d/compress_to=0
 
 
 def ensure_import(out: Path, rel: str) -> None:
-    """새 SVG에는 Godot 가져오기 설정을 미리 둔다: 2배로 래스터화, 밉맵 (확대·축소해도 선명하게).
+    """새 PNG에는 Godot 가져오기 설정을 미리 둔다 (밉맵).
     Godot가 처음 가져올 때 uid와 경로를 채워 넣으므로, 이미 있는 파일은 건드리지 않는다."""
     p = out / (rel + ".import")
     if not p.exists():
-        p.write_text((PNG_IMPORT if rel.endswith(".png") else IMPORT_TEMPLATE) % rel, encoding="utf-8")
+        p.write_text(PNG_IMPORT % rel, encoding="utf-8")
 
 
 # ── 3차원 모형 (models.json) ───────────────────────────────────────────
@@ -300,14 +260,32 @@ def models() -> str:
     return "\n".join(lines) + "\n"
 
 
-def build() -> dict[str, str]:
+def info(registry: dict) -> dict:
+    """게임이 쓰는 크기 정보: 바닥 크기·높이·이름 (건물은 모양마다 높이, 탈것은 치수·세계)."""
+    out = {}
+    for sid, spec in registry.items():
+        e = {k: v for k, v in spec.items() if k not in ("fn", "headings", "variants")}
+        if spec.get("variants"):
+            vl = [{"height": spec.get("height")}]
+            for v in range(1, 1 + max(spec["variants"])):
+                vs = spec["variants"].get(v)
+                if vs is not None:
+                    vl.append({"height": vs.get("height") or spec.get("height")})
+            e["variants"] = vl
+        out[sid] = e
+    return out
+
+
+def build(svg: bool = False) -> dict[str, str]:
+    """svg: 디자인 검토용 아이소메트릭 SVG(낮·밤 불빛)도 만든다 — 게임에는 넣지 않는다."""
     load_types()
     files: dict[str, str] = {}
-    meta = {"px_per_m": iso.S, "projection": "orthographic, azimuth 45°, elevation 30°"}
+    meta = {}
     for group, reg in (("buildings", BUILDINGS), ("vehicles", VEHICLES)):
-        f, m = render(group, reg)
-        files.update(f)
-        meta[group] = m
+        meta[group] = info(reg)
+        if svg:
+            f, _ = render(group, reg)
+            files.update(f)
     files["art.json"] = json.dumps(meta, ensure_ascii=False, indent=1, sort_keys=True) + "\n"
     files["models.json"] = models()
     for rel, fn in planets.FILES.items():
@@ -328,18 +306,27 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="파일이 생성 결과와 같은지만 확인")
     ap.add_argument("--out", type=Path, default=ART)
+    ap.add_argument("--svg", type=Path, default=None, help="디자인 검토용 SVG를 쓸 폴더 (게임 밖)")
     args = ap.parse_args()
+    if args.svg is not None:
+        if args.svg.resolve() == ART.resolve() or ART.resolve() in args.svg.resolve().parents:
+            print("SVG는 게임 폴더(game/art) 밖에 쓴다 — 게임은 3D 모형만 쓴다")
+            return 1
+        files = {k: v for k, v in build(svg=True).items() if k.endswith(".svg")}
+        for rel, text in files.items():
+            p = args.svg / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text, encoding="utf-8")
+        print("SVG %d개를 %s 에 썼다" % (len(files), args.svg))
+        return 0
     files = build()
+    stray = sorted(p.relative_to(args.out).as_posix() for p in args.out.rglob("*.svg")) if args.out.exists() else []
     if args.check:
         bad = []
         for rel, text in files.items():
             if not _same(args.out / rel, text):
                 bad.append(rel)
-        known = set(files)
-        for p in args.out.rglob("*.svg"):
-            rel = p.relative_to(args.out).as_posix()
-            if rel not in known:
-                bad.append(rel + " (생성기에 없음)")
+        bad += [rel + " (게임에 필요 없는 2D 그림)" for rel in stray]
         if bad:
             print("그림이 생성기와 다르다 — python3 game/tools/art/make_art.py 를 실행하라:")
             for b in bad[:30]:
@@ -355,9 +342,11 @@ def main() -> int:
                 p.write_bytes(text)
             else:
                 p.write_text(text, encoding="utf-8")
-        if rel.endswith((".svg", ".png")) and args.out == ART:
+        if rel.endswith(".png") and args.out == ART:
             ensure_import(args.out, rel)
     print("그림 %d개를 %s 에 썼다" % (len(files), args.out))
+    if stray:
+        print("게임에 필요 없는 2D 그림 %d개가 남아 있다 (예: %s) — 지워라" % (len(stray), stray[0]))
     return 0
 
 

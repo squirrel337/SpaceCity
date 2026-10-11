@@ -1,4 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="51" viewBox="-32 -33 64 51">
-<defs><radialGradient id="r15" gradientUnits="userSpaceOnUse" cx="4.53" cy="-12.36" r="7"><stop offset="0" stop-color="#7FE3DA" stop-opacity="0.9"/><stop offset="0.35" stop-color="#7FE3DA" stop-opacity="0.41"/><stop offset="1" stop-color="#7FE3DA" stop-opacity="0"/></radialGradient></defs>
-<polygon points="11.53,-12.36 11.18,-10.19 10.19,-8.24 8.64,-6.69 6.69,-5.7 4.53,-5.36 2.36,-5.7 0.41,-6.69 -1.14,-8.24 -2.13,-10.19 -2.47,-12.36 -2.13,-14.52 -1.14,-16.47 0.41,-18.02 2.36,-19.01 4.53,-19.36 6.69,-19.01 8.64,-18.02 10.19,-16.47 11.18,-14.52" fill="url(#r15)"/>
-</svg>

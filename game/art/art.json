@@ -9,64 +9,19 @@
    "title": "공기분무 농장",
    "variants": [
     {
-     "anchor": [
-      43,
-      60
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      86,
-      87
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      43,
-      60
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      86,
-      87
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      43,
-      60
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      86,
-      87
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      43,
-      60
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      86,
-      87
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      43,
-      60
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      86,
-      87
-     ]
+     "height": 3.6
     }
    ]
   },
@@ -79,64 +34,19 @@
    "title": "조류 수로",
    "variants": [
     {
-     "anchor": [
-      47,
-      54
-     ],
-     "height": 2.2,
-     "lights": true,
-     "px": [
-      94,
-      95
-     ]
+     "height": 2.2
     },
     {
-     "anchor": [
-      47,
-      54
-     ],
-     "height": 2.2,
-     "lights": true,
-     "px": [
-      94,
-      95
-     ]
+     "height": 2.2
     },
     {
-     "anchor": [
-      47,
-      54
-     ],
-     "height": 2.2,
-     "lights": true,
-     "px": [
-      94,
-      95
-     ]
+     "height": 2.2
     },
     {
-     "anchor": [
-      47,
-      54
-     ],
-     "height": 2.2,
-     "lights": true,
-     "px": [
-      94,
-      95
-     ]
+     "height": 2.2
     },
     {
-     "anchor": [
-      47,
-      54
-     ],
-     "height": 2.0,
-     "lights": true,
-     "px": [
-      94,
-      95
-     ]
+     "height": 2.0
     }
    ]
   },
@@ -149,64 +59,19 @@
    "title": "조류 생물반응기",
    "variants": [
     {
-     "anchor": [
-      32,
-      40
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      64,
-      58
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      32,
-      34
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      64,
-      52
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      32,
-      37
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      64,
-      55
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      32,
-      37
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      64,
-      55
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      32,
-      43
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      64,
-      61
-     ]
+     "height": 3.6
     }
    ]
   },
@@ -219,64 +84,19 @@
    "title": "알칼리 전기분해기",
    "variants": [
     {
-     "anchor": [
-      37,
-      40
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      74,
-      60
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      37,
-      33
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      74,
-      53
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      37,
-      41
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      74,
-      61
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      37,
-      33
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      74,
-      53
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      37,
-      41
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      74,
-      61
-     ]
+     "height": 3.6
     }
    ]
   },
@@ -289,64 +109,19 @@
    "title": "고체 아민 흡착기",
    "variants": [
     {
-     "anchor": [
-      28,
-      29
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      56,
-      45
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      28,
-      29
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      56,
-      45
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      28,
-      31
-     ],
-     "height": 3.1,
-     "lights": true,
-     "px": [
-      56,
-      47
-     ]
+     "height": 3.1
     },
     {
-     "anchor": [
-      28,
-      29
-     ],
-     "height": 3.3,
-     "lights": true,
-     "px": [
-      56,
-      45
-     ]
+     "height": 3.3
     },
     {
-     "anchor": [
-      28,
-      31
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      56,
-      47
-     ]
+     "height": 3.0
     }
    ]
   },
@@ -359,64 +134,19 @@
    "title": "배터리 뱅크",
    "variants": [
     {
-     "anchor": [
-      35,
-      34
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      70,
-      54
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      35,
-      33
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      70,
-      53
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      35,
-      32
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      70,
-      52
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      35,
-      34
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      70,
-      54
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      35,
-      35
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      70,
-      55
-     ]
+     "height": 3.4
     }
    ]
   },
@@ -429,64 +159,19 @@
    "title": "방벽 착륙장",
    "variants": [
     {
-     "anchor": [
-      137,
-      92
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      274,
-      164
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      137,
-      92
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      274,
-      162
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      137,
-      92
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      274,
-      162
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      137,
-      92
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      274,
-      164
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      137,
-      92
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      274,
-      162
-     ]
+     "height": 3.0
     }
    ]
   },
@@ -499,64 +184,19 @@
    "title": "양면 패널 타워",
    "variants": [
     {
-     "anchor": [
-      26,
-      157
-     ],
-     "height": 22.0,
-     "lights": true,
-     "px": [
-      51,
-      173
-     ]
+     "height": 22.0
     },
     {
-     "anchor": [
-      26,
-      157
-     ],
-     "height": 22.0,
-     "lights": true,
-     "px": [
-      51,
-      172
-     ]
+     "height": 22.0
     },
     {
-     "anchor": [
-      28,
-      157
-     ],
-     "height": 22.0,
-     "lights": true,
-     "px": [
-      64,
-      173
-     ]
+     "height": 22.0
     },
     {
-     "anchor": [
-      25,
-      157
-     ],
-     "height": 22.4,
-     "lights": true,
-     "px": [
-      51,
-      172
-     ]
+     "height": 22.4
     },
     {
-     "anchor": [
-      35,
-      156
-     ],
-     "height": 22.0,
-     "lights": true,
-     "px": [
-      62,
-      173
-     ]
+     "height": 22.0
     }
    ]
   },
@@ -569,64 +209,19 @@
    "title": "결합제 분사 프린터",
    "variants": [
     {
-     "anchor": [
-      42,
-      35
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      86,
-      58
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      42,
-      41
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      86,
-      64
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      42,
-      35
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      85,
-      60
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      42,
-      34
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      86,
-      57
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      42,
-      36
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      86,
-      59
-     ]
+     "height": 4.0
     }
    ]
   },
@@ -639,64 +234,19 @@
    "title": "생명과학 연구소",
    "variants": [
     {
-     "anchor": [
-      51,
-      53
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      110,
-      95
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      51,
-      53
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      110,
-      95
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      51,
-      54
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      109,
-      95
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      51,
-      51
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      112,
-      93
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      51,
-      53
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      110,
-      95
-     ]
+     "height": 4.4
     }
    ]
   },
@@ -709,64 +259,19 @@
    "title": "팽창식 저장 주머니",
    "variants": [
     {
-     "anchor": [
-      42,
-      24
-     ],
-     "height": 1.8,
-     "lights": true,
-     "px": [
-      84,
-      47
-     ]
+     "height": 1.8
     },
     {
-     "anchor": [
-      42,
-      24
-     ],
-     "height": 1.8,
-     "lights": true,
-     "px": [
-      84,
-      47
-     ]
+     "height": 1.8
     },
     {
-     "anchor": [
-      42,
-      24
-     ],
-     "height": 1.6,
-     "lights": true,
-     "px": [
-      84,
-      47
-     ]
+     "height": 1.6
     },
     {
-     "anchor": [
-      42,
-      24
-     ],
-     "height": 1.8,
-     "lights": true,
-     "px": [
-      84,
-      47
-     ]
+     "height": 1.8
     },
     {
-     "anchor": [
-      42,
-      25
-     ],
-     "height": 2.0,
-     "lights": true,
-     "px": [
-      84,
-      48
-     ]
+     "height": 2.0
     }
    ]
   },
@@ -779,64 +284,19 @@
    "title": "무증발 저장소",
    "variants": [
     {
-     "anchor": [
-      54,
-      74
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      107,
-      102
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      54,
-      74
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      107,
-      102
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      54,
-      74
-     ],
-     "height": 6.6,
-     "lights": true,
-     "px": [
-      107,
-      102
-     ]
+     "height": 6.6
     },
     {
-     "anchor": [
-      54,
-      74
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      107,
-      102
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      54,
-      70
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      107,
-      98
-     ]
+     "height": 7.0
     }
    ]
   },
@@ -849,64 +309,19 @@
    "title": "보시 반응기",
    "variants": [
     {
-     "anchor": [
-      34,
-      37
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      68,
-      56
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      34,
-      37
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      68,
-      56
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      34,
-      37
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      68,
-      56
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      34,
-      37
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      68,
-      56
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      34,
-      36
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      68,
-      55
-     ]
+     "height": 3.4
     }
    ]
   },
@@ -919,64 +334,19 @@
    "title": "브레이턴 원자로",
    "variants": [
     {
-     "anchor": [
-      64,
-      100
-     ],
-     "height": 8.6,
-     "lights": true,
-     "px": [
-      141,
-      141
-     ]
+     "height": 8.6
     },
     {
-     "anchor": [
-      64,
-      100
-     ],
-     "height": 8.6,
-     "lights": true,
-     "px": [
-      141,
-      141
-     ]
+     "height": 8.6
     },
     {
-     "anchor": [
-      64,
-      100
-     ],
-     "height": 8.6,
-     "lights": true,
-     "px": [
-      141,
-      141
-     ]
+     "height": 8.6
     },
     {
-     "anchor": [
-      64,
-      100
-     ],
-     "height": 8.6,
-     "lights": true,
-     "px": [
-      141,
-      141
-     ]
+     "height": 8.6
     },
     {
-     "anchor": [
-      64,
-      96
-     ],
-     "height": 8.0,
-     "lights": true,
-     "px": [
-      141,
-      136
-     ]
+     "height": 8.0
     }
    ]
   },
@@ -989,64 +359,19 @@
    "title": "레골리스 벽돌 압착기",
    "variants": [
     {
-     "anchor": [
-      37,
-      46
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      79,
-      69
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      37,
-      46
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      79,
-      69
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      37,
-      46
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      79,
-      69
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      37,
-      46
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      74,
-      66
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      41,
-      46
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      83,
-      69
-     ]
+     "height": 3.6
     }
    ]
   },
@@ -1059,64 +384,19 @@
    "title": "방송 스튜디오",
    "variants": [
     {
-     "anchor": [
-      61,
-      51
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      97,
-      87
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      61,
-      51
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      97,
-      87
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      61,
-      53
-     ],
-     "height": 4.8,
-     "lights": true,
-     "px": [
-      97,
-      88
-     ]
+     "height": 4.8
     },
     {
-     "anchor": [
-      61,
-      51
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      97,
-      87
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      61,
-      51
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      97,
-      87
-     ]
+     "height": 4.6
     }
    ]
   },
@@ -1129,64 +409,19 @@
    "title": "버킷휠 굴착기",
    "variants": [
     {
-     "anchor": [
-      45,
-      56
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      90,
-      80
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      45,
-      59
-     ],
-     "height": 6.4,
-     "lights": true,
-     "px": [
-      90,
-      83
-     ]
+     "height": 6.4
     },
     {
-     "anchor": [
-      45,
-      56
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      90,
-      80
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      55,
-      56
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      100,
-      80
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      65,
-      56
-     ],
-     "height": 5.6,
-     "lights": true,
-     "px": [
-      110,
-      80
-     ]
+     "height": 5.6
     }
    ]
   },
@@ -1199,64 +434,19 @@
    "title": "매립형 원자로",
    "variants": [
     {
-     "anchor": [
-      33,
-      38
-     ],
-     "height": 2.9,
-     "lights": true,
-     "px": [
-      74,
-      56
-     ]
+     "height": 2.9
     },
     {
-     "anchor": [
-      33,
-      38
-     ],
-     "height": 2.9,
-     "lights": true,
-     "px": [
-      74,
-      56
-     ]
+     "height": 2.9
     },
     {
-     "anchor": [
-      37,
-      38
-     ],
-     "height": 2.9,
-     "lights": true,
-     "px": [
-      78,
-      56
-     ]
+     "height": 2.9
     },
     {
-     "anchor": [
-      33,
-      38
-     ],
-     "height": 3.1,
-     "lights": true,
-     "px": [
-      74,
-      56
-     ]
+     "height": 3.1
     },
     {
-     "anchor": [
-      37,
-      38
-     ],
-     "height": 2.9,
-     "lights": true,
-     "px": [
-      70,
-      56
-     ]
+     "height": 2.9
     }
    ]
   },
@@ -1269,64 +459,19 @@
    "title": "카페",
    "variants": [
     {
-     "anchor": [
-      34,
-      41
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      67,
-      67
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      33,
-      41
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      66,
-      67
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      34,
-      42
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      81,
-      68
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      33,
-      41
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      66,
-      67
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      35,
-      41
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      68,
-      67
-     ]
+     "height": 3.4
     }
    ]
   },
@@ -1339,64 +484,19 @@
    "title": "탄소열 환원로",
    "variants": [
     {
-     "anchor": [
-      44,
-      55
-     ],
-     "height": 5.5,
-     "lights": true,
-     "px": [
-      88,
-      79
-     ]
+     "height": 5.5
     },
     {
-     "anchor": [
-      44,
-      55
-     ],
-     "height": 5.5,
-     "lights": true,
-     "px": [
-      88,
-      79
-     ]
+     "height": 5.5
     },
     {
-     "anchor": [
-      44,
-      55
-     ],
-     "height": 5.5,
-     "lights": true,
-     "px": [
-      88,
-      79
-     ]
+     "height": 5.5
     },
     {
-     "anchor": [
-      44,
-      53
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      88,
-      77
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      44,
-      55
-     ],
-     "height": 5.8,
-     "lights": true,
-     "px": [
-      88,
-      79
-     ]
+     "height": 5.8
     }
    ]
   },
@@ -1409,64 +509,19 @@
    "title": "클로렐라 기둥",
    "variants": [
     {
-     "anchor": [
-      28,
-      54
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      56,
-      70
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      28,
-      54
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      56,
-      70
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      28,
-      54
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      56,
-      70
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      28,
-      53
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      56,
-      69
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      28,
-      54
-     ],
-     "height": 4.8,
-     "lights": true,
-     "px": [
-      56,
-      70
-     ]
+     "height": 4.8
     }
    ]
   },
@@ -1479,64 +534,19 @@
    "title": "진료소",
    "variants": [
     {
-     "anchor": [
-      31,
-      37
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      60,
-      53
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      31,
-      37
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      60,
-      53
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      31,
-      40
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      60,
-      56
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      31,
-      35
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      60,
-      51
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      31,
-      37
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      60,
-      53
-     ]
+     "height": 3.2
     }
    ]
   },
@@ -1549,64 +559,19 @@
    "title": "CO₂ 제거기",
    "variants": [
     {
-     "anchor": [
-      29,
-      32
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      58,
-      49
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      29,
-      40
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      58,
-      57
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      29,
-      37
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      58,
-      54
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      29,
-      27
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      58,
-      44
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      29,
-      28
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      58,
-      45
-     ]
+     "height": 3.0
     }
    ]
   },
@@ -1619,64 +584,19 @@
    "title": "냉동 저장고",
    "variants": [
     {
-     "anchor": [
-      37,
-      37
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      74,
-      57
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      37,
-      37
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      74,
-      57
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      37,
-      37
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      74,
-      57
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      37,
-      37
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      74,
-      57
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      37,
-      50
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      74,
-      70
-     ]
+     "height": 3.8
     }
    ]
   },
@@ -1689,64 +609,19 @@
    "title": "지구 교신 센터",
    "variants": [
     {
-     "anchor": [
-      44,
-      76
-     ],
-     "height": 9.0,
-     "lights": true,
-     "px": [
-      88,
-      100
-     ]
+     "height": 9.0
     },
     {
-     "anchor": [
-      44,
-      59
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      88,
-      83
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      44,
-      72
-     ],
-     "height": 8.4,
-     "lights": true,
-     "px": [
-      88,
-      96
-     ]
+     "height": 8.4
     },
     {
-     "anchor": [
-      44,
-      83
-     ],
-     "height": 9.6,
-     "lights": true,
-     "px": [
-      88,
-      107
-     ]
+     "height": 9.6
     },
     {
-     "anchor": [
-      44,
-      67
-     ],
-     "height": 7.6,
-     "lights": true,
-     "px": [
-      88,
-      91
-     ]
+     "height": 7.6
     }
    ]
   },
@@ -1759,64 +634,19 @@
    "title": "크레이터 지붕",
    "variants": [
     {
-     "anchor": [
-      113,
-      122
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      226,
-      227
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      126,
-      122
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      259,
-      227
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      113,
-      122
-     ],
-     "height": 4.3,
-     "lights": true,
-     "px": [
-      226,
-      227
-     ]
+     "height": 4.3
     },
     {
-     "anchor": [
-      113,
-      122
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      226,
-      227
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      135,
-      122
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      270,
-      227
-     ]
+     "height": 4.0
     }
    ]
   },
@@ -1829,64 +659,19 @@
    "title": "승무원 캡슐",
    "variants": [
     {
-     "anchor": [
-      24,
-      38
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      48,
-      52
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      24,
-      38
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      48,
-      52
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      24,
-      53
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      48,
-      67
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      24,
-      38
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      48,
-      52
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      24,
-      38
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      55,
-      52
-     ]
+     "height": 4.2
     }
    ]
   },
@@ -1899,64 +684,19 @@
    "title": "극저온 연구소",
    "variants": [
     {
-     "anchor": [
-      41,
-      48
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      81,
-      70
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      41,
-      48
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      81,
-      70
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      41,
-      48
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      81,
-      70
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      41,
-      48
-     ],
-     "height": 4.8,
-     "lights": true,
-     "px": [
-      81,
-      70
-     ]
+     "height": 4.8
     },
     {
-     "anchor": [
-      41,
-      48
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      81,
-      70
-     ]
+     "height": 4.6
     }
    ]
   },
@@ -1969,64 +709,19 @@
    "title": "극저온 탱크",
    "variants": [
     {
-     "anchor": [
-      40,
-      55
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      80,
-      77
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      40,
-      55
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      80,
-      77
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      40,
-      52
-     ],
-     "height": 5.6,
-     "lights": true,
-     "px": [
-      80,
-      74
-     ]
+     "height": 5.6
     },
     {
-     "anchor": [
-      40,
-      67
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      80,
-      89
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      40,
-      57
-     ],
-     "height": 6.2,
-     "lights": true,
-     "px": [
-      80,
-      79
-     ]
+     "height": 6.2
     }
    ]
   },
@@ -2039,64 +734,19 @@
    "title": "남세균 반응기",
    "variants": [
     {
-     "anchor": [
-      41,
-      43
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      75,
-      65
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      41,
-      43
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      75,
-      65
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      42,
-      42
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      76,
-      65
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      41,
-      43
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      75,
-      65
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      41,
-      43
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      75,
-      65
-     ]
+     "height": 3.6
     }
    ]
   },
@@ -2109,64 +759,19 @@
    "title": "기록 보관소",
    "variants": [
     {
-     "anchor": [
-      37,
-      40
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      74,
-      60
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      37,
-      39
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      74,
-      59
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      37,
-      53
-     ],
-     "height": 4.3,
-     "lights": true,
-     "px": [
-      74,
-      73
-     ]
+     "height": 4.3
     },
     {
-     "anchor": [
-      37,
-      41
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      74,
-      61
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      37,
-      38
-     ],
-     "height": 3.7,
-     "lights": true,
-     "px": [
-      74,
-      58
-     ]
+     "height": 3.7
     }
    ]
   },
@@ -2179,64 +784,19 @@
    "title": "지하 대피소",
    "variants": [
     {
-     "anchor": [
-      65,
-      46
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      108,
-      78
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      65,
-      46
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      108,
-      78
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      65,
-      47
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      109,
-      80
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      65,
-      45
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      108,
-      76
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      65,
-      52
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      108,
-      84
-     ]
+     "height": 3.0
     }
    ]
   },
@@ -2249,64 +809,19 @@
    "title": "돔 마을",
    "variants": [
     {
-     "anchor": [
-      74,
-      56
-     ],
-     "height": 5.5,
-     "lights": true,
-     "px": [
-      143,
-      92
-     ]
+     "height": 5.5
     },
     {
-     "anchor": [
-      69,
-      51
-     ],
-     "height": 5.5,
-     "lights": true,
-     "px": [
-      140,
-      89
-     ]
+     "height": 5.5
     },
     {
-     "anchor": [
-      74,
-      53
-     ],
-     "height": 5.2,
-     "lights": true,
-     "px": [
-      143,
-      89
-     ]
+     "height": 5.2
     },
     {
-     "anchor": [
-      94,
-      51
-     ],
-     "height": 5.6,
-     "lights": true,
-     "px": [
-      163,
-      95
-     ]
+     "height": 5.6
     },
     {
-     "anchor": [
-      74,
-      56
-     ],
-     "height": 6.2,
-     "lights": true,
-     "px": [
-      143,
-      92
-     ]
+     "height": 6.2
     }
    ]
   },
@@ -2319,64 +834,19 @@
    "title": "드래그라인",
    "variants": [
     {
-     "anchor": [
-      41,
-      46
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      78,
-      66
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      41,
-      46
-     ],
-     "height": 6.4,
-     "lights": true,
-     "px": [
-      78,
-      66
-     ]
+     "height": 6.4
     },
     {
-     "anchor": [
-      41,
-      47
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      78,
-      67
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      64,
-      46
-     ],
-     "height": 5.6,
-     "lights": true,
-     "px": [
-      101,
-      66
-     ]
+     "height": 5.6
     },
     {
-     "anchor": [
-      41,
-      46
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      78,
-      66
-     ]
+     "height": 7.0
     }
    ]
   },
@@ -2389,64 +859,19 @@
    "title": "드론 격납고",
    "variants": [
     {
-     "anchor": [
-      53,
-      48
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      106,
-      76
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      53,
-      48
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      106,
-      76
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      53,
-      48
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      106,
-      76
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      53,
-      59
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      106,
-      87
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      53,
-      48
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      106,
-      76
-     ]
+     "height": 3.4
     }
    ]
   },
@@ -2459,64 +884,19 @@
    "title": "액적 방열기",
    "variants": [
     {
-     "anchor": [
-      49,
-      68
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      98,
-      99
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      49,
-      68
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      98,
-      99
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      49,
-      68
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      98,
-      99
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      49,
-      68
-     ],
-     "height": 5.4,
-     "lights": true,
-     "px": [
-      98,
-      99
-     ]
+     "height": 5.4
     },
     {
-     "anchor": [
-      49,
-      68
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      98,
-      99
-     ]
+     "height": 4.6
     }
    ]
   },
@@ -2529,64 +909,19 @@
    "title": "물 전기분해기",
    "variants": [
     {
-     "anchor": [
-      32,
-      40
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      64,
-      58
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      32,
-      29
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      61,
-      47
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      32,
-      29
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      64,
-      47
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      32,
-      48
-     ],
-     "height": 4.8,
-     "lights": true,
-     "px": [
-      64,
-      66
-     ]
+     "height": 4.8
     },
     {
-     "anchor": [
-      32,
-      33
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      64,
-      51
-     ]
+     "height": 3.2
     }
    ]
   },
@@ -2599,64 +934,19 @@
    "title": "전자 부품 공장",
    "variants": [
     {
-     "anchor": [
-      53,
-      51
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      106,
-      79
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      53,
-      51
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      106,
-      79
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      53,
-      51
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      106,
-      79
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      53,
-      51
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      106,
-      79
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      53,
-      51
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      106,
-      79
-     ]
+     "height": 4.6
     }
    ]
   },
@@ -2669,64 +959,19 @@
    "title": "레골리스 굴착기",
    "variants": [
     {
-     "anchor": [
-      38,
-      30
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      84,
-      51
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      38,
-      28
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      76,
-      49
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      43,
-      25
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      81,
-      46
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      45,
-      21
-     ],
-     "height": 2.0,
-     "lights": true,
-     "px": [
-      83,
-      43
-     ]
+     "height": 2.0
     },
     {
-     "anchor": [
-      38,
-      29
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      76,
-      51
-     ]
+     "height": 2.6
     }
    ]
   },
@@ -2739,64 +984,19 @@
    "title": "FFC 환원로",
    "variants": [
     {
-     "anchor": [
-      44,
-      46
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      88,
-      70
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      44,
-      51
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      88,
-      75
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      44,
-      46
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      88,
-      70
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      44,
-      51
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      88,
-      75
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      44,
-      46
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      88,
-      70
-     ]
+     "height": 4.0
     }
    ]
   },
@@ -2809,64 +1009,19 @@
    "title": "현장 실험실",
    "variants": [
     {
-     "anchor": [
-      27,
-      55
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      50,
-      68
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      27,
-      55
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      50,
-      68
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      27,
-      48
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      50,
-      61
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      27,
-      59
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      50,
-      72
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      27,
-      45
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      54,
-      58
-     ]
+     "height": 3.2
     }
    ]
   },
@@ -2879,64 +1034,19 @@
    "title": "100 kW 원자로",
    "variants": [
     {
-     "anchor": [
-      38,
-      66
-     ],
-     "height": 8.0,
-     "lights": true,
-     "px": [
-      76,
-      90
-     ]
+     "height": 8.0
     },
     {
-     "anchor": [
-      38,
-      67
-     ],
-     "height": 7.6,
-     "lights": true,
-     "px": [
-      76,
-      91
-     ]
+     "height": 7.6
     },
     {
-     "anchor": [
-      38,
-      66
-     ],
-     "height": 8.0,
-     "lights": true,
-     "px": [
-      76,
-      90
-     ]
+     "height": 8.0
     },
     {
-     "anchor": [
-      38,
-      66
-     ],
-     "height": 8.0,
-     "lights": true,
-     "px": [
-      88,
-      87
-     ]
+     "height": 8.0
     },
     {
-     "anchor": [
-      45,
-      69
-     ],
-     "height": 8.4,
-     "lights": true,
-     "px": [
-      83,
-      90
-     ]
+     "height": 8.4
     }
    ]
   },
@@ -2949,64 +1059,19 @@
    "title": "메가와트급 원자로",
    "variants": [
     {
-     "anchor": [
-      64,
-      61
-     ],
-     "height": 8.5,
-     "lights": true,
-     "px": [
-      140,
-      95
-     ]
+     "height": 8.5
     },
     {
-     "anchor": [
-      65,
-      61
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      127,
-      93
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      61,
-      60
-     ],
-     "height": 7.6,
-     "lights": true,
-     "px": [
-      129,
-      92
-     ]
+     "height": 7.6
     },
     {
-     "anchor": [
-      67,
-      46
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      146,
-      81
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      73,
-      58
-     ],
-     "height": 6.8,
-     "lights": true,
-     "px": [
-      149,
-      92
-     ]
+     "height": 6.8
     }
    ]
   },
@@ -3019,64 +1084,19 @@
    "title": "소형 핵분열로",
    "variants": [
     {
-     "anchor": [
-      33,
-      57
-     ],
-     "height": 6.5,
-     "lights": true,
-     "px": [
-      66,
-      75
-     ]
+     "height": 6.5
     },
     {
-     "anchor": [
-      33,
-      58
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      66,
-      76
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      28,
-      59
-     ],
-     "height": 6.8,
-     "lights": true,
-     "px": [
-      56,
-      75
-     ]
+     "height": 6.8
     },
     {
-     "anchor": [
-      32,
-      54
-     ],
-     "height": 5.6,
-     "lights": true,
-     "px": [
-      64,
-      72
-     ]
+     "height": 5.6
     },
     {
-     "anchor": [
-      31,
-      62
-     ],
-     "height": 6.4,
-     "lights": true,
-     "px": [
-      63,
-      80
-     ]
+     "height": 6.4
     }
    ]
   },
@@ -3089,64 +1109,19 @@
    "title": "500 kW 원자로",
    "variants": [
     {
-     "anchor": [
-      53,
-      56
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      104,
-      84
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      51,
-      57
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      102,
-      85
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      51,
-      57
-     ],
-     "height": 7.4,
-     "lights": true,
-     "px": [
-      102,
-      85
-     ]
+     "height": 7.4
     },
     {
-     "anchor": [
-      61,
-      56
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      112,
-      84
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      51,
-      57
-     ],
-     "height": 6.6,
-     "lights": true,
-     "px": [
-      102,
-      85
-     ]
+     "height": 6.6
     }
    ]
   },
@@ -3159,64 +1134,19 @@
    "title": "식량 저장고",
    "variants": [
     {
-     "anchor": [
-      39,
-      39
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      74,
-      58
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      38,
-      44
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      76,
-      65
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      38,
-      42
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      76,
-      63
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      31,
-      31
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      62,
-      49
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      38,
-      29
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      76,
-      50
-     ]
+     "height": 3.0
     }
    ]
   },
@@ -3229,64 +1159,19 @@
    "title": "정삼투 정수기",
    "variants": [
     {
-     "anchor": [
-      25,
-      28
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      50,
-      42
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      25,
-      28
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      50,
-      42
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      25,
-      31
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      50,
-      45
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      25,
-      30
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      50,
-      44
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      25,
-      28
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      50,
-      42
-     ]
+     "height": 2.4
     }
    ]
   },
@@ -3299,64 +1184,19 @@
    "title": "주조소",
    "variants": [
     {
-     "anchor": [
-      53,
-      54
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      106,
-      82
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      53,
-      54
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      106,
-      82
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      53,
-      55
-     ],
-     "height": 6.4,
-     "lights": true,
-     "px": [
-      106,
-      83
-     ]
+     "height": 6.4
     },
     {
-     "anchor": [
-      53,
-      54
-     ],
-     "height": 5.6,
-     "lights": true,
-     "px": [
-      106,
-      82
-     ]
+     "height": 5.6
     },
     {
-     "anchor": [
-      53,
-      72
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      106,
-      100
-     ]
+     "height": 6.0
     }
    ]
   },
@@ -3369,64 +1209,19 @@
    "title": "공동 주방",
    "variants": [
     {
-     "anchor": [
-      51,
-      48
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      93,
-      75
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      51,
-      48
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      93,
-      75
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      51,
-      42
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      93,
-      69
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      51,
-      50
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      93,
-      77
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      51,
-      48
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      93,
-      75
-     ]
+     "height": 3.4
     }
    ]
   },
@@ -3439,64 +1234,19 @@
    "title": "대형 갠트리 프린터",
    "variants": [
     {
-     "anchor": [
-      68,
-      70
-     ],
-     "height": 7.5,
-     "lights": true,
-     "px": [
-      138,
-      107
-     ]
+     "height": 7.5
     },
     {
-     "anchor": [
-      68,
-      70
-     ],
-     "height": 7.5,
-     "lights": true,
-     "px": [
-      138,
-      107
-     ]
+     "height": 7.5
     },
     {
-     "anchor": [
-      68,
-      79
-     ],
-     "height": 7.5,
-     "lights": true,
-     "px": [
-      138,
-      116
-     ]
+     "height": 7.5
     },
     {
-     "anchor": [
-      68,
-      79
-     ],
-     "height": 7.5,
-     "lights": true,
-     "px": [
-      138,
-      116
-     ]
+     "height": 7.5
     },
     {
-     "anchor": [
-      79,
-      70
-     ],
-     "height": 7.5,
-     "lights": true,
-     "px": [
-      149,
-      107
-     ]
+     "height": 7.5
     }
    ]
   },
@@ -3509,64 +1259,19 @@
    "title": "정원 돔",
    "variants": [
     {
-     "anchor": [
-      62,
-      69
-     ],
-     "height": 6.5,
-     "lights": true,
-     "px": [
-      124,
-      102
-     ]
+     "height": 6.5
     },
     {
-     "anchor": [
-      62,
-      70
-     ],
-     "height": 6.2,
-     "lights": true,
-     "px": [
-      124,
-      103
-     ]
+     "height": 6.2
     },
     {
-     "anchor": [
-      62,
-      67
-     ],
-     "height": 6.8,
-     "lights": true,
-     "px": [
-      124,
-      100
-     ]
+     "height": 6.8
     },
     {
-     "anchor": [
-      62,
-      69
-     ],
-     "height": 6.4,
-     "lights": true,
-     "px": [
-      124,
-      102
-     ]
+     "height": 6.4
     },
     {
-     "anchor": [
-      62,
-      68
-     ],
-     "height": 6.5,
-     "lights": true,
-     "px": [
-      124,
-      101
-     ]
+     "height": 6.5
     }
    ]
   },
@@ -3579,64 +1284,19 @@
    "title": "고압 기체 저장대",
    "variants": [
     {
-     "anchor": [
-      34,
-      35
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      68,
-      54
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      34,
-      34
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      68,
-      53
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      34,
-      30
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      68,
-      49
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      34,
-      35
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      68,
-      54
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      34,
-      38
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      69,
-      57
-     ]
+     "height": 3.2
     }
    ]
   },
@@ -3649,64 +1309,19 @@
    "title": "압축 기체 축전기",
    "variants": [
     {
-     "anchor": [
-      32,
-      35
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      64,
-      53
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      32,
-      35
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      64,
-      53
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      32,
-      35
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      64,
-      53
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      32,
-      34
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      64,
-      52
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      32,
-      35
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      64,
-      53
-     ]
+     "height": 3.0
     }
    ]
   },
@@ -3719,64 +1334,19 @@
    "title": "곡물 사일로",
    "variants": [
     {
-     "anchor": [
-      31,
-      70
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      62,
-      88
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      31,
-      70
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      62,
-      88
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      31,
-      69
-     ],
-     "height": 6.6,
-     "lights": true,
-     "px": [
-      62,
-      87
-     ]
+     "height": 6.6
     },
     {
-     "anchor": [
-      31,
-      70
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      62,
-      88
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      31,
-      72
-     ],
-     "height": 7.2,
-     "lights": true,
-     "px": [
-      62,
-      90
-     ]
+     "height": 7.2
     }
    ]
   },
@@ -3789,64 +1359,19 @@
    "title": "녹지 공원",
    "variants": [
     {
-     "anchor": [
-      66,
-      80
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      132,
-      127
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      72,
-      76
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      142,
-      119
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      66,
-      82
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      132,
-      127
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      61,
-      67
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      122,
-      109
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      66,
-      80
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      132,
-      127
-     ]
+     "height": 7.0
     }
    ]
   },
@@ -3859,64 +1384,19 @@
    "title": "체육관",
    "variants": [
     {
-     "anchor": [
-      53,
-      49
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      103,
-      76
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      53,
-      48
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      103,
-      75
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      53,
-      50
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      103,
-      77
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      53,
-      56
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      103,
-      83
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      53,
-      49
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      103,
-      76
-     ]
+     "height": 4.2
     }
    ]
   },
@@ -3929,64 +1409,19 @@
    "title": "여압 거주 모듈",
    "variants": [
     {
-     "anchor": [
-      41,
-      50
-     ],
-     "height": 4.7,
-     "lights": true,
-     "px": [
-      82,
-      72
-     ]
+     "height": 4.7
     },
     {
-     "anchor": [
-      33,
-      61
-     ],
-     "height": 7.5,
-     "lights": true,
-     "px": [
-      70,
-      79
-     ]
+     "height": 7.5
     },
     {
-     "anchor": [
-      42,
-      43
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      81,
-      65
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      39,
-      46
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      78,
-      68
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      40,
-      46
-     ],
-     "height": 4.8,
-     "lights": true,
-     "px": [
-      86,
-      70
-     ]
+     "height": 4.8
     }
    ]
   },
@@ -3999,64 +1434,19 @@
    "title": "여압 거주 모듈 (레골리스 피복)",
    "variants": [
     {
-     "anchor": [
-      51,
-      43
-     ],
-     "height": 4.7,
-     "lights": true,
-     "px": [
-      103,
-      70
-     ]
+     "height": 4.7
     },
     {
-     "anchor": [
-      42,
-      53
-     ],
-     "height": 7.4,
-     "lights": true,
-     "px": [
-      85,
-      76
-     ]
+     "height": 7.4
     },
     {
-     "anchor": [
-      47,
-      41
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      94,
-      66
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      57,
-      39
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      110,
-      67
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      48,
-      41
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      94,
-      65
-     ]
+     "height": 4.6
     }
    ]
   },
@@ -4069,64 +1459,19 @@
    "title": "수직 거주탑",
    "variants": [
     {
-     "anchor": [
-      52,
-      102
-     ],
-     "height": 13.0,
-     "lights": true,
-     "px": [
-      104,
-      130
-     ]
+     "height": 13.0
     },
     {
-     "anchor": [
-      52,
-      104
-     ],
-     "height": 13.4,
-     "lights": true,
-     "px": [
-      104,
-      132
-     ]
+     "height": 13.4
     },
     {
-     "anchor": [
-      52,
-      101
-     ],
-     "height": 12.6,
-     "lights": true,
-     "px": [
-      104,
-      129
-     ]
+     "height": 12.6
     },
     {
-     "anchor": [
-      52,
-      102
-     ],
-     "height": 13.0,
-     "lights": true,
-     "px": [
-      104,
-      130
-     ]
+     "height": 13.0
     },
     {
-     "anchor": [
-      52,
-      107
-     ],
-     "height": 13.2,
-     "lights": true,
-     "px": [
-      104,
-      135
-     ]
+     "height": 13.2
     }
    ]
   },
@@ -4139,64 +1484,19 @@
    "title": "헬륨-3 핵융합 시험로",
    "variants": [
     {
-     "anchor": [
-      95,
-      105
-     ],
-     "height": 12.0,
-     "lights": true,
-     "px": [
-      201,
-      156
-     ]
+     "height": 12.0
     },
     {
-     "anchor": [
-      95,
-      105
-     ],
-     "height": 12.0,
-     "lights": true,
-     "px": [
-      201,
-      156
-     ]
+     "height": 12.0
     },
     {
-     "anchor": [
-      95,
-      105
-     ],
-     "height": 12.0,
-     "lights": true,
-     "px": [
-      201,
-      156
-     ]
+     "height": 12.0
     },
     {
-     "anchor": [
-      98,
-      105
-     ],
-     "height": 12.0,
-     "lights": true,
-     "px": [
-      204,
-      156
-     ]
+     "height": 12.0
     },
     {
-     "anchor": [
-      92,
-      105
-     ],
-     "height": 12.0,
-     "lights": true,
-     "px": [
-      198,
-      156
-     ]
+     "height": 12.0
     }
    ]
   },
@@ -4209,64 +1509,19 @@
    "title": "열 탐침 밭",
    "variants": [
     {
-     "anchor": [
-      46,
-      57
-     ],
-     "height": 1.6,
-     "lights": true,
-     "px": [
-      94,
-      83
-     ]
+     "height": 1.6
     },
     {
-     "anchor": [
-      46,
-      57
-     ],
-     "height": 1.6,
-     "lights": true,
-     "px": [
-      94,
-      83
-     ]
+     "height": 1.6
     },
     {
-     "anchor": [
-      46,
-      57
-     ],
-     "height": 1.8,
-     "lights": true,
-     "px": [
-      94,
-      83
-     ]
+     "height": 1.8
     },
     {
-     "anchor": [
-      50,
-      57
-     ],
-     "height": 1.6,
-     "lights": true,
-     "px": [
-      98,
-      83
-     ]
+     "height": 1.6
     },
     {
-     "anchor": [
-      46,
-      57
-     ],
-     "height": 1.8,
-     "lights": true,
-     "px": [
-      95,
-      80
-     ]
+     "height": 1.8
     }
    ]
   },
@@ -4279,64 +1534,19 @@
    "title": "히트파이프 방열판",
    "variants": [
     {
-     "anchor": [
-      31,
-      63
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      63,
-      81
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      31,
-      63
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      63,
-      81
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      31,
-      63
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      63,
-      82
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      31,
-      65
-     ],
-     "height": 7.4,
-     "lights": true,
-     "px": [
-      63,
-      83
-     ]
+     "height": 7.4
     },
     {
-     "anchor": [
-      33,
-      60
-     ],
-     "height": 6.6,
-     "lights": true,
-     "px": [
-      65,
-      78
-     ]
+     "height": 6.6
     }
    ]
   },
@@ -4349,64 +1559,19 @@
    "title": "대형 착륙장",
    "variants": [
     {
-     "anchor": [
-      244,
-      161
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      488,
-      286
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      244,
-      161
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      488,
-      286
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      244,
-      156
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      488,
-      281
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      244,
-      161
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      488,
-      286
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      244,
-      165
-     ],
-     "height": 6.4,
-     "lights": true,
-     "px": [
-      488,
-      290
-     ]
+     "height": 6.4
     }
    ]
   },
@@ -4419,64 +1584,19 @@
    "title": "호퍼 발착장",
    "variants": [
     {
-     "anchor": [
-      53,
-      35
-     ],
-     "height": 0.8,
-     "lights": true,
-     "px": [
-      133,
-      64
-     ]
+     "height": 0.8
     },
     {
-     "anchor": [
-      53,
-      35
-     ],
-     "height": 0.8,
-     "lights": true,
-     "px": [
-      133,
-      64
-     ]
+     "height": 0.8
     },
     {
-     "anchor": [
-      80,
-      35
-     ],
-     "height": 0.8,
-     "lights": true,
-     "px": [
-      133,
-      64
-     ]
+     "height": 0.8
     },
     {
-     "anchor": [
-      53,
-      67
-     ],
-     "height": 0.8,
-     "lights": true,
-     "px": [
-      133,
-      96
-     ]
+     "height": 0.8
     },
     {
-     "anchor": [
-      53,
-      35
-     ],
-     "height": 0.8,
-     "lights": true,
-     "px": [
-      106,
-      77
-     ]
+     "height": 0.8
     }
    ]
   },
@@ -4489,64 +1609,19 @@
    "title": "수소 환원로",
    "variants": [
     {
-     "anchor": [
-      36,
-      63
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      72,
-      83
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      36,
-      63
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      72,
-      83
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      36,
-      66
-     ],
-     "height": 7.4,
-     "lights": true,
-     "px": [
-      72,
-      86
-     ]
+     "height": 7.4
     },
     {
-     "anchor": [
-      36,
-      63
-     ],
-     "height": 6.6,
-     "lights": true,
-     "px": [
-      72,
-      83
-     ]
+     "height": 6.6
     },
     {
-     "anchor": [
-      36,
-      63
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      72,
-      83
-     ]
+     "height": 7.0
     }
    ]
   },
@@ -4559,64 +1634,19 @@
    "title": "수경 농장",
    "variants": [
     {
-     "anchor": [
-      40,
-      60
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      80,
-      82
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      41,
-      58
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      82,
-      81
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      37,
-      58
-     ],
-     "height": 6.2,
-     "lights": true,
-     "px": [
-      74,
-      76
-     ]
+     "height": 6.2
     },
     {
-     "anchor": [
-      45,
-      42
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      90,
-      66
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      42,
-      49
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      84,
-      72
-     ]
+     "height": 2.8
     }
    ]
   },
@@ -4629,64 +1659,19 @@
    "title": "얼음 차폐 돔",
    "variants": [
     {
-     "anchor": [
-      73,
-      92
-     ],
-     "height": 6.5,
-     "lights": true,
-     "px": [
-      146,
-      147
-     ]
+     "height": 6.5
     },
     {
-     "anchor": [
-      73,
-      92
-     ],
-     "height": 5.8,
-     "lights": true,
-     "px": [
-      146,
-      147
-     ]
+     "height": 5.8
     },
     {
-     "anchor": [
-      73,
-      92
-     ],
-     "height": 6.9,
-     "lights": true,
-     "px": [
-      146,
-      147
-     ]
+     "height": 6.9
     },
     {
-     "anchor": [
-      73,
-      92
-     ],
-     "height": 6.3,
-     "lights": true,
-     "px": [
-      146,
-      147
-     ]
+     "height": 6.3
     },
     {
-     "anchor": [
-      73,
-      92
-     ],
-     "height": 6.5,
-     "lights": true,
-     "px": [
-      146,
-      147
-     ]
+     "height": 6.5
     }
    ]
   },
@@ -4699,64 +1684,19 @@
    "title": "대형 얼음 수확기",
    "variants": [
     {
-     "anchor": [
-      60,
-      60
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      123,
-      107
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      60,
-      65
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      123,
-      112
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      60,
-      60
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      123,
-      107
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      60,
-      60
-     ],
-     "height": 6.4,
-     "lights": true,
-     "px": [
-      123,
-      107
-     ]
+     "height": 6.4
     },
     {
-     "anchor": [
-      60,
-      60
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      123,
-      107
-     ]
+     "height": 6.0
     }
    ]
   },
@@ -4769,64 +1709,19 @@
    "title": "얼음 채굴기",
    "variants": [
     {
-     "anchor": [
-      72,
-      58
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      144,
-      103
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      72,
-      54
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      121,
-      95
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      67,
-      68
-     ],
-     "height": 8.6,
-     "lights": true,
-     "px": [
-      114,
-      98
-     ]
+     "height": 8.6
     },
     {
-     "anchor": [
-      67,
-      55
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      116,
-      96
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      70,
-      54
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      119,
-      95
-     ]
+     "height": 3.6
     }
    ]
   },
@@ -4839,64 +1734,19 @@
    "title": "이온성 액체 흡수기",
    "variants": [
     {
-     "anchor": [
-      37,
-      42
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      74,
-      62
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      37,
-      35
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      74,
-      55
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      37,
-      41
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      74,
-      61
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      37,
-      37
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      74,
-      57
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      37,
-      42
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      74,
-      62
-     ]
+     "height": 4.2
     }
    ]
   },
@@ -4909,64 +1759,19 @@
    "title": "철-공기 장주기 전지",
    "variants": [
     {
-     "anchor": [
-      41,
-      38
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      82,
-      60
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      41,
-      38
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      82,
-      60
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      41,
-      38
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      82,
-      60
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      41,
-      39
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      82,
-      61
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      41,
-      38
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      82,
-      60
-     ]
+     "height": 2.8
     }
    ]
   },
@@ -4979,64 +1784,19 @@
    "title": "킬로파워 10 kW",
    "variants": [
     {
-     "anchor": [
-      19,
-      41
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      38,
-      53
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      19,
-      41
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      38,
-      53
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      19,
-      41
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      38,
-      53
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      19,
-      41
-     ],
-     "height": 4.8,
-     "lights": true,
-     "px": [
-      38,
-      53
-     ]
+     "height": 4.8
     },
     {
-     "anchor": [
-      19,
-      41
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      38,
-      53
-     ]
+     "height": 4.6
     }
    ]
   },
@@ -5049,64 +1809,19 @@
    "title": "착륙장",
    "variants": [
     {
-     "anchor": [
-      138,
-      77
-     ],
-     "height": 2.0,
-     "lights": true,
-     "px": [
-      276,
-      148
-     ]
+     "height": 2.0
     },
     {
-     "anchor": [
-      179,
-      108
-     ],
-     "height": 2.0,
-     "lights": true,
-     "px": [
-      350,
-      199
-     ]
+     "height": 2.0
     },
     {
-     "anchor": [
-      125,
-      81
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      250,
-      145
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      137,
-      66
-     ],
-     "height": 1.4,
-     "lights": true,
-     "px": [
-      274,
-      136
-     ]
+     "height": 1.4
     },
     {
-     "anchor": [
-      128,
-      132
-     ],
-     "height": 10.0,
-     "lights": true,
-     "px": [
-      256,
-      198
-     ]
+     "height": 10.0
     }
    ]
   },
@@ -5119,64 +1834,19 @@
    "title": "대형 추진제 공장",
    "variants": [
     {
-     "anchor": [
-      70,
-      96
-     ],
-     "height": 11.0,
-     "lights": true,
-     "px": [
-      140,
-      133
-     ]
+     "height": 11.0
     },
     {
-     "anchor": [
-      70,
-      95
-     ],
-     "height": 11.0,
-     "lights": true,
-     "px": [
-      140,
-      132
-     ]
+     "height": 11.0
     },
     {
-     "anchor": [
-      70,
-      96
-     ],
-     "height": 10.4,
-     "lights": true,
-     "px": [
-      140,
-      133
-     ]
+     "height": 10.4
     },
     {
-     "anchor": [
-      70,
-      113
-     ],
-     "height": 11.0,
-     "lights": true,
-     "px": [
-      140,
-      150
-     ]
+     "height": 11.0
     },
     {
-     "anchor": [
-      70,
-      96
-     ],
-     "height": 11.4,
-     "lights": true,
-     "px": [
-      140,
-      133
-     ]
+     "height": 11.4
     }
    ]
   },
@@ -5189,64 +1859,19 @@
    "title": "레이저 통신소",
    "variants": [
     {
-     "anchor": [
-      36,
-      49
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      72,
-      69
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      36,
-      45
-     ],
-     "height": 4.8,
-     "lights": true,
-     "px": [
-      72,
-      65
-     ]
+     "height": 4.8
     },
     {
-     "anchor": [
-      36,
-      51
-     ],
-     "height": 5.2,
-     "lights": true,
-     "px": [
-      72,
-      71
-     ]
+     "height": 5.2
     },
     {
-     "anchor": [
-      36,
-      49
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      72,
-      69
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      36,
-      47
-     ],
-     "height": 4.8,
-     "lights": true,
-     "px": [
-      72,
-      67
-     ]
+     "height": 4.8
     }
    ]
   },
@@ -5259,64 +1884,19 @@
    "title": "발사대 급유탑",
    "variants": [
     {
-     "anchor": [
-      43,
-      120
-     ],
-     "height": 14.0,
-     "lights": true,
-     "px": [
-      85,
-      146
-     ]
+     "height": 14.0
     },
     {
-     "anchor": [
-      43,
-      120
-     ],
-     "height": 14.0,
-     "lights": true,
-     "px": [
-      85,
-      146
-     ]
+     "height": 14.0
     },
     {
-     "anchor": [
-      43,
-      113
-     ],
-     "height": 13.0,
-     "lights": true,
-     "px": [
-      85,
-      139
-     ]
+     "height": 13.0
     },
     {
-     "anchor": [
-      43,
-      120
-     ],
-     "height": 14.0,
-     "lights": true,
-     "px": [
-      85,
-      146
-     ]
+     "height": 14.0
     },
     {
-     "anchor": [
-      43,
-      120
-     ],
-     "height": 14.0,
-     "lights": true,
-     "px": [
-      85,
-      146
-     ]
+     "height": 14.0
     }
    ]
   },
@@ -5329,64 +1909,19 @@
    "title": "경량 타워",
    "variants": [
     {
-     "anchor": [
-      18,
-      119
-     ],
-     "height": 16.0,
-     "lights": true,
-     "px": [
-      36,
-      130
-     ]
+     "height": 16.0
     },
     {
-     "anchor": [
-      18,
-      115
-     ],
-     "height": 15.4,
-     "lights": true,
-     "px": [
-      36,
-      128
-     ]
+     "height": 15.4
     },
     {
-     "anchor": [
-      18,
-      119
-     ],
-     "height": 16.0,
-     "lights": true,
-     "px": [
-      36,
-      130
-     ]
+     "height": 16.0
     },
     {
-     "anchor": [
-      18,
-      124
-     ],
-     "height": 16.6,
-     "lights": true,
-     "px": [
-      36,
-      135
-     ]
+     "height": 16.6
     },
     {
-     "anchor": [
-      18,
-      119
-     ],
-     "height": 16.0,
-     "lights": true,
-     "px": [
-      36,
-      130
-     ]
+     "height": 16.0
     }
    ]
   },
@@ -5399,64 +1934,19 @@
    "title": "수산화리튬 정화기",
    "variants": [
     {
-     "anchor": [
-      20,
-      22
-     ],
-     "height": 1.6,
-     "lights": true,
-     "px": [
-      40,
-      34
-     ]
+     "height": 1.6
     },
     {
-     "anchor": [
-      20,
-      22
-     ],
-     "height": 1.6,
-     "lights": true,
-     "px": [
-      40,
-      34
-     ]
+     "height": 1.6
     },
     {
-     "anchor": [
-      20,
-      22
-     ],
-     "height": 1.6,
-     "lights": true,
-     "px": [
-      40,
-      34
-     ]
+     "height": 1.6
     },
     {
-     "anchor": [
-      20,
-      22
-     ],
-     "height": 2.0,
-     "lights": true,
-     "px": [
-      40,
-      34
-     ]
+     "height": 2.0
     },
     {
-     "anchor": [
-      20,
-      22
-     ],
-     "height": 1.6,
-     "lights": true,
-     "px": [
-      40,
-      34
-     ]
+     "height": 1.6
     }
    ]
   },
@@ -5469,64 +1959,19 @@
    "title": "소형 액화기",
    "variants": [
     {
-     "anchor": [
-      33,
-      52
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      66,
-      70
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      33,
-      52
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      66,
-      70
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      33,
-      52
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      66,
-      70
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      33,
-      46
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      66,
-      64
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      33,
-      52
-     ],
-     "height": 5.2,
-     "lights": true,
-     "px": [
-      66,
-      70
-     ]
+     "height": 5.2
     }
    ]
   },
@@ -5539,64 +1984,19 @@
    "title": "광학 천문대",
    "variants": [
     {
-     "anchor": [
-      36,
-      60
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      83,
-      81
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      36,
-      56
-     ],
-     "height": 6.6,
-     "lights": true,
-     "px": [
-      83,
-      77
-     ]
+     "height": 6.6
     },
     {
-     "anchor": [
-      36,
-      62
-     ],
-     "height": 7.2,
-     "lights": true,
-     "px": [
-      83,
-      83
-     ]
+     "height": 7.2
     },
     {
-     "anchor": [
-      36,
-      59
-     ],
-     "height": 6.8,
-     "lights": true,
-     "px": [
-      83,
-      80
-     ]
+     "height": 6.8
     },
     {
-     "anchor": [
-      36,
-      60
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      83,
-      81
-     ]
+     "height": 7.0
     }
    ]
   },
@@ -5609,64 +2009,19 @@
    "title": "기계 공작소",
    "variants": [
     {
-     "anchor": [
-      55,
-      54
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      110,
-      84
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      55,
-      54
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      110,
-      84
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      55,
-      54
-     ],
-     "height": 5.2,
-     "lights": true,
-     "px": [
-      110,
-      84
-     ]
+     "height": 5.2
     },
     {
-     "anchor": [
-      55,
-      54
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      110,
-      84
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      55,
-      65
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      110,
-      95
-     ]
+     "height": 5.0
     }
    ]
   },
@@ -5679,64 +2034,19 @@
    "title": "자기 차폐실",
    "variants": [
     {
-     "anchor": [
-      42,
-      48
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      82,
-      70
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      51,
-      48
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      91,
-      70
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      42,
-      47
-     ],
-     "height": 4.8,
-     "lights": true,
-     "px": [
-      82,
-      69
-     ]
+     "height": 4.8
     },
     {
-     "anchor": [
-      42,
-      48
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      82,
-      70
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      42,
-      49
-     ],
-     "height": 5.2,
-     "lights": true,
-     "px": [
-      82,
-      71
-     ]
+     "height": 5.2
     }
    ]
   },
@@ -5749,64 +2059,19 @@
    "title": "재료 연구소",
    "variants": [
     {
-     "anchor": [
-      56,
-      54
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      110,
-      83
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      56,
-      55
-     ],
-     "height": 6.2,
-     "lights": true,
-     "px": [
-      110,
-      84
-     ]
+     "height": 6.2
     },
     {
-     "anchor": [
-      55,
-      54
-     ],
-     "height": 5.6,
-     "lights": true,
-     "px": [
-      109,
-      83
-     ]
+     "height": 5.6
     },
     {
-     "anchor": [
-      57,
-      54
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      111,
-      83
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      56,
-      56
-     ],
-     "height": 6.4,
-     "lights": true,
-     "px": [
-      110,
-      85
-     ]
+     "height": 6.4
     }
    ]
   },
@@ -5819,64 +2084,19 @@
    "title": "의료실",
    "variants": [
     {
-     "anchor": [
-      39,
-      44
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      78,
-      66
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      35,
-      43
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      70,
-      63
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      36,
-      45
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      72,
-      65
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      34,
-      53
-     ],
-     "height": 5.4,
-     "lights": true,
-     "px": [
-      68,
-      72
-     ]
+     "height": 5.4
     },
     {
-     "anchor": [
-      38,
-      42
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      78,
-      63
-     ]
+     "height": 3.8
     }
    ]
   },
@@ -5889,64 +2109,19 @@
    "title": "막 생물반응기",
    "variants": [
     {
-     "anchor": [
-      46,
-      61
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      87,
-      87
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      39,
-      58
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      87,
-      87
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      46,
-      61
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      87,
-      87
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      39,
-      58
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      87,
-      87
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      46,
-      61
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      87,
-      87
-     ]
+     "height": 3.6
     }
    ]
   },
@@ -5959,64 +2134,19 @@
    "title": "금속 3D 프린터",
    "variants": [
     {
-     "anchor": [
-      27,
-      32
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      54,
-      48
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      27,
-      32
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      54,
-      48
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      27,
-      32
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      54,
-      48
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      27,
-      32
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      54,
-      48
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      27,
-      32
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      54,
-      48
-     ]
+     "height": 3.0
     }
    ]
   },
@@ -6029,64 +2159,19 @@
    "title": "마이크로채널 반응기",
    "variants": [
     {
-     "anchor": [
-      25,
-      27
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      50,
-      42
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      25,
-      27
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      50,
-      42
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      25,
-      39
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      50,
-      54
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      25,
-      31
-     ],
-     "height": 2.9,
-     "lights": true,
-     "px": [
-      50,
-      46
-     ]
+     "height": 2.9
     },
     {
-     "anchor": [
-      25,
-      25
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      50,
-      40
-     ]
+     "height": 2.4
     }
    ]
   },
@@ -6099,64 +2184,19 @@
    "title": "마이크로파 추출기",
    "variants": [
     {
-     "anchor": [
-      57,
-      46
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      103,
-      81
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      57,
-      46
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      103,
-      81
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      39,
-      36
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      85,
-      71
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      57,
-      46
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      103,
-      81
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      57,
-      46
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      103,
-      78
-     ]
+     "height": 3.6
     }
    ]
   },
@@ -6169,64 +2209,19 @@
    "title": "소형 전기분해기",
    "variants": [
     {
-     "anchor": [
-      22,
-      24
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      44,
-      37
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      22,
-      35
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      44,
-      48
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      22,
-      23
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      44,
-      36
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      22,
-      38
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      44,
-      51
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      22,
-      24
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      44,
-      37
-     ]
+     "height": 2.4
     }
    ]
   },
@@ -6239,64 +2234,19 @@
    "title": "분자체 흡착기",
    "variants": [
     {
-     "anchor": [
-      31,
-      38
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      62,
-      56
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      31,
-      34
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      62,
-      52
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      31,
-      38
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      62,
-      56
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      31,
-      34
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      62,
-      52
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      31,
-      53
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      62,
-      71
-     ]
+     "height": 3.4
     }
    ]
   },
@@ -6309,64 +2259,19 @@
    "title": "용융염 원자로",
    "variants": [
     {
-     "anchor": [
-      80,
-      110
-     ],
-     "height": 10.0,
-     "lights": true,
-     "px": [
-      170,
-      155
-     ]
+     "height": 10.0
     },
     {
-     "anchor": [
-      80,
-      110
-     ],
-     "height": 10.0,
-     "lights": true,
-     "px": [
-      169,
-      155
-     ]
+     "height": 10.0
     },
     {
-     "anchor": [
-      72,
-      110
-     ],
-     "height": 10.0,
-     "lights": true,
-     "px": [
-      162,
-      155
-     ]
+     "height": 10.0
     },
     {
-     "anchor": [
-      80,
-      113
-     ],
-     "height": 10.4,
-     "lights": true,
-     "px": [
-      170,
-      158
-     ]
+     "height": 10.4
     },
     {
-     "anchor": [
-      80,
-      100
-     ],
-     "height": 9.6,
-     "lights": true,
-     "px": [
-      170,
-      145
-     ]
+     "height": 9.6
     }
    ]
   },
@@ -6379,64 +2284,19 @@
    "title": "대형 전해 라인",
    "variants": [
     {
-     "anchor": [
-      73,
-      77
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      143,
-      115
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      73,
-      77
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      143,
-      115
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      73,
-      77
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      143,
-      115
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      73,
-      77
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      143,
-      115
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      73,
-      77
-     ],
-     "height": 7.4,
-     "lights": true,
-     "px": [
-      143,
-      115
-     ]
+     "height": 7.4
     }
    ]
   },
@@ -6449,64 +2309,19 @@
    "title": "용융 레골리스 전해조",
    "variants": [
     {
-     "anchor": [
-      49,
-      60
-     ],
-     "height": 6.5,
-     "lights": true,
-     "px": [
-      98,
-      87
-     ]
+     "height": 6.5
     },
     {
-     "anchor": [
-      49,
-      51
-     ],
-     "height": 5.4,
-     "lights": true,
-     "px": [
-      98,
-      78
-     ]
+     "height": 5.4
     },
     {
-     "anchor": [
-      49,
-      69
-     ],
-     "height": 7.6,
-     "lights": true,
-     "px": [
-      98,
-      96
-     ]
+     "height": 7.6
     },
     {
-     "anchor": [
-      49,
-      56
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      98,
-      83
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      49,
-      50
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      98,
-      77
-     ]
+     "height": 5.0
     }
    ]
   },
@@ -6519,64 +2334,19 @@
    "title": "다중 여과 정수장",
    "variants": [
     {
-     "anchor": [
-      42,
-      44
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      84,
-      67
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      42,
-      44
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      84,
-      67
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      42,
-      42
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      85,
-      65
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      42,
-      44
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      84,
-      67
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      42,
-      45
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      84,
-      68
-     ]
+     "height": 4.2
     }
    ]
   },
@@ -6589,64 +2359,19 @@
    "title": "니켈-수소 전지",
    "variants": [
     {
-     "anchor": [
-      32,
-      32
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      64,
-      50
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      32,
-      32
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      64,
-      50
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      32,
-      31
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      64,
-      49
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      32,
-      33
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      64,
-      51
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      32,
-      32
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      64,
-      50
-     ]
+     "height": 2.8
     }
    ]
   },
@@ -6659,64 +2384,19 @@
    "title": "부품 공장",
    "variants": [
     {
-     "anchor": [
-      50,
-      53
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      93,
-      79
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      43,
-      39
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      86,
-      64
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      49,
-      41
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      92,
-      65
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      49,
-      53
-     ],
-     "height": 6.4,
-     "lights": true,
-     "px": [
-      103,
-      82
-     ]
+     "height": 6.4
     },
     {
-     "anchor": [
-      43,
-      47
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      91,
-      71
-     ]
+     "height": 3.8
     }
    ]
   },
@@ -6729,64 +2409,19 @@
    "title": "고분자막 전기분해기",
    "variants": [
     {
-     "anchor": [
-      34,
-      37
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      68,
-      56
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      34,
-      37
-     ],
-     "height": 3.3,
-     "lights": true,
-     "px": [
-      68,
-      56
-     ]
+     "height": 3.3
     },
     {
-     "anchor": [
-      34,
-      37
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      68,
-      56
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      34,
-      38
-     ],
-     "height": 3.3,
-     "lights": true,
-     "px": [
-      68,
-      57
-     ]
+     "height": 3.3
     },
     {
-     "anchor": [
-      34,
-      52
-     ],
-     "height": 3.5,
-     "lights": true,
-     "px": [
-      68,
-      71
-     ]
+     "height": 3.5
     }
    ]
   },
@@ -6799,64 +2434,19 @@
    "title": "폴리에틸렌 대피소",
    "variants": [
     {
-     "anchor": [
-      40,
-      46
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      75,
-      65
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      40,
-      39
-     ],
-     "height": 3.1,
-     "lights": true,
-     "px": [
-      74,
-      58
-     ]
+     "height": 3.1
     },
     {
-     "anchor": [
-      39,
-      48
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      73,
-      67
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      40,
-      46
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      77,
-      66
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      41,
-      45
-     ],
-     "height": 3.3,
-     "lights": true,
-     "px": [
-      75,
-      64
-     ]
+     "height": 3.3
     }
    ]
   },
@@ -6869,64 +2459,19 @@
    "title": "감자 재배실",
    "variants": [
     {
-     "anchor": [
-      51,
-      64
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      99,
-      99
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      51,
-      64
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      99,
-      99
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      51,
-      64
-     ],
-     "height": 2.9,
-     "lights": true,
-     "px": [
-      99,
-      99
-     ]
+     "height": 2.9
     },
     {
-     "anchor": [
-      51,
-      64
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      99,
-      99
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      51,
-      64
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      99,
-      99
-     ]
+     "height": 3.2
     }
    ]
   },
@@ -6939,64 +2484,19 @@
    "title": "인쇄 거주동",
    "variants": [
     {
-     "anchor": [
-      53,
-      55
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      110,
-      83
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      53,
-      54
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      110,
-      84
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      53,
-      72
-     ],
-     "height": 5.4,
-     "lights": true,
-     "px": [
-      110,
-      100
-     ]
+     "height": 5.4
     },
     {
-     "anchor": [
-      53,
-      52
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      106,
-      83
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      69,
-      55
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      126,
-      85
-     ]
+     "height": 5.0
     }
    ]
   },
@@ -7009,64 +2509,19 @@
    "title": "추진제 공장",
    "variants": [
     {
-     "anchor": [
-      49,
-      89
-     ],
-     "height": 9.5,
-     "lights": true,
-     "px": [
-      98,
-      116
-     ]
+     "height": 9.5
     },
     {
-     "anchor": [
-      49,
-      47
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      98,
-      74
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      49,
-      39
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      98,
-      66
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      49,
-      92
-     ],
-     "height": 10.4,
-     "lights": true,
-     "px": [
-      98,
-      119
-     ]
+     "height": 10.4
     },
     {
-     "anchor": [
-      49,
-      84
-     ],
-     "height": 8.4,
-     "lights": true,
-     "px": [
-      98,
-      111
-     ]
+     "height": 8.4
     }
    ]
   },
@@ -7079,64 +2534,19 @@
    "title": "방열판",
    "variants": [
     {
-     "anchor": [
-      31,
-      59
-     ],
-     "height": 6.8,
-     "lights": false,
-     "px": [
-      62,
-      77
-     ]
+     "height": 6.8
     },
     {
-     "anchor": [
-      31,
-      57
-     ],
-     "height": 6.4,
-     "lights": false,
-     "px": [
-      62,
-      75
-     ]
+     "height": 6.4
     },
     {
-     "anchor": [
-      31,
-      64
-     ],
-     "height": 7.4,
-     "lights": false,
-     "px": [
-      62,
-      82
-     ]
+     "height": 7.4
     },
     {
-     "anchor": [
-      32,
-      56
-     ],
-     "height": 5.6,
-     "lights": false,
-     "px": [
-      64,
-      74
-     ]
+     "height": 5.6
     },
     {
-     "anchor": [
-      33,
-      35
-     ],
-     "height": 3.2,
-     "lights": false,
-     "px": [
-      66,
-      53
-     ]
+     "height": 3.2
     }
    ]
   },
@@ -7149,64 +2559,19 @@
    "title": "래서 굴착 로봇",
    "variants": [
     {
-     "anchor": [
-      19,
-      18
-     ],
-     "height": 1.6,
-     "lights": true,
-     "px": [
-      38,
-      29
-     ]
+     "height": 1.6
     },
     {
-     "anchor": [
-      19,
-      24
-     ],
-     "height": 1.8,
-     "lights": true,
-     "px": [
-      38,
-      35
-     ]
+     "height": 1.8
     },
     {
-     "anchor": [
-      19,
-      18
-     ],
-     "height": 1.4,
-     "lights": true,
-     "px": [
-      38,
-      29
-     ]
+     "height": 1.4
     },
     {
-     "anchor": [
-      19,
-      24
-     ],
-     "height": 1.8,
-     "lights": true,
-     "px": [
-      38,
-      35
-     ]
+     "height": 1.8
     },
     {
-     "anchor": [
-      23,
-      18
-     ],
-     "height": 1.6,
-     "lights": true,
-     "px": [
-      46,
-      31
-     ]
+     "height": 1.6
     }
    ]
   },
@@ -7219,64 +2584,19 @@
    "title": "레골리스 차폐 돔",
    "variants": [
     {
-     "anchor": [
-      62,
-      49
-     ],
-     "height": 5.2,
-     "lights": true,
-     "px": [
-      124,
-      82
-     ]
+     "height": 5.2
     },
     {
-     "anchor": [
-      60,
-      72
-     ],
-     "height": 5.4,
-     "lights": true,
-     "px": [
-      120,
-      104
-     ]
+     "height": 5.4
     },
     {
-     "anchor": [
-      58,
-      48
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      116,
-      84
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      63,
-      54
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      123,
-      86
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      62,
-      48
-     ],
-     "height": 5.6,
-     "lights": true,
-     "px": [
-      126,
-      84
-     ]
+     "height": 5.6
     }
    ]
   },
@@ -7289,64 +2609,19 @@
    "title": "레골리스 3D 프린터",
    "variants": [
     {
-     "anchor": [
-      55,
-      79
-     ],
-     "height": 7.2,
-     "lights": true,
-     "px": [
-      110,
-      109
-     ]
+     "height": 7.2
     },
     {
-     "anchor": [
-      47,
-      46
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      94,
-      71
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      54,
-      78
-     ],
-     "height": 7.4,
-     "lights": true,
-     "px": [
-      108,
-      107
-     ]
+     "height": 7.4
     },
     {
-     "anchor": [
-      57,
-      75
-     ],
-     "height": 6.6,
-     "lights": true,
-     "px": [
-      105,
-      101
-     ]
+     "height": 6.6
     },
     {
-     "anchor": [
-      53,
-      27
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      100,
-      53
-     ]
+     "height": 2.4
     }
    ]
   },
@@ -7359,64 +2634,19 @@
    "title": "레골리스 열 저장소",
    "variants": [
     {
-     "anchor": [
-      44,
-      43
-     ],
-     "height": 1.2,
-     "lights": true,
-     "px": [
-      86,
-      79
-     ]
+     "height": 1.2
     },
     {
-     "anchor": [
-      44,
-      43
-     ],
-     "height": 1.2,
-     "lights": true,
-     "px": [
-      86,
-      79
-     ]
+     "height": 1.2
     },
     {
-     "anchor": [
-      43,
-      43
-     ],
-     "height": 1.2,
-     "lights": true,
-     "px": [
-      85,
-      79
-     ]
+     "height": 1.2
     },
     {
-     "anchor": [
-      44,
-      43
-     ],
-     "height": 1.4,
-     "lights": true,
-     "px": [
-      86,
-      79
-     ]
+     "height": 1.4
     },
     {
-     "anchor": [
-      44,
-      43
-     ],
-     "height": 1.2,
-     "lights": true,
-     "px": [
-      86,
-      79
-     ]
+     "height": 1.2
     }
    ]
   },
@@ -7429,64 +2659,19 @@
    "title": "레골리스 체질기",
    "variants": [
     {
-     "anchor": [
-      47,
-      41
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      77,
-      58
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      47,
-      41
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      77,
-      58
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      37,
-      40
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      67,
-      57
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      47,
-      41
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      77,
-      58
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      47,
-      41
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      77,
-      58
-     ]
+     "height": 3.6
     }
    ]
   },
@@ -7499,64 +2684,19 @@
    "title": "재활 운동실",
    "variants": [
     {
-     "anchor": [
-      42,
-      53
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      80,
-      74
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      42,
-      53
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      80,
-      74
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      42,
-      53
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      80,
-      74
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      42,
-      53
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      80,
-      74
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      42,
-      53
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      80,
-      74
-     ]
+     "height": 4.2
     }
    ]
   },
@@ -7569,64 +2709,19 @@
    "title": "연구동",
    "variants": [
     {
-     "anchor": [
-      44,
-      55
-     ],
-     "height": 7.5,
-     "lights": true,
-     "px": [
-      88,
-      79
-     ]
+     "height": 7.5
     },
     {
-     "anchor": [
-      44,
-      47
-     ],
-     "height": 6.4,
-     "lights": true,
-     "px": [
-      88,
-      71
-     ]
+     "height": 6.4
     },
     {
-     "anchor": [
-      44,
-      55
-     ],
-     "height": 7.2,
-     "lights": true,
-     "px": [
-      88,
-      79
-     ]
+     "height": 7.2
     },
     {
-     "anchor": [
-      44,
-      45
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      88,
-      69
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      44,
-      59
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      84,
-      84
-     ]
+     "height": 4.6
     }
    ]
   },
@@ -7639,64 +2734,19 @@
    "title": "대형 재생 연료전지",
    "variants": [
     {
-     "anchor": [
-      44,
-      39
-     ],
-     "height": 3.9,
-     "lights": true,
-     "px": [
-      88,
-      63
-     ]
+     "height": 3.9
     },
     {
-     "anchor": [
-      44,
-      39
-     ],
-     "height": 3.9,
-     "lights": true,
-     "px": [
-      88,
-      63
-     ]
+     "height": 3.9
     },
     {
-     "anchor": [
-      44,
-      38
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      88,
-      62
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      44,
-      46
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      88,
-      70
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      44,
-      39
-     ],
-     "height": 3.9,
-     "lights": true,
-     "px": [
-      88,
-      63
-     ]
+     "height": 3.9
     }
    ]
   },
@@ -7709,64 +2759,19 @@
    "title": "재생 연료전지",
    "variants": [
     {
-     "anchor": [
-      29,
-      26
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      58,
-      43
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      29,
-      27
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      58,
-      44
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      29,
-      34
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      58,
-      51
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      29,
-      30
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      58,
-      47
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      29,
-      26
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      58,
-      43
-     ]
+     "height": 2.6
     }
    ]
   },
@@ -7779,64 +2784,19 @@
    "title": "로봇 정비고",
    "variants": [
     {
-     "anchor": [
-      49,
-      40
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      98,
-      67
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      49,
-      47
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      98,
-      74
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      49,
-      49
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      98,
-      76
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      49,
-      37
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      98,
-      64
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      49,
-      32
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      98,
-      59
-     ]
+     "height": 3.2
     }
    ]
   },
@@ -7849,64 +2809,19 @@
    "title": "대형 정비 기지",
    "variants": [
     {
-     "anchor": [
-      70,
-      65
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      140,
-      102
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      70,
-      65
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      140,
-      102
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      70,
-      65
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      140,
-      102
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      70,
-      65
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      140,
-      102
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      70,
-      65
-     ],
-     "height": 6.4,
-     "lights": true,
-     "px": [
-      140,
-      102
-     ]
+     "height": 6.4
     }
    ]
   },
@@ -7919,64 +2834,19 @@
    "title": "로봇 차고",
    "variants": [
     {
-     "anchor": [
-      34,
-      46
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      68,
-      67
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      34,
-      46
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      68,
-      67
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      34,
-      46
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      68,
-      67
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      34,
-      46
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      68,
-      67
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      34,
-      46
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      68,
-      67
-     ]
+     "height": 3.0
     }
    ]
   },
@@ -7989,64 +2859,19 @@
    "title": "대피 차량",
    "variants": [
     {
-     "anchor": [
-      40,
-      44
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      87,
-      64
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      40,
-      44
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      87,
-      64
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      40,
-      46
-     ],
-     "height": 3.9,
-     "lights": true,
-     "px": [
-      87,
-      66
-     ]
+     "height": 3.9
     },
     {
-     "anchor": [
-      40,
-      41
-     ],
-     "height": 3.3,
-     "lights": true,
-     "px": [
-      87,
-      61
-     ]
+     "height": 3.3
     },
     {
-     "anchor": [
-      40,
-      45
-     ],
-     "height": 3.7,
-     "lights": true,
-     "px": [
-      87,
-      65
-     ]
+     "height": 3.7
     }
    ]
   },
@@ -8059,64 +2884,19 @@
    "title": "방사성동위원소 발전기",
    "variants": [
     {
-     "anchor": [
-      15,
-      22
-     ],
-     "height": 1.8,
-     "lights": true,
-     "px": [
-      31,
-      31
-     ]
+     "height": 1.8
     },
     {
-     "anchor": [
-      15,
-      19
-     ],
-     "height": 1.8,
-     "lights": true,
-     "px": [
-      30,
-      28
-     ]
+     "height": 1.8
     },
     {
-     "anchor": [
-      15,
-      20
-     ],
-     "height": 1.7,
-     "lights": true,
-     "px": [
-      30,
-      29
-     ]
+     "height": 1.7
     },
     {
-     "anchor": [
-      16,
-      22
-     ],
-     "height": 1.8,
-     "lights": true,
-     "px": [
-      31,
-      32
-     ]
+     "height": 1.8
     },
     {
-     "anchor": [
-      15,
-      19
-     ],
-     "height": 1.8,
-     "lights": true,
-     "px": [
-      30,
-      28
-     ]
+     "height": 1.8
     }
    ]
   },
@@ -8129,64 +2909,19 @@
    "title": "사바티에 반응기",
    "variants": [
     {
-     "anchor": [
-      32,
-      38
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      64,
-      56
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      32,
-      41
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      64,
-      59
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      32,
-      29
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      64,
-      47
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      32,
-      42
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      64,
-      60
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      32,
-      50
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      64,
-      68
-     ]
+     "height": 5.0
     }
    ]
   },
@@ -8199,64 +2934,19 @@
    "title": "소형 사바티에 반응기",
    "variants": [
     {
-     "anchor": [
-      20,
-      25
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      40,
-      37
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      20,
-      23
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      40,
-      35
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      20,
-      25
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      40,
-      37
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      20,
-      23
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      40,
-      35
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      20,
-      27
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      40,
-      39
-     ]
+     "height": 2.6
     }
    ]
   },
@@ -8269,116 +2959,44 @@
    "title": "대형 사바티에 반응기",
    "variants": [
     {
-     "anchor": [
-      40,
-      34
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      80,
-      56
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      40,
-      34
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      80,
-      56
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      40,
-      34
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      80,
-      56
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      40,
-      34
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      80,
-      56
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      40,
-      42
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      80,
-      64
-     ]
+     "height": 4.0
     }
    ]
   },
   "scaffold_l": {
-   "anchor": [
-    78,
-    76
-   ],
    "foot": [
     14,
     12
    ],
    "height": 5.0,
-   "lights": true,
-   "px": [
-    156,
-    117
-   ],
    "title": "공사 중 (큰 건물)"
   },
   "scaffold_m": {
-   "anchor": [
-    47,
-    53
-   ],
    "foot": [
     9,
     6
    ],
    "height": 4.0,
-   "lights": true,
-   "px": [
-    94,
-    78
-   ],
    "title": "공사 중 (중간 건물)"
   },
   "scaffold_s": {
-   "anchor": [
-    30,
-    38
-   ],
    "foot": [
     5,
     4
    ],
    "height": 3.0,
-   "lights": true,
-   "px": [
-    60,
-    55
-   ],
    "title": "공사 중 (작은 건물)"
   },
   "seed_vault": {
@@ -8390,64 +3008,19 @@
    "title": "종자 금고",
    "variants": [
     {
-     "anchor": [
-      34,
-      32
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      77,
-      55
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      34,
-      32
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      77,
-      55
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      34,
-      36
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      77,
-      58
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      34,
-      31
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      77,
-      55
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      34,
-      32
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      77,
-      55
-     ]
+     "height": 2.6
     }
    ]
   },
@@ -8460,64 +3033,19 @@
    "title": "소결 착륙장",
    "variants": [
     {
-     "anchor": [
-      171,
-      70
-     ],
-     "height": 0.6,
-     "lights": true,
-     "px": [
-      342,
-      133
-     ]
+     "height": 0.6
     },
     {
-     "anchor": [
-      171,
-      70
-     ],
-     "height": 0.6,
-     "lights": true,
-     "px": [
-      342,
-      133
-     ]
+     "height": 0.6
     },
     {
-     "anchor": [
-      171,
-      70
-     ],
-     "height": 0.6,
-     "lights": true,
-     "px": [
-      342,
-      133
-     ]
+     "height": 0.6
     },
     {
-     "anchor": [
-      171,
-      70
-     ],
-     "height": 0.6,
-     "lights": true,
-     "px": [
-      342,
-      133
-     ]
+     "height": 0.6
     },
     {
-     "anchor": [
-      171,
-      70
-     ],
-     "height": 0.6,
-     "lights": true,
-     "px": [
-      342,
-      154
-     ]
+     "height": 0.6
     }
    ]
   },
@@ -8530,64 +3058,19 @@
    "title": "나트륨이온 배터리",
    "variants": [
     {
-     "anchor": [
-      35,
-      34
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      70,
-      54
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      35,
-      34
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      70,
-      54
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      35,
-      33
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      70,
-      53
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      35,
-      33
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      70,
-      53
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      35,
-      34
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      70,
-      54
-     ]
+     "height": 2.6
     }
    ]
   },
@@ -8600,64 +3083,19 @@
    "title": "고체산화물 전기분해기",
    "variants": [
     {
-     "anchor": [
-      42,
-      42
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      79,
-      62
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      42,
-      42
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      79,
-      62
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      41,
-      45
-     ],
-     "height": 3.9,
-     "lights": true,
-     "px": [
-      78,
-      65
-     ]
+     "height": 3.9
     },
     {
-     "anchor": [
-      43,
-      40
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      80,
-      60
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      42,
-      41
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      79,
-      61
-     ]
+     "height": 3.8
     }
    ]
   },
@@ -8670,64 +3108,19 @@
    "title": "태양 집광 소결기",
    "variants": [
     {
-     "anchor": [
-      41,
-      47
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      86,
-      69
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      42,
-      47
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      87,
-      68
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      41,
-      47
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      86,
-      69
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      41,
-      41
-     ],
-     "height": 4.8,
-     "lights": true,
-     "px": [
-      86,
-      63
-     ]
+     "height": 4.8
     },
     {
-     "anchor": [
-      41,
-      47
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      78,
-      69
-     ]
+     "height": 6.0
     }
    ]
   },
@@ -8740,64 +3133,19 @@
    "title": "수직 태양광 타워",
    "variants": [
     {
-     "anchor": [
-      24,
-      165
-     ],
-     "height": 22.0,
-     "lights": true,
-     "px": [
-      48,
-      179
-     ]
+     "height": 22.0
     },
     {
-     "anchor": [
-      24,
-      152
-     ],
-     "height": 21.0,
-     "lights": true,
-     "px": [
-      48,
-      166
-     ]
+     "height": 21.0
     },
     {
-     "anchor": [
-      28,
-      147
-     ],
-     "height": 20.0,
-     "lights": true,
-     "px": [
-      56,
-      161
-     ]
+     "height": 20.0
     },
     {
-     "anchor": [
-      23,
-      188
-     ],
-     "height": 26.0,
-     "lights": true,
-     "px": [
-      46,
-      202
-     ]
+     "height": 26.0
     },
     {
-     "anchor": [
-      25,
-      161
-     ],
-     "height": 22.0,
-     "lights": true,
-     "px": [
-      50,
-      175
-     ]
+     "height": 22.0
     }
    ]
   },
@@ -8810,64 +3158,19 @@
    "title": "전고체 배터리",
    "variants": [
     {
-     "anchor": [
-      33,
-      33
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      69,
-      51
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      33,
-      33
-     ],
-     "height": 2.9,
-     "lights": true,
-     "px": [
-      69,
-      51
-     ]
+     "height": 2.9
     },
     {
-     "anchor": [
-      33,
-      33
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      69,
-      51
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      37,
-      33
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      70,
-      51
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      33,
-      33
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      69,
-      51
-     ]
+     "height": 2.4
     }
    ]
   },
@@ -8880,64 +3183,19 @@
    "title": "스피룰리나 배양조",
    "variants": [
     {
-     "anchor": [
-      39,
-      48
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      75,
-      75
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      39,
-      48
-     ],
-     "height": 2.4,
-     "lights": true,
-     "px": [
-      75,
-      75
-     ]
+     "height": 2.4
     },
     {
-     "anchor": [
-      39,
-      48
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      75,
-      75
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      39,
-      48
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      75,
-      75
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      39,
-      48
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      75,
-      75
-     ]
+     "height": 3.0
     }
    ]
   },
@@ -8950,64 +3208,19 @@
    "title": "저중력 스포츠 돔",
    "variants": [
     {
-     "anchor": [
-      93,
-      113
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      186,
-      187
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      93,
-      113
-     ],
-     "height": 6.6,
-     "lights": true,
-     "px": [
-      186,
-      187
-     ]
+     "height": 6.6
     },
     {
-     "anchor": [
-      93,
-      113
-     ],
-     "height": 7.4,
-     "lights": true,
-     "px": [
-      186,
-      187
-     ]
+     "height": 7.4
     },
     {
-     "anchor": [
-      93,
-      113
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      186,
-      187
-     ]
+     "height": 7.0
     },
     {
-     "anchor": [
-      99,
-      113
-     ],
-     "height": 7.0,
-     "lights": true,
-     "px": [
-      198,
-      187
-     ]
+     "height": 7.0
     }
    ]
   },
@@ -9020,64 +3233,19 @@
    "title": "폭풍 대피소",
    "variants": [
     {
-     "anchor": [
-      46,
-      59
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      92,
-      84
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      48,
-      47
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      92,
-      71
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      46,
-      55
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      94,
-      80
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      44,
-      29
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      87,
-      53
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      47,
-      35
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      93,
-      60
-     ]
+     "height": 3.4
     }
    ]
   },
@@ -9090,64 +3258,19 @@
    "title": "승화 정제 공장",
    "variants": [
     {
-     "anchor": [
-      55,
-      63
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      110,
-      93
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      55,
-      63
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      110,
-      93
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      55,
-      63
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      110,
-      93
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      55,
-      63
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      110,
-      93
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      55,
-      63
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      110,
-      93
-     ]
+     "height": 5.0
     }
    ]
   },
@@ -9160,64 +3283,19 @@
    "title": "초고용량 축전기",
    "variants": [
     {
-     "anchor": [
-      22,
-      24
-     ],
-     "height": 2.0,
-     "lights": true,
-     "px": [
-      44,
-      37
-     ]
+     "height": 2.0
     },
     {
-     "anchor": [
-      22,
-      24
-     ],
-     "height": 2.1,
-     "lights": true,
-     "px": [
-      44,
-      37
-     ]
+     "height": 2.1
     },
     {
-     "anchor": [
-      22,
-      27
-     ],
-     "height": 2.2,
-     "lights": true,
-     "px": [
-      44,
-      40
-     ]
+     "height": 2.2
     },
     {
-     "anchor": [
-      22,
-      24
-     ],
-     "height": 2.0,
-     "lights": true,
-     "px": [
-      44,
-      37
-     ]
+     "height": 2.0
     },
     {
-     "anchor": [
-      22,
-      24
-     ],
-     "height": 2.0,
-     "lights": true,
-     "px": [
-      44,
-      37
-     ]
+     "height": 2.0
     }
    ]
   },
@@ -9230,64 +3308,19 @@
    "title": "수술 센터",
    "variants": [
     {
-     "anchor": [
-      46,
-      57
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      103,
-      86
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      46,
-      57
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      103,
-      86
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      46,
-      59
-     ],
-     "height": 4.8,
-     "lights": true,
-     "px": [
-      103,
-      88
-     ]
+     "height": 4.8
     },
     {
-     "anchor": [
-      46,
-      56
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      103,
-      85
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      46,
-      57
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      103,
-      86
-     ]
+     "height": 4.6
     }
    ]
   },
@@ -9300,64 +3333,19 @@
    "title": "수직 방열탑",
    "variants": [
     {
-     "anchor": [
-      23,
-      98
-     ],
-     "height": 12.0,
-     "lights": true,
-     "px": [
-      46,
-      112
-     ]
+     "height": 12.0
     },
     {
-     "anchor": [
-      23,
-      98
-     ],
-     "height": 12.0,
-     "lights": true,
-     "px": [
-      46,
-      112
-     ]
+     "height": 12.0
     },
     {
-     "anchor": [
-      23,
-      101
-     ],
-     "height": 12.4,
-     "lights": true,
-     "px": [
-      46,
-      115
-     ]
+     "height": 12.4
     },
     {
-     "anchor": [
-      23,
-      95
-     ],
-     "height": 11.6,
-     "lights": true,
-     "px": [
-      46,
-      110
-     ]
+     "height": 11.6
     },
     {
-     "anchor": [
-      23,
-      98
-     ],
-     "height": 12.0,
-     "lights": true,
-     "px": [
-      46,
-      112
-     ]
+     "height": 12.0
     }
    ]
   },
@@ -9370,64 +3358,19 @@
    "title": "50 m 트러스 타워",
    "variants": [
     {
-     "anchor": [
-      42,
-      265
-     ],
-     "height": 36.4,
-     "lights": true,
-     "px": [
-      84,
-      288
-     ]
+     "height": 36.4
     },
     {
-     "anchor": [
-      42,
-      265
-     ],
-     "height": 36.4,
-     "lights": true,
-     "px": [
-      84,
-      288
-     ]
+     "height": 36.4
     },
     {
-     "anchor": [
-      30,
-      265
-     ],
-     "height": 36.4,
-     "lights": true,
-     "px": [
-      62,
-      286
-     ]
+     "height": 36.4
     },
     {
-     "anchor": [
-      42,
-      265
-     ],
-     "height": 36.4,
-     "lights": true,
-     "px": [
-      84,
-      288
-     ]
+     "height": 36.4
     },
     {
-     "anchor": [
-      42,
-      265
-     ],
-     "height": 37.2,
-     "lights": true,
-     "px": [
-      84,
-      288
-     ]
+     "height": 37.2
     }
    ]
   },
@@ -9440,64 +3383,19 @@
    "title": "저장 탱크",
    "variants": [
     {
-     "anchor": [
-      44,
-      39
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      88,
-      63
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      44,
-      38
-     ],
-     "height": 3.4,
-     "lights": true,
-     "px": [
-      88,
-      62
-     ]
+     "height": 3.4
     },
     {
-     "anchor": [
-      44,
-      54
-     ],
-     "height": 5.4,
-     "lights": true,
-     "px": [
-      88,
-      78
-     ]
+     "height": 5.4
     },
     {
-     "anchor": [
-      44,
-      33
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      88,
-      57
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      44,
-      44
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      88,
-      68
-     ]
+     "height": 5.0
     }
    ]
   },
@@ -9510,64 +3408,19 @@
    "title": "원격 진료실",
    "variants": [
     {
-     "anchor": [
-      32,
-      42
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      61,
-      58
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      32,
-      41
-     ],
-     "height": 4.2,
-     "lights": true,
-     "px": [
-      61,
-      57
-     ]
+     "height": 4.2
     },
     {
-     "anchor": [
-      32,
-      37
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      61,
-      53
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      32,
-      43
-     ],
-     "height": 4.0,
-     "lights": true,
-     "px": [
-      61,
-      59
-     ]
+     "height": 4.0
     },
     {
-     "anchor": [
-      32,
-      42
-     ],
-     "height": 4.1,
-     "lights": true,
-     "px": [
-      61,
-      58
-     ]
+     "height": 4.1
     }
    ]
   },
@@ -9580,64 +3433,19 @@
    "title": "원격 조종실",
    "variants": [
     {
-     "anchor": [
-      42,
-      49
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      84,
-      72
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      42,
-      49
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      84,
-      72
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      42,
-      49
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      84,
-      72
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      42,
-      50
-     ],
-     "height": 4.4,
-     "lights": true,
-     "px": [
-      84,
-      73
-     ]
+     "height": 4.4
     },
     {
-     "anchor": [
-      42,
-      49
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      84,
-      72
-     ]
+     "height": 4.6
     }
    ]
   },
@@ -9650,64 +3458,19 @@
    "title": "공연장",
    "variants": [
     {
-     "anchor": [
-      52,
-      60
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      126,
-      112
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      52,
-      60
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      126,
-      112
-     ]
+     "height": 5.0
     },
     {
-     "anchor": [
-      52,
-      69
-     ],
-     "height": 5.4,
-     "lights": true,
-     "px": [
-      126,
-      121
-     ]
+     "height": 5.4
     },
     {
-     "anchor": [
-      52,
-      58
-     ],
-     "height": 4.6,
-     "lights": true,
-     "px": [
-      126,
-      110
-     ]
+     "height": 4.6
     },
     {
-     "anchor": [
-      52,
-      61
-     ],
-     "height": 5.0,
-     "lights": true,
-     "px": [
-      126,
-      113
-     ]
+     "height": 5.0
     }
    ]
   },
@@ -9720,64 +3483,19 @@
    "title": "열 저장 와디",
    "variants": [
     {
-     "anchor": [
-      39,
-      43
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      73,
-      67
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      41,
-      43
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      75,
-      67
-     ]
+     "height": 2.6
     },
     {
-     "anchor": [
-      39,
-      43
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      73,
-      67
-     ]
+     "height": 2.8
     },
     {
-     "anchor": [
-      39,
-      42
-     ],
-     "height": 2.5,
-     "lights": true,
-     "px": [
-      73,
-      67
-     ]
+     "height": 2.5
     },
     {
-     "anchor": [
-      34,
-      43
-     ],
-     "height": 2.6,
-     "lights": true,
-     "px": [
-      73,
-      67
-     ]
+     "height": 2.6
     }
    ]
   },
@@ -9790,64 +3508,19 @@
    "title": "추적식 타워",
    "variants": [
     {
-     "anchor": [
-      28,
-      181
-     ],
-     "height": 24.0,
-     "lights": true,
-     "px": [
-      54,
-      196
-     ]
+     "height": 24.0
     },
     {
-     "anchor": [
-      30,
-      180
-     ],
-     "height": 23.6,
-     "lights": true,
-     "px": [
-      56,
-      195
-     ]
+     "height": 23.6
     },
     {
-     "anchor": [
-      26,
-      180
-     ],
-     "height": 24.2,
-     "lights": true,
-     "px": [
-      52,
-      195
-     ]
+     "height": 24.2
     },
     {
-     "anchor": [
-      30,
-      181
-     ],
-     "height": 24.0,
-     "lights": true,
-     "px": [
-      56,
-      196
-     ]
+     "height": 24.0
     },
     {
-     "anchor": [
-      26,
-      179
-     ],
-     "height": 23.6,
-     "lights": true,
-     "px": [
-      52,
-      199
-     ]
+     "height": 23.6
     }
    ]
   },
@@ -9860,64 +3533,19 @@
    "title": "대형 팽창 거주동",
    "variants": [
     {
-     "anchor": [
-      46,
-      59
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      89,
-      86
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      46,
-      60
-     ],
-     "height": 6.2,
-     "lights": true,
-     "px": [
-      88,
-      83
-     ]
+     "height": 6.2
     },
     {
-     "anchor": [
-      51,
-      59
-     ],
-     "height": 6.0,
-     "lights": true,
-     "px": [
-      102,
-      86
-     ]
+     "height": 6.0
     },
     {
-     "anchor": [
-      46,
-      62
-     ],
-     "height": 5.6,
-     "lights": true,
-     "px": [
-      90,
-      90
-     ]
+     "height": 5.6
     },
     {
-     "anchor": [
-      46,
-      60
-     ],
-     "height": 6.1,
-     "lights": true,
-     "px": [
-      89,
-      83
-     ]
+     "height": 6.1
     }
    ]
   },
@@ -9930,64 +3558,19 @@
    "title": "증기 압축 증류기",
    "variants": [
     {
-     "anchor": [
-      28,
-      29
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      56,
-      45
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      28,
-      29
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      56,
-      45
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      28,
-      29
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      56,
-      45
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      28,
-      29
-     ],
-     "height": 3.2,
-     "lights": true,
-     "px": [
-      56,
-      45
-     ]
+     "height": 3.2
     },
     {
-     "anchor": [
-      28,
-      40
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      56,
-      56
-     ]
+     "height": 3.0
     }
    ]
   },
@@ -10000,64 +3583,19 @@
    "title": "수직 농장",
    "variants": [
     {
-     "anchor": [
-      58,
-      110
-     ],
-     "height": 12.0,
-     "lights": true,
-     "px": [
-      106,
-      136
-     ]
+     "height": 12.0
     },
     {
-     "anchor": [
-      48,
-      100
-     ],
-     "height": 11.4,
-     "lights": true,
-     "px": [
-      96,
-      126
-     ]
+     "height": 11.4
     },
     {
-     "anchor": [
-      58,
-      110
-     ],
-     "height": 12.0,
-     "lights": true,
-     "px": [
-      106,
-      136
-     ]
+     "height": 12.0
     },
     {
-     "anchor": [
-      48,
-      100
-     ],
-     "height": 11.4,
-     "lights": true,
-     "px": [
-      96,
-      126
-     ]
+     "height": 11.4
     },
     {
-     "anchor": [
-      58,
-      113
-     ],
-     "height": 12.4,
-     "lights": true,
-     "px": [
-      106,
-      139
-     ]
+     "height": 12.4
     }
    ]
   },
@@ -10070,64 +3608,19 @@
    "title": "매립 물탱크",
    "variants": [
     {
-     "anchor": [
-      50,
-      32
-     ],
-     "height": 1.5,
-     "lights": true,
-     "px": [
-      101,
-      58
-     ]
+     "height": 1.5
     },
     {
-     "anchor": [
-      50,
-      29
-     ],
-     "height": 1.5,
-     "lights": true,
-     "px": [
-      101,
-      53
-     ]
+     "height": 1.5
     },
     {
-     "anchor": [
-      50,
-      32
-     ],
-     "height": 1.6,
-     "lights": true,
-     "px": [
-      101,
-      58
-     ]
+     "height": 1.6
     },
     {
-     "anchor": [
-      50,
-      32
-     ],
-     "height": 1.5,
-     "lights": true,
-     "px": [
-      101,
-      56
-     ]
+     "height": 1.5
     },
     {
-     "anchor": [
-      50,
-      29
-     ],
-     "height": 1.5,
-     "lights": true,
-     "px": [
-      101,
-      53
-     ]
+     "height": 1.5
     }
    ]
   },
@@ -10140,64 +3633,19 @@
    "title": "물 재활용기",
    "variants": [
     {
-     "anchor": [
-      32,
-      51
-     ],
-     "height": 5.2,
-     "lights": true,
-     "px": [
-      64,
-      69
-     ]
+     "height": 5.2
     },
     {
-     "anchor": [
-      32,
-      50
-     ],
-     "height": 5.2,
-     "lights": true,
-     "px": [
-      64,
-      68
-     ]
+     "height": 5.2
     },
     {
-     "anchor": [
-      32,
-      33
-     ],
-     "height": 3.0,
-     "lights": true,
-     "px": [
-      64,
-      51
-     ]
+     "height": 3.0
     },
     {
-     "anchor": [
-      32,
-      37
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      64,
-      55
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      32,
-      32
-     ],
-     "height": 2.8,
-     "lights": true,
-     "px": [
-      64,
-      50
-     ]
+     "height": 2.8
     }
    ]
   },
@@ -10210,70 +3658,23 @@
    "title": "밀 재배실",
    "variants": [
     {
-     "anchor": [
-      56,
-      69
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      114,
-      104
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      56,
-      69
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      114,
-      104
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      56,
-      69
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      114,
-      104
-     ]
+     "height": 3.8
     },
     {
-     "anchor": [
-      56,
-      69
-     ],
-     "height": 3.6,
-     "lights": true,
-     "px": [
-      114,
-      104
-     ]
+     "height": 3.6
     },
     {
-     "anchor": [
-      56,
-      69
-     ],
-     "height": 3.8,
-     "lights": true,
-     "px": [
-      114,
-      104
-     ]
+     "height": 3.8
     }
    ]
   }
  },
- "projection": "orthographic, azimuth 45°, elevation 30°",
- "px_per_m": 8.0,
  "vehicles": {
   "astronaut": {
    "dims": [
@@ -10284,52 +3685,6 @@
    "flying": false,
    "group": "people",
    "title": "우주비행사 (키 1.85 m)",
-   "views": {
-    "ne": {
-     "anchor": [
-      8,
-      17
-     ],
-     "lights": false,
-     "px": [
-      15,
-      23
-     ]
-    },
-    "nw": {
-     "anchor": [
-      7,
-      17
-     ],
-     "lights": false,
-     "px": [
-      15,
-      23
-     ]
-    },
-    "se": {
-     "anchor": [
-      8,
-      17
-     ],
-     "lights": false,
-     "px": [
-      15,
-      23
-     ]
-    },
-    "sw": {
-     "anchor": [
-      7,
-      17
-     ],
-     "lights": false,
-     "px": [
-      15,
-      23
-     ]
-    }
-   },
    "world": "달"
   },
   "builder_robot": {
@@ -10341,52 +3696,6 @@
    "flying": false,
    "group": "ground",
    "title": "건설 로봇",
-   "views": {
-    "ne": {
-     "anchor": [
-      28,
-      33
-     ],
-     "lights": true,
-     "px": [
-      56,
-      49
-     ]
-    },
-    "nw": {
-     "anchor": [
-      28,
-      35
-     ],
-     "lights": true,
-     "px": [
-      56,
-      51
-     ]
-    },
-    "se": {
-     "anchor": [
-      28,
-      33
-     ],
-     "lights": true,
-     "px": [
-      56,
-      49
-     ]
-    },
-    "sw": {
-     "anchor": [
-      28,
-      33
-     ],
-     "lights": true,
-     "px": [
-      56,
-      49
-     ]
-    }
-   },
    "world": "달"
   },
   "cargo_hauler": {
@@ -10398,59 +3707,9 @@
    "flying": false,
    "group": "ground",
    "title": "화물 운반차",
-   "views": {
-    "ne": {
-     "anchor": [
-      26,
-      31
-     ],
-     "lights": true,
-     "px": [
-      55,
-      45
-     ]
-    },
-    "nw": {
-     "anchor": [
-      29,
-      31
-     ],
-     "lights": true,
-     "px": [
-      55,
-      45
-     ]
-    },
-    "se": {
-     "anchor": [
-      26,
-      33
-     ],
-     "lights": true,
-     "px": [
-      55,
-      47
-     ]
-    },
-    "sw": {
-     "anchor": [
-      29,
-      33
-     ],
-     "lights": true,
-     "px": [
-      55,
-      47
-     ]
-    }
-   },
    "world": "달"
   },
   "cargo_lander": {
-   "anchor": [
-    44,
-    48
-   ],
    "dims": [
     9.6,
     9.6,
@@ -10458,19 +3717,10 @@
    ],
    "flying": false,
    "group": "space",
-   "lights": true,
-   "px": [
-    88,
-    72
-   ],
    "title": "화물 착륙선",
    "world": "달"
   },
   "crew_lander": {
-   "anchor": [
-    49,
-    126
-   ],
    "dims": [
     10.0,
     10.0,
@@ -10478,11 +3728,6 @@
    ],
    "flying": false,
    "group": "space",
-   "lights": true,
-   "px": [
-    98,
-    151
-   ],
    "title": "유인 착륙선",
    "world": "달"
   },
@@ -10495,59 +3740,9 @@
    "flying": false,
    "group": "ground",
    "title": "굴착 로봇",
-   "views": {
-    "ne": {
-     "anchor": [
-      20,
-      19
-     ],
-     "lights": true,
-     "px": [
-      40,
-      29
-     ]
-    },
-    "nw": {
-     "anchor": [
-      20,
-      20
-     ],
-     "lights": true,
-     "px": [
-      40,
-      30
-     ]
-    },
-    "se": {
-     "anchor": [
-      20,
-      19
-     ],
-     "lights": true,
-     "px": [
-      40,
-      29
-     ]
-    },
-    "sw": {
-     "anchor": [
-      20,
-      19
-     ],
-     "lights": true,
-     "px": [
-      40,
-      29
-     ]
-    }
-   },
    "world": "달"
   },
   "hopper": {
-   "anchor": [
-    23,
-    33
-   ],
    "dims": [
     4.4,
     4.4,
@@ -10555,11 +3750,6 @@
    ],
    "flying": false,
    "group": "air",
-   "lights": true,
-   "px": [
-    46,
-    46
-   ],
    "title": "로켓 호퍼",
    "world": "달"
   },
@@ -10572,59 +3762,9 @@
    "flying": false,
    "group": "ground",
    "title": "비가압 로버",
-   "views": {
-    "ne": {
-     "anchor": [
-      20,
-      22
-     ],
-     "lights": true,
-     "px": [
-      44,
-      33
-     ]
-    },
-    "nw": {
-     "anchor": [
-      24,
-      22
-     ],
-     "lights": true,
-     "px": [
-      44,
-      33
-     ]
-    },
-    "se": {
-     "anchor": [
-      20,
-      26
-     ],
-     "lights": true,
-     "px": [
-      44,
-      40
-     ]
-    },
-    "sw": {
-     "anchor": [
-      24,
-      25
-     ],
-     "lights": true,
-     "px": [
-      44,
-      39
-     ]
-    }
-   },
    "world": "달"
   },
   "mars_helicopter": {
-   "anchor": [
-    29,
-    28
-   ],
    "dims": [
     6.0,
     6.0,
@@ -10632,19 +3772,10 @@
    ],
    "flying": true,
    "group": "air",
-   "lights": true,
-   "px": [
-    58,
-    38
-   ],
    "title": "화성 헬리콥터",
    "world": "화성"
   },
   "mars_plane": {
-   "anchor": [
-    66,
-    39
-   ],
    "dims": [
     9.0,
     22.0,
@@ -10652,19 +3783,10 @@
    ],
    "flying": true,
    "group": "air",
-   "lights": true,
-   "px": [
-    140,
-    74
-   ],
    "title": "화성 비행기",
    "world": "화성"
   },
   "orbital_tug": {
-   "anchor": [
-    81,
-    42
-   ],
    "dims": [
     16.0,
     26.0,
@@ -10672,11 +3794,6 @@
    ],
    "flying": true,
    "group": "space",
-   "lights": true,
-   "px": [
-    166,
-    87
-   ],
    "title": "궤도 예인선",
    "world": "지구-달 궤도"
   },
@@ -10689,59 +3806,9 @@
    "flying": false,
    "group": "ground",
    "title": "가압 로버",
-   "views": {
-    "ne": {
-     "anchor": [
-      29,
-      38
-     ],
-     "lights": true,
-     "px": [
-      63,
-      53
-     ]
-    },
-    "nw": {
-     "anchor": [
-      34,
-      42
-     ],
-     "lights": true,
-     "px": [
-      63,
-      57
-     ]
-    },
-    "se": {
-     "anchor": [
-      29,
-      39
-     ],
-     "lights": true,
-     "px": [
-      63,
-      54
-     ]
-    },
-    "sw": {
-     "anchor": [
-      34,
-      39
-     ],
-     "lights": true,
-     "px": [
-      63,
-      54
-     ]
-    }
-   },
    "world": "달"
   },
   "titan_rotorcraft": {
-   "anchor": [
-    33,
-    33
-   ],
    "dims": [
     6.0,
     5.0,
@@ -10749,19 +3816,10 @@
    ],
    "flying": true,
    "group": "air",
-   "lights": true,
-   "px": [
-    65,
-    44
-   ],
    "title": "타이탄 회전익기",
    "world": "타이탄"
   },
   "transport_ship": {
-   "anchor": [
-    223,
-    128
-   ],
    "dims": [
     60.0,
     30.0,
@@ -10769,19 +3827,10 @@
    ],
    "flying": true,
    "group": "space",
-   "lights": true,
-   "px": [
-    373,
-    246
-   ],
    "title": "행성간 수송선",
    "world": "태양계"
   },
   "venus_airship": {
-   "anchor": [
-    103,
-    109
-   ],
    "dims": [
     32.0,
     10.0,
@@ -10789,11 +3838,6 @@
    ],
    "flying": true,
    "group": "air",
-   "lights": true,
-   "px": [
-    195,
-    124
-   ],
    "title": "금성 비행선",
    "world": "금성"
   }

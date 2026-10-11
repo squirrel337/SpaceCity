@@ -89,57 +89,84 @@ func _save_roundtrip() -> void:
 
 
 func _map_check() -> void:
-	## 기지 지도: 건물 자리, 공사 현장으로 가는 로봇, 착륙선 사건, 지도·목록 전환
-	var m: BaseMap = main.base_map
-	_check(m.layout.capacity("hab_module") >= 30, "거주 모듈 자리가 모자란다")
-	_check(m.layout.capacity("solar_tower") == 38, "태양광 타워 자리가 능선 칸(8+10+20)과 다르다")
+	## 기지 배치·교통·평면도: 건물 자리, 공사 현장으로 가는 로봇, 착륙선 사건, 평면도·목록 전환
+	var layout: BaseLayout = main.plan.layout
+	_check(layout.capacity("hab_module") >= 30, "거주 모듈 자리가 모자란다")
+	_check(layout.capacity("solar_tower") == 38, "태양광 타워 자리가 능선 칸(8+10+20)과 다르다")
 	_check(main.sim.M.size() == 145 and GameData.FAMILY.size() == 29, "건물이 29계열 145종이 아니다")
 	for kind in main.sim.M:
 		if GameData.family(kind) == kind:
-			_check(m.layout.capacity(kind) > 0, "지도에 기본 자리가 없는 계열: " + kind)
-		_check(ArtLib.variants(kind) == 5, "변형이 5가지가 아닌 건물: " + kind)
-		for v in range(ArtLib.variants(kind)):
-			_check(ArtLib.texture(ArtLib.building(kind, v)["file"]) != null, "그림이 없는 건물: %s v%d" % [kind, v])
-	for v in range(5):
-		_check(ArtLib.texture(ArtLib.building("hab_module_covered", v)["file"]) != null, "피복 거주 모듈 그림이 없다")
+			_check(layout.capacity(kind) > 0, "기본 자리가 없는 계열: " + kind)
+		_check(ArtLib.variants(kind) == 5, "모양이 5가지가 아닌 건물: " + kind)
+	_check(ModelLib.variants("hab_module_covered") == 5, "피복 거주 모듈 모형이 다섯 가지가 아니다")
 	var seen := {}
 	for i in range(5):
-		seen[BaseMap.variant_of("hab_module", i)] = true
-	_check(seen.size() == 5, "이웃한 자리 다섯 곳의 변형이 겹친다")
+		seen[BaseScene.variant_of("hab_module", i)] = true
+	_check(seen.size() == 5, "이웃한 자리 다섯 곳의 모양이 겹친다")
 	main.sim.enqueue("medical_bay", "", 0.0)
-	var sites := m._sites()
-	_check(not sites.is_empty(), "공사 현장이 지도에 없다")
+	main.plan.sync(main.sim)
+	var sites := BaseScene.sites(main.sim, main.plan)
+	_check(not sites.is_empty(), "공사 현장이 없다")
+	var traffic: BaseTraffic = main.world.city.traffic
 	for _i in range(900):
-		m.traffic.update(0.1, main.sim, sites)
+		traffic.update(0.1, main.sim, sites)
 	var working := 0
-	for a in m.traffic.agents:
+	for a in traffic.agents:
 		if a["role"] == "robot" and a["state"] == "work":
 			working += 1
-		var info := ArtLib.info("vehicles", a["id"], a["heading"])
-		_check(not info.is_empty() and ArtLib.texture(info["file"]) != null, "그림이 없는 탈것: " + a["id"])
+		_check(ModelLib.has("vehicles", a["id"]), "3D 모형이 없는 탈것: " + a["id"])
 	_check(working > 0, "로봇이 공사 현장에 가지 않았다")
 	var before := int(main.sim.stats.get("arrived", 0))
 	main.sim.stats["arrived"] = before + 1
-	m.traffic.update(0.1, main.sim, sites)
-	_check(m.traffic.agents.any(func(a): return a["role"] == "lander"), "유인 착륙선이 나타나지 않았다")
+	traffic.update(0.1, main.sim, sites)
+	_check(traffic.agents.any(func(a): return a["role"] == "lander"), "유인 착륙선이 나타나지 않았다")
 	for _i in range(200):
-		m.traffic.update(0.1, main.sim, sites)
-	_check(not m.traffic.agents.any(func(a): return a["role"] == "lander"), "착륙선이 떠나지 않았다")
+		traffic.update(0.1, main.sim, sites)
+	_check(not traffic.agents.any(func(a): return a["role"] == "lander"), "착륙선이 떠나지 않았다")
 	main.sim.stats["arrived"] = before
-	m.traffic.reset(main.sim)
+	traffic.reset(main.sim)
+	var w: WorldView = main.world
 	main._set_view("list")
-	_check(main.city_view.visible and not m.visible, "목록으로 바뀌지 않았다")
+	_check(main.city_view.visible and not w.visible, "목록으로 바뀌지 않았다")
+	# 평면도: 같은 3D 장면을 위에서 직교 투영으로
 	main._set_view("map")
-	m.zoom_by(1.5)
-	m.fit()
-	print("smoke: map %d robots working, %d agents" % [working, m.traffic.agents.size()])
+	w._process(0.016)
+	_check(w.visible and w.plan_view and w.cam.plan, "지도가 평면도로 바뀌지 않았다")
+	_check(w._camera.projection == Camera3D.PROJECTION_ORTHOGONAL and w._camera.size > 0.0, "평면도가 직교 투영이 아니다")
+	var up := w.cam.basis.z.dot(Astro.vec(Astro.norm3(Astro.sub3(w.cam.pos, w._info("moon")["center"]))))
+	_check(up > 0.999, "평면도가 똑바로 내려다보지 않는다")
+	var km0 := w.cam.plan_km
+	w.zoom_by(1.5)
+	_check(w.cam.plan_km > km0 * 1.4, "평면도가 축소되지 않았다")
+	w.plan_core()
+	w._process(0.016)
+	_check(absf(w.cam.plan_km - WorldView.PLAN_CORE_KM) < 1e-9, "평면도 '거주구'의 범위가 다르다")
+	var g: Variant = w.city.ground_at(w, w.size * 0.5)
+	_check(g != null, "평면도에서 땅을 고를 수 없다")
+	var core := BaseLayout.uv_to_xy(BaseLayout.DISTRICTS["core"]["uv"])
+	_check(g != null and (g as Vector2).distance_to(core) < 2.0, "평면도 가운데가 거주구가 아니다")
+	var picked := ""
+	for b in w.city._boxes:
+		var sp: Variant = w.screen_of(w.city.global_transform * (b[0] as AABB).get_center())
+		if sp != null and Rect2(Vector2.ZERO, w.size).has_point(sp):
+			picked = w.city.pick(w, sp)
+			if picked != "":
+				break
+	_check(picked != "", "평면도에서 건물을 고를 수 없다")
+	w.plan_fit()
+	w._process(0.016)
+	main._set_view("world")
+	w._process(0.016)
+	_check(not w.plan_view and not w.cam.plan and w._camera.projection == Camera3D.PROJECTION_PERSPECTIVE,
+		"3D로 돌아오지 않았다")
+	print("smoke: map %d robots working, %d agents, plan view picked %s" % [working, traffic.agents.size(), picked])
 
 
 func _world_check() -> void:
 	## 3D 우주 보기: 모형, 천체 위치, 구글 어스식 조작(끌기·휠·날기), 축척 공간, 3D 도시
 	var w: WorldView = main.world
 	main._set_view("world")
-	_check(w.visible and not main.base_map.visible, "3D 보기로 바뀌지 않았다")
+	_check(w.visible and not w.plan_view, "3D 보기로 바뀌지 않았다")
 	for kind in main.sim.M:
 		_check(ModelLib.variants(kind) == 5, "3D 모형 변형이 5가지가 아닌 건물: " + kind)
 		for v in range(5):
