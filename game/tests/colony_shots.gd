@@ -49,8 +49,8 @@ func _shot(name: String, full := false) -> void:
 	print("shot ", name)
 
 
-## 시험: 기술·비용을 채우고 그 부지의 발사 창을 지금 열어 원정대를 보낸 뒤, 하루 만에 도착하게 한다
-func _send(site_id: String) -> void:
+## 시험: 기술·비용을 채우고 그 부지의 발사 창을 지금 열어 원정대를 보낸다. quick이면 하루 만에 도착하게 한다
+func _send(site_id: String, quick := true) -> void:
 	var col: Colonies = main.colonies
 	var home: CitySim = col.home()["sim"]
 	for t in col.expedition(site_id).get("requires", []):
@@ -60,7 +60,7 @@ func _send(site_id: String) -> void:
 	home.stock["metal_t"] = maxf(home.stock["metal_t"], 50.0)
 	var now_d := col.hour / 24.0
 	col._windows[site_id] = {"best": now_d, "start": now_d - 1.0, "end": now_d + 1.0, "half": 1.0}
-	if col.launch(site_id):
+	if col.launch(site_id) and quick:
 		col.expeditions[-1]["arrive"] = col.hour + 24
 
 
@@ -81,6 +81,8 @@ func _process(_delta: float) -> bool:
 		_send("mars_hellas")
 		_send("ceres_occator")
 		_run_hours(24 * 12)
+		_send("titan_adiri", false)          # 이동 중인 원정대 (6.1년)
+		_run_hours(24 * 3)
 		main._set_speed(0)
 		main.modal.visible = false
 		main._set_view("world")
