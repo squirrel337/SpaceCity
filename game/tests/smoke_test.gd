@@ -436,6 +436,15 @@ func _colony_check() -> void:
 	# 고향으로
 	main._on_colony_view(0)
 	_check(main.sim == home and main.world.ground.body == "moon", "고향으로 돌아오지 못했다")
+	# 직접 줌인: 고르지 않은 화성 도시 위로 내려가면 카메라는 그대로, 그 도시를 고른다
+	var wv: WorldView = main.world
+	wv._descent.clear()
+	wv._enter_cool = 0.0
+	wv.cam.look_at_surface("mars", Astro.latlon(-42.4, 70.5), 5.0, 0.5, Vector3(0, 0, 1))
+	wv._check_enter(0.0)
+	_check(main.sim == mars and wv.ground.body == "mars" and wv.cam.focus == "mars", "화성 도시로 줌인해도 그 도시를 고르지 않았다")
+	main._on_colony_view(0)
+	_check(main.sim == home, "고향으로 돌아오지 못했다 (줌인 뒤)")
 	print("smoke: colonies %d, mars pop %d day %d, next mars window %s (phase %.1f°)" % [col.list.size(),
 		int(mars.population()), mars.current_day(), window_text, phase])
 

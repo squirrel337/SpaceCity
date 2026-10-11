@@ -113,6 +113,7 @@ func _build() -> void:
 	world.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	world.module_tapped.connect(_on_module_tapped)
 	world.colony_picked.connect(_on_colony_view)
+	world.colony_entered.connect(_on_colony_entered)
 	city_area.add_child(world)
 	city_area.add_child(_build_view_switch())
 	city_area.add_child(_build_place_bar())
@@ -519,6 +520,14 @@ func _on_colony_view(index: int) -> void:
 		world.fly_to_colony()
 		return
 	_activate(index, true)
+
+
+## 3D에서 고르지 않은 도시 위로 직접 줌인했다: 카메라는 그대로 두고 그 도시를 고른다 (자세한 도시가 나타난다)
+func _on_colony_entered(index: int) -> void:
+	if index < 0 or index >= colonies.list.size() or index == active or tool.active() or modal.visible:
+		return
+	_activate(index, false)
+	_toast("%s — 이 도시를 본다" % colonies.list[index]["name"], "info")
 
 
 ## 식민지 고르기 단추·3D 지도의 점·개척 탭을 맞춘다

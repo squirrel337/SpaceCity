@@ -17,6 +17,7 @@ extends Control
 signal module_tapped(mid: String)
 signal focus_changed(id: String)
 signal colony_picked(index: int)
+signal colony_entered(index: int)          # 고르지 않은 도시 가까이로 직접 줌인했다 — 그 도시를 고른다
 
 const BG := Color(0.0, 0.0, 0.0)
 const SHELL_K := 0.32               # 먼 천체를 껍질에 줄여 넣는 로그 기울기
@@ -52,6 +53,7 @@ var ground: SiteGround               # 그 도시가 앉은 땅
 var grounds := {}                    # 천체 id → SiteGround (달은 늘, 다른 천체는 처음 고를 때 만든다)
 var colonies: Array = []             # [{name, site, body, dir: 몸체 고정 Vector3, pop, active}] — 점과 이름표
 var _descent := {}                   # 식민지로 날아간 뒤 내려앉기
+var _enter_cool := 0.0
 
 var _frame := {}                     # 이번 프레임의 천체 위치·자세 (id → {center, frame, radius, ...})
 var _unit := 1.0                     # 렌더 단위 1 = _unit km
@@ -359,6 +361,7 @@ func _process(delta: float) -> void:
 	_frame.clear()
 	cam.update(delta, jd)
 	_step_descent(delta)
+	_check_enter(delta)
 	_place_all()
 	if city and sim:
 		city.update(delta, speed_level)
@@ -632,6 +635,24 @@ func fly_to_colony() -> void:
 		return
 	cam.fly_to(g.body, r * 3.2, 2.4, g.site_dir())
 	_descent = {"wait": true}
+
+
+## 고르지 않은 식민지 위로 직접 내려가면 (고도 30 km 아래, 도시에서 수십 km 안) 그 도시를 고르게 알린다
+func _check_enter(delta: float) -> void:
+	_enter_cool = maxf(0.0, _enter_cool - delta)
+	if _enter_cool > 0.0 or cam.mode != "body" or cam.flying() or not _descent.is_empty() or cam.dist > 30.0:
+		return
+	var r := cam.radius_of(cam.focus)
+	var t := Astro.vec(cam.t_dir)
+	for i in colonies.size():
+		var c: Dictionary = colonies[i]
+		if c.get("active", false) or c.get("transit", false) or String(c.get("body", "")) != cam.focus:
+			continue
+		var d: Vector3 = c.get("dir", Vector3.ZERO)
+		if t.dot(d.normalized()) > cos(minf(80.0 / maxf(r, 1.0), 0.5)):
+			_enter_cool = 2.0
+			colony_entered.emit(i)
+			return
 
 
 func _begin_descent(g: SiteGround) -> void:
