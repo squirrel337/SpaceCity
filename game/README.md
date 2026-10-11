@@ -27,17 +27,26 @@
 - **연구** 탭에서 연구 순서를 고르고, **전력** 탭에서 절전 문턱을 정한다.
 - 대피소가 모자란 대형 폭풍이면 **대피소 추첨** 카드가 뜬다 — 생명과 동의 사이의 선택이다.
 - **자동 운영**을 켜면 시드가 문서의 추천 운영대로 짓고 연구한다. 3년(2063년 말)이 되면 보고서가 나온다.
-- **개척** 탭에서 다른 천체로 **원정대**를 보낸다 — 화성 헬라스 분지, 수성 북극 프로코피예프, 세레스 오카토르, 칼리스토 발할라, 타이탄 아디리.
-  필요한 기술(예: 시드 분산 처리·극저온 추진제 생산), 고향의 부품·금속·지구 지원 점수, 그리고 **발사 창**이 있어야 떠난다.
-  발사 창은 지구와 목적지 행성의 실제 위치로 정한다 (호만 전이의 위상각이 맞는 날 앞뒤로 며칠 — 화성은 약 26개월마다).
-  전이 기간(화성 259일 … 타이탄 6.1년)이 지나면 도착해 시드가 자동 운영으로 기지를 세운다. 그 식민지를 골라 자동 운영을 끄면 넘겨받는다.
+- **천체마다 기본 도시**가 있다 — 달 섀클턴(고향, 직접 운영), 화성 헬라스, 수성 프로코피예프, 세레스 오카토르, 칼리스토 발할라, 타이탄 아디리, 지구 나로 우주항.
+  고향 밖의 기본 도시는 시드가 자동 운영하고, 그 도시를 골라 자동 운영을 끄면 넘겨받는다.
+- **개척** 탭에서 천체마다 후보 부지(2~3곳, 모두 18곳)에 **원정대**를 보내 도시를 더 세운다. 같은 천체는 그 천체에서 가장 큰 도시가
+  **로버 행렬**(지구는 **비행편**)을 보내고 비용을 낸다 — 준비 며칠 + 거리 ÷ 하루 이동 (달 500 km, 화성 400 km, 세레스·타이탄 600 km, 지구 8,000 km).
+  도시를 모두 잃은 천체로는 고향에서 원정선이 간다: 필요한 기술(예: 시드 분산 처리·극저온 추진제), 고향의 부품·금속·지구 지원 점수, 그리고 **발사 창**이 있어야 떠난다.
+  발사 창은 지구와 목적지 행성의 실제 위치로 정한다 (호만 전이의 위상각이 맞는 날 앞뒤로 며칠 — 화성은 약 26개월마다), 전이는 화성 259일 … 타이탄 6.1년.
 - 부지마다 규칙이 다르다: 화성은 대기의 CO₂로 사바티에가 돌고 먼지 폭풍이 태양광을 몇 주씩 25%로 깎는다. 수성은 햇빛이 넘치지만 방열이 절반이다.
-  세레스는 하루 9시간에 얼음이 넘치고, 칼리스토·타이탄은 햇빛이 쓸모없어 원자로로 산다. 낮과 밤은 그 천체의 자전을 따른다.
+  세레스는 하루 9시간에 얼음이 넘치고, 칼리스토·타이탄은 햇빛이 쓸모없어 원자로로 산다. 지구는 바깥 공기로 숨 쉬고(생명유지·대피소가 필요 없다) 보급이 물·식량·산소 30일치를 늘 채운다.
+  낮과 밤은 그 천체의 자전을 따르고, 밤이 사흘보다 긴 곳(달 적도의 14일 밤 등)은 태양광 타워 대신 원자로와 축전으로 밤을 넘긴다.
 - 식민지는 모두 **같은 시계**로 흐르고, 연구한 기술은 하루에 한 번 모든 식민지가 나눠 갖는다. 다른 식민지의 위급한 일은 이름을 붙여 알린다.
 - **도시 단위 확대**: 3D 지도에서 행성을 보면 도시는 점과 이름·인구만 보인다 (태양계 축척에서는 행성 이름에 '도시 n'). 점이나 개척 탭의 '보기',
   윗줄의 식민지 고르기를 누르면 카메라가 그 행성으로 날아가 도시를 마주 본 뒤 내려앉는다. 고르지 않은 도시 위로 직접 줌인해도(고도 30 km 아래) 그 도시를 고른다.
   자세한 도시(건물·길·탈것)는 **고른 식민지 하나만** 그린다.
-  다른 천체의 땅은 기지 둘레 반지름 60 km의 지형 조각이 그 행성 구와 같은 색·빛으로 이어지고, 화성·타이탄은 하늘색과 연무가 있다.
+  도시의 건물·길·탈것은 어느 천체에서나 실제 크기(미터)다.
+- **천체의 겉모습**: 화성·수성·세레스·칼리스토·타이탄은 달처럼 GPU로 굽는다 — 실제 지형(헬라스·아르기레 분지, 올림푸스 산과 타르시스 화산,
+  매리너스 협곡, 극관, 칼로리스 분지, 오카토르의 밝은 염류, 발할라의 여러 겹 고리, 크라켄·리게이아 해 …)과 크레이터 무늬를 정육면체 지도(법선 + 밝기)에
+  처음엔 작게, 다가가면 곱게 굽는다. 고른 도시 둘레 약 450 km는 더 고운 지역 지도, 반지름 60 km는 같은 함수로 높이를 구운 지형 조각이어서 구와 이어진다.
+  타이탄은 멀리서 주황 연무에 가리고 내려갈수록 땅과 바다가 드러난다. 화성·타이탄·지구는 하늘색과 연무가 있다.
+- **지구의 해안**: Natural Earth 1:10m(땅·작은 섬·호수)으로 만든 해안 거리 지도를 픽셀마다 문턱으로 잘라 해안을 또렷하게 긋고, 지도 칸보다 잔 굴곡은 잡음으로 더한다.
+  지구 도시 둘레 256 km는 125 m 칸의 고운 해안 지도를 쓴다 — 나로 우주항 둘레의 다도해가 보인다. 구름은 땅 가까이서 옅어진다.
 - 앱을 닫거나 내리면 자동 저장한다. Android의 뒤로 가기는 메뉴를 연다.
 
 | 조작 | PC | Android |
@@ -59,12 +68,12 @@
 |---|---|
 | `sim/` | 규칙. 노드·씬을 쓰지 않는 순수 GDScript — `CitySim`(도시, 부지 보정 포함), `GameData`(모듈·기술·부지 자료), `AutoPolicy`(자동 운영), `PyRandom`(파이썬과 같은 난수), `PyCompat`(파이썬의 반올림·합계 규칙) |
 | `ui/` | 화면. 씬 파일 없이 코드로 만든다 — 상단 바, `colonies`(여러 식민지: 함께 흐르는 시계, 원정·발사 창·도착, 기술 나누기, 저장), 기지의 건물·탈것 목록(`base_scene`·`base_traffic`, 3D 도시가 쓴다), 배치(`city_plan`: 건물마다의 자리·방향·모양과 길 그물·길 찾기·배치 규칙·저장, `base_layout`: 능선형·평지형 기본 배치와 처음 길, `place_tool`: 자리 고르기 도구), 모듈 목록, 일조 예보, 탭 6개(`colony_panel`: 개척), 결정 카드 |
-| `ui/world/` | 3D 세계 — `world_view`(화면·입력·이름표·식민지 점), `orbit_cam`(구글 어스식 카메라, 식민지로 날아가 내려앉기), `astro`(천체력: 행성·위성 궤도, 달 자전, 별 목록), `site_ground`(도시가 앉는 땅의 공통 틀), `moon_surface`(달 구·남극 지형), `site_surface`(다른 천체 부지의 지형 조각), `city3d`(고른 식민지의 기지), `model_lib`(그림 생성기의 3D 모델), `sky_builder`·`planet_look`(별·은하수·행성), `shaders/` |
-| `art/` | 건물·탈것의 3D 모델(`models.json`)과 크기 정보(`art.json`: 바닥 크기·높이·모양 수·이름), 지구 땅 지도(`planets/`). 생성기가 만든 결과라 직접 고치지 않는다 |
+| `ui/world/` | 3D 세계 — `world_view`(화면·입력·이름표·식민지 점), `orbit_cam`(구글 어스식 카메라, 식민지로 날아가 내려앉기), `astro`(천체력: 행성·위성 궤도, 달 자전, 별 목록), `site_ground`(도시가 앉는 땅의 공통 틀), `moon_surface`(달 구·남극 지형), `site_surface`(다른 부지의 지형 조각·지역 지도 굽기, 지구는 해안 지도), `body_surface`·`body_baker`(암석·얼음 천체의 겉모습 자료와 정육면체 지도 굽기, 가까이 가면 곱게), `baker`(GPU 굽기를 한 번에 하나씩), `city3d`(고른 식민지의 기지), `model_lib`(그림 생성기의 3D 모델), `sky_builder`·`planet_look`(별·은하수·행성), `shaders/`(`body_field`: 천체의 높이·밝기 함수, `earth_surface`: 지구의 땅·바다) |
+| `art/` | 건물·탈것의 3D 모델(`models.json`)과 크기 정보(`art.json`: 바닥 크기·높이·모양 수·이름), 지구 지도(`planets/`: 얼음·메마른 땅 `earth_land.png`, Natural Earth 1:10m에서 만든 해안 거리 지도 `earth_coast*.png`). 생성기가 만든 결과라 직접 고치지 않는다 |
 | `data/` | `docs/design/data/`(밝은 별·은하 좌표 `sky.json` 포함)와 근거리 항성(`docs/concept/examples/nearby_stars.json`)의 JSON 사본. 단일 출처는 문서 쪽이다 |
 | `fonts/` | Pretendard (SIL Open Font License 1.1, `Pretendard-LICENSE.txt`) |
-| `tests/` | `parity_dump.gd`(파이썬과 비교할 일별 상태, `--site`로 부지), `smoke_test.gd`(화면을 띄워 자동 운영으로 3년 보고서까지 돌리기, 배치·탈것·3D 카메라·자리 고르기·길 점검, 화성 원정·도착·식민지 고르기·저장 왕복), `screenshots.gd`·`world_shots.gd`·`types_shots.gd`·`colony_shots.gd`(화면 캡처 — 3D는 기지에서 이웃 별까지, 자리 고르기와 길, 새 종류 116종, 식민지 점·화성으로 날아가 내려앉기·개척 탭) |
-| `tools/` | `parity_check.py`, `sync_data.py`, `art/`(그림 생성기) |
+| `tests/` | `parity_dump.gd`(파이썬과 비교할 일별 상태, `--site`로 부지), `smoke_test.gd`(화면을 띄워 자동 운영으로 3년 보고서까지 돌리기, 배치·탈것·3D 카메라·자리 고르기·길 점검, 화성 원정·도착·식민지 고르기·저장 왕복), `screenshots.gd`·`world_shots.gd`·`types_shots.gd`·`colony_shots.gd`·`body_shots.gd`(화면 캡처 — 3D는 기지에서 이웃 별까지, 자리 고르기와 길, 새 종류 116종, 식민지 점·화성으로 날아가 내려앉기·개척 탭, 천체마다 행성 전체·지역·지형 조각·도시) |
+| `tools/` | `parity_check.py`, `sync_data.py`, `art/`(그림 생성기, `earth_coast.py`: Natural Earth에서 지구 해안 거리 지도 만들기 — 내려받기가 필요해 CI에서는 다시 만들지 않는다) |
 
 ## 시험
 
@@ -96,16 +105,19 @@ godot --headless --path game --script res://tests/smoke_test.gd
 | `preview_types.py` | 묶음 하나의 그림·3D 모형만 따로 그려 대조표를 만든다 (바닥 칸을 점선으로 겹친다) |
 | `vehicles.py` | 탈것 14종과 우주비행사. 지상 탈것은 네 방향 |
 | `make_art.py` | `game/art/`에 `models.json`(3D 모델)·`art.json`(크기 정보)·지구 땅 지도를 쓴다. `--svg DIR`은 디자인 검토용 SVG를 게임 밖에 쓴다 |
-| `planets.py` | 지구 땅 지도(대륙·만년설·사막 다각형을 래스터화한 PNG) |
+| `planets.py` | 지구 땅 지도(대륙·만년설·사막 다각형을 래스터화한 PNG — 게임은 만년설·사막 칸을 쓴다) |
+| `earth_coast.py` | 지구 해안 거리 지도 — Natural Earth 1:10m의 땅·작은 섬·호수에서 지구 전체(4096 × 2048, ±40 km)와 지구 부지 둘레(256 km, 125 m 칸, ±8 km)를 만든다 (numpy·Pillow, `--fetch`로 내려받기) |
 | `contact_sheet.gd` | 여러 SVG(`--svg`로 만든 것)를 한 장에 모아 본다 |
 | `model_sheet.gd` | 3D 모델을 게임과 같은 셰이더로 그려 한 장에 모아 본다 (화면이 필요하다 — `xvfb-run`) |
 
 ```bash
 python3 game/tools/art/make_art.py                  # 3D 모델·크기 정보를 다시 만든다
 python3 game/tools/art/make_art.py --svg /tmp/svg   # 디자인 검토용 SVG (게임 밖)
+python3 game/tools/art/earth_coast.py --fetch       # 지구 해안 거리 지도 (Natural Earth v5.1.2를 내려받는다)
 godot --headless --path game --script res://tools/art/contact_sheet.gd -- --out sheet.png --scale 2 /tmp/svg/buildings/*.svg
 xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 --script res://tests/world_shots.gd -- --out /tmp/world
 xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 --script res://tests/colony_shots.gd -- --out /tmp/colony
+xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 --script res://tests/body_shots.gd -- --out /tmp/bodies --sites mars_hellas,earth_naro
 xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 --script res://tools/art/model_sheet.gd -- --out /tmp/models.png all
 ```
 

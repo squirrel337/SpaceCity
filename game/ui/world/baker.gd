@@ -32,8 +32,10 @@ static func render(host: Node, mat: Material, size: Vector2i) -> Image:
 	host.add_child(vp)
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
-	var img := vp.get_texture().get_image()
-	vp.queue_free()
+	var img: Image = null
+	if is_instance_valid(vp):
+		img = vp.get_texture().get_image()
+		vp.queue_free()
 	_busy = false
 	count += 1
 	if img == null or img.is_empty():

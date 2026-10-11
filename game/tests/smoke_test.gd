@@ -386,7 +386,8 @@ func _colony_check() -> void:
 		var es: CitySim = col.list[ei]["sim"]
 		_check(es.open_air and es.co2_ppm() < 850.0, "지구 도시의 공기가 바깥 공기가 아니다 (%.0f ppm)" % es.co2_ppm())
 		_check(es.population() > 400.0, "지구 도시가 자라지 않았다 (%d명)" % int(es.population()))
-		_check(es.stock["water_kg"] >= es.population() * es.PER["water_use_kg"] * 29.0, "지구 도시의 물을 시장이 채우지 않았다")
+		# 보급은 시간마다 그때 인구의 30일치를 채운다 — 방금 정착민이 내렸으면(한 번에 40명) 조금 모자랄 수 있다
+		_check(es.stock["water_kg"] >= es.population() * es.PER["water_use_kg"] * 25.0, "지구 도시의 물을 시장이 채우지 않았다")
 	# 천문력으로 찾은 화성 창의 가장 좋은 날: 화성이 지구보다 호만 위상각(약 44°)만큼 앞서야 한다
 	var w: Dictionary = col.window("mars_hellas")
 	var jd := col._jd(float(w["best"]))
@@ -456,6 +457,7 @@ func _colony_check() -> void:
 	var cands := marks.filter(func(m): return m.get("candidate", false))
 	_check(cities.size() == col.list.size() and bool(cities[hi]["active"]), "3D 지도의 도시 점이 맞지 않다")
 	_check(cands.size() == col.candidates().size() - col.list.size(), "3D 지도의 후보지 점이 맞지 않다 (%d)" % cands.size())
+	_world_surface_check(wv)
 	for _i in range(24):
 		main._step()
 	main._refresh_live()
@@ -492,3 +494,31 @@ func _colony_check() -> void:
 func _check(ok: bool, message: String) -> void:
 	if not ok:
 		failures.append(message)
+
+
+## 천체의 겉모습: 암석·얼음 천체 다섯의 굽기 자료, 타이탄의 바다, 지구의 해안 지도와 지구 도시의 땅 (헤드리스라 굽지는 않는다)
+func _world_surface_check(wv: WorldView) -> void:
+	var col: Colonies = main.colonies
+	for b in ["mercury", "mars", "ceres", "callisto", "titan"]:
+		_check(BodySurface.has_body(b) and wv.body_baker.has(b), "%s의 겉모습 자료가 없다" % b)
+		var m: ShaderMaterial = wv._bodies[b]["mat"]
+		_check(int(m.get_shader_parameter("pal_n")) >= 4, "%s 구에 팔레트가 없다" % b)
+	var titan := BodySurface.of("titan", 2574.7)
+	_check(titan.liquid > 0.0 and int(titan.u["sea_n"]) >= 10 and int(titan.u["keep_n"]) == 3, "타이탄의 바다·기지 자리가 맞지 않다")
+	var mars := BodySurface.of("mars", 3389.5)
+	_check(int(mars.u["mnt_n"]) >= 5 and int(mars.u["tro_n"]) >= 3 and int(mars.u["bas_n"]) >= 10, "화성의 지형 자료가 모자란다")
+	var earth_mat: ShaderMaterial = wv._bodies["earth"]["mat"]
+	_check(bool(earth_mat.get_shader_parameter("has_coast")) and int(earth_mat.get_shader_parameter("ekeep_n")) == 3,
+		"지구의 해안 지도·기지 자리가 없다")
+	_check(PlanetLook.coast_local("earth_naro") != null, "나로 둘레의 고운 해안 지도가 없다")
+	var kr := wv.ground_for("titan_kraken") as SiteSurface
+	_check(kr != null and kr.surface != null and kr.surface.liquid > 0.0 and kr.needs_cap(), "크라켄 해 땅이 타이탄 자료를 쓰지 않는다")
+	var ni := col.index_of_site("earth_naro")
+	var keep: CitySim = main.sim
+	main._on_colony_view(ni)
+	var eg := wv.ground as SiteSurface
+	_check(eg != null and eg.body == "earth" and not eg.needs_cap() and eg.sky_color().a > 0.0, "나로의 땅이 지구 땅이 아니다")
+	_check(absf(eg.local_height_m(Vector2.ZERO)) < 0.01, "나로 기지 평지가 평평하지 않다")
+	main._on_colony_view(col.index_of_sim(keep))
+	print("smoke: worlds — 굽는 천체 %d, 타이탄 바다 %d, 화성 산 %d·협곡 %d, 지구 해안 %s" % [wv.body_baker.surfaces.size(),
+		int(titan.u["sea_n"]), int(mars.u["mnt_n"]), int(mars.u["tro_n"]), "있음" if bool(earth_mat.get_shader_parameter("has_coast")) else "없음"])

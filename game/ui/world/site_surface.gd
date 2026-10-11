@@ -24,7 +24,7 @@ const LOOKS := {
 	"moon": {"hill_h": 30.0, "hill_m": 3500.0, "rough_h": 2.5, "craters": 60, "dune_h": 0.0, "dune_m": 1.0},
 }
 ## 얼음·서리의 색 (능선형은 영구 그늘 분화구, 평지형은 얼음 매장지의 서리 낀 땅)
-const FROST := {"mars": "#b39684", "mercury": "#5d6168", "ceres": "#b9bec4", "callisto": "#c4c8cc", "titan": "#b9b0a2",
+const FROST := {"mars": "#a48a7a", "mercury": "#5d6168", "ceres": "#8e9399", "callisto": "#a3a7ab", "titan": "#a39b8f",
 	"moon": "#8f949b"}
 ## 대기의 하늘색 (낮, 땅 가까이). 대기가 없으면 없다
 const SKY := {"mars": Color(0.78, 0.6, 0.43), "titan": Color(0.5, 0.35, 0.17), "earth": Color(0.62, 0.75, 0.93)}
@@ -101,7 +101,7 @@ func setup(p_body: String, p_site: Dictionary, sphere_node: MeshInstance3D, p_ra
 	var ridge := layout.kind == "ridge"
 	patch_mat.set_shader_parameter("ice", Vector4(ic.x, ic.y, BaseLayout.ICE_CRATER_R * (1.0 if ridge else 1.6), 0.0))
 	patch_mat.set_shader_parameter("frost", Color(String(FROST.get(body, "#b9bec4"))))
-	patch_mat.set_shader_parameter("frost_k", 0.6 if (ridge or body in ["ceres", "callisto"]) else 0.4)
+	patch_mat.set_shader_parameter("frost_k", 0.55 if ridge else 0.35)
 	var atmo: Color = PlanetLook.ATMO.get(body, Color(0, 0, 0, 0))
 	patch_mat.set_shader_parameter("soft_k", minf(0.6, atmo.a))
 	if surface != null:
