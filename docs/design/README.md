@@ -80,7 +80,7 @@
 | [09 온보딩·제작](09-onboarding-production.md) | 첫 1시간 스크립트, MVP 수직 슬라이스 명세, 마일스톤, 팀, 리스크, 남은 결정 |
 | [용어집](glossary.md) | 게임 용어 정의 |
 | [game/](../../game/README.md) | 실행 가능한 시대 0 프로토타입 (Godot 4.7) — Windows exe·Android APK 빌드, 파이썬 시뮬레이터와의 일치 시험 |
-| [data/](data/) · [sim/](sim/) · [mockups/](mockups/) · [images/](images/) | 시대 0 데이터(JSON — 모듈·기술, 3D 세계의 천체·밝은 별·월면 지형 `sky.json`), 밸런스 시뮬레이터·차트 스크립트, UI 목업 원본(HTML), 렌더한 이미지 |
+| [data/](data/) · [sim/](sim/) · [mockups/](mockups/) · [images/](images/) | 시대 0 데이터(JSON — 모듈·기술, 도시 부지 6곳의 보정·원정 `city_sites.json`, 3D 세계의 천체·밝은 별·월면 지형 `sky.json`), 밸런스 시뮬레이터·차트 스크립트, UI 목업 원본(HTML), 렌더한 이미지 |
 
 ## 카탈로그에서 바뀐 점
 

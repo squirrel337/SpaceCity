@@ -1,6 +1,7 @@
 extends SceneTree
 ## 화면이 실제로 도는지 확인하는 연기 시험 — 메인 씬을 띄우고, 자동 운영으로 60일을 돌리고,
-## 탭을 모두 열어 보고, 저장·불러오기를 왕복한 뒤 3년 보고서까지 간다. 오류가 하나라도 나면 실패한다.
+## 탭을 모두 열어 보고, 저장·불러오기를 왕복한 뒤 3년 보고서까지 간다. 끝으로 화성에 원정대를 보내
+## 두 번째 식민지를 세우고 고르고 저장을 왕복한다. 오류가 하나라도 나면 실패한다.
 ##   godot --headless --path game --script res://tests/smoke_test.gd
 
 var main: Control
@@ -32,7 +33,7 @@ func _process(_delta: float) -> bool:
 			main._step()
 		main._refresh_live()
 		if frames % 40 == 0:
-			main._select_tab(["life", "power", "build", "research", "log"][(frames / 40) % 5])
+			main._select_tab(["life", "power", "build", "research", "colony", "log"][(frames / 40) % 6])
 	elif frames == 400:
 		_check(main.sim.current_day() >= 60, "60일을 돌지 못했다 (%d일)" % main.sim.current_day())
 		_check(main.sim.population() > 0, "정착민이 모두 사라졌다")
@@ -64,6 +65,8 @@ func _process(_delta: float) -> bool:
 			_check(report_seen or main.modal.context == "report", "3년 보고서가 뜨지 않았다")
 			var s: Dictionary = main.sim.summary()
 			print("smoke: 3y pop %d, trust %.1f, deaths %d, techs %d" % [int(s["population_end"]), s["trust_end"], int(s["deaths"]), s["techs"]])
+			main.modal.visible = false
+			_colony_check()
 			if failures.is_empty():
 				print("smoke: OK")
 				quit(0)
@@ -83,7 +86,7 @@ func _save_roundtrip() -> void:
 	# 같은 상태에서 같은 결정이면 같은 결과가 나와야 한다
 	for _i in range(24 * 10):
 		restored.advance_hour()
-		main.sim.advance_hour()
+		main.colonies.step()          # 식민지 시계와 함께 (식민지는 아직 하나)
 	_check(absf(restored.stock["o2_kg"] - main.sim.stock["o2_kg"]) < 1e-6, "불러온 뒤 10일의 결과가 다르다")
 	_check(restored.rng.random() == main.sim.rng.random(), "난수 상태가 이어지지 않았다")
 
@@ -292,7 +295,7 @@ func _plan_check() -> void:
 	# 공사가 끝나면 지어진 건물이 된다
 	var uid := int(e["uid"])
 	for _i in range(24 * 40):
-		sim.advance_hour()
+		main.colonies.step()          # 식민지 시계와 함께 (sim은 고향)
 		if sim.queue.all(func(it): return int(it["seq"]) != int(e["seq"])):
 			break
 	plan.sync(sim)
@@ -356,6 +359,85 @@ func _types_check() -> void:
 			break
 	_check(split, "매립형 원자로를 거주구 가까이 놓을 자리를 찾지 못했다")
 	print("smoke: types %d mixed built, %d/116 placeable" % [mixed, placed])
+
+
+## 다른 천체의 식민지: 발사 창(천문력)·원정·도착·함께 흐르는 시간·기술 나누기·고르기(3D 땅과 도시)·저장 왕복
+func _colony_check() -> void:
+	var col: Colonies = main.colonies
+	var home: CitySim = main.sim
+	_check(col.list.size() == 1 and String(col.list[0]["site"]) == GameData.HOME_SITE, "고향 식민지 하나로 시작하지 않았다")
+	# 천문력으로 찾은 화성 창의 가장 좋은 날: 화성이 지구보다 호만 위상각(약 44°)만큼 앞서야 한다
+	var w: Dictionary = col.window("mars_hellas")
+	var jd := col._jd(float(w["best"]))
+	var phase := wrapf(Colonies._lon("mars", jd) - Colonies._lon("earth", jd), -180.0, 180.0)
+	_check(absf(phase - 44.3) < 1.5, "화성 발사 창의 위상각이 맞지 않다 (%.1f°)" % phase)
+	_check(float(w["end"]) >= col.hour / 24.0 and float(w["best"]) - col.hour / 24.0 < 800.0, "다음 화성 창이 회합 주기 안에 없다")
+	var window_text := col.date_text(float(w["best"]) * 24.0)
+	# 시험: 기술·비용을 채우고 지금 창을 연다
+	for t in ["seed_distributed", "cryogenic_propellant"]:
+		home.techs[t] = true
+	home.support = maxf(home.support, 5000.0)
+	home.stock["parts"] = maxf(home.stock["parts"], 2000.0)
+	var now_d := col.hour / 24.0
+	col._windows["mars_hellas"] = {"best": now_d, "start": now_d - 1.0, "end": now_d + 1.0, "half": 1.0}
+	var why := col.block_reason("mars_hellas")
+	_check(why == "", "화성으로 떠날 수 없다: " + why)
+	var support_before := home.support
+	_check(col.launch("mars_hellas"), "원정대가 떠나지 못했다")
+	_check(absf(support_before - home.support - 600.0) < 1e-6, "원정 비용을 고향이 내지 않았다")
+	_check(col.block_reason("mars_hellas") != "", "같은 부지로 두 번 떠날 수 있다")
+	_check(int(col.expeditions[0]["arrive"]) - col.hour == 259 * 24, "전이 기간이 259일이 아니다")
+	col.expeditions[0]["arrive"] = col.hour + 24          # 시험: 하루 만에 도착
+	main._update_colony_ui()
+	main._select_tab("colony")
+	for _i in range(31 * 24):
+		if main.modal.visible:
+			if main.modal.context == "storm":
+				main.modal.visible = false
+				main._on_modal_choice("storm", "lottery")
+			else:
+				main.modal.visible = false
+		main._step()
+	_check(col.list.size() == 2, "원정대가 도착해 식민지가 서지 않았다")
+	if col.list.size() < 2:
+		return
+	var mars: CitySim = col.list[1]["sim"]
+	_check(mars.site_id == "mars_hellas" and mars.hour == col.hour - int(col.list[1]["founded"]), "화성 식민지의 시계가 맞지 않다")
+	_check(mars.date_text() == home.date_text(), "두 식민지의 날짜가 다르다")
+	_check(mars.population() > 0, "화성 식민지가 첫 달을 버티지 못했다")
+	_check(mars.techs.has("seed_distributed") and mars.techs.size() == home.techs.size(), "기술이 나눠지지 않았다")
+	# 고르기: 탭·도구·3D 땅과 도시가 화성을 본다. 다른 도시는 그리지 않는다
+	main._on_colony_view(1)
+	_check(main.sim == mars and main.world.ground.body == "mars", "화성 식민지를 고르지 못했다")
+	_check(main.world.city != null and main.world.city.get_parent() == main.world.ground.city_root, "화성에 3D 도시가 서지 않았다")
+	_check(main.world.moon.city_root.get_child_count() == 0, "고르지 않은 달 도시가 남아 있다")
+	_check(main.plan.layout.kind == "open" and main.tool.sim == mars, "화성의 배치·도구가 맞지 않다")
+	_check(not home.interactive and mars.interactive, "고른 식민지만 결정 카드를 띄워야 한다")
+	var marks: Array = main.world.colonies
+	_check(marks.size() == 2 and bool(marks[1]["active"]) and String(marks[1]["body"]) == "mars", "3D 지도의 식민지 점이 맞지 않다")
+	for _i in range(24):
+		main._step()
+	main._refresh_live()
+	# 저장 왕복 (판 2: 식민지 둘)
+	var text := JSON.stringify(col.to_save(), "", false, true)
+	var back := Colonies.new()
+	_check(back.load_save(JSON.parse_string(text)), "식민지 저장을 읽지 못했다")
+	_check(back.list.size() == 2 and back.hour == col.hour, "불러온 식민지·시각이 다르다")
+	if back.list.size() == 2:
+		var mb: CitySim = back.list[1]["sim"]
+		_check(mb.site_id == "mars_hellas" and absf(mb.population() - mars.population()) < 1e-9, "불러온 화성 식민지가 다르다")
+		main.plan.sync(mars)
+		_check((back.list[1]["plan"] as CityPlan).buildings.size() == main.plan.buildings.size(), "불러온 화성 배치가 다르다")
+	# 판 1 저장(식민지 하나)도 읽는다
+	var v1 := home.to_save()
+	v1["plan"] = (col.list[0]["plan"] as CityPlan).to_save()
+	var old := Colonies.new()
+	_check(old.load_save(JSON.parse_string(JSON.stringify(v1, "", false, true))) and old.list.size() == 1, "판 1 저장을 읽지 못했다")
+	# 고향으로
+	main._on_colony_view(0)
+	_check(main.sim == home and main.world.ground.body == "moon", "고향으로 돌아오지 못했다")
+	print("smoke: colonies %d, mars pop %d day %d, next mars window %s (phase %.1f°)" % [col.list.size(),
+		int(mars.population()), mars.current_day(), window_text, phase])
 
 
 func _check(ok: bool, message: String) -> void:

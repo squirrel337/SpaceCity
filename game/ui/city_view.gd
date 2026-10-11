@@ -11,6 +11,8 @@ const GAP := 8.0
 const MIN_CARD_W := 150.0
 
 var sim: CitySim
+var title := "섀클턴 시드 시티"     # 고른 식민지 이름
+var ridge := true                  # 능선형 부지(그림자) / 평지형(낮·밤)
 var _cards := []
 
 
@@ -79,10 +81,14 @@ func _draw_header() -> void:
 	draw_polyline(ridge.slice(1, ridge.size() - 1), Color("3a4256"), 1.5)
 	if not lit:
 		draw_rect(sky, Color(0.05, 0.08, 0.2, 0.35))
-	var state := "일조 — 태양광 %s kW" % Fmt.n(sim.solar_kw)
+	var state := "일조" if ridge else "낮"
+	if sim.solar_kw > 0.0:
+		state += " — 태양광 %s kW" % Fmt.n(sim.solar_kw)
 	if not lit:
-		state = "그림자 — 태양광 0 kW, 축전 %s" % Fmt.pct((sim.battery + sim.rfc) / maxf(1.0, sim.bat_cap + sim.rfc_cap))
-	draw_string(font, Vector2(16, 26), "섀클턴 시드 시티", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Palette.TEXT)
+		state = "그림자" if ridge else "밤"
+		if sim.bat_cap + sim.rfc_cap > 0.0:
+			state += " — 태양광 0 kW, 축전 %s" % Fmt.pct((sim.battery + sim.rfc) / maxf(1.0, sim.bat_cap + sim.rfc_cap))
+	draw_string(font, Vector2(16, 26), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Palette.TEXT)
 	draw_string(font, Vector2(16, 46), state, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Palette.AMBER if lit else Palette.BLUE)
 	if not sim.pending_storm.is_empty():
 		_draw_right(font, w - 16, 26, "태양 양성자 폭풍 경보", 15, Palette.RED)

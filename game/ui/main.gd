@@ -1,15 +1,19 @@
 extends Control
 ## SpaceCity 시대 0 프로토타입 — 화면 구성과 게임 루프.
 ## 규칙은 sim/의 CitySim이 맡고, 여기서는 시간을 흘리고 보여 주고 결정을 받는다.
+## 식민지가 여럿이면(Colonies) 모두 같은 시계로 흐르고, 화면·탭·도구는 고른 식민지 하나(sim)를 본다.
 
 const SAVE_PATH := "user://spacecity_save.json"
 const HOURS_PER_SECOND := [0.0, 3.0, 9.0, 30.0]   # 정지 · 1×(하루 8초) · 3×(2.7초) · 10×(0.8초)
 const SPEED_LABELS := ["정지", "1×", "3×", "10×"]
 const REPORT_DAY := 1096                            # 3년 보고서
 const JUMP_LIMIT_H := 24 * 30
-const TABS := [["life", "생명유지"], ["power", "전력"], ["build", "건설"], ["research", "연구"], ["log", "기록"]]
+const TABS := [["life", "생명유지"], ["power", "전력"], ["build", "건설"], ["research", "연구"], ["colony", "개척"],
+	["log", "기록"]]
 
-var sim: CitySim
+var sim: CitySim                    # 고른 식민지의 시뮬레이션 (탭·도구·3D 도시가 본다)
+var colonies := Colonies.new()
+var active := 0                     # 고른 식민지 번호
 var speed := 0
 var _last_speed := 1
 var _acc := 0.0
@@ -41,6 +45,7 @@ var toasts: VBoxContainer
 var speed_buttons: Array[Button] = []
 var auto_button: Button
 var date_label: Label
+var colony_button: OptionButton
 var chips := {}
 var tabs := {}
 var tab_buttons := {}
@@ -107,6 +112,7 @@ func _build() -> void:
 	world = WorldView.new()
 	world.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	world.module_tapped.connect(_on_module_tapped)
+	world.colony_picked.connect(_on_colony_view)
 	city_area.add_child(world)
 	city_area.add_child(_build_view_switch())
 	city_area.add_child(_build_place_bar())
@@ -157,7 +163,7 @@ func _build_view_switch() -> Control:
 		elif tool.mode in ["road", "erase"]:
 			tool.stop())
 	row.add_child(road_button)
-	view_buttons["world"].tooltip_text = "달 위의 도시 — 끌어서 돌리고, 휠·두 손가락으로 확대해 행성과 별까지 (M)"
+	view_buttons["world"].tooltip_text = "식민지의 도시 — 끌어서 돌리고, 휠·두 손가락으로 확대해 행성과 별까지 (M)"
 	view_buttons["list"].tooltip_text = "모듈 목록 (M)"
 	world_row = HBoxContainer.new()
 	world_row.add_theme_constant_override("separation", 4)
@@ -166,7 +172,7 @@ func _build_view_switch() -> Control:
 	gap.custom_minimum_size.x = 8
 	world_row.add_child(gap)
 	for spec in [["−", "축소", func(): world.zoom_by(1.6)], ["+", "확대", func(): world.zoom_by(1.0 / 1.6)],
-			["기지", "기지 위로 (H)", func(): world.home()], ["달", "달 전체", func(): world.show_moon()],
+			["기지", "고른 식민지의 도시 위로 (H)", func(): world.fly_to_colony()], ["달", "달 전체", func(): world.show_moon()],
 			["지구·달", "지구와 달", func(): world.show_earth_moon()], ["태양계", "태양계", func(): world.show_solar_system()],
 			["별", "이웃 별 (25광년)", func(): world.show_neighbors()]]:
 		var wb := Button.new()
@@ -327,11 +333,18 @@ func _build_top_bar() -> Control:
 	date_label = ThemeFactory.heading("", 18)
 	date_label.custom_minimum_size.x = 150
 	row.add_child(date_label)
+	colony_button = OptionButton.new()
+	colony_button.custom_minimum_size = Vector2(104, 42)
+	colony_button.fit_to_longest_item = false
+	colony_button.clip_text = true
+	colony_button.tooltip_text = "식민지 고르기 — 그 도시로 날아간다"
+	colony_button.item_selected.connect(func(i: int): _on_colony_view(i))
+	row.add_child(colony_button)
 	for i in range(4):
 		var b := Button.new()
 		b.text = SPEED_LABELS[i]
 		b.toggle_mode = true
-		b.custom_minimum_size = Vector2(48, 42)
+		b.custom_minimum_size = Vector2(44, 42)
 		b.pressed.connect(_set_speed.bind(i))
 		row.add_child(b)
 		speed_buttons.append(b)
@@ -395,8 +408,14 @@ func _build_side() -> Control:
 		b.text = t[1]
 		b.toggle_mode = true
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.custom_minimum_size.y = 42
-		b.add_theme_font_size_override("font_size", 15)
+		b.custom_minimum_size = Vector2(0, 42)
+		b.clip_text = true
+		b.add_theme_font_size_override("font_size", 14)
+		for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+			var sb := (theme.get_stylebox(state, "Button") as StyleBoxFlat).duplicate() as StyleBoxFlat
+			sb.content_margin_left = 3
+			sb.content_margin_right = 3
+			b.add_theme_stylebox_override(state, sb)
 		b.pressed.connect(_select_tab.bind(t[0]))
 		tab_row.add_child(b)
 		tab_buttons[t[0]] = b
@@ -408,7 +427,7 @@ func _build_side() -> Control:
 	host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel_scroll.add_child(host)
 	tabs = {"life": LifePanel.new(), "power": PowerPanel.new(), "build": BuildPanel.new(),
-		"research": ResearchPanel.new(), "log": LogPanel.new()}
+		"research": ResearchPanel.new(), "colony": ColonyPanel.new(), "log": LogPanel.new()}
 	for key in tabs:
 		tabs[key].size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tabs[key].visible = false
@@ -416,40 +435,109 @@ func _build_side() -> Control:
 	tabs["build"].changed.connect(_on_player_change)
 	tabs["build"].place_requested.connect(_begin_place)
 	tabs["research"].changed.connect(_on_player_change)
+	tabs["colony"].mgr = colonies
+	tabs["colony"].view_requested.connect(_on_colony_view)
+	tabs["colony"].changed.connect(func():
+		_update_colony_ui()
+		_on_player_change())
 	return side
 
 
 # ── 새 게임·저장 ─────────────────────────────────────────────────
 func _new_game(seed_value: int, autopilot: bool) -> void:
-	_attach(CitySim.new(seed_value, 40.0, "good" if autopilot else ""))
+	var s := CitySim.new(seed_value, 40.0, "good" if autopilot else "")
+	colonies.start(s, CityPlan.create(s, world.ground_for(s.site_id).layout))
+	_begin_session(0)
 	sim.note("관리 기록 — 가동 확인. 정착민 120명. 시드 %d." % seed_value, "info")
 	if autopilot:
 		sim.note("자동 운영 — 시드가 추천 운영 방침으로 짓고 연구한다", "info")
 
 
-func _attach(new_sim: CitySim, plan_data: Variant = null) -> void:
-	sim = new_sim
-	plan = CityPlan.from_save(plan_data, sim)
-	tool.bind(sim, plan)
-	sim.interactive = true
-	sim.noted.connect(_on_note)
-	for key in tabs:
-		tabs[key].bind(sim)
-	city_view.sim = sim
-	world.set_sim(sim, plan, tool)
-	forecast.sim = sim
-	auto_button.set_pressed_no_signal(sim.autopilot != null)
-	_last_day = sim.current_day()
-	_report_shown = sim.current_day() >= REPORT_DAY
+## 새 게임·불러오기 뒤: 식민지마다 기록을 잇고, 고른 식민지를 화면에 붙인다
+func _begin_session(index: int) -> void:
+	sim = null
+	for c in colonies.list:
+		_wire(c)
+	_last_day = colonies.hour / 24
+	_report_shown = _last_day >= REPORT_DAY
 	_game_over = false
 	_acc = 0.0
 	_jumping = false
 	for c in toasts.get_children():
 		c.queue_free()
+	_activate(clampi(index, 0, colonies.list.size() - 1), false)
+	world.home(false)
 	_select_tab("life")
 	_set_speed(0)
+
+
+func _wire(c: Dictionary) -> void:
+	var s: CitySim = c["sim"]
+	if s.has_meta("wired"):
+		return
+	s.set_meta("wired", true)
+	s.noted.connect(_on_colony_note.bind(s.get_instance_id()))
+
+
+## 식민지를 고른다: 탭·목록·도구·3D 도시가 그 식민지를 본다. fly면 카메라가 그 도시로 날아가 내려앉는다
+func _activate(index: int, fly: bool = true) -> void:
+	if index < 0 or index >= colonies.list.size():
+		return
+	tool.stop()
+	if sim != null:
+		sim.interactive = false
+	active = index
+	var c: Dictionary = colonies.list[index]
+	sim = c["sim"]
+	plan = c["plan"]
+	sim.interactive = true
+	tool.bind(sim, plan)
+	for key in tabs:
+		tabs[key].bind(sim)
+	city_view.sim = sim
+	city_view.title = String(c["name"])
+	city_view.ridge = plan.layout.kind == "ridge"
+	world.set_sim(sim, plan, tool)
+	world.city.title = String(c["name"])
+	forecast.sim = sim
+	auto_button.set_pressed_no_signal(sim.autopilot != null)
+	_update_colony_ui()
+	if fly:
+		if view_mode != "world":
+			_set_view("world")
+		world.fly_to_colony()
 	_dirty = true
 	_refresh_live()
+
+
+func _on_colony_view(index: int) -> void:
+	if index < 0 or index >= colonies.list.size():
+		return
+	if index == active:
+		if view_mode != "world":
+			_set_view("world")
+		world.fly_to_colony()
+		return
+	_activate(index, true)
+
+
+## 식민지 고르기 단추·3D 지도의 점·개척 탭을 맞춘다
+func _update_colony_ui() -> void:
+	colony_button.clear()
+	for c in colonies.list:
+		colony_button.add_item(String(c.get("short", c["name"])))
+	colony_button.select(active)
+	colony_button.visible = colonies.list.size() > 1        # 식민지가 하나뿐이면 감춘다 (윗줄 자리)
+	_update_markers()
+	if current_tab == "colony":
+		tabs["colony"].rebuild()
+
+
+func _update_markers() -> void:
+	var dirs := {}
+	for b in world.grounds:
+		dirs[b] = (world.grounds[b] as SiteGround).site_dir()
+	world.set_colonies(colonies.markers(active, dirs))
 
 
 func _save() -> void:
@@ -457,8 +545,8 @@ func _save() -> void:
 		return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f != null:
-		var data := sim.to_save()
-		data["plan"] = plan.to_save()
+		var data := colonies.to_save()
+		data["active"] = active
 		f.store_string(JSON.stringify(data, "", false, true))
 		f.close()
 
@@ -467,9 +555,9 @@ func _load_save() -> bool:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return false
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-	if not data is Dictionary or int(data.get("version", 0)) != 1:
+	if not data is Dictionary or not colonies.load_save(data):
 		return false
-	_attach(CitySim.from_save(data), data.get("plan"))
+	_begin_session(int(data.get("active", 0)))
 	sim.note("관리 기록 — 저장한 지점에서 다시 가동했다", "info")
 	return true
 
@@ -563,6 +651,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_select_tab("research")
 		KEY_L:
 			_select_tab("log")
+		KEY_P:
+			_select_tab("colony")
 		KEY_M:
 			_set_view("list" if view_mode == "world" else "world")
 		_:
@@ -575,7 +665,7 @@ func _start_jump() -> void:
 		return
 	_set_speed(0)
 	_jumping = true
-	_jump_start = sim.hour
+	_jump_start = colonies.hour
 
 
 func _process(delta: float) -> void:
@@ -583,12 +673,12 @@ func _process(delta: float) -> void:
 		return
 	var stepped := false
 	if _jumping:
-		for _i in range(24 * 4):
+		for _i in range(maxi(24, 96 / maxi(1, colonies.list.size()))):
 			_step()
 			stepped = true
-			if not _jumping or modal.visible:
+			if not _jumping or modal.visible or _game_over:
 				break
-			if sim.hour - _jump_start >= JUMP_LIMIT_H:
+			if colonies.hour - _jump_start >= JUMP_LIMIT_H:
 				_jumping = false
 				break
 	elif speed > 0:
@@ -599,9 +689,10 @@ func _process(delta: float) -> void:
 			_step()
 			stepped = true
 			steps += 1
-			if speed == 0 or modal.visible:
+			if speed == 0 or modal.visible or _game_over:
 				_acc = 0.0
 				break
+	world.hour_frac = clampf(_acc, 0.0, 1.0) if speed > 0 else 0.0
 	_ui_clock += delta
 	if stepped:
 		_dirty = true
@@ -610,39 +701,92 @@ func _process(delta: float) -> void:
 		_refresh_live()
 
 
+## 한 시간: 모든 식민지가 함께 흐른다 (고른 식민지만 결정 카드를 띄운다)
 func _step() -> void:
-	sim.advance_hour()
+	for i in colonies.step():
+		_on_founded(i)
 	if not sim.pending_storm.is_empty():
 		_jumping = false
 		_set_speed(0)
 		_show_storm()
 		return
-	var day := sim.current_day()
+	@warning_ignore("integer_division")
+	var day := colonies.hour / 24
 	if day != _last_day:
 		_last_day = day
 		_on_new_day(day)
 
 
 func _on_new_day(day: int) -> void:
-	if tabs[current_tab] is BuildPanel or tabs[current_tab] is ResearchPanel:
+	if tabs[current_tab] is BuildPanel or tabs[current_tab] is ResearchPanel or tabs[current_tab] is ColonyPanel:
 		tabs[current_tab].rebuild()
+	# 식민지를 잃는다: 절멸, 또는 신뢰가 10 아래로 1년 — 고향을 잃으면 게임이 끝난다
+	for i in range(colonies.list.size() - 1, -1, -1):
+		var c: Dictionary = colonies.list[i]
+		var cs: CitySim = c["sim"]
+		var why := ""
+		var text := ""
+		if cs.population() <= 0:
+			why = "절멸"
+			text = "시드가 돌보던 정착민이 모두 사라졌다."
+		elif cs.trust_low_days >= 365:
+			why = "시드 정지"
+			text = "신뢰가 10 아래로 1년이 지났다. 평의회가 시드를 끄기로 했다."
+		if why == "":
+			continue
+		if String(c["site"]) == GameData.HOME_SITE or colonies.list.size() == 1:
+			_end_game(why, text)
+			return
+		_lose_colony(i, why)
 	var pop := sim.population()
 	if pop <= 0:
-		_end_game("절멸", "시드가 돌보던 정착민이 모두 사라졌다.")
-		return
-	if sim.trust_low_days >= 365:
-		_end_game("시드 정지", "신뢰가 10 아래로 1년이 지났다. 평의회가 시드를 끄기로 했다.")
 		return
 	var o2_days: float = sim.stock["o2_kg"] / (pop * sim.PER["o2_kg"])
 	var food_days: float = sim.stock["food_kg"] / (pop * sim.PER["food_kg"])
 	if (o2_days < 3 or food_days < 3) and day - _alarm_day > 2:
 		_alarm_day = day
 		_set_speed(0)
-		_toast("위급 — %s 비축이 3일 아래다" % ("산소" if o2_days < 3 else "식량"), "critical")
+		_toast("위급 — %s%s 비축이 3일 아래다" % [_colony_tag(sim), "산소" if o2_days < 3 else "식량"], "critical")
 	if day >= REPORT_DAY and not _report_shown:
 		_report_shown = true
 		_set_speed(0)
 		_show_report()
+
+
+## 원정대가 도착해 새 식민지가 섰다
+func _on_founded(i: int) -> void:
+	var c: Dictionary = colonies.list[i]
+	_wire(c)
+	_jumping = false
+	_toast("%s 도착 — 개척을 시작한다. 개척 탭이나 3D 지도의 점을 눌러 그 도시로 날아간다" % c["name"], "good")
+	var h := colonies.home()
+	if not h.is_empty():
+		(h["sim"] as CitySim).note("원정대 도착 — %s. 시드가 새 기지를 세우기 시작했다" % c["name"], "good")
+	_update_colony_ui()
+
+
+func _lose_colony(i: int, why: String) -> void:
+	var was_active := i == active
+	var c := colonies.remove(i)
+	if active > i or active >= colonies.list.size():
+		active = maxi(0, active - 1)
+	_toast("%s — %s. 식민지를 잃었다" % [c["name"], why], "critical")
+	var h := colonies.home()
+	if not h.is_empty():
+		(h["sim"] as CitySim).note("식민지 소실 — %s (%s)" % [c["name"], why], "death")
+	if was_active:
+		sim = null
+		_activate(maxi(0, colonies.index_of_site(GameData.HOME_SITE)), true)
+	else:
+		_update_colony_ui()
+
+
+## 다른 식민지의 일을 알릴 때 붙이는 이름 (고른 식민지 하나뿐이면 없다)
+func _colony_tag(s: CitySim) -> String:
+	if colonies.list.size() < 2:
+		return ""
+	var i := colonies.index_of_sim(s)
+	return "[%s] " % colonies.list[i]["short"] if i >= 0 else ""
 
 
 # ── 화면 갱신 ───────────────────────────────────────────────────
@@ -663,7 +807,8 @@ func _refresh_live() -> void:
 	var ppm := sim.co2_ppm()
 	_set_chip("o2", Fmt.days(o2_days), "산소 비축", Palette.level_color(o2_days, 10, 5))
 	_set_chip("co2", "%s ppm" % Fmt.n(ppm), "CO₂", Palette.RED if ppm > 5000 else (Palette.AMBER if ppm > 2500 else Palette.TEXT))
-	_set_chip("soc", Fmt.pct(soc), "축전" + (" · 그림자" if sim.is_dark() else ""), Palette.level_color(soc, 0.4, 0.15))
+	var shade := "그림자" if plan.layout.kind == "ridge" else "밤"
+	_set_chip("soc", Fmt.pct(soc), "축전" + (" · " + shade if sim.is_dark() else ""), Palette.level_color(soc, 0.4, 0.15))
 	_set_chip("food", Fmt.days(food_days), "식량 · 자급 %s" % Fmt.pct(made / food_need if food_need > 0 else 0.0),
 		Palette.level_color(food_days, 20, 7))
 	_set_chip("pop", "%d명" % int(pop), "인구 · 주거 %d" % int(sim.housing_cap), Palette.AMBER if pop > sim.housing_cap else Palette.TEXT)
@@ -672,6 +817,7 @@ func _refresh_live() -> void:
 	city_view.queue_redraw()
 	forecast.queue_redraw()
 	tabs[current_tab].update_view()
+	_update_markers()
 
 
 func _set_chip(key: String, value: String, caption: String, color: Color) -> void:
@@ -718,6 +864,19 @@ func _toast(text: String, kind: String) -> void:
 	tween.tween_interval(4.0)
 	tween.tween_property(p, "modulate:a", 0.0, 0.6)
 	tween.tween_callback(p.queue_free)
+
+
+## 식민지의 기록: 고른 식민지는 평소처럼, 다른 식민지는 위급한 일만 이름을 붙여 알린다
+func _on_colony_note(hour: int, text: String, kind: String, sim_id: int) -> void:
+	if sim != null and sim.get_instance_id() == sim_id:
+		_on_note(hour, text, kind)
+		return
+	if kind in ["critical", "death"]:
+		for c in colonies.list:
+			if (c["sim"] as CitySim).get_instance_id() == sim_id:
+				_toast("[%s] %s" % [c["short"], text], kind)
+				break
+	_dirty = true
 
 
 func _on_note(_hour: int, text: String, kind: String) -> void:
@@ -770,7 +929,10 @@ func _show_help() -> void:
 		"농장이 72시간 넘게 꺼지면 작물이 죽는다.\n" +
 		"· 대피소가 인구보다 적으면 대형 폭풍 때 대피소 추첨을 해야 한다. 거주 모듈에 레골리스를 덮으면 평소 선량이 준다.\n" +
 		"· 누적 선량 600 mSv에 닿은 사람은 다음 유인선으로 귀환한다.\n" +
-		"· 신뢰가 30 아래면 위임이 줄고, 10 아래로 1년이 지나면 시드가 정지된다.",
+		"· 신뢰가 30 아래면 위임이 줄고, 10 아래로 1년이 지나면 시드가 정지된다.\n" +
+		"· 개척 탭(P): 화성·수성·세레스·칼리스토·타이탄으로 원정대를 보낸다. 필요한 기술, 고향의 부품·지원 점수, " +
+		"열린 발사 창이 있어야 떠난다. 도착하면 시드가 자동 운영으로 기지를 세우고, 모든 식민지가 같은 시계로 흐른다.\n" +
+		"· 3D 지도에서 행성을 보면 도시는 점과 이름뿐이다. 점이나 개척 탭의 '보기'를 누르면 그 도시로 날아가 내려앉는다.",
 		[["ok", "닫기", ""]])
 
 
@@ -788,7 +950,8 @@ func _show_storm() -> void:
 
 
 func _show_report() -> void:
-	var s := sim.summary()
+	var h := colonies.home()
+	var s: Dictionary = (h["sim"] if not h.is_empty() else sim).summary()
 	var body := "인구 %d명 · 신뢰 %d · 평균 사기 %d\n사망 %d명 · 작물 고사 %d회 · 폭풍 때 대피소 밖 연인원 %d명 · 생명유지 감전 %d시간 · 완료한 기술 %d개\n\n" % [
 		int(s["population_end"]), int(round(s["trust_end"])), int(round(s["morale_avg"])), int(s["deaths"]), s["crop_losses"],
 		int(round(s["exposed_person_events"])), s["brownout_hours"], s["techs"]]

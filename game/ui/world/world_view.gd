@@ -292,16 +292,20 @@ func _spin_hours(id: String) -> float:
 	var sun_az := atan2(to_sun.dot(pole.cross(node)), to_sun.dot(node))
 	var site := ground.site_dir()
 	var site_lon := atan2(site.y, site.x)
-	# 시뮬레이션의 하루: 위상 0에서 해가 뜨고 light_frac에서 진다 → 시간각 -90°..90°가 낮
+	# 시뮬레이션의 하루: 위상 0에서 해가 뜨고 light_frac에서 진다 → 그 부지의 실제 해돋이·해넘이 시간각에 맞춘다
+	# (해의 적위와 부지의 위도로: cos H0 = −tan φ · tan δ)
 	var light := clampf(float(il.get("light_frac", 0.5)), 0.05, 0.95)
 	var ph := fposmod((float(sim.hour) + hour_frac) / float(il["day_h"]) + 0.02, 1.0)
-	var hour_angle := -PI * 0.5 + PI * ph / light if ph < light \
-		else PI * 0.5 + PI * (ph - light) / (1.0 - light)
+	var decl := asin(clampf(to_sun.dot(pole), -1.0, 1.0))
+	var lat := asin(clampf(site.z, -1.0, 1.0))
+	var h0 := acos(clampf(-tan(lat) * tan(decl), -0.94, 0.94))
+	var hour_angle := -h0 + 2.0 * h0 * ph / light if ph < light \
+		else h0 + (TAU - 2.0 * h0) * (ph - light) / (1.0 - light)
 	var w_sim := hour_angle + sun_az - site_lon
 	var w_vis := TAU * fposmod(vis_hours / rot, 1.0)
 	var r := float(b["radius_km"])
 	var alt := Astro.len3(Astro.sub3(cam.pos, c)) - r
-	var k := 1.0 - smoothstep(0.3 * r, 1.5 * r, alt)
+	var k := 1.0 - smoothstep(4.0 * r, 12.0 * r, alt)      # 행성 단위(반지름의 몇 배)로 다가오면 그 도시의 시각
 	return rot * (w_vis + wrapf(w_sim - w_vis, -PI, PI) * k) / TAU
 
 
@@ -1069,15 +1073,15 @@ func _label_colony(i: int, font: Font, placed: Array) -> void:
 	var pos2: Vector2 = sp
 	if not Rect2(Vector2(-40, -40), size + Vector2(80, 80)).has_point(pos2):
 		return
-	var id := "colony:%d" % i
+	var id := String(col_d.get("id", "colony:%d" % i))
 	var hot := _hover_label == id
 	var accent := Color(1.0, 0.72, 0.3) if active else Color(0.55, 0.85, 1.0)
+	if col_d.get("transit", false):
+		accent = Color(0.62, 0.66, 0.74)
 	if hot:
 		accent = Color(1.0, 0.86, 0.55)
 	var text := String(col_d.get("name", ""))
-	var sub := "%s명" % Fmt.n(float(col_d.get("pop", 0)))
-	if col_d.has("note"):
-		sub += " · " + String(col_d["note"])
+	var sub := String(col_d["sub"]) if col_d.has("sub") else "%s명" % Fmt.n(float(col_d.get("pop", 0)))
 	var off := Vector2(12, 5)
 	var tsize := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT + 1)
 	var ssize := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT - 2)
