@@ -7,8 +7,11 @@ render_mode blend_disabled, unshaded;
 
 uniform int face = 0;
 uniform float texel = 0.0015;      // 한 칸의 각 크기 (라디안)
-uniform int mode = 0;              // 0: 정육면체 한 면, 1: 남극 둘레 (방위 등거리, 반지름 cap_rad)
+uniform int mode = 0;              // 0: 정육면체 한 면, 1: 지역 (방위 등거리, 중심 cap_dir, 반지름 cap_rad — 기본은 남극)
 uniform float cap_rad = 0.2;
+uniform vec3 cap_dir = vec3(0.0, 0.0, -1.0);
+uniform vec3 cap_e1 = vec3(1.0, 0.0, 0.0);
+uniform vec3 cap_e2 = vec3(0.0, 1.0, 0.0);
 #include "res://ui/world/shaders/moon_field.gdshaderinc"
 
 void fragment() {
@@ -18,7 +21,7 @@ void fragment() {
 		vec2 q = (UV - 0.5) * 2.0;
 		float rho = length(q) * cap_rad;
 		float ph = atan(q.y, q.x);
-		d = vec3(sin(rho) * cos(ph), sin(rho) * sin(ph), -cos(rho));
+		d = normalize(cap_dir * cos(rho) + (cap_e1 * cos(ph) + cap_e2 * sin(ph)) * sin(rho));
 	} else {
 		g = face_dir(face, UV);
 		d = vec3(g.x, -g.z, g.y);

@@ -1,6 +1,7 @@
 extends SceneTree
-## 식민지 스크린숏 — 고향에서 화성·세레스로 원정대를 보내고(시험이라 창을 열고 하루 만에 도착),
-## 행성 단위의 도시 점, 화성 식민지로 날아가 내려앉기, 화성 도시, 개척 탭, 고향으로 돌아오기를 찍는다 (디스플레이가 필요하다).
+## 식민지 스크린숏 — 천체마다 기본 도시가 있는 세계에서: 화성 헬라스에서 예제로로 로버 행렬을 보내고(시험이라 하루 만에
+## 도착), 타이탄 아디리에서 크라켄 해로 가는 행렬은 이동 중으로 둔다. 행성 단위의 도시 점, 화성 도시로 날아가 내려앉기,
+## 화성 도시, 개척 탭, 세레스·지구 도시, 고향으로 돌아오기를 찍는다 (디스플레이가 필요하다).
 ##   xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 \
 ##     --script res://tests/colony_shots.gd -- --out /tmp/shots [--days 120]
 
@@ -49,15 +50,18 @@ func _shot(name: String, full := false) -> void:
 	print("shot ", name)
 
 
-## 시험: 기술·비용을 채우고 그 부지의 발사 창을 지금 열어 원정대를 보낸다. quick이면 하루 만에 도착하게 한다
+## 시험: 떠나는 도시에 기술·비용을 채우고 (행성 사이면 발사 창을 지금 열어) 원정대를 보낸다. quick이면 하루 만에 도착
 func _send(site_id: String, quick := true) -> void:
 	var col: Colonies = main.colonies
-	var home: CitySim = col.home()["sim"]
-	for t in col.expedition(site_id).get("requires", []):
-		home.techs[t] = true
-	home.support = maxf(home.support, 9000.0)
-	home.stock["parts"] = maxf(home.stock["parts"], 3000.0)
-	home.stock["metal_t"] = maxf(home.stock["metal_t"], 50.0)
+	var r := col.route(site_id)
+	if r["mode"] == "":
+		return
+	var src: CitySim = col.list[int(r["from"])]["sim"]
+	for t in col.missing_techs(site_id, r):
+		src.techs[t] = true
+	src.support = maxf(src.support, 9000.0)
+	src.stock["parts"] = maxf(src.stock["parts"], 3000.0)
+	src.stock["metal_t"] = maxf(src.stock["metal_t"], 50.0)
 	var now_d := col.hour / 24.0
 	col._windows[site_id] = {"best": now_d, "start": now_d - 1.0, "end": now_d + 1.0, "half": 1.0}
 	if col.launch(site_id) and quick:
@@ -78,26 +82,30 @@ func _process(_delta: float) -> bool:
 		main._on_modal_choice("start", "auto")
 		main._set_speed(0)
 		_run_hours(days * 24)
-		_send("mars_hellas")
-		_send("ceres_occator")
-		_run_hours(24 * 12)
-		_send("titan_adiri", false)          # 이동 중인 원정대 (6.1년)
+		_send("mars_jezero")
 		_run_hours(24 * 3)
+		_send("titan_kraken", false)         # 이동 중인 로버 행렬
+		_run_hours(24 * 2)
 		main._set_speed(0)
 		main.modal.visible = false
 		main._set_view("world")
-		var mars := func() -> CitySim: return main.colonies.list[1]["sim"]
+		var col: Colonies = main.colonies
+		var mars_i := col.index_of_site("mars_hellas")
+		var ceres_i := col.index_of_site("ceres_occator")
+		var earth_i := col.index_of_site("earth_naro")
+		var mars := func() -> CitySim: return col.list[mars_i]["sim"]
 		_steps = [
 			["inner_system", func(): w.cam.look_from_space("sun", 3.4e8, 0.9, 0.75)],
 			["moon_globe", func(): w.cam.look_from_space("moon", 1737.4 * 3.2, 0.6, -0.9)],
 			["mars_globe", func():
 				_to_light(mars.call())
 				w.cam.look_from_space("mars", 3389.5 * 3.0, deg_to_rad(70.5) + 0.3, -0.55)],
-			["fly_mid", func(): main._on_colony_view(1), func(): return w.cam._fly.get("t", 1.0) > 0.55],
+			["fly_mid", func(): main._on_colony_view(mars_i), func(): return w.cam._fly.get("t", 1.0) > 0.55],
 			["landing", func(): pass, func(): return not w.cam.flying() and float(w._descent.get("t", 0.0)) > 0.5],
 			["mars_city", func(): pass, func(): return not w.cam.flying() and w._descent.is_empty()],
 			["colony_tab", func(): main._select_tab("colony")],
-			["ceres_city", func(): main._on_colony_view(2), func(): return not w.cam.flying() and w._descent.is_empty()],
+			["ceres_city", func(): main._on_colony_view(ceres_i), func(): return not w.cam.flying() and w._descent.is_empty()],
+			["earth_city", func(): main._on_colony_view(earth_i), func(): return not w.cam.flying() and w._descent.is_empty()],
 			["back_home", func(): main._on_colony_view(0), func(): return not w.cam.flying() and w._descent.is_empty()],
 		]
 		_wait = 30

@@ -9,7 +9,11 @@ signal terrain_ready
 var body := "moon"
 var city_root: Node3D
 var layout: BaseLayout
-var active := false              # 지금 고른 식민지의 땅인가
+var active := false:             # 지금 고른 식민지의 땅인가
+	set(v):
+		if v != active:
+			active = v
+			_active_changed()
 
 var _site := Vector3(0, 0, -1)   # 기지 평지 중심 (천체 고정 단위 벡터)
 var _site_basis := Basis()       # 모형 x, y, z → 천체 고정
@@ -36,6 +40,11 @@ func radius_m() -> float:
 
 func plateau_km() -> float:
 	return _plateau_m / 1000.0
+
+
+## 고른 도시가 되거나 그만둘 때 (다른 천체의 땅은 이때 굽거나 고운 지도를 내려놓는다)
+func _active_changed() -> void:
+	pass
 
 
 ## 지형 조각의 반지름 (m) — 그 안의 높이는 height_km이 안다

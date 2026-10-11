@@ -1,6 +1,7 @@
 class_name PlanetLook
 extends RefCounted
-## 행성·위성의 겉모습 (planet.gdshader의 kind와 색). 지구는 땅 지도(art/planets/earth_land.png)가 있으면 쓴다.
+## 행성·위성의 겉모습 (planet.gdshader의 kind와 색). 지구는 해안 거리 지도(art/planets/earth_coast*.png, Natural Earth)와
+## 얼음·메마른 땅 지도(art/planets/earth_land.png)를 쓴다.
 
 const KINDS := {
 	"mercury": [0, "#8f8a84", "#5e5953", "#b9b3aa", 1.0],
@@ -38,6 +39,7 @@ const DOT := {
 }
 
 static var _land: Texture2D
+static var _coast: Texture2D
 
 
 static func _shader(file: String) -> Shader:
@@ -48,6 +50,46 @@ static func land_texture() -> Texture2D:
 	if _land == null and ResourceLoader.exists("res://art/planets/earth_land.png"):
 		_land = load("res://art/planets/earth_land.png")
 	return _land
+
+
+## 지구 해안 거리 지도 (Natural Earth 1:10m — tools/art/earth_coast.py)
+static func coast_texture() -> Texture2D:
+	if _coast == null and ResourceLoader.exists("res://art/planets/earth_coast.png"):
+		_coast = load("res://art/planets/earth_coast.png")
+	return _coast
+
+
+## 지구 부지 둘레의 고운 해안 지도 (없으면 null)
+static func coast_local(site_id: String) -> Texture2D:
+	var path := "res://art/planets/earth_coast_%s.png" % site_id
+	return load(path) if ResourceLoader.exists(path) else null
+
+
+## 지구의 기지 자리 (방향, 반지름 km) — 해안 지도가 기지를 바다에 두더라도 그 둘레는 땅이다
+static func earth_keep() -> PackedVector4Array:
+	var keep := PackedVector4Array()
+	GameData.load_all()
+	for sid in GameData.SITES:
+		var s: Dictionary = GameData.SITES[sid]
+		if String(s.get("body", "")) == "earth" and s.has("lat") and keep.size() < 4:
+			var v := Astro.latlon(float(s["lat"]), float(s["lon"]))
+			keep.append(Vector4(v.x, v.y, v.z, 1.6))
+	return keep
+
+
+## 지구 셰이더(earth_surface)에 넣는 지도들 — 구, 지형 조각, 조각 굽기가 함께 쓴다
+static func earth_uniforms(m: ShaderMaterial) -> void:
+	var tex := land_texture()
+	m.set_shader_parameter("land", tex)
+	m.set_shader_parameter("has_land", tex != null)
+	var ct := coast_texture()
+	m.set_shader_parameter("coast", ct)
+	m.set_shader_parameter("has_coast", ct != null)
+	var keep := earth_keep()
+	m.set_shader_parameter("ekeep_n", keep.size())
+	if keep.is_empty():
+		keep.append(Vector4.ZERO)
+	m.set_shader_parameter("ekeep", keep)
 
 
 static func material(id: String, look: String) -> ShaderMaterial:
@@ -62,10 +104,8 @@ static func material(id: String, look: String) -> ShaderMaterial:
 	m.set_shader_parameter("seed", float(absi(id.hash()) % 97) + 1.0)
 	m.set_shader_parameter("atmo", ATMO.get(look, Color(0, 0, 0, 0)))
 	if look == "earth":
-		var tex := land_texture()
-		if tex:
-			m.set_shader_parameter("land", tex)
-			m.set_shader_parameter("has_land", true)
+		m.set_shader_parameter("r_km", 6371.0)
+		earth_uniforms(m)
 	return m
 
 

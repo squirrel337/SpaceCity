@@ -1,13 +1,11 @@
-// 행성·위성의 겉 색 (몸체 고정 단위 방향 d → 알베도). planet.gdshader(구)와 site_patch.gdshader(식민지 둘레 지형)가 함께 쓴다.
-// noise.gdshaderinc 다음에 넣는다.
+// 행성·위성의 겉 색 (몸체 고정 단위 방향 d → 알베도) — 구운 지도가 없는 천체(가스 행성 등)와 굽기 전의 planet.gdshader가 쓴다.
+// noise.gdshaderinc 다음에 넣는다. 지구(kind 2)는 earth_surface.gdshaderinc가 그린다.
 uniform int kind = 0;
 uniform float spin_h = 0.0;
 uniform vec4 col_a : source_color = vec4(0.6, 0.6, 0.6, 1.0);
 uniform vec4 col_b : source_color = vec4(0.4, 0.4, 0.4, 1.0);
 uniform vec4 col_c : source_color = vec4(0.8, 0.8, 0.8, 1.0);
 uniform float seed = 1.0;
-uniform sampler2D land : filter_linear_mipmap, repeat_enable;
-uniform bool has_land = false;
 
 vec3 dir_ll(float lat_deg, float lon_deg) {
 	float la = radians(lat_deg);
@@ -62,34 +60,6 @@ vec3 albedo(vec3 d) {
 		// 금성: 두꺼운 구름의 Y자 무늬
 		float sh = fbm(vec3(d.x * 3.0 + lat * 2.5, d.y * 3.0, d.z * 1.2) + vec3(spin_h * 0.002, 0.0, 0.0), 5, seed);
 		return mix(a, b, smoothstep(0.35, 0.7, sh)) * (0.92 + 0.08 * cos(lat * 2.0));
-	}
-	if (kind == 2) {
-		// 지구: 땅 지도(있으면) + 구름
-		float lon = atan(d.y, d.x);
-		vec2 uv = vec2(lon / 6.28318530718 + 0.5, 0.5 - lat / 3.14159265359);
-		vec4 lm = has_land ? texture(land, uv) : vec4(smoothstep(0.52, 0.56, fbm(d * 2.5, 5, seed)), 0.0, 0.0, 1.0);
-		float n = fbm(d * 9.0, 4, seed + 2.0);
-		float n2 = fbm(d * 30.0, 3, seed + 6.0);
-		// 해안선을 조금 흔들어 다각형 티를 줄인다
-		float landm = smoothstep(0.35, 0.65, lm.r + (n2 - 0.5) * 0.35);
-		// 위도대: 열대 숲 → 온대 숲·초원 → 북방 침엽수림 → 툰드라
-		float al = abs(lat);
-		vec3 tropic = mix(vec3(0.07, 0.20, 0.06), vec3(0.14, 0.27, 0.08), n);
-		vec3 temperate = mix(vec3(0.16, 0.28, 0.10), vec3(0.36, 0.38, 0.20), smoothstep(0.4, 0.7, n));
-		vec3 boreal = mix(vec3(0.08, 0.17, 0.09), vec3(0.16, 0.22, 0.12), n);
-		vec3 tundra = mix(vec3(0.38, 0.36, 0.28), vec3(0.5, 0.48, 0.4), n2);
-		vec3 ground = mix(tropic, temperate, smoothstep(0.3, 0.6, al));
-		ground = mix(ground, boreal, smoothstep(0.85, 1.0, al));
-		ground = mix(ground, tundra, smoothstep(1.08, 1.2, al));
-		vec3 desert = mix(vec3(0.72, 0.58, 0.38), vec3(0.84, 0.72, 0.5), n2);
-		float arid = smoothstep(0.25, 0.75, lm.b + (n - 0.5) * 0.35);
-		ground = mix(ground, mix(vec3(0.5, 0.45, 0.3), desert, smoothstep(0.45, 0.85, lm.b)), arid);
-		ground = mix(ground, vec3(0.94, 0.96, 0.98), max(lm.g, smoothstep(1.22, 1.3, abs(lat))));
-		vec3 sea = vec3(0.03, 0.10, 0.24);
-		vec3 col = mix(sea, ground, landm);
-		float cl = fbm(d * vec3(4.0, 4.0, 6.0) + vec3(spin_h * 0.004, 0.0, 0.0), 5, seed + 9.0);
-		cl = smoothstep(0.5, 0.75, cl + 0.12 * cos(lat * 6.0));
-		return mix(col, vec3(0.95), cl * 0.85);
 	}
 	if (kind == 3) {
 		// 화성: 녹슨 흙, 어두운 지대, 극관

@@ -417,6 +417,14 @@ func _bake_cube() -> void:
 		(mm as ShaderMaterial).set_shader_parameter("has_surf", true)
 
 
+## 달 전체의 높이·밝기 함수(moon_field)에 넣는 값 — 다른 달 부지(SiteSurface)의 굽기도 같은 값을 쓴다
+func fill_field_uniforms(mat: ShaderMaterial, size: int) -> void:
+	_fill_bake_uniforms(mat, size)
+	mat.set_shader_parameter("pol_c", _pol_c)
+	mat.set_shader_parameter("pol_p", _pol_p)
+	mat.set_shader_parameter("pol_n", _pol_c.size())
+
+
 func _fill_bake_uniforms(mat: ShaderMaterial, size: int) -> void:
 	var m: Dictionary = Astro.sky.get("moon", {})
 	mat.set_shader_parameter("pol_c", _pol_c)

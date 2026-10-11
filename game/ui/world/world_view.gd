@@ -49,6 +49,7 @@ var _near_stars: MeshInstance3D
 var _sun_glow: MeshInstance3D
 var _rings: MeshInstance3D
 var moon: MoonSurface
+var body_baker: BodyBaker            # 암석·얼음 천체의 겉모습을 GPU로 굽는다 (가까이 가면 더 곱게)
 var city: City3D                     # 지금 고른 식민지의 자세한 도시 (하나뿐)
 var ground: SiteGround               # 그 도시가 앉은 땅
 var grounds := {}                    # 부지 id → SiteGround (달 섀클턴은 늘, 다른 부지는 처음 고를 때 만든다)
@@ -148,7 +149,7 @@ func ground_for(site_id: String) -> SiteGround:
 		_fine_sphere[body] = true
 	var g := SiteSurface.new()
 	_space.add_child(g)
-	g.setup(body, site, node, float(_bodies[body]["radius"]))
+	g.setup(body, site, node, float(_bodies[body]["radius"]), body_baker, moon)
 	grounds[site_id] = g
 	return g
 
@@ -217,6 +218,8 @@ func _build_scene() -> void:
 	_vp.add_child(_fill_light)
 	_space = Node3D.new()
 	_vp.add_child(_space)
+	body_baker = BodyBaker.new()
+	_space.add_child(body_baker)
 	_milky = SkyBuilder.milky_way()
 	_vp.add_child(_milky)
 	_sky_stars = SkyBuilder.sky_stars(SKY_STARS)
@@ -249,8 +252,14 @@ func _make_body(id: String) -> void:
 		mat = null      # MoonSurface가 맡는다
 	else:
 		var r: float = float(b["radius_km"])
-		mi.mesh = SkyBuilder.sphere(96 if r > 2000.0 else 48, 48 if r > 2000.0 else 24)
 		mat = PlanetLook.material(id, look)
+		if BodySurface.has_body(id):
+			# 구운 지도로 그리는 천체: 가까이서도 둥근 윤곽이 보이게 곱게
+			mi.mesh = SkyBuilder.sphere(192, 96)
+			_fine_sphere[id] = true
+			body_baker.add(id, mat, r)
+		else:
+			mi.mesh = SkyBuilder.sphere(96 if r > 2000.0 else 48, 48 if r > 2000.0 else 24)
 	if mat:
 		mi.material_override = mat
 	_space.add_child(mi)
@@ -299,6 +308,8 @@ func _spin_hours(id: String) -> float:
 	if String(il.get("model", "")) != "rotation":
 		return vis_hours
 	var pole: Vector3 = Astro.vec(b.get("pole_ecl", Astro.v3(0, 0, 1)))
+	if id == "earth":
+		pole = Astro.vec(Astro.eq_to_ecl(Astro.v3(0, 0, 1)))
 	var node := Vector3(0, 0, 1).cross(pole)
 	if node.length_squared() < 1e-8:
 		node = Vector3(1, 0, 0)
@@ -317,11 +328,20 @@ func _spin_hours(id: String) -> float:
 	var h0 := acos(clampf(-tan(lat) * tan(decl), -0.94, 0.94))
 	var hour_angle := -h0 + 2.0 * h0 * ph / light if ph < light \
 		else h0 + (TAU - 2.0 * h0) * (ph - light) / (1.0 - light)
-	var w_sim := hour_angle + sun_az - site_lon
-	var w_vis := TAU * fposmod(vis_hours / rot, 1.0)
 	var r := float(b["radius_km"])
 	var alt := Astro.len3(Astro.sub3(cam.pos, c)) - r
 	var k := 1.0 - smoothstep(4.0 * r, 12.0 * r, alt)      # 행성 단위(반지름의 몇 배)로 다가오면 그 도시의 시각
+	if id == "earth":
+		# 지구는 항성시로 돈다 (Astro.frame): 그 도시의 시간각 = 지방 항성시 − 해의 적경이 되게 그리니치 항성시를 맞춘다
+		var cs := cos(Astro.OBLIQ)
+		var sn := sin(Astro.OBLIQ)
+		var se := Vector3(to_sun.x, to_sun.y * cs - to_sun.z * sn, to_sun.y * sn + to_sun.z * cs)
+		var g_sim := hour_angle + atan2(se.y, se.x) - site_lon
+		var g_vis := deg_to_rad(280.46061837 + 360.98564736629 * vis_hours / 24.0)
+		var g := g_vis + wrapf(g_sim - g_vis, -PI, PI) * k
+		return (rad_to_deg(g) - 280.46061837) / 360.98564736629 * 24.0
+	var w_sim := hour_angle + sun_az - site_lon
+	var w_vis := TAU * fposmod(vis_hours / rot, 1.0)
 	return rot * (w_vis + wrapf(w_sim - w_vis, -PI, PI) * k) / TAU
 
 
@@ -480,9 +500,21 @@ func _place_all() -> void:
 			var sun_dir := g_vec(Astro.vec(Astro.norm3(Astro.sub3(sun_c, c)))) if id != "sun" else Vector3.UP
 			mat.set_shader_parameter("sun_dir", sun_dir)
 			mat.set_shader_parameter("spin_h", vis_hours)
+			if id == "earth":
+				# 지구의 구름은 땅 가까이서 옅어진다 (도시와 해안이 보이게)
+				var alt_e := Astro.len3(Astro.sub3(c, cam.pos)) - rad
+				mat.set_shader_parameter("cloud_k", smoothstep(120.0, 900.0, alt_e))
+			if body_baker.has(id):
+				var bs: BodySurface = body_baker.surfaces[id]
+				if bs.veil.r + bs.veil.g + bs.veil.b > 0.0:
+					# 짙은 대기(타이탄): 멀리서는 땅이 연무 뒤로 흐릿하고, 내려갈수록 또렷하다
+					var alt := Astro.len3(Astro.sub3(c, cam.pos)) - rad
+					mat.set_shader_parameter("veil", Color(bs.veil.r, bs.veil.g, bs.veil.b, 0.72 * smoothstep(150.0, 3000.0, alt)))
 		if e.has("ring"):
 			var rmat: ShaderMaterial = (e["ring"] as MeshInstance3D).material_override
 			rmat.set_shader_parameter("sun_dir", g_vec(Astro.vec(Astro.norm3(Astro.sub3(sun_c, c)))))
+	# 가까운 천체는 겉모습 지도를 더 곱게 굽는다
+	body_baker.update_near(near_id, (near_gap + r) / r)
 	_place_sun(sun_c)
 	_place_light(near_id, sun_c)
 	_place_sky()
@@ -540,7 +572,8 @@ func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 	var now := {}
 	var sg := ground as SiteSurface
 	if sg != null and sg.sphere_mat != null:
-		var near_k := 1.0 - smoothstep(30.0, 600.0, sg.cam_alt_km()) if sg.body == near_id else 0.0
+		# 지형 조각이 보이는 고도(2500 km 아래)에서는 구도 조각과 같은 햇빛 세기·색
+		var near_k := 1.0 - smoothstep(1800.0, 2600.0, sg.cam_alt_km()) if sg.body == near_id else 0.0
 		sg.sphere_mat.set_shader_parameter("lit_k", sg.local_light_factor() * lerpf(1.0, 1.6 / 1.75, near_k))
 		sg.sphere_mat.set_shader_parameter("rim_k", smoothstep(0.03, 0.4, sg.cam_alt_km() / sg.radius_km()))
 		if sg.body == near_id:
@@ -601,7 +634,7 @@ func _place_air(g: SiteGround, energy: float) -> void:
 	_env.fog_light_color = sky
 	_env.fog_light_energy = k
 	# 연무: 실제 거리 약 25 km에서 절반쯤 (렌더 단위로 바꾼다)
-	_env.fog_density = 0.028 * storm * _unit / maxf(_near_s, 1e-6) * k
+	_env.fog_density = 0.028 * storm * (g as SiteSurface).air_density() * _unit / maxf(_near_s, 1e-6) * k
 	# 구에도 같은 연무 (행성 셰이더는 장면 연무를 받지 않는다)
 	var air := (sky.srgb_to_linear() * k).linear_to_srgb()
 	air.a = _env.fog_density
