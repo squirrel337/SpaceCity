@@ -33,7 +33,7 @@ func _process(_delta: float) -> bool:
 			main._step()
 		main._refresh_live()
 		if frames % 40 == 0:
-			main._select_tab(["life", "power", "build", "research", "colony", "log"][(frames / 40) % 6])
+			main._select_tab(["life", "power", "build", "research", "colony", "transport", "log"][(frames / 40) % 7])
 	elif frames == 400:
 		_check(main.sim.current_day() >= 60, "60일을 돌지 못했다 (%d일)" % main.sim.current_day())
 		_check(main.sim.population() > 0, "정착민이 모두 사라졌다")
@@ -458,6 +458,7 @@ func _colony_check() -> void:
 	_check(cities.size() == col.list.size() and bool(cities[hi]["active"]), "3D 지도의 도시 점이 맞지 않다")
 	_check(cands.size() == col.candidates().size() - col.list.size(), "3D 지도의 후보지 점이 맞지 않다 (%d)" % cands.size())
 	_world_surface_check(wv)
+	_transport_check(col)
 	for _i in range(24):
 		main._step()
 	main._refresh_live()
@@ -466,6 +467,14 @@ func _colony_check() -> void:
 	var back := Colonies.new()
 	_check(back.load_save(JSON.parse_string(text)), "도시 저장을 읽지 못했다")
 	_check(back.list.size() == col.list.size() and back.hour == col.hour, "불러온 도시·시각이 다르다")
+	_check(back.transport.lines.size() == col.transport.lines.size() and back.transport.trips.size() == col.transport.trips.size(),
+		"불러온 교통(노선·가는 편)이 다르다")
+	# 판 2 저장(교통이 없던 저장)도 읽고 노선을 새로 짠다
+	var v2: Dictionary = JSON.parse_string(text)
+	v2["version"] = 2
+	v2.erase("transport")
+	var back2 := Colonies.new()
+	_check(back2.load_save(v2) and back2.transport.lines.size() == col.transport.lines.size(), "판 2 저장을 읽지 못했다")
 	if back.list.size() == col.list.size():
 		var jb: CitySim = back.list[ji]["sim"]
 		_check(jb.site_id == "mars_jezero" and absf(jb.population() - jez.population()) < 1e-9, "불러온 예제로가 다르다")
@@ -489,6 +498,87 @@ func _colony_check() -> void:
 	for c in col.list:
 		pops.append("%s %d" % [c["short"], int((c["sim"] as CitySim).population())])
 	print("smoke: cities %d (%s), next mars window %s (phase %.1f°)" % [col.list.size(), ", ".join(pops), window_text, phase])
+
+
+## 도시 사이 교통: 노선 짜기, 3년 동안 오간 짐·사람, 화물이 실제로 옮겨지나, 끄고 켜기, 교통 탭. 대도시와 구획 자료
+func _transport_check(col: Colonies) -> void:
+	var tr := col.transport
+	var roles := {}
+	for l in tr.lines:
+		roles[l["role"]] = int(roles.get(l["role"], 0)) + 1
+	Metros.load_all()
+	_check(Metros.list.size() == 26, "대도시가 26곳이 아니다 (%d)" % Metros.list.size())
+	_check(int(roles.get("shuttle", 0)) == 1 and int(roles.get("ship", 0)) == 5, "셔틀·수송선 노선이 맞지 않다 %s" % str(roles))
+	_check(int(roles.get("feeder", 0)) == Metros.list.size() and int(roles.get("air", 0)) >= Metros.list.size(),
+		"대도시 항공편이 맞지 않다 %s" % str(roles))
+	var mars := tr.line_by_id("local:mars_hellas~mars_jezero")
+	_check(not mars.is_empty() and mars["mode"] == "mars_plane", "헬라스–예제로 노선이 없다 (화성 수송기)")
+	_check(int(tr.totals["trips"]) > 1000 and float(tr.totals["t"]) > 10.0 and int(tr.totals["settlers"]) > 0,
+		"3년 동안 교통이 거의 오가지 않았다 %s" % str(tr.totals))
+	for m in Metros.list:
+		_check(PlanetLook.coast_local(String(m["key"])) != null, "%s의 시가지 지도가 없다" % m["name"])
+	# 화물: 헬라스의 넉넉한 식량을 굶주린 예제로로
+	if not mars.is_empty():
+		var hel: CitySim = col.list[col.index_of_site("mars_hellas")]["sim"]
+		var jez: CitySim = col.list[col.index_of_site("mars_jezero")]["sim"]
+		hel.stock["food_kg"] = float(hel.caps.get("food_kg", 20000.0)) * 0.95      # 저장 한도 안에서 넉넉하게
+		jez.stock["food_kg"] = 100.0
+		var dir := 0 if mars["a"] == "mars_hellas" else 1
+		mars["next"][dir] = col.hour
+		mars["next"][1 - dir] = col.hour + 1000
+		var before_h: float = hel.stock["food_kg"]
+		var before_j: float = jez.stock["food_kg"]
+		col.step()
+		var trip := {}
+		for t in tr.trips:
+			if t["line"] == mars["id"] and t["from"] == "mars_hellas":
+				trip = t
+		_check(not trip.is_empty() and float(trip["cargo"].get("food_kg", 0.0)) > 0.0, "헬라스에서 예제로로 식량을 싣지 않았다")
+		if not trip.is_empty():
+			var load_kg := float(trip["cargo"]["food_kg"])
+			_check(absf(before_h - hel.stock["food_kg"] - load_kg) < 50.0, "보낸 식량이 헬라스 비축에서 빠지지 않았다")
+			for _i in range(int(trip["arrive"]) - col.hour):
+				col.step()
+			_check(jez.stock["food_kg"] > before_j + load_kg * 0.5, "예제로에 식량이 닿지 않았다")
+	# 끄면 새로 떠나지 않는다
+	var n0 := int(tr.totals["trips"]) + tr.trips.size()
+	tr.set_enabled(col, false)
+	var leaving := tr.trips.size()
+	for _i in 48:
+		col.step()
+	_check(tr.trips.size() <= leaving, "교통을 껐는데 새 편이 떠났다")
+	tr.set_enabled(col, true)
+	for _i in 48:
+		col.step()
+	_check(int(tr.totals["trips"]) + tr.trips.size() > n0, "교통을 다시 켰는데 움직이지 않는다")
+	main._select_tab("transport")
+	main.tabs["transport"].rebuild()
+	main.tabs["transport"].update_view()
+	main.world.show_route(String(tr.lines[0]["id"]))
+	# 기지의 교통 탈것: 한꺼번에 닿은 여객기 두 대는 진입로에 줄을 선다 (같은 길을 겹쳐 날지 않게)
+	var traffic: BaseTraffic = main.world.city.traffic
+	var feeder := tr.line_by_id("feeder:earth_naro~metro_seoul")
+	var ways := {"runway": {"a": Vector2(0, -1200), "b": Vector2(0, 1200)}, "highways": {}, "bearings": {}}
+	traffic.reset(main.sim)
+	traffic.intercity(tr, "earth_naro", ways)            # 처음에는 지난 사건을 건너뛴다
+	for _k in 2:
+		tr._event("arr", "earth_naro", "metro_seoul", feeder)
+	traffic.intercity(tr, "earth_naro", ways)
+	var planes := traffic.agents.filter(func(a): return a["role"] == "plane")
+	_check(planes.size() == 2 and (planes[0]["pos"] as Vector3).distance_to(planes[1]["pos"]) > 1000.0,
+		"한꺼번에 닿은 여객기가 진입로에 줄을 서지 않았다 (%d대)" % planes.size())
+	traffic.reset(main.sim)
+	# 구획: 필지는 자리마다 하나
+	var lay := BaseLayout.new("open")
+	var lots := 0
+	var slots := 0
+	for d in lay.lots:
+		lots += (lay.lots[d] as Array).size()
+	for k in lay.slots:
+		slots += (lay.slots[k] as Array).size()
+	_check(lots == slots and lots > 200, "구역의 필지 수가 자리 수와 다르다 (%d/%d)" % [lots, slots])
+	print("smoke: transport %d lines %s, trips %d, %.1f t, settlers %d, metros %d" % [tr.lines.size(), str(roles),
+		int(tr.totals["trips"]), float(tr.totals["t"]), int(tr.totals["settlers"]), Metros.list.size()])
 
 
 func _check(ok: bool, message: String) -> void:

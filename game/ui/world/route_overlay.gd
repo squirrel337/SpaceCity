@@ -141,7 +141,9 @@ func draw_lines() -> void:
 		var kind := String(l["kind"])
 		var hot := _hi(l["id"])
 		var col: Color = COLORS.get(kind, Color.WHITE)
-		var base_a := 0.85 if l["role"] in ["local", "shuttle"] else (0.26 if l["role"] == "feeder" else 0.18)
+		var base_a := 0.85 if l["role"] in ["local", "shuttle"] else (0.3 if l["role"] == "feeder" else 0.2)
+		if l["role"] in ["feeder", "air"]:
+			base_a *= clampf(2500.0 / maxf(float(l["km"]), 1.0), 0.22, 1.0)     # 먼 항공편일수록 옅게
 		var width := 2.0 if l["role"] in ["local", "shuttle"] else 1.0
 		if not l["on"] or not tr.enabled:
 			base_a *= 0.3
@@ -312,7 +314,8 @@ func draw_metros(font: Font, placed: Array) -> void:
 	var show_pop := rad_px > 650.0
 	for m in Metros.list:
 		var p := Astro.add3(c, Astro.bmul(info["frame"], Astro.scale3(Astro.dvec(m["dir"]), r)))
-		if _behind(c, r * 0.999, p):
+		# 가리는 공은 땅 가까이서는 거의 지구 반지름 그대로 (지평선 너머 도시 이름이 떠 보이지 않게)
+		if _behind(c, r - clampf(alt * 0.3, 0.02, r * 0.001), p):
 			continue
 		var sp: Variant = _screen(p)
 		if sp == null:

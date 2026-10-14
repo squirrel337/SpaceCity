@@ -449,6 +449,10 @@ func _build_side() -> Control:
 		if view_mode != "world":
 			_set_view("world")
 		world.show_route(id))
+	tabs["transport"].show_metro.connect(func(key: String):
+		if view_mode != "world":
+			_set_view("world")
+		world.fly_to_metro(key))
 	return side
 
 

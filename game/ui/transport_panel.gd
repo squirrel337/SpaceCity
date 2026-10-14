@@ -5,6 +5,7 @@ extends VBoxContainer
 
 signal changed
 signal show_line(id: String)
+signal show_metro(key: String)
 
 const GROUPS := [["space", "우주 노선 — 지구-달 셔틀 · 행성간 수송선"], ["local", "천체 안의 노선"],
 	["feeder", "지구 항공 — 대도시에서 우주항으로"], ["air", "지구 항공 — 대도시 국제선"]]
@@ -36,7 +37,8 @@ func _init() -> void:
 	var help := ThemeFactory.muted("같은 천체의 도시는 로버 화물 열차·로켓 호퍼·비행기로, 지구 우주항과 달의 고향은 셔틀로, 행성 사이는 " +
 		"발사 창마다 수송선으로 잇는다. 떠날 때 받는 도시에 모자란 식량·산소·물·부품·금속을 보내는 도시의 넉넉한 몫에서 싣고, " +
 		"주거에 빈자리가 있으면 지구나 붐비는 도시의 정착민이 탄다. 지구에서 우주로 올리는 화물은 보내는 도시가 운임(지원 점수)을 낸다. " +
-		"지구의 대도시는 가까운 우주항으로 정착민과 부품을 보낸다. 3D 지도에서 노선과 오가는 탈것이 보인다.", 12)
+		"지구의 대도시는 가까운 우주항으로 정착민과 부품을 보낸다 ('도시'를 누르면 그 도시 위로 날아간다). " +
+		"3D 지도에서 노선과 오가는 탈것이 보인다.", 12)
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(help)
 	box.add_theme_constant_override("separation", 8)
@@ -267,16 +269,26 @@ func _compact_row(l: Dictionary) -> Control:
 	row.add_child(text)
 	var see := Button.new()
 	see.text = "보기"
+	see.tooltip_text = "3D 지도에서 이 노선을 본다"
 	see.custom_minimum_size = Vector2(48, 30)
 	see.add_theme_font_size_override("font_size", 11)
 	see.pressed.connect(func(): show_line.emit(id))
 	row.add_child(see)
+	if l["role"] == "feeder" and Metros.is_metro(String(l["a"])):
+		var go := Button.new()
+		go.text = "도시"
+		go.tooltip_text = "%s 위로 날아가 시가지를 본다" % Transport.node_name(l["a"])
+		go.custom_minimum_size = Vector2(48, 30)
+		go.add_theme_font_size_override("font_size", 11)
+		var key := String(l["a"])
+		go.pressed.connect(func(): show_metro.emit(key))
+		row.add_child(go)
 	_live.append(func():
 		var st: Dictionary = l["stats"]
 		var extra := ""
 		if int(st["settlers"]) > 0:
 			extra = " · 정착민 %s명" % Fmt.n(float(st["settlers"]))
-		text.text = "%s → %s · %s km · %s · 승객 %s명%s" % [Transport.node_name(l["a"]),
+		text.text = "%s %s %s · %s km · %s · 승객 %s명%s" % [Transport.node_name(l["a"]), "→" if l["role"] == "feeder" else "↔",
 			Transport.node_name(l["b"]), Fmt.n(float(l["km"])), _trip_len(l), Fmt.n(float(st["pax"])), extra]
 		text.add_theme_color_override("font_color", Palette.TEXT if l["on"] else Palette.MUTED))
 	return row

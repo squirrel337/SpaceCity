@@ -11,8 +11,9 @@ const LANDED_S := 7.0
 const ASCEND_S := 3.5
 const MAX_ROBOTS := 10
 const WALKERS := 6
-const MAX_TRANSIT := 6            # 한꺼번에 보이는 교통 탈것 (빠르게 흐를 때 넘치지 않게)
+const MAX_TRANSIT := 8            # 한꺼번에 보이는 교통 탈것 (빠르게 흐를 때 넘치지 않게)
 const TRANSIT_ROLES := ["convoy", "fly", "plane", "transit_lander"]
+const ROLE_CAP := {"convoy": 6, "fly": 2, "plane": 2, "transit_lander": 1}    # 갈래마다 (열차는 세 대가 한 편)
 
 var plan: CityPlan
 var agents: Array = []
@@ -367,12 +368,32 @@ func intercity(tr: Transport, site: String, ways: Dictionary) -> void:
 	_ev_n = int(evs[-1]["n"])
 	for e in evs:
 		var n := 0
+		var by_role := {}
 		for a in agents:
 			if a["role"] in TRANSIT_ROLES:
 				n += 1
+				by_role[a["role"]] = int(by_role.get(a["role"], 0)) + 1
 		if n >= MAX_TRANSIT:
 			break
+		var role := _transit_role(e, ways)
+		if int(by_role.get(role, 0)) >= int(ROLE_CAP.get(role, 2)):
+			continue
 		_spawn_transit(e, ways)
+
+
+## 그 사건이 띄울 탈것의 갈래
+func _transit_role(e: Dictionary, ways: Dictionary) -> String:
+	match String(e["kind"]):
+		"ground":
+			return "convoy"
+		"air":
+			var vehicle := String(Transport.mode(e["mode"]).get("vehicle", ""))
+			if vehicle in ["airliner", "mars_plane"] and not ways.get("runway", {}).is_empty():
+				return "plane"
+			return "fly"
+		"hop":
+			return "fly"
+	return "transit_lander"
 
 
 func _spawn_transit(e: Dictionary, ways: Dictionary) -> void:
@@ -472,8 +493,14 @@ func _spawn_plane(vehicle: String, rw: Dictionary, arr: bool) -> void:
 	var d3 := Vector3(d.x, d.y, 0)
 	var big := vehicle == "airliner"
 	var speed := 140.0 if big else 60.0
+	# 같은 쪽(내리기·뜨기)의 비행기가 이미 있으면 줄을 선다 — 같은 길을 겹쳐 날지 않게
+	var queue := 0
+	for o in agents:
+		if o["role"] == "plane" and String(o["state"]) == ("arr" if arr else "dep"):
+			queue += 1
 	if arr:
-		var start := a3 - d3 * (3200.0 if big else 900.0) + Vector3(0, 0, 170.0 if big else 70.0)
+		var back := (3200.0 if big else 900.0) + queue * (2600.0 if big else 700.0)
+		var start := a3 - d3 * back + Vector3(0, 0, back * (0.053 if big else 0.078))     # 같은 활공각
 		var touch := a3 + d3 * (260.0 if big else 80.0)
 		var stop := a3 + d3 * length * 0.72
 		_spawn("plane", vehicle, start, speed, {"legs": [[touch, speed], [stop, 14.0]], "flying": true, "state": "arr"})
@@ -482,7 +509,7 @@ func _spawn_plane(vehicle: String, rw: Dictionary, arr: bool) -> void:
 		var lift := a3 + d3 * length * 0.62
 		var out := a3 + d3 * (length + (2600.0 if big else 900.0)) + Vector3(0, 0, 320.0 if big else 120.0)
 		_spawn("plane", vehicle, s3, 16.0, {"legs": [[lift, speed], [out, speed * 1.1]], "flying": false, "state": "dep",
-			"wait": 1.5})
+			"wait": 1.5 + queue * 30.0})
 
 
 func _plane(a: Dictionary, dt: float) -> void:

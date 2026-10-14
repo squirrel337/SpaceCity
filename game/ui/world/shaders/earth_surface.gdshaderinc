@@ -14,6 +14,7 @@ uniform vec3 cl_c = vec3(1.0, 0.0, 0.0);
 uniform vec3 cl_e = vec3(0.0, 1.0, 0.0);
 uniform vec3 cl_n = vec3(0.0, 0.0, 1.0);
 uniform float cl_half = 128.0;
+uniform float cl_range = 8.0;                                         // 지역 지도의 거리 범위 (km) — 대도시 시가지 지도는 2
 uniform sampler2D land : filter_linear_mipmap, repeat_enable;         // R 땅(옛 근사), G 얼음, B 메마른 땅
 uniform bool has_land = false;
 uniform vec4 ekeep[4];                                                // 기지 자리: 방향, 반지름 km (그 안은 땅)
@@ -68,10 +69,10 @@ float earth_sd(vec3 d, float texel_km) {
 			vec2 luv = vec2(0.5 + q.x / (2.0 * cl_half), 0.5 - q.y / (2.0 * cl_half));
 			float m = max(abs(luv.x - 0.5), abs(luv.y - 0.5));
 			if (m < 0.5) {
-				float sl = (texture(coast_loc, luv).r - 0.5) * 2.0 * COAST_LOC_KM;
-				// 지역 지도는 ±8 km에서 끝난다 — 그 너머는 같은 쪽에서 전체 지도의 거리를 쓴다
-				if (abs(sl) > COAST_LOC_KM * 0.95) {
-					sl = sign(sl) * max(abs(sd), COAST_LOC_KM * 0.95);
+				float sl = (texture(coast_loc, luv).r - 0.5) * 2.0 * cl_range;
+				// 지역 지도는 ±cl_range에서 끝난다 — 그 너머는 같은 쪽에서 전체 지도의 거리를 쓴다
+				if (abs(sl) > cl_range * 0.95) {
+					sl = sign(sl) * max(abs(sd), cl_range * 0.95);
 				}
 				float k = 1.0 - smoothstep(0.42, 0.49, m);
 				sd = mix(sd, sl, k);
@@ -121,18 +122,6 @@ vec3 earth_sea(float sd) {
 	return mix(deep, shelf, smoothstep(-14.0, -0.3, sd) * 0.75);
 }
 
-// 땅의 높이 (km, 해수면 위)와 바다 몫 — 조각 굽기용
-float earth_h(vec3 d, float texel_km, out float liq) {
-	float sd = earth_sd(d, texel_km);
-	float tk = max(texel_km, 0.002);
-	liq = 1.0 - smoothstep(-tk * 0.5, tk * 0.5, sd);
-	// 해안에서 천천히 오르는 땅과 구릉 (나로도·쿠루 둘레의 낮은 산 수준)
-	float inland = clamp(sd, 0.0, 40.0);
-	float hills = max(fbm(d * (EARTH_R / 8.0), 5, 31.0) - 0.42, 0.0) * 0.9 * smoothstep(0.2, 4.0, sd);
-	float h = 0.003 + inland * 0.004 + hills;
-	return mix(h, 0.0, liq);
-}
-
 // 가장 가까운 대도시의 시가지 몫 (0~1)과 그 번호 — 가장자리는 잡음으로 들쭉날쭉
 float earth_urban(vec3 d, out int which) {
 	float u = 0.0;
@@ -155,6 +144,20 @@ float earth_urban(vec3 d, out int which) {
 		}
 	}
 	return u;
+}
+
+// 이 방향이 부지 둘레의 고운 지역 지도 안인가 (0~1 — 가장자리에서 전체 지도로 넘어간다)
+float earth_loc_k(vec3 d) {
+	if (!has_coast_loc) {
+		return 0.0;
+	}
+	float w = dot(d, cl_c);
+	if (w < 0.9) {
+		return 0.0;
+	}
+	vec2 q = vec2(dot(d, cl_e), dot(d, cl_n)) * EARTH_R / w;
+	vec2 luv = vec2(0.5 + q.x / (2.0 * cl_half), 0.5 - q.y / (2.0 * cl_half));
+	return 1.0 - smoothstep(0.42, 0.49, max(abs(luv.x - 0.5), abs(luv.y - 0.5)));
 }
 
 // 지역 지도의 공원 (대도시 시가지 지도의 G)
@@ -197,15 +200,15 @@ vec3 earth_city(vec3 d, vec3 col, float sd, float texel_km, out float lights) {
 	float aa = max(texel_km, 1e-4);
 	float vis = 1.0 - smoothstep(bk * 0.12, bk * 0.5, aa);           // 블록이 화면에서 작으면 무늬는 평균으로
 	float r1 = hash1(vec3(floor(g * 2.0), 3.0), 17.0);
-	vec3 roof = mix(vec3(0.42, 0.41, 0.40), vec3(0.64, 0.62, 0.58), r1);
-	roof = mix(roof, vec3(0.50, 0.49, 0.47), 1.0 - vis);
+	vec3 roof = mix(vec3(0.34, 0.33, 0.33), vec3(0.54, 0.52, 0.49), r1);
+	roof = mix(roof, vec3(0.42, 0.41, 0.40), 1.0 - vis);
 	vec2 f = abs(fract(g + 0.5) - 0.5) * bk;
 	vec2 big = abs(fract(g / 5.0 + 0.5) - 0.5) * bk * 5.0;
 	float street = 1.0 - smoothstep(0.006 - aa * 0.5, 0.006 + aa * 0.5, min(f.x, f.y));
 	float avenue = 1.0 - smoothstep(0.015 - aa * 0.5, 0.015 + aa * 0.5, min(big.x, big.y));
 	float road = max(street * 0.8, avenue) * vis;
 	vec3 urb = mix(roof, vec3(0.21, 0.21, 0.22), road);
-	urb = mix(urb, vec3(0.33, 0.34, 0.33), (1.0 - vis) * 0.3);
+	urb = mix(urb, vec3(0.30, 0.31, 0.30), (1.0 - vis) * 0.3);
 	float k = u * (1.0 - park);
 	vec3 out_c = mix(col, urb, k * 0.9);
 	out_c = mix(out_c, mix(col, vec3(0.15, 0.29, 0.12), 0.55), park * u);
@@ -214,4 +217,21 @@ vec3 earth_city(vec3 d, vec3 col, float sd, float texel_km, out float lights) {
 	float glow = mix(0.5 + 0.35 * vnoise(d * (EARTH_R / 0.9), 9.0), 0.25 + 1.1 * road, vis);
 	lights = k * mk.x * glow * (0.55 + 0.45 * core);
 	return out_c;
+}
+
+// 땅의 높이 (km, 해수면 위)와 바다 몫 — 조각 굽기용
+float earth_h(vec3 d, float texel_km, out float liq) {
+	float sd = earth_sd(d, texel_km);
+	float tk = max(texel_km, 0.002);
+	liq = 1.0 - smoothstep(-tk * 0.5, tk * 0.5, sd);
+	// 해안에서 천천히 오르는 땅과 구릉 (나로도·쿠루 둘레의 낮은 산 수준)
+	float inland = clamp(sd, 0.0, 40.0);
+	float hills = max(fbm(d * (EARTH_R / 8.0), 5, 31.0) - 0.42, 0.0) * 0.9 * smoothstep(0.2, 4.0, sd);
+	// 대도시는 평평하게 (강가를 따라 골짜기가 패지 않게)
+	int which;
+	float u = earth_urban(d, which);
+	hills *= 1.0 - 0.92 * u;
+	inland *= 1.0 - 0.6 * u;
+	float h = 0.003 + inland * 0.004 + hills;
+	return mix(h, 0.0, liq);
 }

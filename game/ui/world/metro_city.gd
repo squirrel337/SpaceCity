@@ -14,7 +14,7 @@ const BLOCKS_PER_FRAME := 900
 
 var metro: Dictionary
 var ground: SiteSurface
-var budget := 15000
+var budget := 26000
 var count := 0                   # 지은 건물 수
 var _style: Dictionary
 var _map: Image
@@ -44,7 +44,7 @@ var _shadows := true
 func setup(m: Dictionary, g: SiteSurface, hi: bool) -> void:
 	metro = m
 	ground = g
-	budget = 15000 if hi else 5000
+	budget = 26000 if hi else 9000
 	_shadows = hi
 	_style = Metros.style_of(m)
 	var c: Vector3 = m["dir"]
@@ -151,6 +151,8 @@ func _pick_rows() -> void:
 
 
 func _consider(g: Vector2, far: Array, only_far: bool) -> void:
+	if only_far and absf(g.x) < _n * _block and absf(g.y) < _n * _block:
+		return                                  # 큰 격자에서 이미 본 블록
 	var en := _vv * g.x + _uu * g.y
 	var dist := en.length()
 	if only_far or dist > _gen_r:
@@ -165,11 +167,15 @@ func _consider(g: Vector2, far: Array, only_far: bool) -> void:
 	if s.x < 0.035 or s.y > 0.5:
 		return
 	var h := _hash(g)
+	# 가장자리는 성기게 (짓는 반지름의 75%부터) — 둥근 경계가 보이지 않게
+	if not only_far and dist > _gen_r * 0.72 and h < (dist - _gen_r * 0.72) / (_gen_r * 0.28):
+		return
 	var dens := 1.0 - smoothstep(_radius_m * 0.08, _radius_m * (0.92 + 0.25 * (h - 0.5)), dist)
 	var infl := _influence(en)
 	if dens < 0.04 and infl < 0.05:
 		return
-	_cands.append([dens + 2.5 * infl + h * 0.2, en.x, en.y, dens, infl, minf(s.x, 0.6)])
+	# 도심에서 바깥으로 차례로 (부도심 둘레는 앞당긴다) — 예산이 다하면 바깥은 바닥의 시가지 무늬가 맡는다
+	_cands.append([dens + 0.9 * infl + h * 0.08, en.x, en.y, dens, infl, minf(s.x, 0.6), dist])
 
 
 func _hash(g: Vector2) -> float:
@@ -220,7 +226,7 @@ func _build_some() -> void:
 			end = _cands.size()
 			break
 		var c: Array = _cands[k]
-		_block_buildings(Vector2(c[1], c[2]), float(c[3]), float(c[4]), float(c[5]))
+		_block_buildings(Vector2(c[1], c[2]), float(c[3]), float(c[4]), float(c[5]), float(c[6]))
 	_cursor = end
 	if _cursor >= _cands.size():
 		_commit()
@@ -228,8 +234,8 @@ func _build_some() -> void:
 		_cands.clear()
 
 
-## 블록 하나의 건물들 (시가지 모양에 따라)
-func _block_buildings(en: Vector2, dens: float, infl: float, shore_km: float) -> void:
+## 블록 하나의 건물들 (시가지 모양에 따라). 도심에서 먼 블록(부도심 밖 5 km 너머)은 덩어리 건물 하나로
+func _block_buildings(en: Vector2, dens: float, infl: float, shore_km: float, dist: float) -> void:
 	_rng.seed = absi(hash(Vector2i(int(en.x), int(en.y)))) + 7
 	var b := _block
 	var inner := b - 16.0                       # 길 폭을 뺀 블록
@@ -243,6 +249,17 @@ func _block_buildings(en: Vector2, dens: float, infl: float, shore_km: float) ->
 	var max_h := float(metro.get("max_h", 200.0))
 	var style := String(metro.get("style", "dense"))
 	var base_h := lerpf(low_h, mid_h, pow(dens, 1.1))
+	if dist > 5000.0 and infl < 0.2:
+		# 먼 블록: 크기·높이·자리가 제각각인 덩어리 한두 채 (빈 블록도 있다)
+		if _rng.randf() < 0.18:
+			return
+		var cover := float(_style.get("cover", 0.5))
+		var n_far := 1 if _rng.randf() < 0.65 else 2
+		for k3 in n_far:
+			var side := inner * sqrt(clampf(cover * 1.3, 0.25, 0.85)) * _rng.randf_range(0.5, 1.0) / sqrt(float(n_far))
+			var off5 := Vector2(_rng.randf_range(-1, 1), _rng.randf_range(-1, 1)) * (inner - side) * 0.5
+			_add(_local_en(en, off5), side, side * _rng.randf_range(0.55, 1.0), base_h * _rng.randf_range(0.5, 1.6), 0.15, 0.0)
+		return
 	# 마천루 (도심·부도심)
 	if _rng.randf() < infl * 0.9:
 		var n_t := 1 + int(_rng.randf() * 2.0 * infl)
@@ -253,14 +270,17 @@ func _block_buildings(en: Vector2, dens: float, infl: float, shore_km: float) ->
 			_add(_local_en(en, off), s, s * _rng.randf_range(0.8, 1.4), h, _rng.randf_range(0.65, 0.95), 0.0)
 		if infl > 0.35:
 			return
-	# 아파트 단지: 판상 동 서너 채
+	# 아파트 단지: 길이 60~90 m의 판상 동이 줄지어 (넓은 블록은 두 줄)
 	if slab > 0.0 and _rng.randf() < slab * (0.35 + 0.65 * dens):
 		var rows := 3 + int(_rng.randf() * 2.0)
+		var cols := 2 if inner > 120.0 else 1
 		var gap := inner / rows
+		var length := minf(inner / cols * 0.82, 92.0)
 		var h2 := mid_h * _rng.randf_range(0.75, 1.3)
 		for r in rows:
-			var off2 := Vector2(_rng.randf_range(-4, 4), -inner * 0.5 + gap * (r + 0.5))
-			_add(_local_en(en, off2), inner * _rng.randf_range(0.6, 0.85), 14.0, h2 + _rng.randf_range(-6, 6), 0.18, 0.0)
+			for c in cols:
+				var off2 := Vector2(-inner * 0.5 + inner / cols * (c + 0.5) + _rng.randf_range(-3, 3), -inner * 0.5 + gap * (r + 0.5))
+				_add(_local_en(en, off2), length * _rng.randf_range(0.8, 1.0), 13.0, h2 + _rng.randf_range(-6, 6), 0.18, 0.0)
 		return
 	match style:
 		"haussmann":
@@ -306,7 +326,7 @@ func _add(en: Vector2, w: float, d: float, h: float, glass: float, turn: float) 
 	var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(w, h + 3.0, d)), Vector3(p.x, gy - 3.0, -p.y))
 	var tones: Array = _style.get("tone", ["#c8c4bc"])
 	var col := Color(String(tones[_rng.randi() % tones.size()]))
-	col = col * _rng.randf_range(0.88, 1.1)
+	col = col * _rng.randf_range(0.72, 0.95)
 	col.a = glass
 	var key := Vector2i(int(floor(en.x / CHUNK_M)), int(floor(en.y / CHUNK_M)))
 	if not _chunks.has(key):

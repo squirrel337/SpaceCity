@@ -315,7 +315,7 @@ func _spin_hours(id: String) -> float:
 	var rot := float(b.get("rot_h", 0.0))
 	if id == "earth" and rot != 0.0 and not (ground is SiteSurface and ground.body == "earth"):
 		# 지구에 고른 도시가 없으면: 가까이 갈수록 실제 항성시 (대도시의 낮밤이 게임 시각의 그 도시 시각과 맞는다)
-		var alt_e := Astro.len3(Astro.sub3(cam.pos, Astro.position("earth", jd))) - float(b["radius_km"])
+		var alt_e := _cam_alt(id)
 		var ke := 1.0 - smoothstep(4.0 * float(b["radius_km"]), 12.0 * float(b["radius_km"]), alt_e)
 		var g_vis0 := deg_to_rad(280.46061837 + 360.98564736629 * vis_hours / 24.0)
 		var g_real := deg_to_rad(280.46061837 + 360.98564736629 * (jd - Astro.J2000))
@@ -348,7 +348,7 @@ func _spin_hours(id: String) -> float:
 	var hour_angle := -h0 + 2.0 * h0 * ph / light if ph < light \
 		else h0 + (TAU - 2.0 * h0) * (ph - light) / (1.0 - light)
 	var r := float(b["radius_km"])
-	var alt := Astro.len3(Astro.sub3(cam.pos, c)) - r
+	var alt := _cam_alt(id)
 	var k := 1.0 - smoothstep(4.0 * r, 12.0 * r, alt)      # 행성 단위(반지름의 몇 배)로 다가오면 그 도시의 시각
 	if id == "earth":
 		# 지구는 항성시로 돈다 (Astro.frame): 그 도시의 시간각 = 지방 항성시 − 해의 적경이 되게 그리니치 항성시를 맞춘다
@@ -362,6 +362,15 @@ func _spin_hours(id: String) -> float:
 	var w_sim := hour_angle + sun_az - site_lon
 	var w_vis := TAU * fposmod(vis_hours / rot, 1.0)
 	return rot * (w_vis + wrapf(w_sim - w_vis, -PI, PI) * k) / TAU
+
+
+## 카메라가 그 천체에서 떨어진 거리 (km, 겉면 위). 그 천체를 보고 있으면 카메라의 거리로 — 시간이 한꺼번에 흘러
+## 천체가 궤도를 따라 옮겨 가도 (지난 프레임의 카메라 위치와 어긋나도) 흔들리지 않게
+func _cam_alt(id: String) -> float:
+	if cam.focus == id and cam.mode == "body" and not cam.flying():
+		return cam.dist
+	var b: Dictionary = Astro.bodies[id]
+	return Astro.len3(Astro.sub3(cam.pos, Astro.position(id, jd))) - float(b["radius_km"])
 
 
 func _chain(id: String) -> Array:
@@ -660,7 +669,7 @@ func _make_metro(m: Dictionary) -> void:
 	g.standalone = true
 	_space.add_child(g)
 	var site := {"id": String(m["key"]), "name": String(m["name"]), "lat": float(m["lat"]), "lon": float(m["lon"]),
-		"layout": "open", "map_half_km": float(m["radius_km"]) + 10.0, "parks_map": true}
+		"layout": "open", "map_half_km": float(m["radius_km"]) + 10.0, "map_range_km": 2.0, "parks_map": true}
 	g.setup("earth", site, node, 6371.0, body_baker, moon)
 	var mc := MetroCity.new()
 	g.city_root.add_child(mc)
@@ -697,6 +706,8 @@ func _place_air(g: SiteGround, energy: float) -> void:
 	if g is SiteSurface and cam.mode == "body" and cam.focus == g.body:
 		sky = (g as SiteSurface).sky_color()
 		k = (1.0 - smoothstep(6.0, 90.0, g.cam_alt_km())) * clampf(energy / 1.6, 0.0, 1.0)
+		if (g as SiteSurface).standalone:
+			k *= 1.0 - 0.92 * (g as SiteSurface).night_k     # 대도시의 밤: 하늘과 연무가 어둡다
 	var sg := ground as SiteSurface
 	if sg != null and sg.sphere_mat != null and (sg != g or sky.a <= 0.0 or k <= 0.001):
 		sg.sphere_mat.set_shader_parameter("air", Color(0, 0, 0, 0))

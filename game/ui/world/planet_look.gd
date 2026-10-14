@@ -1,7 +1,7 @@
 class_name PlanetLook
 extends RefCounted
 ## 행성·위성의 겉모습 (planet.gdshader의 kind와 색). 지구는 해안 거리 지도(art/planets/earth_coast*.png, Natural Earth)와
-## 얼음·메마른 땅 지도(art/planets/earth_land.png)를 쓴다.
+## 얼음·메마른 땅 지도(art/planets/earth_land.png), 대도시의 시가지(data/earth_cities.json)를 쓴다.
 
 const KINDS := {
 	"mercury": [0, "#8f8a84", "#5e5953", "#b9b3aa", 1.0],
@@ -90,6 +90,22 @@ static func earth_uniforms(m: ShaderMaterial) -> void:
 	if keep.is_empty():
 		keep.append(Vector4.ZERO)
 	m.set_shader_parameter("ekeep", keep)
+	# 대도시: 시가지 (방향, 반지름 km)와 불빛 세기(인구)·큰길 방향·블록 크기 — 3D 건물과 같은 격자
+	Metros.load_all()
+	var mv := PackedVector4Array()
+	var mk := PackedVector4Array()
+	for c in Metros.list:
+		var dir: Vector3 = c["dir"]
+		mv.append(Vector4(dir.x, dir.y, dir.z, float(c["radius_km"])))
+		var st := Metros.style_of(c)
+		mk.append(Vector4(0.45 + 0.22 * log(float(c["pop_m"]) + 1.0), deg_to_rad(float(c.get("grid_deg", 0.0))),
+			float(st.get("block_m", 120.0)) / 1000.0, 0.0))
+	m.set_shader_parameter("metro_n", mini(mv.size(), 28))
+	if mv.is_empty():
+		mv.append(Vector4.ZERO)
+		mk.append(Vector4.ZERO)
+	m.set_shader_parameter("metro", mv)
+	m.set_shader_parameter("metro_k", mk)
 
 
 static func material(id: String, look: String) -> ShaderMaterial:

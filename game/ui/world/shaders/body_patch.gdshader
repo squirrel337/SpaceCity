@@ -160,9 +160,14 @@ void fragment() {
 	float shore_n = (fbm(vec3(mpos * 0.004, 7.0), 4, 9.0) - 0.5) * 0.5
 		+ (fbm(vec3(mpos * 0.05, 8.0), 3, 10.0) - 0.5) * 0.3 * (1.0 - smoothstep(5.0, 40.0, mpp));
 	float wet = step(0.5, wet_v + shore_n);
+	if (mode == 1 && cl_parks) {
+		// 대도시 지도(강을 그린 고운 지도) 안에서는 조각마다 해안 거리로 — 꼭짓점 사이보다 좁은 강도 끊기지 않는다
+		// (시가지의 땅은 거의 해수면이다)
+		wet = mix(wet, 1.0 - step(0.0, sd), step(0.5, earth_loc_k(bdir)));
+	}
 	col = mix(col, mode == 1 ? earth_sea(min(sd, -0.05)) : liq_col, wet);
 	ALBEDO = col * gain;
-	EMISSION = vec3(1.0, 0.6, 0.24) * city_l * (1.0 - wet) * night_glow * 0.7;
+	EMISSION = vec3(1.0, 0.6, 0.24) * city_l * (1.0 - wet) * night_glow * 0.45;
 	ROUGHNESS = mix(1.0, 0.06, wet);
 	SPECULAR = 0.0;
 	// 가까이서 보이는 흙의 잔주름 (화면 미분으로 법선을 흔든다)

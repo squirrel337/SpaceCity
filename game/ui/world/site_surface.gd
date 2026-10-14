@@ -154,7 +154,7 @@ func sky_color() -> Color:
 
 ## 땅 가까이 연무의 짙기 (1 = 실제 거리 약 25 km에서 절반) — 화성은 맑고, 타이탄은 탁하다
 func air_density() -> float:
-	return float({"mars": 0.45, "titan": 0.45, "earth": 0.35}.get(body, 1.0))
+	return float({"mars": 0.45, "titan": 0.45, "earth": 0.2}.get(body, 1.0))
 
 
 ## 구웠나 (조각의 높이 격자)
@@ -185,6 +185,7 @@ func _earth_uniforms(mat: ShaderMaterial, with_local := true) -> void:
 		mat.set_shader_parameter("cl_e", n.cross(c))
 		mat.set_shader_parameter("cl_n", n)
 		mat.set_shader_parameter("cl_half", float(site_data.get("map_half_km", 128.0)))
+		mat.set_shader_parameter("cl_range", float(site_data.get("map_range_km", 8.0)))
 	mat.set_shader_parameter("cl_parks", loc != null and bool(site_data.get("parks_map", false)))
 
 

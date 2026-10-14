@@ -1,7 +1,7 @@
 {
   "_meta": {
     "title": "도시 사이 교통 — 노선의 탈것, 실어 나르는 규칙, 지구 대도시의 항공편",
-    "source": "04-system-layer.md §5 도시 사이 교통",
+    "source": "04-system-layer.md §5 물류 — 프로토타입의 도시 사이 교통",
     "modes": "탈것 갈래: name, vehicle(3D 모형 id), kind(ground 땅 · hop 로켓 도약 · air 비행 · ferry 지구-달 · ship 행성 사이), speed_km_h(평균 속력 — ferry·ship은 trip_h·전이 일수), cap_t(화물 t), seats(사람), every_h(한쪽에서 떠나는 간격 — ship은 발사 창마다), load_h(싣고 내리는 시간)",
     "surface": "같은 천체의 도시 사이 노선: 거리가 far_km보다 가까우면 near, 멀면 far. 노선은 그 천체의 도시를 잇는 가장 짧은 그물(최소 신장 나무)이다",
     "cargo": "실어 나르는 비축: key, t_per(한 단위의 무게 t), need_days(받는 도시가 바라는 비축 — 사람이 하루에 쓰는 양 × 일수, per = 그 양의 열쇠) 또는 need(고정량), keep_x(보내는 도시는 need × keep_x 넘는 몫만 보낸다). 시장이 채우는 도시(지구)는 시장에서 사서 보낸다",
