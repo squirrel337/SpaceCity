@@ -1,0 +1,282 @@
+class_name TransportPanel
+extends VBoxContainer
+## 교통 탭 — 도시 사이 교통 전체와 노선 하나하나를 켜고 끈다. 노선마다 탈것·거리·걸리는 시간·다음 출발·누계,
+## 가는 중인 행성간 수송선의 진행. '보기'를 누르면 3D 지도가 그 노선을 비춘다.
+
+signal changed
+signal show_line(id: String)
+
+const GROUPS := [["space", "우주 노선 — 지구-달 셔틀 · 행성간 수송선"], ["local", "천체 안의 노선"],
+	["feeder", "지구 항공 — 대도시에서 우주항으로"], ["air", "지구 항공 — 대도시 국제선"]]
+
+var sim: CitySim
+var mgr: Colonies
+var status := Label.new()
+var master := CheckButton.new()
+var box := VBoxContainer.new()
+var _live: Array = []
+var _open := {"space": true, "local": true, "feeder": false, "air": false}
+
+
+func _init() -> void:
+	add_theme_constant_override("separation", 10)
+	add_child(ThemeFactory.heading("교통"))
+	master.text = "도시 사이 교통 운행"
+	master.button_pressed = true
+	master.custom_minimum_size.y = 40
+	master.toggled.connect(func(on: bool):
+		if mgr != null:
+			mgr.transport.set_enabled(mgr, on)
+			changed.emit()
+			rebuild())
+	add_child(master)
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status.add_theme_font_size_override("font_size", 14)
+	add_child(status)
+	var help := ThemeFactory.muted("같은 천체의 도시는 로버 화물 열차·로켓 호퍼·비행기로, 지구 우주항과 달의 고향은 셔틀로, 행성 사이는 " +
+		"발사 창마다 수송선으로 잇는다. 떠날 때 받는 도시에 모자란 식량·산소·물·부품·금속을 보내는 도시의 넉넉한 몫에서 싣고, " +
+		"주거에 빈자리가 있으면 지구나 붐비는 도시의 정착민이 탄다. 지구에서 우주로 올리는 화물은 보내는 도시가 운임(지원 점수)을 낸다. " +
+		"지구의 대도시는 가까운 우주항으로 정착민과 부품을 보낸다. 3D 지도에서 노선과 오가는 탈것이 보인다.", 12)
+	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	add_child(help)
+	box.add_theme_constant_override("separation", 8)
+	add_child(box)
+
+
+func bind(p_sim: CitySim) -> void:
+	sim = p_sim
+	rebuild()
+
+
+static func _clear(node: Node) -> void:
+	for c in node.get_children():
+		node.remove_child(c)
+		c.queue_free()
+
+
+func update_view() -> void:
+	if mgr == null:
+		return
+	var tr := mgr.transport
+	master.set_pressed_no_signal(tr.enabled)
+	var on_n := 0
+	for l in tr.lines:
+		if l["on"]:
+			on_n += 1
+	var tt: Dictionary = tr.totals
+	status.text = "노선 %d개 (운행 %d) · 지금 움직이는 탈것 %d · 지금까지 화물 %s t · 정착민 %s명 · 승객 %s명%s" % [
+		tr.lines.size(), on_n, tr.trips.size(), Fmt.n(float(tt.get("t", 0.0)), 1), Fmt.n(float(tt.get("settlers", 0))),
+		Fmt.n(float(tt.get("pax", 0))), "" if tr.enabled else " — 운행을 멈췄다"]
+	status.add_theme_color_override("font_color", Palette.TEXT if tr.enabled else Palette.AMBER)
+	for f in _live:
+		(f as Callable).call()
+
+
+func rebuild() -> void:
+	if mgr == null:
+		return
+	_live.clear()
+	_clear(box)
+	var tr := mgr.transport
+	var by_group := {"space": [], "local": [], "feeder": [], "air": []}
+	for l in tr.lines:
+		match String(l["role"]):
+			"shuttle", "ship":
+				by_group["space"].append(l)
+			"local":
+				by_group["local"].append(l)
+			"feeder":
+				by_group["feeder"].append(l)
+			_:
+				by_group["air"].append(l)
+	by_group["local"].sort_custom(func(a, b): return Colonies.BODY_ORDER.find(a["body"]) < Colonies.BODY_ORDER.find(b["body"]))
+	for g in GROUPS:
+		var ls: Array = by_group[g[0]]
+		if ls.is_empty():
+			continue
+		box.add_child(HSeparator.new())
+		var head := HBoxContainer.new()
+		var title := ThemeFactory.heading("%s · %d" % [g[1], ls.size()], 15)
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		head.add_child(title)
+		var fold := Button.new()
+		fold.text = "접기" if _open[g[0]] else "펼치기"
+		fold.custom_minimum_size = Vector2(0, 32)
+		fold.add_theme_font_size_override("font_size", 12)
+		var key: String = g[0]
+		fold.pressed.connect(func():
+			_open[key] = not _open[key]
+			rebuild())
+		head.add_child(fold)
+		box.add_child(head)
+		if not _open[g[0]]:
+			box.add_child(_group_summary(ls))
+			continue
+		var compact: bool = g[0] in ["feeder", "air"]
+		for l in ls:
+			box.add_child(_compact_row(l) if compact else _line_card(l))
+	if tr.lines.is_empty():
+		box.add_child(ThemeFactory.muted("아직 이을 도시가 없다."))
+	update_view()
+
+
+## 접힌 묶음: 운행 편수·누계 한 줄
+func _group_summary(ls: Array) -> Control:
+	var label := ThemeFactory.muted("", 12)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var tr := mgr.transport
+	_live.append(func():
+		var n_on := 0
+		var t := 0.0
+		var settlers := 0
+		var pax := 0
+		var moving := 0
+		for l in ls:
+			if l["on"]:
+				n_on += 1
+			t += float(l["stats"]["t"])
+			settlers += int(l["stats"]["settlers"])
+			pax += int(l["stats"]["pax"])
+			moving += tr.running(l["id"])
+		label.text = "노선 %d개 중 %d개 운행 · 하늘에 %d편 · 누적 화물 %s t · 정착민 %s명 · 승객 %s명" % [ls.size(), n_on, moving,
+			Fmt.n(t, 1), Fmt.n(float(settlers)), Fmt.n(float(pax))])
+	return label
+
+
+func _line_title(l: Dictionary) -> String:
+	var arrow := " ↔ "
+	if l["role"] == "feeder":
+		arrow = " → "
+	return "%s · %s%s%s" % [Transport.mode_name(l["mode"]), Transport.node_name(l["a"]), arrow, Transport.node_name(l["b"])]
+
+
+static func _trip_len(l: Dictionary) -> String:
+	var h := int(l["trip_h"])
+	if h >= 24 * 60:
+		return "%s일 길" % Fmt.n(h / 24.0)
+	return "%s 길" % Fmt.hours(float(h))
+
+
+func _line_card(l: Dictionary) -> Control:
+	var tr := mgr.transport
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 9))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
+	card.add_child(v)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 6)
+	v.add_child(top)
+	var on := CheckBox.new()
+	on.button_pressed = l["on"]
+	on.tooltip_text = "이 노선 운행"
+	var id := String(l["id"])
+	on.toggled.connect(func(p: bool):
+		tr.set_line_on(mgr, id, p)
+		changed.emit()
+		update_view())
+	top.add_child(on)
+	var title := Label.new()
+	title.text = _line_title(l)
+	title.add_theme_font_override("font", ThemeFactory.bold)
+	title.add_theme_font_size_override("font_size", 14)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(title)
+	var see := Button.new()
+	see.text = "보기"
+	see.tooltip_text = "3D 지도에서 이 노선을 본다"
+	see.custom_minimum_size = Vector2(56, 34)
+	see.add_theme_font_size_override("font_size", 12)
+	see.pressed.connect(func(): show_line.emit(id))
+	top.add_child(see)
+	var plan := ThemeFactory.muted("", 12)
+	plan.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(plan)
+	var sums := ThemeFactory.muted("", 12)
+	sums.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sums.add_theme_color_override("font_color", Palette.TEXT.darkened(0.15))
+	v.add_child(sums)
+	var last := ThemeFactory.muted("", 12)
+	last.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(last)
+	var ships := VBoxContainer.new()
+	ships.add_theme_constant_override("separation", 4)
+	v.add_child(ships)
+	var ship_meters := {}
+	_live.append(func():
+		var dist := ""
+		if l["kind"] == "ship":
+			dist = "발사 창마다"
+		elif l["kind"] == "ferry":
+			dist = "38만 km"
+		else:
+			dist = "%s km" % Fmt.n(float(l["km"]))
+		var nxt := tr.next_in(mgr, l)
+		var when := "다음 출발 %s 뒤" % (Fmt.hours(float(nxt)) if nxt < 24 * 60 else "%s일" % Fmt.n(nxt / 24.0))
+		if not l["on"] or not tr.enabled:
+			when = "멈춤"
+		plan.text = "%s · %s · %s · 지금 %d편 운행" % [dist, _trip_len(l), when, tr.running(l["id"])]
+		var st: Dictionary = l["stats"]
+		sums.text = "누적 %d편 · 화물 %s t · 정착민 %s명" % [int(st["trips"]), Fmt.n(float(st["t"]), 1), Fmt.n(float(st["settlers"]))]
+		last.text = ("지난 운행: " + String(l["last"])) if String(l["last"]) != "" else "아직 닿은 편이 없다"
+		# 가는 중인 수송선·셔틀
+		if l["kind"] in ["ship", "ferry"]:
+			var seen := {}
+			for t in tr.trips:
+				if t["line"] != l["id"]:
+					continue
+				var key := "%s/%d" % [t["from"], int(t["depart"])]
+				seen[key] = true
+				var m: Meter = ship_meters.get(key)
+				if m == null:
+					m = Meter.new("가는 중")
+					ships.add_child(m)
+					ship_meters[key] = m
+				var span := maxf(1.0, float(t["arrive"]) - float(t["depart"]))
+				var left := maxf(0.0, (float(t["arrive"]) - mgr.hour) / 24.0)
+				m.set_values((mgr.hour - float(t["depart"])) / span, "D-%d" % ceili(left),
+					"%s → %s · %s · %s 도착" % [Transport.node_name(t["from"]), Transport.node_name(t["to"]),
+						Transport.load_text(t["cargo"], Transport.count_people(t["people"])), mgr.date_text(float(t["arrive"]))],
+					Palette.BLUE)
+			for key2 in ship_meters.keys():
+				if not seen.has(key2):
+					(ship_meters[key2] as Node).queue_free()
+					ship_meters.erase(key2))
+	return card
+
+
+## 대도시 항공편: 한 줄 (켜기 · 이름 · 거리 · 누계)
+func _compact_row(l: Dictionary) -> Control:
+	var tr := mgr.transport
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var on := CheckBox.new()
+	on.button_pressed = l["on"]
+	var id := String(l["id"])
+	on.toggled.connect(func(p: bool):
+		tr.set_line_on(mgr, id, p)
+		changed.emit()
+		update_view())
+	row.add_child(on)
+	var text := Label.new()
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.add_theme_font_size_override("font_size", 12)
+	row.add_child(text)
+	var see := Button.new()
+	see.text = "보기"
+	see.custom_minimum_size = Vector2(48, 30)
+	see.add_theme_font_size_override("font_size", 11)
+	see.pressed.connect(func(): show_line.emit(id))
+	row.add_child(see)
+	_live.append(func():
+		var st: Dictionary = l["stats"]
+		var extra := ""
+		if int(st["settlers"]) > 0:
+			extra = " · 정착민 %s명" % Fmt.n(float(st["settlers"]))
+		text.text = "%s → %s · %s km · %s · 승객 %s명%s" % [Transport.node_name(l["a"]),
+			Transport.node_name(l["b"]), Fmt.n(float(l["km"])), _trip_len(l), Fmt.n(float(st["pax"])), extra]
+		text.add_theme_color_override("font_color", Palette.TEXT if l["on"] else Palette.MUTED))
+	return row

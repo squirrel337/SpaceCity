@@ -3676,6 +3676,17 @@
   }
  },
  "vehicles": {
+  "airliner": {
+   "dims": [
+    40.0,
+    36.0,
+    12.0
+   ],
+   "flying": true,
+   "group": "air",
+   "title": "여객기",
+   "world": "지구"
+  },
   "astronaut": {
    "dims": [
     0.8,
@@ -3807,6 +3818,17 @@
    "group": "ground",
    "title": "가압 로버",
    "world": "달"
+  },
+  "space_shuttle": {
+   "dims": [
+    10.6,
+    10.6,
+    12.0
+   ],
+   "flying": false,
+   "group": "space",
+   "title": "지구-달 셔틀",
+   "world": "지구-달"
   },
   "titan_rotorcraft": {
    "dims": [

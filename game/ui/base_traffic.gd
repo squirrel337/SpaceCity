@@ -1,6 +1,8 @@
 class_name BaseTraffic
 extends RefCounted
 ## 지도의 탈것과 사람 — 시뮬레이션의 사건(착륙선 도착, 공사, 고장)에 맞춰 움직인다.
+## 도시 사이 교통(Transport)의 출발·도착도 띄운다: 로버 화물 열차는 고속도로로 드나들고, 호퍼·회전익기는 착륙장으로
+## 날아들고, 셔틀·수송선의 착륙선은 착륙장에 내리고 오르며, 비행기는 활주로에 내리고 뜬다.
 ## 길은 배치 계획(CityPlan)의 길 그물을 따라 찾는다. 보여 주기만 한다. 시뮬레이션 숫자에는 영향을 주지 않는다.
 
 const LANDER_HIGH := 150.0        # 착륙선이 나타나는 높이 (m)
@@ -9,12 +11,16 @@ const LANDED_S := 7.0
 const ASCEND_S := 3.5
 const MAX_ROBOTS := 10
 const WALKERS := 6
+const MAX_TRANSIT := 6            # 한꺼번에 보이는 교통 탈것 (빠르게 흐를 때 넘치지 않게)
+const TRANSIT_ROLES := ["convoy", "fly", "plane", "transit_lander"]
 
 var plan: CityPlan
 var agents: Array = []
 var _seen := {}
 var _landers_waiting: Array = []
 var _rng := RandomNumberGenerator.new()
+var _ev_n := -1                   # 본 교통 사건 번호 (-1 = 아직 맞추지 않았다)
+var _site := ""
 
 
 func _init(p_plan: CityPlan = null) -> void:
@@ -26,6 +32,7 @@ func _init(p_plan: CityPlan = null) -> void:
 func reset(sim: CitySim) -> void:
 	agents.clear()
 	_landers_waiting.clear()
+	_ev_n = -1
 	for key in ["cargo_delivered", "express", "arrived"]:
 		_seen[key] = int(sim.stats.get(key, 0)) if sim else 0
 
@@ -167,6 +174,18 @@ func _step(a: Dictionary, dt: float, sim: CitySim, sites: Array) -> void:
 			return
 		"hopper":
 			_hopper(a, dt, sim)
+			return
+		"convoy":
+			_convoy(a, dt)
+			return
+		"fly":
+			_fly(a, dt)
+			return
+		"plane":
+			_plane(a, dt)
+			return
+		"transit_lander":
+			_transit_lander(a, dt)
 			return
 	if not a["path"].is_empty():
 		_move(a, dt)
@@ -331,3 +350,206 @@ func _start_hop(a: Dictionary, to: Vector3, state: String) -> void:
 	a["dur"] = clampf(dist / 30.0, 3.0, 7.0)
 	a["apex"] = clampf(dist * 0.35, 20.0, 60.0)
 	a["state"] = state
+
+
+# ── 도시 사이 교통 ─────────────────────────────────────────────
+## 교통의 새 사건(이 도시의 출발·도착)을 탈것으로 띄운다. ways: City3D의 고속도로·활주로·방향
+func intercity(tr: Transport, site: String, ways: Dictionary) -> void:
+	if plan == null:
+		return
+	if site != _site or _ev_n < 0:
+		_site = site
+		_ev_n = tr.last_event_n()            # 처음에는 지난 일을 다시 보이지 않는다
+		return
+	var evs := tr.events_after(site, _ev_n)
+	if evs.is_empty():
+		return
+	_ev_n = int(evs[-1]["n"])
+	for e in evs:
+		var n := 0
+		for a in agents:
+			if a["role"] in TRANSIT_ROLES:
+				n += 1
+		if n >= MAX_TRANSIT:
+			break
+		_spawn_transit(e, ways)
+
+
+func _spawn_transit(e: Dictionary, ways: Dictionary) -> void:
+	var arr := String(e["type"]) == "arr"
+	var vehicle := String(Transport.mode(e["mode"]).get("vehicle", "cargo_hauler"))
+	var bearing: Vector2 = ways.get("bearings", {}).get(e["line"], Vector2(1, 0))
+	var dir3 := Vector3(bearing.x, bearing.y, 0.0)
+	var pad := _transit_pad()
+	match String(e["kind"]):
+		"ground":
+			var h: Dictionary = ways.get("highways", {}).get(e["line"], {})
+			if h.is_empty():
+				return
+			var a3 := Vector3(h["a"].x, h["a"].y, 0)
+			var b3 := Vector3(h["b"].x, h["b"].y, 0)
+			var far := a3.lerp(b3, 0.4)
+			var depot := _road_point(_place_of(["food_store", "tank_farm", "parts_fab"], "industry"))
+			for k in 3:
+				if arr:
+					var start := far + (b3 - a3).normalized() * (k * 16.0)
+					var path := [a3]
+					path.append_array(plan.route(a3, depot))
+					_spawn("convoy", vehicle, start, 12.0, {"path": path, "wait": k * 1.3, "state": "arr"})
+				else:
+					var path2 := plan.route(depot, a3)
+					path2.append(far)
+					_spawn("convoy", vehicle, depot, 12.0, {"path": path2, "wait": k * 1.3, "state": "dep"})
+		"air":
+			var rw: Dictionary = ways.get("runway", {})
+			if vehicle in ["airliner", "mars_plane"] and not rw.is_empty():
+				_spawn_plane(vehicle, rw, arr)
+			else:
+				_spawn_fly(vehicle, pad, dir3, arr, 160.0)
+		"hop":
+			_spawn_fly(vehicle, pad, dir3, arr, 240.0)
+		"ferry", "ship":
+			var id := vehicle if String(e["kind"]) == "ferry" else "cargo_lander"
+			var high := 420.0 if String(e["kind"]) == "ferry" else LANDER_HIGH * 1.6
+			_spawn("transit_lander", id, pad + Vector3(0, 0, high if arr else 0.0), 0.0,
+				{"base": pad, "state": "descend" if arr else "landed", "t": 0.0, "high": high, "flying": true,
+				"thrust": arr, "stay": 6.0 if arr else 3.0})
+
+
+## 교통 착륙선이 내리는 착륙장: 두 번째 착륙장이 있으면 그것 (화물선 착륙선과 겹치지 않게)
+func _transit_pad() -> Vector3:
+	var pads := plan.built_of_family("landing_pad")
+	if pads.size() >= 2:
+		return pads[1]
+	if pads.size() == 1:
+		return pads[0] + Vector3(0, 26, 0)
+	var slots: Array = plan.layout.slots.get("landing_pad", [])
+	return slots[1] if slots.size() >= 2 else _pad_spot()
+
+
+## 호퍼·회전익기: 다른 도시 쪽 하늘에서 날아들어 착륙장에 내리거나, 거기서 떠올라 그쪽으로 사라진다
+func _spawn_fly(vehicle: String, pad: Vector3, dir3: Vector3, arr: bool, high: float) -> void:
+	var far := pad + dir3 * 900.0 + Vector3(0, 0, high)
+	if arr:
+		_spawn("fly", vehicle, far, 0.0, {"from": far, "to": pad, "t": 0.0, "dur": 7.0, "apex": 60.0, "flying": true,
+			"thrust": true, "land": true})
+	else:
+		_spawn("fly", vehicle, pad, 0.0, {"from": pad, "to": far, "t": 0.0, "dur": 7.0, "apex": 60.0, "flying": true,
+			"thrust": true, "land": false, "wait": 2.0})
+
+
+func _fly(a: Dictionary, dt: float) -> void:
+	if a["wait"] > 0.0:
+		a["wait"] -= dt
+		return
+	if a.get("parked", false):
+		a["gone"] = true
+		return
+	a["t"] += dt
+	var k := clampf(a["t"] / a["dur"], 0.0, 1.0)
+	var e := k * k * (3.0 - 2.0 * k)
+	var p: Vector3 = (a["from"] as Vector3).lerp(a["to"], e)
+	p.z += 4.0 * float(a["apex"]) * e * (1.0 - e)
+	a["pos"] = p
+	a["thrust"] = k < 0.3 or k > 0.7
+	if k >= 1.0:
+		a["thrust"] = false
+		if a["land"]:
+			a["flying"] = false
+			a["parked"] = true
+			a["wait"] = 5.0
+		else:
+			a["gone"] = true
+
+
+## 비행기: 활주로 a→b 방향으로 내려앉아 달리다 멈추거나, 달려서 떠올라 사라진다
+func _spawn_plane(vehicle: String, rw: Dictionary, arr: bool) -> void:
+	var a2: Vector2 = rw["a"]
+	var b2: Vector2 = rw["b"]
+	var length := a2.distance_to(b2)
+	var d := (b2 - a2) / length
+	var a3 := Vector3(a2.x, a2.y, 0)
+	var d3 := Vector3(d.x, d.y, 0)
+	var big := vehicle == "airliner"
+	var speed := 140.0 if big else 60.0
+	if arr:
+		var start := a3 - d3 * (3200.0 if big else 900.0) + Vector3(0, 0, 170.0 if big else 70.0)
+		var touch := a3 + d3 * (260.0 if big else 80.0)
+		var stop := a3 + d3 * length * 0.72
+		_spawn("plane", vehicle, start, speed, {"legs": [[touch, speed], [stop, 14.0]], "flying": true, "state": "arr"})
+	else:
+		var s3 := a3 + d3 * (150.0 if big else 60.0)
+		var lift := a3 + d3 * length * 0.62
+		var out := a3 + d3 * (length + (2600.0 if big else 900.0)) + Vector3(0, 0, 320.0 if big else 120.0)
+		_spawn("plane", vehicle, s3, 16.0, {"legs": [[lift, speed], [out, speed * 1.1]], "flying": false, "state": "dep",
+			"wait": 1.5})
+
+
+func _plane(a: Dictionary, dt: float) -> void:
+	if a["wait"] > 0.0:
+		a["wait"] -= dt
+		return
+	var legs: Array = a["legs"]
+	if legs.is_empty():
+		a["gone"] = true
+		return
+	var target: Vector3 = legs[0][0]
+	var want: float = legs[0][1]
+	a["speed"] = move_toward(float(a["speed"]), want, dt * 40.0)
+	var d: Vector3 = target - a["pos"]
+	var dist := d.length()
+	var stepm := float(a["speed"]) * dt
+	if dist <= stepm:
+		a["pos"] = target
+		legs.pop_front()
+		if a["state"] == "arr" and legs.size() == 1:
+			a["flying"] = false               # 바퀴가 닿았다
+		elif a["state"] == "dep" and legs.size() == 1:
+			a["flying"] = true                # 떠올랐다
+		if legs.is_empty() and a["state"] == "arr":
+			a["wait"] = 2.5
+	else:
+		a["pos"] += d / dist * stepm
+	a["heading"] = heading_of(d)
+
+
+## 셔틀·수송선 착륙선: 높이 high에서 내려와 머물다 다시 오르거나 (도착), 착륙장에 서 있다 오른다 (출발)
+func _transit_lander(a: Dictionary, dt: float) -> void:
+	a["t"] += dt
+	var base: Vector3 = a["base"]
+	var high: float = a["high"]
+	match a["state"]:
+		"descend":
+			var k := clampf(a["t"] / 5.0, 0.0, 1.0)
+			a["pos"] = base + Vector3(0, 0, high * (1.0 - (1.0 - pow(1.0 - k, 3.0))))
+			a["thrust"] = true
+			if k >= 1.0:
+				a["state"] = "landed"
+				a["t"] = 0.0
+				a["thrust"] = false
+		"landed":
+			a["pos"] = base
+			a["thrust"] = false
+			if a["t"] >= float(a["stay"]):
+				a["state"] = "ascend"
+				a["t"] = 0.0
+		"ascend":
+			var k2 := clampf(a["t"] / 4.0, 0.0, 1.0)
+			a["pos"] = base + Vector3(0, 0, high * 1.2 * k2 * k2)
+			a["thrust"] = true
+			if k2 >= 1.0:
+				a["gone"] = true
+
+
+func _convoy(a: Dictionary, dt: float) -> void:
+	if a["wait"] > 0.0:
+		a["wait"] -= dt
+		return
+	if not a["path"].is_empty():
+		_move(a, dt)
+		return
+	if a["state"] == "arr":
+		a["state"] = "parked"
+		a["wait"] = 4.0
+	else:
+		a["gone"] = true

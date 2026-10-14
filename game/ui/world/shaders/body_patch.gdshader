@@ -37,6 +37,7 @@ uniform float eseed = 1.0;                           // 지구 구와 같은 잡
 uniform float ls_k = 0.5;                            // 대기 없는 땅의 빛 (로멜-젤리거) 몫
 uniform float soft_k = 0.0;                          // 대기가 해 질 녘 빛을 퍼뜨리는 몫 (구의 행성 셰이더와 같은 값)
 uniform float gain = 1.0;
+uniform float night_glow = 0.0;                      // 지구: 그 자리의 밤 (시가지 불빛)
 uniform int debug = 0;
 varying vec3 bdir;
 varying vec2 mpos;
@@ -135,6 +136,7 @@ void fragment() {
 	float n2 = fbm(vec3(mpos * 0.06, 2.0), 3, 5.0);
 	vec3 col;
 	float sd = 0.0;
+	float city_l = 0.0;
 	if (mode == 1) {
 		// 지구: 구와 같은 땅 색, 도시 둘레는 밭·숲·풀밭의 무늬
 		sd = earth_sd(bdir, max(mpp, 0.5) / 1000.0);
@@ -144,6 +146,7 @@ void fragment() {
 		col = mix(col, col * vec3(0.72, 0.86, 0.7), smoothstep(0.5, 0.62, f1) * 0.8);
 		col = mix(col, col * vec3(1.18, 1.12, 0.92), smoothstep(0.55, 0.7, f2) * 0.5 * (1.0 - smoothstep(4.0, 30.0, mpp)));
 		col *= 0.92 + 0.16 * n1;
+		col = earth_city(bdir, col, sd, max(mpp, 0.5) / 1000.0, city_l);
 	} else {
 		a += 0.05 * (n1 - 0.5) + 0.04 * (n2 - 0.5) * (1.0 - smoothstep(4.0, 30.0, mpp));
 		col = pal_color(a);
@@ -159,6 +162,7 @@ void fragment() {
 	float wet = step(0.5, wet_v + shore_n);
 	col = mix(col, mode == 1 ? earth_sea(min(sd, -0.05)) : liq_col, wet);
 	ALBEDO = col * gain;
+	EMISSION = vec3(1.0, 0.6, 0.24) * city_l * (1.0 - wet) * night_glow * 0.7;
 	ROUGHNESS = mix(1.0, 0.06, wet);
 	SPECULAR = 0.0;
 	// 가까이서 보이는 흙의 잔주름 (화면 미분으로 법선을 흔든다)

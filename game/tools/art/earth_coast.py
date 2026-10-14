@@ -3,12 +3,16 @@
 
     python3 game/tools/art/earth_coast.py --fetch        # Natural Earth v5.1.2 GeoJSON을 내려받아서
     python3 game/tools/art/earth_coast.py --ne DIR       # 이미 받아 둔 DIR/ne_10m_{land,minor_islands,lakes}.geojson으로
+    python3 game/tools/art/earth_coast.py --ne DIR --only-metros   # 대도시 시가지 지도만 (강 지도도 DIR에서)
 
 결과 (game/art/planets/):
   earth_coast.png         정거원통 4096 × 2048: 가장 가까운 해안까지의 거리 (땅 +, 바다 −).
                           ±40 km → 0..255 (127.5 = 해안). 셰이더가 거리를 문턱으로 잘라 해안을 픽셀마다 또렷하게 긋는다.
   earth_coast_<부지>.png  지구 부지(city_sites.json, body = earth) 둘레 256 km 네모 (중심의 접평면, 위 = 북쪽),
                           2048 × 2048 (125 m 칸), ±8 km → 0..255. 도시 가까이서는 이 지도가 해안을 긋는다.
+  earth_coast_metro_<id>.png  지구의 대도시(earth_cities.json) 둘레 (반지름 + 10 km) × 2 네모, 1024 × 1024:
+                          R = 해안·강 거리 ±2 km (강은 Natural Earth 강 중심선을 도시 자료의 폭만큼 물로 판다),
+                          G = 공원·산 (건물이 서지 않는다). 시가지 바닥과 3D 건물이 쓴다.
 
 거리는 4배(지역 지도는 2배) 고운 격자에서 땅·바다 경계까지 셈한 뒤 평균으로 줄인다 — 해안의 위치가 칸보다 곱다.
 make_art.py와 달리 CI에서 다시 만들지 않는다 (내려받기가 필요하다). 데이터를 바꾸면 이 도구로 다시 만든다.
@@ -38,6 +42,12 @@ LOCAL_N = 2048               # 부지 지도
 LOCAL_HALF_KM = 128.0
 LOCAL_SS = 2
 LOCAL_RANGE_KM = 8.0
+CITIES = ROOT / "docs" / "design" / "data" / "earth_cities.json"
+RIVERS = ("ne_10m_rivers_lake_centerlines", "ne_10m_rivers_europe", "ne_10m_rivers_north_america")
+METRO_N = 1024
+METRO_SS = 2
+METRO_PAD_KM = 10.0          # 대도시 지도의 반 폭 = 시가지 반지름 + 이만큼 (game/ui/metros.gd와 같다)
+METRO_RANGE_KM = 2.0
 
 
 def polygons(geojson: dict):
@@ -49,9 +59,9 @@ def polygons(geojson: dict):
             yield p[0], p[1:]
 
 
-def load_layers(src: Path | None) -> dict:
+def load_layers(src: Path | None, names=LAYERS) -> dict:
     data = {}
-    for name in LAYERS:
+    for name in names:
         if src is None:
             with urllib.request.urlopen(NE_URL % name, timeout=120) as r:
                 data[name] = json.loads(r.read().decode("utf-8"))
@@ -224,16 +234,148 @@ def local_map(data: dict, lat: float, lon: float) -> tuple[Image.Image, bool]:
     return encode(shrink(sd, LOCAL_SS), LOCAL_RANGE_KM), centre
 
 
+def _keep_near(feats: list, lat: float, lon: float, deg: float = 1.5) -> list:
+    """대도시 둘레(경계 상자)의 선만"""
+    out = []
+    dlon = deg / max(math.cos(math.radians(lat)), 0.2)
+    for ft in feats:
+        g = ft.get("geometry")
+        if g is None:
+            continue
+        lines = g["coordinates"] if g["type"] == "MultiLineString" else [g["coordinates"]]
+        keep = []
+        for ln in lines:
+            lats = [p[1] for p in ln]
+            lons = [p[0] for p in ln]
+            if max(lats) < lat - deg or min(lats) > lat + deg or max(lons) < lon - dlon or min(lons) > lon + dlon:
+                continue
+            keep.append(ln)
+        if keep:
+            out.append((ft["properties"], keep))
+    return out
+
+
+def _river_key(props: dict) -> list:
+    keys = []
+    for k in ("name", "name_en", "name_alt"):
+        if props.get(k):
+            keys.append(str(props[k]))
+    if props.get("rivernum") is not None:
+        keys.append("#%d" % int(props["rivernum"]))
+    return keys
+
+
+def metro_map(data: dict, rivers: dict, city: dict) -> tuple[Image.Image, bool]:
+    lat, lon = float(city["lat"]), float(city["lon"])
+    c, e, n = local_frame(lat, lon)
+    half = float(city["radius_km"]) + METRO_PAD_KM
+    size = METRO_N * METRO_SS
+    reach = math.cos(min(math.pi / 2, half * 3.0 / R_KM))
+
+    def proj(plon, plat):
+        d = latlon(plat, plon)
+        w = float(d @ c)
+        if w < reach:
+            q = np.array([d @ e, d @ n])
+            nq = np.linalg.norm(q)
+            if nq < 1e-9:
+                return (size * 0.5, size * 0.5)
+            q = q / nq * half * 6.0
+        else:
+            q = np.array([d @ e, d @ n]) * R_KM / w
+        return ((q[0] + half) / (2 * half) * size, (half - q[1]) / (2 * half) * size)
+
+    sub = {}
+    for name in LAYERS:
+        feats = []
+        for ft in data[name]["features"]:
+            g = ft["geometry"]
+            polys = g["coordinates"] if g["type"] == "MultiPolygon" else [g["coordinates"]]
+            keep = []
+            for p in polys:
+                lons = [pt[0] for pt in p[0]]
+                lats = [pt[1] for pt in p[0]]
+                if max(lats) < lat - 2 or min(lats) > lat + 2:
+                    continue
+                dlon = 2 / max(math.cos(math.radians(lat)), 0.2)
+                if (max(lons) < lon - dlon or min(lons) > lon + dlon) and max(lons) - min(lons) < 300:
+                    continue
+                keep.append(p)
+            if keep:
+                feats.append({"geometry": {"type": "MultiPolygon", "coordinates": keep}})
+        sub[name] = {"features": feats}
+    land = rasterize(sub, size, size, proj)
+    # 강: 중심선을 폭만큼 물로 판다
+    px = 2 * half / size
+    want = city.get("rivers", {})
+    if want:
+        img = Image.fromarray((land * 255).astype(np.uint8), "L")
+        dr = ImageDraw.Draw(img)
+        for layer in RIVERS:
+            if layer not in rivers:
+                continue
+            for props, lines in _keep_near(rivers[layer]["features"], lat, lon):
+                width = next((float(want[k]) for k in _river_key(props) if k in want), None)
+                if width is None:
+                    continue
+                w_px = max(1, int(round(width / px)))
+                for ln in lines:
+                    pts = [proj(p[0], p[1]) for p in ln]
+                    dr.line(pts, fill=0, width=w_px, joint="curve")
+                    r = w_px / 2.0
+                    for (x, y) in (pts[0], pts[-1]):
+                        dr.ellipse((x - r, y - r, x + r, y + r), fill=0)
+        land = np.asarray(img) > 127
+    k = int(math.ceil(METRO_RANGE_KM / px)) + 2
+    sd = signed(land, np.full(size, px), px, k, k, False)
+    red = encode(shrink(sd, METRO_SS), METRO_RANGE_KM)
+    # 공원·산
+    park = Image.new("L", (METRO_N, METRO_N), 0)
+    pd = ImageDraw.Draw(park)
+    kpx = METRO_N / (2 * half)
+
+    def to_px(plat, plon):
+        x, y = proj(plon, plat)
+        return (x / METRO_SS, y / METRO_SS)
+
+    for pk in city.get("parks", []):
+        x, y = to_px(float(pk[1]), float(pk[2]))
+        if len(pk) >= 6:
+            hl, hw, ang = float(pk[3]) * kpx, float(pk[4]) * kpx, math.radians(float(pk[5]))
+            ux, uy = math.sin(ang), -math.cos(ang)       # 길이 방향 (북에서 시계 방향, 화면 y는 아래)
+            vx, vy = -uy, ux
+            corners = [(x + ux * a * hl + vx * b * hw, y + uy * a * hl + vy * b * hw) for a, b in ((1, 1), (1, -1), (-1, -1), (-1, 1))]
+            pd.polygon(corners, fill=255)
+        else:
+            r = float(pk[3]) * kpx
+            pd.ellipse((x - r, y - r, x + r, y + r), fill=255)
+    blue = Image.new("L", (METRO_N, METRO_N), 0)
+    centre = bool(land[size // 2, size // 2])
+    return Image.merge("RGB", (red, park, blue)), centre
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="지구 해안 거리 지도 (Natural Earth 1:10m)")
     ap.add_argument("--ne", type=Path, help="ne_10m_*.geojson이 있는 폴더")
     ap.add_argument("--fetch", action="store_true", help="Natural Earth v5.1.2를 내려받는다")
     ap.add_argument("--only-local", action="store_true", help="부지 지도만")
+    ap.add_argument("--only-metros", action="store_true", help="대도시 시가지 지도만")
+    ap.add_argument("--metro", action="append", help="이 대도시(id)의 지도만 (여러 번)")
     args = ap.parse_args()
     if args.ne is None and not args.fetch:
         ap.error("--ne DIR 또는 --fetch")
     data = load_layers(None if args.fetch else args.ne)
     OUT.mkdir(parents=True, exist_ok=True)
+    rivers = load_layers(None if args.fetch else args.ne, RIVERS)
+    for city in json.loads(CITIES.read_text(encoding="utf-8"))["cities"]:
+        if args.metro and city["id"] not in args.metro:
+            continue
+        img, on_land = metro_map(data, rivers, city)
+        path = OUT / ("earth_coast_metro_%s.png" % city["id"])
+        img.save(path, optimize=True)
+        print("썼다:", path, "" if on_land else "(도심이 물 위 — 지도를 확인할 것)")
+    if args.only_metros:
+        return
     if not args.only_local:
         print("지구 전체 …", file=sys.stderr)
         global_map(data).save(OUT / "earth_coast.png", optimize=True)

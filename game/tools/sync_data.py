@@ -18,6 +18,8 @@ SOURCES = {
     "city_sites.json": ROOT / "docs" / "design" / "data" / "city_sites.json",
     "sky.json": ROOT / "docs" / "design" / "data" / "sky.json",
     "surfaces.json": ROOT / "docs" / "design" / "data" / "surfaces.json",
+    "transport.json": ROOT / "docs" / "design" / "data" / "transport.json",
+    "earth_cities.json": ROOT / "docs" / "design" / "data" / "earth_cities.json",
     "nearby_stars.json": ROOT / "docs" / "concept" / "examples" / "nearby_stars.json",
 }
 FILES = tuple(SOURCES)

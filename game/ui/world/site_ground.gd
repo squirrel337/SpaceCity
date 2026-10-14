@@ -20,6 +20,7 @@ var _site_basis := Basis()       # 모형 x, y, z → 천체 고정
 var _plateau_m := 0.0            # 평지 높이 (기준 구 위, m)
 var _cam_alt_km := 1e9
 var _dark_k := 0.0
+var raise_sun := true            # 기지 가까이에서 해를 지평선 위로 올린다 (대도시는 실제 밤을 그대로)
 
 
 func site_dir() -> Vector3:
@@ -75,7 +76,7 @@ func update_frame(_view: WorldView, _info: Dictionary, _sun_c: PackedFloat64Arra
 ## 기지 가까이에서는 해를 지평선 위 7° 이상으로 올린다 (낮은 해 아래 땅이 거의 검지 않게)
 func adjust_light(dir: Vector3, view: WorldView) -> Vector3:
 	var k := 1.0 - smoothstep(30.0, 600.0, _cam_alt_km)
-	if k <= 0.0 or view == null:
+	if k <= 0.0 or view == null or not raise_sun:
 		return dir
 	var f: Basis = view._info(body)["frame"]
 	var up := WorldView.g_vec(f * _site)

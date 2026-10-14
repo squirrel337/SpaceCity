@@ -1,0 +1,48 @@
+{
+  "_meta": {
+    "title": "도시 사이 교통 — 노선의 탈것, 실어 나르는 규칙, 지구 대도시의 항공편",
+    "source": "04-system-layer.md §5 도시 사이 교통",
+    "modes": "탈것 갈래: name, vehicle(3D 모형 id), kind(ground 땅 · hop 로켓 도약 · air 비행 · ferry 지구-달 · ship 행성 사이), speed_km_h(평균 속력 — ferry·ship은 trip_h·전이 일수), cap_t(화물 t), seats(사람), every_h(한쪽에서 떠나는 간격 — ship은 발사 창마다), load_h(싣고 내리는 시간)",
+    "surface": "같은 천체의 도시 사이 노선: 거리가 far_km보다 가까우면 near, 멀면 far. 노선은 그 천체의 도시를 잇는 가장 짧은 그물(최소 신장 나무)이다",
+    "cargo": "실어 나르는 비축: key, t_per(한 단위의 무게 t), need_days(받는 도시가 바라는 비축 — 사람이 하루에 쓰는 양 × 일수, per = 그 양의 열쇠) 또는 need(고정량), keep_x(보내는 도시는 need × keep_x 넘는 몫만 보낸다). 시장이 채우는 도시(지구)는 시장에서 사서 보낸다",
+    "people": "정착민: 받는 도시에 주거·CO₂ 제거 여유가 있고 식량·산소 비축이 min_days 넘을 때 탄다. 보내는 도시는 지구의 도시이거나 주거가 crowded 넘게 찬 도시. 한 번에 받는 도시 인구의 max_frac까지, 받는 도시는 주거의 keep_free를 비워 둔다",
+    "freight": "지구에서 달로(ferry), 행성 사이(ship) 실어 올리는 화물의 운임 — 보내는 도시가 지원 점수로 낸다 (support_per_t). 모자라면 낼 수 있는 만큼만 싣는다",
+    "metro": "지구의 대도시(earth_cities.json)에서 가장 가까운 지구 도시(우주항)로 가는 항공편: every_h 간격, 한 편에 정착민 settlers명까지(우주항에 빈 주거가 있을 때), 부품 parts까지(우주항의 부품이 need 아래일 때)",
+    "notes": "도시마다 일주일에 한 번 들고 난 화물·사람을 기록에 남긴다 (note_days)"
+  },
+  "modes": {
+    "rover_train": {"name": "로버 화물 열차", "vehicle": "cargo_hauler", "kind": "ground", "speed_km_h": 30, "cap_t": 40,
+      "seats": 12, "every_h": 48, "load_h": 4},
+    "hopper": {"name": "로켓 호퍼", "vehicle": "hopper", "kind": "hop", "speed_km_h": 2400, "cap_t": 6, "seats": 8,
+      "every_h": 72, "load_h": 3},
+    "mars_plane": {"name": "화성 수송기", "vehicle": "mars_plane", "kind": "air", "speed_km_h": 360, "cap_t": 4, "seats": 6,
+      "every_h": 48, "load_h": 2},
+    "rotorcraft": {"name": "타이탄 회전익기", "vehicle": "titan_rotorcraft", "kind": "air", "speed_km_h": 110, "cap_t": 5,
+      "seats": 8, "every_h": 48, "load_h": 2},
+    "airliner": {"name": "여객기", "vehicle": "airliner", "kind": "air", "speed_km_h": 850, "cap_t": 20, "seats": 220,
+      "every_h": 12, "load_h": 2},
+    "shuttle": {"name": "지구-달 셔틀", "vehicle": "space_shuttle", "kind": "ferry", "trip_h": 72, "cap_t": 25, "seats": 30,
+      "every_h": 168, "load_h": 12},
+    "ship": {"name": "행성간 수송선", "vehicle": "transport_ship", "kind": "ship", "cap_t": 300, "seats": 120, "load_h": 48}
+  },
+  "surface": {
+    "moon": {"near": "rover_train", "far": "hopper", "far_km": 500},
+    "mars": {"near": "rover_train", "far": "mars_plane", "far_km": 400},
+    "mercury": {"near": "rover_train", "far": "hopper", "far_km": 300},
+    "ceres": {"near": "hopper", "far": "hopper", "far_km": 0},
+    "callisto": {"near": "rover_train", "far": "hopper", "far_km": 300},
+    "titan": {"near": "rotorcraft", "far": "rotorcraft", "far_km": 0},
+    "earth": {"near": "airliner", "far": "airliner", "far_km": 0}
+  },
+  "cargo": [
+    {"key": "food_kg", "name": "식량", "t_per": 0.001, "per": "food_kg", "need_days": 60, "keep_x": 1.5},
+    {"key": "o2_kg", "name": "산소", "t_per": 0.001, "per": "o2_kg", "need_days": 30, "keep_x": 1.5},
+    {"key": "water_kg", "name": "물", "t_per": 0.001, "per": "water_use_kg", "need_days": 20, "keep_x": 1.5},
+    {"key": "parts", "name": "부품", "t_per": 0.1, "need": 300, "keep_x": 2.0},
+    {"key": "metal_t", "name": "금속", "t_per": 1.0, "need": 20, "keep_x": 2.0}
+  ],
+  "people": {"min_days": 30, "crowded": 0.95, "max_frac": 0.1, "keep_free": 0.05, "min_pop": 20, "earth_share": 0.15},
+  "freight": {"support_per_t": 7.5},
+  "metro": {"mode": "airliner", "every_h": 24, "settlers": 40, "parts": 30},
+  "note_days": 7
+}

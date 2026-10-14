@@ -16,6 +16,8 @@ uniform float bright = 1.0;
 // 식민지의 지형 조각이 보이는 동안 그 자리를 비운다 (몸체 고정 방향, 단위 구의 현 길이)
 uniform vec3 hole_dir = vec3(0.0, 0.0, 1.0);
 uniform float hole_chord = 0.0;
+uniform vec3 hole2_dir = vec3(0.0, 0.0, 1.0);    // 지구: 가까이 간 대도시의 지형 조각 자리
+uniform float hole2_chord = 0.0;
 // 식민지 가까이: 그 땅의 밤(시뮬레이션)이면 어둡게, 대기의 연무(rgb 색, a 렌더 단위당 밀도), 가장자리 빛 줄이기
 uniform float lit_k = 1.0;
 uniform vec4 air : source_color = vec4(0.0, 0.0, 0.0, 0.0);
@@ -88,6 +90,9 @@ void fragment() {
 	if (hole_chord > 0.0 && length(d - hole_dir) < hole_chord) {
 		discard;
 	}
+	if (hole2_chord > 0.0 && length(d - hole2_dir) < hole2_chord) {
+		discard;
+	}
 	vec3 nw = normalize((MODEL_MATRIX * vec4(o, 0.0)).xyz);
 	vec3 l = normalize(sun_dir);
 	vec3 wp = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -100,6 +105,7 @@ void fragment() {
 	float wet = 0.0;
 	float landm = 1.0;
 	float cl = 0.0;
+	float city_l = 0.0;
 	if (has_surf) {
 		vec4 s = surf_at(o, d);
 		ns = normalize((MODEL_MATRIX * vec4(normalize(s.rgb * 2.0 - 1.0), 0.0)).xyz);
@@ -121,7 +127,7 @@ void fragment() {
 		float tk = max(length(fwidth(d)) * r_km, 1e-4);
 		float sd = earth_sd(d, tk);
 		landm = smoothstep(-tk * 0.5, tk * 0.5, sd);
-		alb = mix(earth_sea(sd), earth_ground(d, sd, seed), landm);
+		alb = mix(earth_sea(sd), earth_city(d, earth_ground(d, sd, seed), sd, tk, city_l), landm);
 		wet = 1.0 - landm;
 		float lat = asin(clamp(d.z, -1.0, 1.0));
 		cl = fbm(d * vec3(4.0, 4.0, 6.0) + vec3(spin_h * 0.004, 0.0, 0.0), 5, seed + 9.0);
@@ -160,10 +166,11 @@ void fragment() {
 			c += sun_col * lit_k * sp * wet * step(0.0, ndl_g);
 		}
 		if (kind == 2) {
-			// 밤의 도시 불빛
-			float city = landm * (1.0 - cl) * smoothstep(0.62, 0.8, fbm(d * 30.0, 3, 4.0))
-				* (1.0 - smoothstep(0.5, 1.2, abs(asin(clamp(d.z, -1.0, 1.0)))));
-			c += vec3(1.0, 0.5, 0.15) * city * (1.0 - smoothstep(-0.2, 0.05, ndl_g)) * 0.12;
+			// 밤의 불빛: 대도시의 시가지 (도심일수록 밝게)와 잔 마을들
+			float town = landm * smoothstep(0.78, 0.9, fbm(d * 70.0, 3, 4.0))
+				* (1.0 - smoothstep(0.45, 1.15, abs(asin(clamp(d.z, -1.0, 1.0))))) * 0.12;
+			float night = 1.0 - smoothstep(-0.2, 0.05, ndl_g);
+			c += vec3(1.0, 0.6, 0.24) * (city_l * landm * 0.55 + town) * (1.0 - cl * 0.7) * night;
 		}
 		if (veil.a > 0.0) {
 			// 짙은 대기: 멀리서는 땅이 연무 뒤로 흐릿하다

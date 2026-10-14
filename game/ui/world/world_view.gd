@@ -79,6 +79,10 @@ var _clock := 0.0
 var _ready_done := false
 var plan: CityPlan
 var tool: PlaceTool
+var mgr: Colonies                    # 모든 도시와 교통 (노선·탈것을 그린다)
+var routes: RouteOverlay
+var metro_grounds := {}              # 대도시 key → {ground: SiteSurface, city: MetroCity, used} (가까이 갈 때 만든다, 둘까지)
+var _metro_near: SiteSurface         # 카메라가 내려다보는 대도시의 땅 (없으면 null)
 
 
 func _init() -> void:
@@ -106,6 +110,7 @@ func _init() -> void:
 	_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_overlay.draw.connect(_draw_overlay)
 	add_child(_overlay)
+	routes = RouteOverlay.new(self)
 	_build_scene()
 	cam.body_info = _info
 	cam.terrain = _terrain_km
@@ -128,6 +133,8 @@ func set_sim(new_sim: CitySim, p_plan: CityPlan = null, p_tool: PlaceTool = null
 	tool = p_tool
 	if g != ground or city == null:
 		_mount_city(g)
+	city.transport = mgr.transport if mgr != null else null
+	city.site_key = sim.site_id if sim != null else ""
 	city.set_sim(sim, plan, tool)
 	_update_time(0.0)
 	if not _ready_done:
@@ -154,8 +161,12 @@ func ground_for(site_id: String) -> SiteGround:
 	return g
 
 
-## 그 천체에서 지형을 그리는 땅: 고른 도시의 땅이 그 천체에 있으면 그것, 달이면 섀클턴, 아니면 없다
+## 그 천체에서 지형을 그리는 땅: 지구의 대도시 위면 그 땅, 고른 도시의 땅이 그 천체에 있으면 그것, 달이면 섀클턴, 아니면 없다
 func _ground_on(body: String) -> SiteGround:
+	if body == "earth" and _metro_near != null:
+		var t := Astro.vec(cam.t_dir)
+		if _metro_near.covers(t) and not (ground != null and ground.body == "earth" and ground.covers(t)):
+			return _metro_near
 	if ground != null and ground.body == body:
 		return ground
 	if body == "moon":
@@ -302,6 +313,14 @@ func _info(id: String) -> Dictionary:
 func _spin_hours(id: String) -> float:
 	var b: Dictionary = Astro.bodies[id]
 	var rot := float(b.get("rot_h", 0.0))
+	if id == "earth" and rot != 0.0 and not (ground is SiteSurface and ground.body == "earth"):
+		# 지구에 고른 도시가 없으면: 가까이 갈수록 실제 항성시 (대도시의 낮밤이 게임 시각의 그 도시 시각과 맞는다)
+		var alt_e := Astro.len3(Astro.sub3(cam.pos, Astro.position("earth", jd))) - float(b["radius_km"])
+		var ke := 1.0 - smoothstep(4.0 * float(b["radius_km"]), 12.0 * float(b["radius_km"]), alt_e)
+		var g_vis0 := deg_to_rad(280.46061837 + 360.98564736629 * vis_hours / 24.0)
+		var g_real := deg_to_rad(280.46061837 + 360.98564736629 * (jd - Astro.J2000))
+		var g0 := g_vis0 + wrapf(g_real - g_vis0, -PI, PI) * ke
+		return (rad_to_deg(g0) - 280.46061837) / 360.98564736629 * 24.0
 	if rot == 0.0 or sim == null or ground == null or ground.body != id or not (ground is SiteSurface):
 		return vis_hours
 	var il: Dictionary = sim.C["illumination"]
@@ -366,6 +385,8 @@ func _chain(id: String) -> Array:
 func _terrain_km(id: String, dir_b: Vector3) -> float:
 	if ground != null and ground.body == id and ground.covers(dir_b):
 		return ground.height_km(dir_b)
+	if id == "earth" and _metro_near != null and _metro_near.covers(dir_b):
+		return _metro_near.height_km(dir_b)
 	if id == "moon" and moon:
 		return moon.height_km(dir_b)
 	return 0.0
@@ -457,6 +478,7 @@ static func g_basis(b: Basis) -> Basis:
 
 
 func _place_all() -> void:
+	_update_metros()
 	# 가장 가까운 천체 표면까지의 거리로 근거리 범위·단위를 정한다
 	var near_id := cam.focus
 	var near_gap := INF
@@ -521,6 +543,10 @@ func _place_all() -> void:
 	for k in grounds:
 		var gk: SiteGround = grounds[k]
 		gk.update_frame(self, _info(gk.body), sun_c)
+	for k in metro_grounds:
+		var me: Dictionary = metro_grounds[k]
+		(me["ground"] as SiteSurface).update_frame(self, _info("earth"), sun_c)
+		(me["city"] as MetroCity).update(self)
 
 
 static func g_basis_cam(b: Basis) -> Basis:
@@ -571,6 +597,8 @@ func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 	# (가까이서는 올린 해, 그 땅의 밤이면 어둡게, 주변광·반사광까지). 고르지 않은 천체의 구는 기본값으로
 	var now := {}
 	var sg := ground as SiteSurface
+	if g is SiteSurface and (g as SiteSurface).standalone:
+		sg = g as SiteSurface              # 대도시 위: 지구 구도 그 땅 조각과 같은 빛
 	if sg != null and sg.sphere_mat != null:
 		# 지형 조각이 보이는 고도(2500 km 아래)에서는 구도 조각과 같은 햇빛 세기·색
 		var near_k := 1.0 - smoothstep(1800.0, 2600.0, sg.cam_alt_km()) if sg.body == near_id else 0.0
@@ -596,6 +624,59 @@ func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 			_reset_sphere(m)
 	_sphere_touched = now
 	_place_air(g, energy)
+
+
+## 지구의 대도시: 카메라가 내려다보는 곳(고도 1500 km 아래)에서 가까운 대도시의 땅(지형 조각)과 시가지를 만든다.
+## 둘까지 두고 (오래 안 본 것부터 치운다), 지형 조각은 내려다보는 대도시 하나만 그린다
+func _update_metros() -> void:
+	var near_key := ""
+	if cam.mode == "body" and cam.focus == "earth" and _bodies.has("earth"):
+		var alt := Astro.len3(Astro.sub3(cam.pos, _info("earth")["center"])) - 6371.0
+		if alt < 1500.0:
+			var m := Metros.nearest(Astro.vec(cam.t_dir), 250.0)
+			if not m.is_empty():
+				near_key = String(m["key"])
+				if not metro_grounds.has(near_key):
+					_make_metro(m)
+	_metro_near = null
+	for k in metro_grounds:
+		var me: Dictionary = metro_grounds[k]
+		var g: SiteSurface = me["ground"]
+		g.shown = k == near_key
+		if g.shown:
+			me["used"] = _clock
+			_metro_near = g
+	if _metro_near == null and _bodies.has("earth"):
+		var em: ShaderMaterial = _bodies["earth"]["mat"]
+		em.set_shader_parameter("hole2_chord", 0.0)
+
+
+func _make_metro(m: Dictionary) -> void:
+	var node: MeshInstance3D = _bodies["earth"]["node"]
+	if not _fine_sphere.has("earth"):
+		node.mesh = SkyBuilder.sphere(256, 128)
+		_fine_sphere["earth"] = true
+	var g := SiteSurface.new()
+	g.standalone = true
+	_space.add_child(g)
+	var site := {"id": String(m["key"]), "name": String(m["name"]), "lat": float(m["lat"]), "lon": float(m["lon"]),
+		"layout": "open", "map_half_km": float(m["radius_km"]) + 10.0, "parks_map": true}
+	g.setup("earth", site, node, 6371.0, body_baker, moon)
+	var mc := MetroCity.new()
+	g.city_root.add_child(mc)
+	mc.setup(m, g, quality_hi)
+	metro_grounds[String(m["key"])] = {"ground": g, "city": mc, "used": _clock}
+	while metro_grounds.size() > 2:
+		var oldest := ""
+		var t := INF
+		for k in metro_grounds:
+			if float(metro_grounds[k]["used"]) < t and k != String(m["key"]):
+				t = float(metro_grounds[k]["used"])
+				oldest = k
+		if oldest == "":
+			break
+		(metro_grounds[oldest]["ground"] as SiteSurface).dispose()
+		metro_grounds.erase(oldest)
 
 
 ## 고른 도시가 떠난 천체의 구: 땅 둘레 값을 지운다
@@ -728,12 +809,23 @@ func _begin_descent(g: SiteGround) -> void:
 	_descent = {"t": 0.0, "d0": d0, "d1": 0.52, "tilt": deg_to_rad(60.0), "body": g.body}
 
 
+## 천체의 한 점 위로 내려간다 (대도시): 고도 d1 km, 기울기 tilt
+func _begin_descent_at(body: String, dir: Vector3, d1: float, tilt: float) -> void:
+	var d0 := maxf(cam.dist, d1)
+	var north := Vector3(0, 0, 1) - dir * dir.z
+	cam.look_at_surface(body, dir, d0, 0.0, north if north.length_squared() > 1e-8 else Vector3(1, 0, 0))
+	_descent = {"t": 0.0, "d0": d0, "d1": d1, "tilt": tilt, "body": body}
+
+
 func _step_descent(delta: float) -> void:
 	if _descent.is_empty():
 		return
 	if _descent.get("wait", false):
-		if not cam.flying() and ground != null:
-			_begin_descent(ground)
+		if not cam.flying():
+			if _descent.has("dir"):
+				_begin_descent_at(String(_descent["body"]), _descent["dir"], float(_descent["d1"]), float(_descent["tilt"]))
+			elif ground != null:
+				_begin_descent(ground)
 		return
 	_descent["t"] += delta / 2.2
 	var t: float = clampf(_descent["t"], 0.0, 1.0)
@@ -742,6 +834,45 @@ func _step_descent(delta: float) -> void:
 	cam.tilt = float(_descent["tilt"]) * e * e
 	if t >= 1.0:
 		_descent.clear()
+
+
+## 지구의 대도시 위로 날아가 시가지를 비스듬히 내려다본다
+func fly_to_metro(key: String) -> void:
+	var m := Metros.of(key)
+	if m.is_empty():
+		return
+	var dir: Vector3 = m["dir"]
+	var r := 6371.0
+	_descent = {"wait": true, "body": "earth", "dir": dir, "d1": maxf(14.0, float(m.get("radius_km", 20.0)) * 0.9),
+		"tilt": deg_to_rad(58.0)}
+	if cam.focus == "earth" and cam.mode == "body" and not cam.flying() and cam.dist < r * 0.5:
+		_begin_descent_at("earth", dir, float(_descent["d1"]), float(_descent["tilt"]))
+		return
+	cam.fly_to("earth", r * 2.4, 2.4, dir)
+
+
+## 교통 탭의 '보기': 노선 전체가 보이게 날아가고 잠깐 밝게 그린다
+func show_route(id: String) -> void:
+	if mgr == null:
+		return
+	var l := mgr.transport.line_by_id(id)
+	if l.is_empty():
+		return
+	routes.highlight(id)
+	_descent.clear()
+	match String(l["kind"]):
+		"ferry":
+			show_earth_moon()
+		"ship":
+			cam.fly_to("sun", 4.2e8 if String(l["b"]).begins_with("mercury") or String(l["a"]).begins_with("mercury") else 9.0e8)
+		_:
+			var body := String(l["body"])
+			var r := float(Astro.bodies[body]["radius_km"])
+			var a := Transport.node_dir(l["a"])
+			var b := Transport.node_dir(l["b"])
+			var mid := (a + b).normalized() if (a + b).length() > 1e-6 else a
+			var span := acos(clampf(a.dot(b), -1.0, 1.0)) * r
+			cam.fly_to(body, clampf(span * 1.5 + r * 0.15, r * 0.25, r * 3.2), 2.2, mid)
 
 
 func show_moon() -> void:
@@ -977,6 +1108,8 @@ func _click(p: Vector2, touch: bool = false, keep: bool = false) -> void:
 				colony_picked.emit(int(String(item[1]).substr(7)))
 			elif String(item[1]).begins_with("site:"):
 				site_picked.emit(String(item[1]).substr(5))
+			elif String(item[1]).begins_with("metro:"):
+				fly_to_metro(String(item[1]).substr(6))
 			else:
 				_fly_to_label(item[1])
 			return
@@ -1030,11 +1163,13 @@ func _draw_overlay() -> void:
 	_labels.clear()
 	var font := ThemeFactory.regular if ThemeFactory.regular else get_theme_default_font()
 	_draw_orbits()
+	routes.draw_lines()
 	var placed: Array = []
 	# 태양계 천체
 	# 식민지: 행성 단위에서는 점과 이름만 (자세한 도시는 고른 식민지에 내려앉을 때)
 	for i in colonies.size():
 		_label_colony(i, font, placed)
+	routes.draw_metros(font, placed)
 	var order := ["sun", "earth", "moon", "mars", "venus", "mercury", "jupiter", "saturn", "uranus", "neptune",
 		"pluto", "ceres", "io", "europa", "ganymede", "callisto", "titan", "triton", "phobos", "deimos", "charon"]
 	for id in order:

@@ -20,6 +20,20 @@ const DISTRICTS := {
 	"ice": {"uv": Vector2(-140, -152), "row_w": 46.0, "types": [["ice_miner", 3]]},
 	"pad": {"uv": Vector2(142, 208), "row_w": 76.0, "types": [["landing_pad", 2]]},
 }
+## 구역의 이름과 색 (3D 기지의 구역 판·테두리·이름표)
+const DISTRICT_INFO := {
+	"core": ["거주 구역", Color("7aa7f0")],
+	"civic": ["시민 광장·연구 단지", Color("c86bfa")],
+	"domes": ["돔·대피소", Color("f4a6c6")],
+	"life": ["생명유지 단지", Color("3fb8af")],
+	"power": ["축전·방열 단지", Color("f2c14e")],
+	"farm": ["농업 구역", Color("8fcf6e")],
+	"industry": ["산업 단지", Color("c9a77f")],
+	"reactor": ["원자로 구역", Color("e9875a")],
+	"ice": ["얼음 채굴장", Color("4cc9f0")],
+	"pad": ["우주항", Color("aab3c8")],
+}
+const PLAZA_R := 13.0            # 거주 구역 한가운데 광장 (큰길이 만나는 곳)
 const GAP := 3.0
 const BOUNDS_UV := Rect2(-235, -262, 470, 530)      # 지도 끝 (u, v)
 const CREST_V := -214.0                               # 능선 마루 (그 위는 하늘)
@@ -35,6 +49,8 @@ const ZONES := {
 var slots := {}            # 종류 → Array[Vector3] (자리 중심, 채우는 순서)
 var district_of := {}      # 종류 → 구역 이름
 var rects := {}            # 구역 → Rect2 (월드 x·y)
+var lots := {}             # 구역 → Array[Rect2] 필지 (자리마다 칸 — 빈 필지도 구획으로 보인다)
+var lanes := {}            # 구역 → Array[[Vector2, Vector2]] 줄 사이 보행로
 var gates := {}            # 구역 → Vector3 (길이 닿는 구역 가장자리)
 var hub := Vector3.ZERO
 var roads: Array = []      # Array[PackedVector3Array] — 처음 길 (CityPlan이 길 그물로 바꾼다)
@@ -103,6 +119,8 @@ func _pack(name: String, d: Dictionary) -> void:
 	var center := uv_to_xy(d["uv"])
 	var origin := center - Vector2(row_w, y) * 0.5
 	rects[name] = Rect2(origin, Vector2(row_w, y))
+	lots[name] = []
+	lanes[name] = []
 	for item in local:
 		var kind: String = item[0]
 		var p: Vector2 = origin + item[1]
@@ -110,6 +128,15 @@ func _pack(name: String, d: Dictionary) -> void:
 			slots[kind] = []
 		slots[kind].append(Vector3(p.x, p.y, 0))
 		district_of[kind] = name
+		var cell := _cell(d, kind)
+		lots[name].append(Rect2(p - cell * 0.5 + Vector2(0.5, 0.5), cell - Vector2(1.0, 1.0)))
+	# 줄 사이 보행로: 줄이 바뀌는 곳마다 구역을 가로지른다
+	var ys := {}
+	for r in lots[name]:
+		ys[snappedf((r as Rect2).position.y - 0.5, 0.01)] = true
+	for yy in ys:
+		if yy > origin.y + 0.5:
+			lanes[name].append([Vector2(origin.x, yy), Vector2(origin.x + row_w, yy)])
 
 
 func _towers() -> void:

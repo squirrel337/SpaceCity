@@ -11,8 +11,9 @@ extends RefCounted
 ##   이 맞는 날을 가운데로 앞뒤 며칠(회합 주기의 4%, 6~21일)이 열린다.
 ## 비용은 떠나는 도시가 낸다. 새 도시는 시드가 자동 운영으로 세우고, 그 도시를 골라 '자동 운영'을 끄면 넘겨받는다.
 ## 기술은 하루에 한 번 모든 도시가 나눠 갖는다 (지식은 전파로 건너간다).
+## 도시 사이 교통(Transport)이 같은 시계로 화물과 정착민을 실어 나른다 — 도시가 생기거나 없어지면 노선을 다시 짠다.
 
-const SAVE_VERSION := 2
+const SAVE_VERSION := 3
 const ORIGIN := "earth"            # 행성 사이 원정이 떠나는 행성 (고향 달 기지는 지구 곁)
 ## 개척 탭과 도시 고르기에서 천체를 늘어놓는 순서
 const BODY_ORDER := ["moon", "earth", "mars", "mercury", "ceres", "callisto", "titan"]
@@ -23,6 +24,7 @@ var hour := 0                      # 게임 시작부터 흐른 시간 (= 고향
 var start_unix := 0                # 게임을 시작한 시각
 var seed_value := 2061
 var _windows := {}                 # 부지 → {best, start, end} (게임 일) — 창이 지나면 다시 셈한다
+var transport := Transport.new()   # 도시 사이 교통
 
 
 ## 새 게임: 고향 도시와 천체마다의 기본 도시로 시작한다
@@ -34,6 +36,8 @@ func start(sim: CitySim, plan: CityPlan) -> void:
 	seed_value = sim.seed_value
 	_windows.clear()
 	found_defaults()
+	transport.reset()
+	transport.rebuild(self)
 
 
 ## 아직 없는 기본 도시를 지금 시각에 세운다 (새 게임, 기본 도시가 없던 옛 저장)
@@ -129,7 +133,8 @@ func date_text(game_hour: float) -> String:
 
 
 # ── 시간 ────────────────────────────────────────────────────────
-## 한 시간: 모든 도시가 함께 흐른다. 도착한 원정대는 새 도시가 된다 — 그 번호들을 돌려준다
+## 한 시간: 모든 도시가 함께 흐른다. 도착한 원정대는 새 도시가 된다 — 그 번호들을 돌려준다.
+## 교통은 도시가 흐른 뒤에 떠나고 닿는다
 func step() -> Array:
 	hour += 1
 	for c in list:
@@ -139,6 +144,9 @@ func step() -> Array:
 		if hour >= int(e["arrive"]):
 			expeditions.erase(e)
 			arrived.append(_found(e))
+	if not arrived.is_empty():
+		transport.rebuild(self)
+	transport.step(self)
 	if hour % 24 == 0:
 		share_techs()
 	return arrived
@@ -167,6 +175,7 @@ func _found(e: Dictionary) -> int:
 func remove(index: int) -> Dictionary:
 	var c: Dictionary = list[index]
 	list.remove_at(index)
+	transport.rebuild(self)
 	return c
 
 
@@ -414,10 +423,11 @@ func to_save() -> Dictionary:
 		cols.append({"name": c["name"], "site": c["site"], "founded": c["founded"],
 			"sim": (c["sim"] as CitySim).to_save(), "plan": (c["plan"] as CityPlan).to_save()})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
-		"colonies": cols, "expeditions": expeditions, "defaults": 1}
+		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save()}
 
 
-## 저장을 읽는다 (판 1 = 도시 하나뿐이던 저장). 기본 도시가 없던 저장이면 지금 시각에 세운다. 실패하면 false
+## 저장을 읽는다 (판 1 = 도시 하나뿐이던 저장, 판 2 = 교통이 없던 저장). 기본 도시가 없던 저장이면 지금 시각에 세운다.
+## 실패하면 false
 func load_save(data: Dictionary) -> bool:
 	var v := int(data.get("version", 0))
 	if v == 1:
@@ -430,8 +440,9 @@ func load_save(data: Dictionary) -> bool:
 		seed_value = s.seed_value
 		_windows.clear()
 		found_defaults()
+		transport.load_save({}, self)
 		return true
-	if v != SAVE_VERSION or not data.get("colonies") is Array or (data["colonies"] as Array).is_empty():
+	if (v != SAVE_VERSION and v != 2) or not data.get("colonies") is Array or (data["colonies"] as Array).is_empty():
 		return false
 	list = []
 	for cd in data["colonies"]:
@@ -452,6 +463,7 @@ func load_save(data: Dictionary) -> bool:
 	_windows.clear()
 	if not data.has("defaults"):
 		found_defaults()
+	transport.load_save(data.get("transport", {}) if data.get("transport") is Dictionary else {}, self)
 	return true
 
 

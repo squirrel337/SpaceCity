@@ -1,8 +1,9 @@
-"""탈것 14종.
+"""탈것 16종.
 
 모형은 앞이 +x를 보도록 적는다. 지상 탈것은 네 방향(se·sw·nw·ne)으로 돌려 그린다.
 달에는 공기가 없어 날개·로터가 쓸모없다 — 달의 '헬리콥터'는 로켓 호퍼다.
 비행기·헬리콥터·비행선은 대기가 있는 화성·타이탄·금성용이다 (시대 1 이후).
+지구의 하늘에는 여객기가 다니고, 지구-달 셔틀이 지구 착륙장과 달 기지를 오간다.
 """
 from __future__ import annotations
 
@@ -339,6 +340,74 @@ def cargo_lander(sp: Sprite):
     sp.parts(items)
 
 
+@vehicle("space_shuttle", 10.6, 10.6, 12.0, "지구-달 셔틀", "지구-달", "space")
+def space_shuttle(sp: Sprite):
+    """지구 착륙장과 달 기지를 오가며 사람과 짐을 나르는 재사용 셔틀.
+    바닥의 열 차폐로 지구 대기에 들어와 엔진을 켜고 내려앉는다. 다리 넷으로 선다."""
+    sp.contact_shadow(0, 0, 5.2, 5.2, 0.45)
+    rb, zb, rt, zt = 3.8, 4.2, 2.1, 9.6      # 객실 원뿔: 밑(반지름·높이)·위
+
+    def rad(z):
+        """몸통 반지름 (원뿔 밑은 원기둥)."""
+        return rb + (rt - rb) * (z - zb) / (zt - zb) if z > zb else rb
+
+    def at(z, a, lift=0.03):
+        """몸통 겉면의 점 (a: 도)."""
+        r = rad(z) + lift
+        return (r * math.cos(math.radians(a)), r * math.sin(math.radians(a)), z)
+
+    items = []
+    for k in range(4):
+        a = math.radians(45 + k * 90)
+        d = (math.cos(a), math.sin(a), 0.0)
+        top = (3.55 * d[0], 3.55 * d[1], 2.7)
+        ft = (4.8 * d[0], 4.8 * d[1], 0.12)
+
+        def leg(top=top, ft=ft, d=d):
+            sp.line(top, ft, 0.28, "#9aa1aa")
+            sp.line((3.4 * d[0], 3.4 * d[1], 1.2), ft, 0.16, "#9aa1aa")
+            foot(sp, ft, 0.5)
+        items.append(((ft[0] * 0.8, ft[1] * 0.8, 1.5), leg))
+
+    def engines():
+        for k in range(4):
+            a = math.radians(45 + k * 90)
+            c = (1.5 * math.cos(a), 1.5 * math.sin(a))
+            sp.frustum((c[0], c[1], 1.0), (c[0], c[1], 0.45), 0.32, 0.55, DARK, cap_mat=CHAR)
+
+    def hull_():
+        sp.frustum((0, 0, 1.0), (0, 0, 1.6), 3.2, rb, CHAR, cap_mat=CHAR)      # 열 차폐
+        sp.cyl((0, 0, 1.6), (0, 0, zb), rb, WHITE, caps=False, bands=[0.12], band_color="#b3ad9f")
+        sp.frustum((0, 0, zb), (0, 0, zt), rb, rt, WHITE, bands=[0.36, 0.66], band_color="#b3ad9f")
+        sp.frustum((0, 0, zb + 0.15), (0, 0, zb + 0.55), rad(zb + 0.15) + 0.02, rad(zb + 0.55) + 0.02, TEAL,
+                   caps=False)
+        sp.frustum((0, 0, zt), (0, 0, 10.7), rt, 1.15, WHITE, cap_mat=STEEL)
+        sp.cyl((0, 0, zt - 0.08), (0, 0, zt + 0.08), rt + 0.05, STEEL, caps=False)  # 이음 고리
+        sp.cyl((0, 0, 10.7), (0, 0, 11.6), 0.8, STEEL, cap_mat=DARK)           # 도킹 포트
+        # 창 (꼭대기 가까이 한 바퀴)
+        for k in range(12):
+            a = 45 + 30 * k
+            sp.window([at(8.0, a - 6.5), at(8.0, a + 6.5), at(8.6, a + 6.5), at(8.6, a - 6.5)])
+        sp.glow((0, 0, 8.3), 44, WARM_WINDOW, 0.25)
+        # 짐칸 문 (+y쪽)
+        door = ([at(1.85, a) for a in range(68, 113, 11)] + [at(4.0, a) for a in range(112, 67, -11)])
+        sp.polyline3(door, "#7d848d", 0.07, closed=True)
+        sp.line(at(1.85, 90), at(4.0, 90), 0.05, "#7d848d")
+        for a in (76, 104):
+            sp.lamp(at(4.12, a, 0.1), WARM_WINDOW, 7)
+        # 자세 제어 분사기 (RCS)
+        for k in range(4):
+            a = k * 90
+            c = at(9.2, a, 0.1)
+            sp.box(c[0] - 0.15, c[1] - 0.15, 9.05, 0.3, 0.3, 0.34, STEEL, top=DARK)
+        sp.lamp(at(9.5, 90, 0.25), "#ff4a3a", 5)
+        sp.lamp(at(9.5, 0, 0.25), "#7CF29A", 5)
+        sp.lamp((0, 0, 11.78), "#ff5a3c", 6)
+
+    items += [((0, 0, 0.7), engines), ((0, 0, 6.0), hull_)]
+    sp.parts(items)
+
+
 @vehicle("orbital_tug", 16.0, 26.0, 4.0, "궤도 예인선", "지구-달 궤도", "space", flying=True)
 def orbital_tug(sp: Sprite):
     items = []
@@ -563,6 +632,135 @@ def venus_airship(sp: Sprite):
 
     items += [((-13.0, 0, 6.0), fins), ((0, 0, 6.0), envelope), ((0, 0, 1.0), gondola)]
     sp.parts(items)
+
+
+# ── 지구의 하늘 ──────────────────────────────────────────────────────
+
+PAINT = Mat("#F3F2EE", 0.3)              # 여객기 흰 도장
+WING = Mat("#C9CED4", 0.3)               # 날개 회색 도장
+WING_UNDER = Mat("#AEB4BB", 0.2)
+LIVERY = BLUE                            # 꼬리 날개·윙렛
+COCKPIT = Mat("#1C2A38", 0.25)           # 조종석 유리 (눈부심이 적다)
+
+
+def toward(pts, want):
+    """법선이 want 쪽을 보도록 꼭짓점 순서를 맞춘다."""
+    n = cross(sub(pts[1], pts[0]), sub(pts[2], pts[0]))
+    return list(pts) if dot(n, want) > 0 else list(reversed(pts))
+
+
+def lerp3(a, b, t):
+    return add(a, mul(sub(b, a), t))
+
+
+def slab(sp: Sprite, le0, te0, le1, te1, t0: float, t1: float, up, mat: Mat, under: Mat | None = None):
+    """두께 있는 날개: 뿌리(le0·te0)와 끝(le1·te1)의 앞·뒷전 (가운데 면), 두께 t0·t1, up = 두께 방향.
+    뿌리 면은 동체 속이라 적지 않는다. 윗면·아랫면 꼭짓점(뿌리 앞전·뿌리 뒷전·끝 뒷전·끝 앞전)을 돌려준다."""
+    h0, h1 = mul(up, t0 / 2), mul(up, t1 / 2)
+    a0, b0, a1, b1 = add(le0, h0), add(te0, h0), add(le1, h1), add(te1, h1)
+    c0, d0, c1, d1 = sub(le0, h0), sub(te0, h0), sub(le1, h1), sub(te1, h1)
+    fwd = sub(le0, te0)
+    sp.face(toward([c0, d0, d1, c1], mul(up, -1)), under or mat)
+    sp.face(toward([b0, b1, d1, d0], mul(fwd, -1)), mat)
+    sp.face(toward([a1, b1, d1, c1], sub(add(le1, te1), add(le0, te0))), mat)
+    sp.face(toward([a0, a1, c1, c0], fwd), mat)
+    sp.face(toward([a0, b0, b1, a1], up), mat)
+    return (a0, b0, b1, a1), (c0, d0, d1, c1)
+
+
+@vehicle("airliner", 40.0, 36.0, 12.0, "여객기", "지구", "air", flying=True)
+def airliner(sp: Sprite):
+    """쌍발 제트 여객기 (A320·737 크기). 바퀴를 내린 모습 — 바퀴 밑이 z=0이라 활주로에 그대로 닿는다."""
+    R, zc = 2.0, 3.9                         # 동체 반지름·중심 높이
+    xn, rx = 16.2, 3.8                       # 기수 타원체 (끝이 x=20)
+    x0 = -11.5                               # 원통 동체 뒤끝
+    tail = (-20.0, 0.0, zc + 1.65)           # 꼬리 원뿔 끝 (보조 동력 장치 배기구)
+
+    def surf(x, t, lift=0.03):
+        """원통 동체 겉면의 점. t: cyl_patch의 각도 (+y쪽은 180°+올려본 각, -y쪽은 -올려본 각)."""
+        r = R + lift
+        return (x, -r * math.cos(math.radians(t)), zc - r * math.sin(math.radians(t)))
+
+    def nose(x, a, lift=0.06):
+        """기수 겉면의 점. a: +y에서 위로 잰 각."""
+        k = math.sqrt(max(0.0, 1.0 - ((x - xn) / rx) ** 2))
+        p = (x, R * k * math.cos(math.radians(a)), zc + R * k * math.sin(math.radians(a)))
+        return add(p, mul(norm(((p[0] - xn) / rx ** 2, p[1] / R ** 2, (p[2] - zc) / R ** 2)), lift))
+
+    def gear(x, y, top, r, w):
+        sp.line((x, y, top), (x, y, r), 0.24 if r > 0.5 else 0.16, "#9aa1aa")
+        sp.cyl((x, y - w, r), (x, y + w, r), r, TIRE, cap_mat=HUB, bands=[0.5], band_color="#24272c")
+
+    def engine(side):
+        y, z, r = side * 5.75, 1.6, 1.08
+        sp.frustum((-1.5, y, z), (-2.5, y, z), 0.55, 0.12, STEEL)                    # 배기 원뿔
+        sp.frustum((-1.5, y, z), (3.4, y, z), 0.82, r, PAINT, cap_mat=DARK)          # 나셀 (앞 뚜껑이 팬)
+        sp.ring3((3.4, y, z), r - 0.04, "#c9ced4", 0.16, normal=(1, 0, 0), front_only=False)
+        sp.frustum((3.4, y, z), (3.65, y, z), 0.3, 0.03, SILVER)                      # 스피너
+        sp.face(toward([(-1.0, y, 2.35), (2.7, y, 2.35), (0.9, y, 3.05), (-1.0, y, 3.05)], (0, side, 0)),
+                WING, two_sided=True, back=WING)                                      # 파일런
+
+    def wing(side):
+        def f():
+            le1, te1 = (-5.2, side * 17.55, 4.0), (-6.8, side * 17.55, 4.0)
+            near = [lambda: engine(side), lambda: gear(-1.0, side * 3.8, 2.6, 0.58, 0.5)]
+            for fn in (near if side < 0 else near[::-1]):        # 카메라에서 먼 것부터
+                fn()
+            slab(sp, (3.2, side * 1.3, 2.6), (-4.4, side * 1.3, 2.6), le1, te1, 0.7, 0.2, (0, 0, 1), WING,
+                 WING_UNDER)
+            a, b = add(le1, (-0.15, 0, 0.1)), add(te1, (0.05, 0, 0.1))           # 윙렛
+            sp.face(toward([a, b, add(b, (-0.5, side * 0.45, 1.9)), add(a, (-1.3, side * 0.45, 1.9))], (0, side, 0)),
+                    LIVERY, two_sided=True, back=LIVERY)
+            sp.lamp(add(le1, (0.1, side * 0.15, 0.0)), "#ff4a3a" if side > 0 else "#7CF29A", 8)
+        return f
+
+    def hstab(side):
+        sp.face(toward([(-14.4, side * 0.3, 5.0), (-18.4, side * 0.3, 5.0), (-19.5, side * 6.3, 5.6),
+                        (-17.8, side * 6.3, 5.6)], (0, 0, 1)), WING, two_sided=True, back=WING_UNDER)
+
+    def cabin(side):
+        """창 줄 (긴 유리 하나를 흰 칸막이로 나눈다)과 앞뒤 문."""
+        a0, a1 = (186.0, 197.0) if side > 0 else (-17.0, -6.0)
+        L = xn - x0
+        pts = Sprite.cyl_patch((x0, 0, zc), (xn, 0, zc), R, (-9.2 - x0) / L, (13.8 - x0) / L, a0, a1, 0.03)
+        sp.window(pts)
+        sp.panel_grid(pts[0], sub(pts[3], pts[0]), sub(pts[1], pts[0]), 30, 1, "#f3f2ee", 2.8, 1.0)
+        d0, d1 = (160.0, 215.0) if side > 0 else (-35.0, 20.0)
+        ts = [d0 + (d1 - d0) * i / 4 for i in range(5)]
+        for xa in (14.3, -10.4):
+            sp.polyline3([surf(xa, t) for t in ts] + [surf(xa + 0.85, t) for t in reversed(ts)], "#a3a9b1",
+                         0.06, closed=True)
+
+    def body():
+        hstab(-1)
+        gear(15.0, 0.0, zc - 1.0, 0.38, 0.32)                                # 앞바퀴
+        sp.lamp((-0.6, 0.0, zc - R - 0.42), "#ff5a3c", 6)                    # 배 쪽 충돌 방지등
+        sp.ellipsoid((-0.6, 0.0, zc - 1.6), 6.6, 1.8, 0.8, PAINT)            # 날개 뿌리 덮개
+        sp.frustum((x0 + 0.5, 0, zc), tail, R, 0.35, PAINT, caps=False)       # 기운 원뿔: 동체 속에서 시작
+        sp.disc(tail, norm(sub(tail, (x0 + 0.5, 0, zc))), 0.35, DARK, two_sided=False)
+        cabin(-1)                                  # 먼 쪽: 선은 가려지지 않으니 동체보다 먼저
+        sp.ellipsoid((xn, 0, zc), rx, R, R, PAINT)
+        sp.cyl((x0, 0, zc), (xn, 0, zc), R, PAINT, caps=False)
+        cabin(1)
+        for s in (1, -1):                          # 조종석 창: 앞 두 장, 옆 두 장씩
+            for xa, xb, a0, a1 in ((18.85, 18.05, 60, 88), (18.45, 17.7, 31, 56), (17.55, 16.95, 33, 52)):
+                if s < 0:
+                    a0, a1 = 180 - a1, 180 - a0
+                pts = [nose(xa, a0), nose(xa, a1), nose(xb, a1), nose(xb, a0)]
+                c = mul(add(pts[0], pts[2]), 0.5)
+                sp.window(toward(pts, sub(c, (xn, 0, zc))), glass=COCKPIT, light_alpha=0.7)
+        top, bot = slab(sp, (-12.6, 0, 5.75), (-19.3, 0, 5.75), (-17.0, 0, 12.0), (-19.9, 0, 12.0), 0.55, 0.2,
+                        (0, 1, 0), PAINT)
+        for c, s in ((top, 1), (bot, -1)):         # 꼬리 날개 도장
+            def P(u, v, c=c):
+                return lerp3(lerp3(c[0], c[1], u), lerp3(c[3], c[2], u), v)
+            sp.face(toward([P(0, 0.4), P(1, 0.04), P(1, 1), P(0, 1)], (0, s, 0)), LIVERY)
+        hstab(1)
+        sp.lamp((-1.0, 0.0, zc + R + 0.08), "#ff5a3c", 6)                    # 위 충돌 방지등
+        sp.lamp(add(tail, (-0.1, 0, 0)), "#ffffff", 6)                       # 꼬리등
+        sp.lamp((15.25, 0.0, 1.25), WARM_WINDOW, 9)                          # 착륙등
+
+    sp.parts([((-1.0, -9.0, 2.5), wing(-1)), ((0.0, 0.0, zc), body), ((-1.0, 9.0, 2.5), wing(1))])
 
 
 # ── 사람 (크기 기준) ─────────────────────────────────────────────────

@@ -53,6 +53,9 @@ var _baking := false
 var _cap_tex: ImageTexture
 var _cap_rad := 0.1
 var _cube_set: Cubemap
+var standalone := false           # 대도시의 땅: 고른 도시가 아니어도 가까이 가면 지형 조각을 그린다 (구의 두 번째 구멍)
+var night_k := 0.0                # 그 자리의 밤 (해의 고도로, 0~1) — 시가지 불빛
+var shown := true                 # 대도시의 땅: 카메라가 내려다보는 대도시만 (구의 두 번째 구멍은 하나다)
 
 
 func setup(p_body: String, p_site: Dictionary, sphere_node: MeshInstance3D, p_radius_km: float,
@@ -131,6 +134,9 @@ func setup(p_body: String, p_site: Dictionary, sphere_node: MeshInstance3D, p_ra
 			if bd == body:
 				_use_cube())
 	terrain_ready.emit.call_deferred()
+	if standalone:
+		raise_sun = false
+		_start_bake.call_deferred()
 
 
 func radius_km() -> float:
@@ -178,7 +184,8 @@ func _earth_uniforms(mat: ShaderMaterial, with_local := true) -> void:
 		mat.set_shader_parameter("cl_c", c)
 		mat.set_shader_parameter("cl_e", n.cross(c))
 		mat.set_shader_parameter("cl_n", n)
-		mat.set_shader_parameter("cl_half", 128.0)
+		mat.set_shader_parameter("cl_half", float(site_data.get("map_half_km", 128.0)))
+	mat.set_shader_parameter("cl_parks", loc != null and bool(site_data.get("parks_map", false)))
 
 
 # ── 높이 ────────────────────────────────────────────────────────
@@ -424,6 +431,13 @@ func _active_changed() -> void:
 		_release()
 
 
+## 대도시의 땅을 치울 때: 구의 두 번째 구멍을 닫는다
+func dispose() -> void:
+	if standalone and sphere_mat != null:
+		sphere_mat.set_shader_parameter("hole2_chord", 0.0)
+	queue_free()
+
+
 ## 고른 도시를 그만두면: 구의 구멍과 고운 지역 지도를 내려놓는다 (높이 격자는 둔다 — 작다)
 func _release() -> void:
 	if sphere_mat != null:
@@ -597,11 +611,21 @@ func update_frame(view: WorldView, info: Dictionary, _sun_c: PackedFloat64Array)
 	var t := _site_transform(view, info)
 	city_root.global_transform = t
 	patch.global_transform = t
-	# 자세한 지형 조각은 고른 도시의 것만 (다른 도시는 행성 단위의 점뿐), 구운 뒤에만
-	var near := active and _cam_alt_km < 2500.0 and _near_site(view, info)
+	# 자세한 지형 조각은 고른 도시의 것만 (다른 도시는 행성 단위의 점뿐) — 대도시는 가까이 가면. 구운 뒤에만
+	var near := (active or (standalone and shown)) and _cam_alt_km < 2500.0 and _near_site(view, info)
 	var show_patch := near and _baked
 	patch.visible = show_patch
 	city_root.visible = near and _cam_alt_km < 400.0
+	if body == "earth":
+		var to_sun := Astro.vec(Astro.norm3(Astro.sub3(view._info("sun")["center"], info["center"])))
+		var sin_el := ((info["frame"] as Basis).inverse() * to_sun).dot(_site)
+		night_k = 1.0 - smoothstep(-0.1, 0.04, sin_el)
+		patch_mat.set_shader_parameter("night_glow", night_k)
+	if standalone:
+		if sphere_mat and shown:
+			sphere_mat.set_shader_parameter("hole2_dir", _site)
+			sphere_mat.set_shader_parameter("hole2_chord", (PATCH_M - 600.0) / (_r_km * 1000.0) if show_patch else 0.0)
+		return
 	if active:
 		_use_cube()
 	if sphere_mat and active:

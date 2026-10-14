@@ -1,6 +1,7 @@
 class_name City3D
 extends Node3D
-## 3D 기지: 건물(자리마다 다섯 가지 모양), 공사 현장(비계), 길, 탈것, 밤의 불빛, 자리 고르기의 유령 건물.
+## 3D 기지: 건물(자리마다 다섯 가지 모양), 공사 현장(비계), 길, 탈것, 밤의 불빛, 자리 고르기의 유령 건물,
+## 구역 판(다진 바닥·테두리·필지 금·보행로·광장)과 구역 이름표, 다른 도시로 가는 고속도로와 활주로(지구·화성).
 ## 좌표는 부모(땅 SiteGround.city_root)의 모형 좌표: 미터, Godot 축 (x, z, -y), 원점 = 기지 평지.
 ## 무엇을 어디에 둘지는 배치 계획(CityPlan)과 규칙(BaseScene, BaseTraffic)을 쓴다. 달이든 다른 천체든 같다.
 
@@ -43,6 +44,17 @@ var _pen: MeshInstance3D
 var _pen_mesh: ImmediateMesh
 var _pen_mat: ShaderMaterial
 var _zones: MeshInstance3D
+var _districts: MeshInstance3D
+var _district_mat: ShaderMaterial
+var _district_n := {}             # 구역 → 그 판 위에 지어진 건물 수
+var _count_rev := -1
+var transport: Transport          # 도시 사이 교통 (고속도로·활주로·오가는 탈것)
+var site_key := ""                # 이 도시의 부지 id
+var highways := {}                # 노선 id → {a: 시작(길 그물의 끝), b: 끝, dir, other, km}
+var runway := {}                  # {a, b, w} — 대기가 있는 천체의 비행기 기지 (지구·화성)
+var bearings := {}                # 노선 id → 그 노선의 다른 도시 쪽 (모형 좌표 수평 단위 벡터)
+var _ways: MeshInstance3D
+var _ways_sig := "-"
 
 
 func setup(p_ground: SiteGround) -> void:
@@ -55,6 +67,7 @@ func setup(p_ground: SiteGround) -> void:
 	add_child(_agents_root)
 	ground.terrain_ready.connect(_on_terrain_ready)
 	_make_tool_nodes()
+	_make_districts()
 	_ring = MeshInstance3D.new()
 	_ring.mesh = _ring_mesh()
 	var rm := ShaderMaterial.new()
@@ -80,6 +93,9 @@ func setup(p_ground: SiteGround) -> void:
 func _on_terrain_ready() -> void:
 	_sig = ""
 	_road_rev = -1
+	_ways_sig = "-"
+	if _districts:
+		_districts.mesh = _district_mesh()
 	if _zones:
 		_zones.mesh = _zone_mesh()
 	for i in _floods.size():
@@ -124,12 +140,17 @@ func update(delta: float, speed_level: int) -> void:
 		_sig = sig
 		_rebuild()
 	_update_tool()
+	_update_ways()
 	var sites := BaseScene.sites(sim, plan)
+	if transport != null:
+		traffic.intercity(transport, site_key, {"highways": highways, "runway": runway, "bearings": bearings})
 	traffic.update(delta * VIS_SPEED[clampi(speed_level, 0, 3)], sim, sites)
 	_sync_agents(delta)
 	_night = move_toward(_night, 1.0 if sim.is_dark() else 0.0, delta / 0.8)
 	if _road_mat:
 		_road_mat.set_shader_parameter("night", _night)
+	if _district_mat:
+		_district_mat.set_shader_parameter("night", _night)
 	var sc := global_transform.basis.get_scale().x
 	for l in _floods:
 		(l as OmniLight3D).light_energy = 1.6 * _night
@@ -574,6 +595,8 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 				var r := Rect2(s2 - Vector2(22, 0), Vector2(44, 5))
 				ov.draw_rect(r, Color(0, 0, 0, 0.6))
 				ov.draw_rect(Rect2(r.position, Vector2(44.0 * _progress_of(it), 5)), Palette.AMBER)
+	_draw_district_labels(view, ov, font, bold)
+	_draw_way_signs(view, ov, font, bold)
 	_draw_tool_overlay(view, ov, font, bold)
 	# 상태 (왼쪽 위)
 	var lit := not sim.is_dark()
@@ -653,3 +676,271 @@ func _draw_tool_overlay(view: WorldView, ov: Control, font: Font, bold: Font) ->
 static func _shadow_text(ov: Control, font: Font, pos: Vector2, text: String, font_size: int, color: Color) -> void:
 	ov.draw_string(font, pos + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.7))
 	ov.draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+
+
+# ── 구역 판 ─────────────────────────────────────────────────────
+## 땅에 깔리는 판의 정점·색·띠 (구역 판, 고속도로, 활주로가 함께 쓴다). 높이는 땅과 곡률을 따른다
+class _Geo:
+	var v := PackedVector3Array()
+	var c := PackedColorArray()
+	var uv := PackedVector2Array()
+	var n := PackedVector3Array()
+	var idx := PackedInt32Array()
+	var city: City3D
+
+	func _init(p_city: City3D) -> void:
+		city = p_city
+
+	func vert(p: Vector2, h: float, col: Color, u: Vector2) -> int:
+		v.append(city._local(p, h))
+		c.append(col)
+		uv.append(u)
+		n.append(Vector3.UP)
+		return v.size() - 1
+
+	## a → b 띠 (반너비 hw). UV.x = 가로 0~1 (glow > 0이면 UV.x 대신 그 값), UV.y = 길이 (m)
+	func strip(a: Vector2, b: Vector2, hw: float, h: float, col: Color, glow := -1.0, step := 6.0) -> void:
+		var d := b - a
+		var length := d.length()
+		if length < 0.01:
+			return
+		var nn := Vector2(-d.y, d.x) / length * hw
+		var steps := maxi(1, int(ceil(length / step)))
+		var base := v.size()
+		for k in steps + 1:
+			var t := float(k) / steps
+			var q := a.lerp(b, t)
+			for side in [-1.0, 1.0]:
+				vert(q + nn * side, h, col, Vector2(glow if glow >= 0.0 else 0.5 + side * 0.5, t * length))
+		for k in steps:
+			var o := base + k * 2
+			idx.append_array(PackedInt32Array([o, o + 1, o + 2, o + 1, o + 3, o + 2]))
+
+	func outline(r: Rect2, w: float, h: float, col: Color, glow := 0.0) -> void:
+		var p := [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]
+		for i in 4:
+			var a: Vector2 = p[i]
+			var b: Vector2 = p[(i + 1) % 4]
+			var e := (b - a).normalized() * w * 0.5
+			strip(a - e, b + e, w * 0.5, h, col, glow)
+
+	func grid(r: Rect2, h: float, col: Color, cell := 8.0) -> void:
+		var nu := maxi(1, int(ceil(r.size.x / cell)))
+		var nv := maxi(1, int(ceil(r.size.y / cell)))
+		var base := v.size()
+		for j in nv + 1:
+			for i in nu + 1:
+				vert(r.position + r.size * Vector2(float(i) / nu, float(j) / nv), h, col, Vector2.ZERO)
+		for j in nv:
+			for i in nu:
+				var o := base + j * (nu + 1) + i
+				idx.append_array(PackedInt32Array([o, o + 1, o + nu + 2, o, o + nu + 2, o + nu + 1]))
+
+	func disc(center: Vector2, rad: float, h: float, col: Color, segs := 32) -> void:
+		var cidx := vert(center, h, col, Vector2.ZERO)
+		for k in segs + 1:
+			var a := TAU * k / segs
+			vert(center + Vector2(cos(a), sin(a)) * rad, h, col, Vector2.ZERO)
+		for k in segs:
+			idx.append_array(PackedInt32Array([cidx, cidx + 2 + k, cidx + 1 + k]))
+
+	func ring(center: Vector2, rad: float, w: float, h: float, col: Color, glow := 0.0, segs := 40) -> void:
+		var base := v.size()
+		for k in segs + 1:
+			var a := TAU * k / segs
+			var d := Vector2(cos(a), sin(a))
+			vert(center + d * (rad - w * 0.5), h, col, Vector2(glow, 0.0))
+			vert(center + d * (rad + w * 0.5), h, col, Vector2(glow, 0.0))
+		for k in segs:
+			var o := base + k * 2
+			idx.append_array(PackedInt32Array([o, o + 1, o + 3, o, o + 3, o + 2]))
+
+	func mesh() -> ArrayMesh:
+		var m := ArrayMesh.new()
+		if idx.is_empty():
+			return m
+		var arr := []
+		arr.resize(Mesh.ARRAY_MAX)
+		arr[Mesh.ARRAY_VERTEX] = v
+		arr[Mesh.ARRAY_COLOR] = c
+		arr[Mesh.ARRAY_TEX_UV] = uv
+		arr[Mesh.ARRAY_NORMAL] = n
+		arr[Mesh.ARRAY_INDEX] = idx
+		m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+		return m
+
+
+func _make_districts() -> void:
+	_districts = MeshInstance3D.new()
+	_district_mat = ShaderMaterial.new()
+	_district_mat.shader = load("res://ui/world/shaders/district.gdshader")
+	_districts.material_override = _district_mat
+	_districts.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_districts.mesh = _district_mesh()
+	add_child(_districts)
+
+
+## 구역 판: 다진 바닥(구역 색이 옅게 섞인 어두운 판), 빛나는 테두리, 필지 금, 줄 사이 보행로. 거주 구역 가운데 광장
+func _district_mesh() -> ArrayMesh:
+	var g := _Geo.new(self)
+	for name in layout.rects:
+		var col: Color = BaseLayout.DISTRICT_INFO.get(name, ["", Color(0.8, 0.8, 0.8)])[1]
+		var r: Rect2 = (layout.rects[name] as Rect2).grow(4.0)
+		g.grid(r, 0.035, Color(Color(0.14, 0.14, 0.15).lerp(col, 0.22), 0.3))
+		for ln in layout.lanes.get(name, []):
+			g.strip(ln[0], ln[1], 1.0, 0.04, Color(0.66, 0.64, 0.6, 0.28))
+		for lot in layout.lots.get(name, []):
+			g.outline(lot, 0.3, 0.045, Color(0.85, 0.86, 0.88, 0.3))
+		g.outline(r, 1.1, 0.05, Color(col, 0.85), 1.0)
+	var hub := Vector2(layout.hub.x, layout.hub.y)
+	g.disc(hub, BaseLayout.PLAZA_R, 0.055, Color(0.6, 0.58, 0.54, 0.5))
+	g.ring(hub, BaseLayout.PLAZA_R, 0.8, 0.06, Color(1.0, 0.78, 0.45, 0.8), 1.0)
+	g.ring(hub, BaseLayout.PLAZA_R * 0.45, 0.5, 0.06, Color(0.85, 0.86, 0.88, 0.45))
+	return g.mesh()
+
+
+## 구역마다 그 판 위에 지어진 건물 수 (배치가 바뀔 때만 다시 센다)
+func _count_districts() -> void:
+	if plan.revision == _count_rev:
+		return
+	_count_rev = plan.revision
+	_district_n.clear()
+	for e in plan.buildings:
+		if int(e["seq"]) >= 0:
+			continue
+		var p := Vector2(float(e["x"]), float(e["y"]))
+		for name in layout.rects:
+			if (layout.rects[name] as Rect2).grow(6.0).has_point(p):
+				_district_n[name] = int(_district_n.get(name, 0)) + 1
+				break
+
+
+## 구역 이름표: 기지를 내려다볼 때 (0.16~2.2 km) 구역마다 이름 · 지어진 건물 · 필지
+func _draw_district_labels(view: WorldView, ov: Control, font: Font, bold: Font) -> void:
+	var d := view.cam.dist
+	var a := smoothstep(0.12, 0.2, d) * (1.0 - smoothstep(2.2, 3.4, d))
+	if a < 0.03 or (tool != null and tool.active()):
+		return
+	_count_districts()
+	var placed: Array = []
+	for name in layout.rects:
+		var r: Rect2 = layout.rects[name]
+		var info: Array = BaseLayout.DISTRICT_INFO.get(name, [name, Color.WHITE])
+		var sp: Variant = view.screen_of(global_transform * _local(r.get_center(), 10.0))
+		if sp == null:
+			continue
+		var s2: Vector2 = sp
+		var text: String = info[0]
+		var col: Color = info[1]
+		var sub := "건물 %d · 필지 %d" % [int(_district_n.get(name, 0)), (layout.lots.get(name, []) as Array).size()]
+		var w := maxf(bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x,
+			font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x) + 22.0
+		var rect := Rect2(s2 - Vector2(w * 0.5, 16.0), Vector2(w, 32.0))
+		if not Rect2(Vector2.ZERO, view.size).intersects(rect):
+			continue
+		var clash := false
+		for o in placed:
+			if (o as Rect2).intersects(rect):
+				clash = true
+				break
+		if clash:
+			continue
+		placed.append(rect)
+		ov.draw_rect(rect, Color(0.04, 0.05, 0.08, 0.45 * a))
+		ov.draw_rect(Rect2(rect.position, Vector2(3.0, rect.size.y)), Color(col, 0.95 * a))
+		ov.draw_string(bold, rect.position + Vector2(10, 14), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12,
+			Color(col.lightened(0.45), a))
+		ov.draw_string(font, rect.position + Vector2(10, 27), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+			Color(0.82, 0.84, 0.88, 0.85 * a))
+
+
+# ── 다른 도시로 가는 길 ─────────────────────────────────────────
+## 고속도로(땅길 노선마다)와 활주로(대기가 있는 천체): 노선이나 길 그물이 바뀌면 다시 놓는다
+func _update_ways() -> void:
+	var ids := PackedStringArray()
+	if transport != null:
+		for l in transport.lines_of(site_key):
+			ids.append(String(l["id"]))
+	var sig := "%s|%d|%s" % [",".join(ids), plan.road_rev, ground.body]
+	if sig == _ways_sig:
+		return
+	_ways_sig = sig
+	highways.clear()
+	runway.clear()
+	bearings.clear()
+	var g := _Geo.new(self)
+	var hub := Vector2(layout.hub.x, layout.hub.y)
+	if transport != null:
+		for l in transport.lines_of(site_key):
+			var other := String(l["b"]) if String(l["a"]) == site_key else String(l["a"])
+			var dir := _bearing(Transport.node_dir(other))
+			bearings[l["id"]] = dir
+			if l["kind"] != "ground":
+				continue
+			# 그 방향으로 가장 바깥에 있는 길 그물의 꼭짓점에서 나간다
+			var start := hub
+			var best := -INF
+			for q in plan.nodes:
+				var rel: Vector2 = (q as Vector2) - hub
+				var score := rel.dot(dir) - 0.5 * absf(rel.cross(dir))
+				if score > best:
+					best = score
+					start = q
+			var end_p := start + dir * 3200.0
+			highways[l["id"]] = {"a": start, "b": end_p, "dir": dir, "other": other, "km": float(l["km"]), "mode": l["mode"]}
+			g.strip(start, end_p, 4.5, 0.07, Color.WHITE, -1.0, 10.0)
+	if ground.body in ["earth", "mars"]:
+		# 활주로: 기지 남쪽 바깥, 화면의 가로(u) 방향 — 우주항 구역에서 유도로가 닿는다
+		var length := 2400.0 if ground.body == "earth" else 700.0
+		var v_c := BaseLayout.BOUNDS_UV.end.y + 90.0
+		var a := BaseLayout.uv_to_xy(Vector2(-length * 0.5, v_c))
+		var b := BaseLayout.uv_to_xy(Vector2(length * 0.5, v_c))
+		var w := 45.0 if ground.body == "earth" else 24.0
+		runway = {"a": a, "b": b, "w": w}
+		g.strip(a, b, w * 0.5, 0.07, Color.WHITE, -1.0, 12.0)
+		var gate: Vector3 = layout.gates.get("pad", layout.hub)
+		var from := Vector2(gate.x, gate.y)
+		var to := BaseLayout.uv_to_xy(Vector2(BaseLayout.xy_to_uv(from).x, v_c))
+		g.strip(from, to, 6.0, 0.068, Color.WHITE, -1.0, 8.0)
+	if _ways == null:
+		_ways = MeshInstance3D.new()
+		_ways.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_ways)
+	if _road_mat == null:
+		_road_mat = ShaderMaterial.new()
+		_road_mat.shader = load("res://ui/world/shaders/road.gdshader")
+	_ways.material_override = _road_mat
+	_ways.mesh = g.mesh()
+
+
+## 다른 노드(천체 고정 방향)로 가는 방향 — 기지 모형 좌표의 수평 단위 벡터
+func _bearing(other_dir: Vector3) -> Vector2:
+	var up := ground.site_dir()
+	var t := other_dir - up * up.dot(other_dir)
+	var f := ground.site_frame()
+	var d := Vector2(t.dot(f.x), t.dot(f.y))
+	return d.normalized() if d.length_squared() > 1e-12 else Vector2(1, 0)
+
+
+## 고속도로 들머리의 표지: "→ 마리우스 · 3,157 km"
+func _draw_way_signs(view: WorldView, ov: Control, font: Font, bold: Font) -> void:
+	var d := view.cam.dist
+	var a := smoothstep(0.1, 0.18, d) * (1.0 - smoothstep(3.0, 5.0, d))
+	if a < 0.03:
+		return
+	for id in highways:
+		var h: Dictionary = highways[id]
+		var at: Vector2 = (h["a"] as Vector2) + (h["dir"] as Vector2) * 60.0
+		var sp: Variant = view.screen_of(global_transform * _local(at, 6.0))
+		if sp == null:
+			continue
+		var text := "→ %s · %s km" % [Transport.node_name(h["other"]), Fmt.n(float(h["km"]))]
+		var sub := Transport.mode_name(h["mode"])
+		var w := maxf(bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x,
+			font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x) + 18.0
+		var p: Vector2 = sp
+		var rect := Rect2(p - Vector2(w * 0.5, 18), Vector2(w, 36))
+		ov.draw_rect(rect, Color(0.12, 0.09, 0.03, 0.72 * a))
+		ov.draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2.0)), Color(1.0, 0.72, 0.35, 0.9 * a))
+		ov.draw_string(bold, rect.position + Vector2(9, 16), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1.0, 0.82, 0.55, a))
+		ov.draw_string(font, rect.position + Vector2(9, 31), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.86, 0.84, 0.8, 0.85 * a))

@@ -1,6 +1,8 @@
 // 지구의 땅·바다 — Natural Earth 1:10m에서 만든 해안 거리 지도(tools/art/earth_coast.py)로 해안을 긋는다.
 // 거리를 문턱으로 잘라 픽셀마다 또렷한 해안을 긋고, 지도 칸보다 잔 굴곡은 잡음으로 더한다 (표본 간격까지).
 // 도시 가까이서는 그 부지의 고운 지역 지도(125 m 칸, 둘레 256 km)가 해안을 긋는다.
+// 대도시(earth_cities.json) 둘레는 시가지: 지붕·포장의 회색, 가까이서는 블록 격자의 큰길·골목, 공원, 밤의 불빛.
+// 대도시의 지형 조각은 강·공원을 넣은 시가지 지도(G = 공원)를 지역 지도로 쓴다.
 // 구(planet.gdshader), 도시 둘레 지형 조각(body_patch), 조각 굽기(earth_patch_bake)가 같은 함수를 쓴다.
 // noise.gdshaderinc 다음에 넣는다. 색은 sRGB (호환 렌더러는 ALBEDO를 sRGB로 받는다).
 
@@ -16,6 +18,10 @@ uniform sampler2D land : filter_linear_mipmap, repeat_enable;         // R 땅(�
 uniform bool has_land = false;
 uniform vec4 ekeep[4];                                                // 기지 자리: 방향, 반지름 km (그 안은 땅)
 uniform int ekeep_n = 0;
+uniform vec4 metro[28];                                               // 대도시: 방향 xyz, 시가지 반지름 km
+uniform vec4 metro_k[28];                                             // 대도시: 불빛 세기, 큰길 방향(rad), 블록(km), 0
+uniform int metro_n = 0;
+uniform bool cl_parks = false;                                        // 지역 지도의 G = 공원 (대도시 시가지 지도)
 
 const float EARTH_R = 6371.0;
 const float COAST_KM = 40.0;
@@ -125,4 +131,87 @@ float earth_h(vec3 d, float texel_km, out float liq) {
 	float hills = max(fbm(d * (EARTH_R / 8.0), 5, 31.0) - 0.42, 0.0) * 0.9 * smoothstep(0.2, 4.0, sd);
 	float h = 0.003 + inland * 0.004 + hills;
 	return mix(h, 0.0, liq);
+}
+
+// 가장 가까운 대도시의 시가지 몫 (0~1)과 그 번호 — 가장자리는 잡음으로 들쭉날쭉
+float earth_urban(vec3 d, out int which) {
+	float u = 0.0;
+	which = -1;
+	for (int i = 0; i < 28; i++) {
+		if (i >= metro_n) {
+			break;
+		}
+		float r = metro[i].w;
+		float dk = length(d - metro[i].xyz) * EARTH_R;
+		if (dk > r * 1.5) {
+			continue;
+		}
+		float edge = r * (0.92 + 0.55 * (vnoise(d * (EARTH_R / 6.0), 41.0 + float(i)) - 0.5)
+			+ 0.25 * (vnoise(d * (EARTH_R / 1.5), 43.0 + float(i)) - 0.5));
+		float v = 1.0 - smoothstep(edge * 0.5, edge, dk);
+		if (v > u) {
+			u = v;
+			which = i;
+		}
+	}
+	return u;
+}
+
+// 지역 지도의 공원 (대도시 시가지 지도의 G)
+float earth_park(vec3 d) {
+	if (!has_coast_loc || !cl_parks) {
+		return 0.0;
+	}
+	float w = dot(d, cl_c);
+	if (w < 0.9) {
+		return 0.0;
+	}
+	vec2 q = vec2(dot(d, cl_e), dot(d, cl_n)) * EARTH_R / w;
+	vec2 luv = vec2(0.5 + q.x / (2.0 * cl_half), 0.5 - q.y / (2.0 * cl_half));
+	if (max(abs(luv.x - 0.5), abs(luv.y - 0.5)) > 0.49) {
+		return 0.0;
+	}
+	return texture(coast_loc, luv).g;
+}
+
+// 시가지의 땅 색: 지붕·포장의 회색, 가까이서는 블록 격자의 골목과 다섯 블록마다 큰길 (대도시마다 방향·블록 크기 —
+// 3D 건물과 같은 격자), 공원은 푸르게. lights: 밤 불빛 세기 (0~1)
+vec3 earth_city(vec3 d, vec3 col, float sd, float texel_km, out float lights) {
+	lights = 0.0;
+	int which;
+	float u = earth_urban(d, which);
+	if (u <= 0.0 || which < 0) {
+		return col;
+	}
+	u *= smoothstep(-0.02, 0.05, sd);
+	float park = earth_park(d);
+	vec4 mk = metro_k[which];
+	vec3 c = metro[which].xyz;
+	vec3 e = normalize(vec3(-c.y, c.x, 0.0) + vec3(1e-7, 0.0, 0.0));
+	vec3 n = cross(c, e);
+	vec2 q = vec2(dot(d - c, e), dot(d - c, n)) * EARTH_R;           // 도심에서 동·북 (km)
+	vec2 uu = vec2(sin(mk.y), cos(mk.y));
+	vec2 vv = vec2(cos(mk.y), -sin(mk.y));
+	float bk = max(mk.z, 0.02);
+	vec2 g = vec2(dot(q, vv), dot(q, uu)) / bk;                       // 블록 단위 (길은 정수 자리)
+	float aa = max(texel_km, 1e-4);
+	float vis = 1.0 - smoothstep(bk * 0.12, bk * 0.5, aa);           // 블록이 화면에서 작으면 무늬는 평균으로
+	float r1 = hash1(vec3(floor(g * 2.0), 3.0), 17.0);
+	vec3 roof = mix(vec3(0.42, 0.41, 0.40), vec3(0.64, 0.62, 0.58), r1);
+	roof = mix(roof, vec3(0.50, 0.49, 0.47), 1.0 - vis);
+	vec2 f = abs(fract(g + 0.5) - 0.5) * bk;
+	vec2 big = abs(fract(g / 5.0 + 0.5) - 0.5) * bk * 5.0;
+	float street = 1.0 - smoothstep(0.006 - aa * 0.5, 0.006 + aa * 0.5, min(f.x, f.y));
+	float avenue = 1.0 - smoothstep(0.015 - aa * 0.5, 0.015 + aa * 0.5, min(big.x, big.y));
+	float road = max(street * 0.8, avenue) * vis;
+	vec3 urb = mix(roof, vec3(0.21, 0.21, 0.22), road);
+	urb = mix(urb, vec3(0.33, 0.34, 0.33), (1.0 - vis) * 0.3);
+	float k = u * (1.0 - park);
+	vec3 out_c = mix(col, urb, k * 0.9);
+	out_c = mix(out_c, mix(col, vec3(0.15, 0.29, 0.12), 0.55), park * u);
+	// 밤 불빛: 가까이서는 길을 따라, 멀리서는 시가지 전체가 (도심일수록 밝게)
+	float core = 1.0 - smoothstep(0.0, metro[which].w * 0.7, length(q));
+	float glow = mix(0.5 + 0.35 * vnoise(d * (EARTH_R / 0.9), 9.0), 0.25 + 1.1 * road, vis);
+	lights = k * mk.x * glow * (0.55 + 0.45 * core);
+	return out_c;
 }

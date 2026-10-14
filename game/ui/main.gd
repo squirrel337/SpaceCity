@@ -9,7 +9,7 @@ const SPEED_LABELS := ["정지", "1×", "3×", "10×"]
 const REPORT_DAY := 1096                            # 3년 보고서
 const JUMP_LIMIT_H := 24 * 30
 const TABS := [["life", "생명유지"], ["power", "전력"], ["build", "건설"], ["research", "연구"], ["colony", "개척"],
-	["log", "기록"]]
+	["transport", "교통"], ["log", "기록"]]
 
 var sim: CitySim                    # 고른 식민지의 시뮬레이션 (탭·도구·3D 도시가 본다)
 var colonies := Colonies.new()
@@ -115,6 +115,7 @@ func _build() -> void:
 	world.colony_picked.connect(_on_colony_view)
 	world.colony_entered.connect(_on_colony_entered)
 	world.site_picked.connect(_on_site_picked)
+	world.mgr = colonies
 	city_area.add_child(world)
 	city_area.add_child(_build_view_switch())
 	city_area.add_child(_build_place_bar())
@@ -398,7 +399,7 @@ func _chip() -> Dictionary:
 
 func _build_side() -> Control:
 	var side := PanelContainer.new()
-	side.custom_minimum_size.x = 410
+	side.custom_minimum_size.x = 440
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	side.add_child(v)
@@ -412,11 +413,11 @@ func _build_side() -> Control:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, 42)
 		b.clip_text = true
-		b.add_theme_font_size_override("font_size", 14)
+		b.add_theme_font_size_override("font_size", 13)
 		for state in ["normal", "hover", "pressed", "disabled", "focus"]:
 			var sb := (theme.get_stylebox(state, "Button") as StyleBoxFlat).duplicate() as StyleBoxFlat
-			sb.content_margin_left = 3
-			sb.content_margin_right = 3
+			sb.content_margin_left = 2
+			sb.content_margin_right = 2
 			b.add_theme_stylebox_override(state, sb)
 		b.pressed.connect(_select_tab.bind(t[0]))
 		tab_row.add_child(b)
@@ -429,7 +430,7 @@ func _build_side() -> Control:
 	host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel_scroll.add_child(host)
 	tabs = {"life": LifePanel.new(), "power": PowerPanel.new(), "build": BuildPanel.new(),
-		"research": ResearchPanel.new(), "colony": ColonyPanel.new(), "log": LogPanel.new()}
+		"research": ResearchPanel.new(), "colony": ColonyPanel.new(), "transport": TransportPanel.new(), "log": LogPanel.new()}
 	for key in tabs:
 		tabs[key].size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tabs[key].visible = false
@@ -442,6 +443,12 @@ func _build_side() -> Control:
 	tabs["colony"].changed.connect(func():
 		_update_colony_ui()
 		_on_player_change())
+	tabs["transport"].mgr = colonies
+	tabs["transport"].changed.connect(_on_player_change)
+	tabs["transport"].show_line.connect(func(id: String):
+		if view_mode != "world":
+			_set_view("world")
+		world.show_route(id))
 	return side
 
 
@@ -548,8 +555,8 @@ func _update_colony_ui() -> void:
 	colony_button.select(active)
 	colony_button.visible = colonies.list.size() > 1        # 식민지가 하나뿐이면 감춘다 (윗줄 자리)
 	_update_markers()
-	if current_tab == "colony":
-		tabs["colony"].rebuild()
+	if current_tab in ["colony", "transport"]:
+		tabs[current_tab].rebuild()
 
 
 func _update_markers() -> void:
