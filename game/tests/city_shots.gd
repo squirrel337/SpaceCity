@@ -188,14 +188,35 @@ func _process(_delta: float) -> bool:
 			["moon_tilt", func(): _aim(w, main.plan.hub() + Vector2(40, 40), 0.42, 58.0), func(): return _settled(w)],
 			["moon_cross", func(): _aim(w, _crossing(main.plan), 0.11, 52.0), func(): return _settled(w)],
 			["road_tool", func():
-				_aim(w, main.plan.hub() + Vector2(30, 20), 0.36, 40.0)
+				# 빈 블록의 모서리에서 길을 따라 나가다 블록 안으로 굽는 도로 (곡선)
+				var plan: CityPlan = main.plan
+				var bl := {}
+				var best := INF
+				for b in plan.blocks():
+					var c: Vector2 = b["center"]
+					var empty := true
+					for e in plan.buildings:
+						if Geometry2D.is_point_in_polygon(Vector2(float(e["x"]), float(e["y"])), b["poly"]):
+							empty = false
+							break
+					if empty and c.distance_to(plan.hub()) < best:
+						best = c.distance_to(plan.hub())
+						bl = b
+				var face: PackedVector2Array = bl["face"]
+				var c0 := face[0]
+				var c1 := face[1]
+				var side := c0.distance_to(c1)
+				var t := (c1 - c0).normalized()
+				var inward := Vector2(-t.y, t.x)
+				if not Geometry2D.is_point_in_polygon(c0 + t * side * 0.5 + inward * 6.0, face):
+					inward = -inward
+				_aim(w, (c0 + c1) * 0.5 + inward * side * 0.45, 0.13, 38.0, -inward)
 				main._begin_tool("road")
-				tool.set_road_type("avenue")
-				var a: Vector2 = main.plan.hub() + Vector2(0, -12)
-				tool.road_from = main.plan.snap(a)
-				tool.road_dir = Vector2(1, 0).rotated(-PI / 4.0)
+				tool.set_road_type("street")
+				tool.road_from = c0
+				tool.road_dir = t
 				tool.set_curve(true)
-				tool.hover(main.plan.hub() + Vector2(70, 10)), func(): return _settled(w)],
+				tool.hover(c0 + t * side * 0.82 + inward * side * 0.8), func(): return _settled(w)],
 			["zone_tool", func():
 				main._begin_tool("zone")
 				tool.set_zone_kind("farm")

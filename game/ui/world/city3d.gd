@@ -415,11 +415,7 @@ func _update_tool() -> void:
 			var hw := LayoutData.road_half(tool.road_type)
 			_pen_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
 			_pen_mesh.surface_set_color(Color(good if ok else bad, 0.6))
-			var pts := tool.preview
-			for i in range(pts.size() - 1):
-				_strip(pts[i], pts[i + 1], hw)
-			for i in range(1, pts.size() - 1):
-				_disc(pts[i], hw)
+			_ribbon(tool.preview, hw)
 			_pen_mesh.surface_set_color(Color(good if ok else bad, 0.95))
 			if tool.road_from != null:
 				_disc(tool.road_from, 2.2)
@@ -458,6 +454,43 @@ func _update_tool() -> void:
 			_pen_mesh.surface_set_color(Color(c, 0.18))
 			_disc(tool.at, tool.brush * 0.55)
 			_pen_mesh.surface_end()
+
+
+## 길 미리보기: 점들을 잇는 띠 하나 — 꺾이는 점은 두 방향의 평균 법선으로 (토막이 겹쳐 진해지지 않게), 6 m마다 땅을 따라간다
+func _ribbon(pts: PackedVector2Array, w: float) -> void:
+	var n := pts.size()
+	if n < 2:
+		return
+	var side: Array = []
+	for i in n:
+		var d := Vector2.ZERO
+		if i > 0:
+			d += (pts[i] - pts[i - 1]).normalized()
+		if i < n - 1:
+			d += (pts[i + 1] - pts[i]).normalized()
+		d = d.normalized() if d.length_squared() > 1e-8 else Vector2.RIGHT
+		var nn := Vector2(-d.y, d.x)
+		var k := 1.0
+		if i > 0 and i < n - 1:
+			var d0 := (pts[i] - pts[i - 1]).normalized()
+			k = 1.0 / maxf(0.5, nn.dot(Vector2(-d0.y, d0.x)))       # 꺾인 만큼 넓혀 폭을 지킨다
+		side.append(nn * w * k)
+	for i in n - 1:
+		var a := pts[i]
+		var b := pts[i + 1]
+		var na: Vector2 = side[i]
+		var nb: Vector2 = side[i + 1]
+		var steps := maxi(1, int(ceil(a.distance_to(b) / 6.0)))
+		for s in steps:
+			var t0 := float(s) / steps
+			var t1 := float(s + 1) / steps
+			var c0 := a.lerp(b, t0)
+			var c1 := a.lerp(b, t1)
+			var n0 := na.lerp(nb, t0)
+			var n1 := na.lerp(nb, t1)
+			var q := [_local(c0 - n0, 0.3), _local(c0 + n0, 0.3), _local(c1 + n1, 0.3), _local(c1 - n1, 0.3)]
+			for j in [0, 1, 2, 0, 2, 3]:
+				_pen_mesh.surface_add_vertex(q[j])
 
 
 func _strip(a: Vector2, b: Vector2, w: float) -> void:
