@@ -44,6 +44,7 @@ var city_area: Control
 var view_buttons := {}
 var world_row: HBoxContainer       # 3D: 확대·축소, 기지 (다른 고정점은 위쪽의 경로 막대)
 var anchor_bar: AnchorBar          # 3D: 카메라의 고정점 경로 (우주 › 태양계 › 지구 › 도시)
+var metro_card: MetroCard          # 3D: 지구의 대도시 위에서 — 그 도시의 우주 시설 (도시 기능)
 var view_mode := "world"
 var forecast: ForecastBar
 var modal: Modal
@@ -132,6 +133,15 @@ func _build() -> void:
 	anchor_bar.offset_left = 8
 	anchor_bar.offset_top = 8
 	city_area.add_child(anchor_bar)
+	metro_card = MetroCard.new()
+	metro_card.mgr = colonies
+	metro_card.visible = false
+	metro_card.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	metro_card.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	metro_card.offset_right = -12
+	metro_card.offset_top = 64
+	metro_card.build_requested.connect(_on_metro_build)
+	city_area.add_child(metro_card)
 	tool.changed.connect(_update_place_bar)
 	tool.placed.connect(_on_placed)
 	forecast = ForecastBar.new()
@@ -252,7 +262,7 @@ func _build_place_bar() -> Control:
 	place_buttons["erase"].toggle_mode = true
 	place_bar.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	place_bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	place_bar.offset_top = 70                # 위쪽 경로 막대(우주 › 태양계 › …) 아래
+	place_bar.offset_top = 8                 # 도구를 쓰는 동안 위쪽 경로 막대는 감춘다
 	place_bar.visible = false
 	return place_bar
 
@@ -594,7 +604,9 @@ func _build_side() -> Control:
 	tabs["transport"].show_metro.connect(func(key: String):
 		if view_mode != "world":
 			_set_view("world")
-		world.fly_to_metro(key))
+		var m := Metros.of(key)
+		world.anchors.go({"kind": "metro", "id": key, "name": String(m.get("name", key)), "body": "earth",
+			"dir": m.get("dir", Vector3.ZERO)}))
 	return side
 
 
@@ -855,6 +867,7 @@ func _process(delta: float) -> void:
 		anchor_bar.visible = view_mode == "world" and not tool.active()
 		if anchor_bar.visible:
 			anchor_bar.refresh()
+	_update_metro_card()
 	if sim == null or modal.visible or _game_over:
 		return
 	var stepped := false
@@ -885,6 +898,34 @@ func _process(delta: float) -> void:
 	if _dirty and _ui_clock >= 0.1:
 		_ui_clock = 0.0
 		_refresh_live()
+
+
+## 대도시 카드: 카메라가 대도시 위에 있으면 (닫지 않았으면) 그 도시의 우주 시설을 보인다
+func _update_metro_card() -> void:
+	if metro_card == null:
+		return
+	var mk := world.metro_focus() if view_mode == "world" and sim != null and not tool.active() else ""
+	if mk != metro_card.dismissed:
+		metro_card.dismissed = ""
+	metro_card.visible = mk != "" and mk != metro_card.dismissed and not modal.visible
+	if metro_card.visible:
+		metro_card.payer_index = active
+		metro_card.show_metro(mk, city_area.size.x < 820.0)
+
+
+func _on_metro_build(key: String, fac: String) -> void:
+	var name := "%s %s" % [String(Metros.of(key).get("name", key)), MetroFunctions.fac_name(fac)]
+	var why := colonies.metro_fn.block_reason(key, fac, sim)
+	if colonies.metro_fn.build(key, fac, colonies, active):
+		var lvl := colonies.metro_fn.level(key, fac) + 1
+		_toast("%s — %s (%d일)" % [name, "짓기 시작" if lvl == 1 else "%d단계로 올리기 시작" % lvl,
+			int(MetroFunctions.level_def(fac, lvl).get("days", 0))], "good")
+	else:
+		_toast("%s — 지을 수 없다 (%s)" % [name, why], "warn")
+	metro_card.refresh()
+	if current_tab == "transport":
+		tabs["transport"].rebuild()
+	_dirty = true
 
 
 ## 한 시간: 모든 식민지가 함께 흐른다 (고른 식민지만 결정 카드를 띄운다)
@@ -1141,8 +1182,13 @@ func _show_help() -> void:
 		"· 카메라의 고정점: 3D 화면 위쪽의 경로(우주 › 태양계 › 지구 › 도시)가 지금 카메라가 바라보고 도는 점이다. " +
 		"단계를 누르면 그곳으로, '›'·'▾'를 누르면 그 안의 행성·위성·도시·대도시·날아가는 수송선을 고른다. " +
 		"이름표를 눌러도 고정점이 되고, Backspace는 한 단계 위로. '우주'에서는 우리 은하 전체를 본다.\n" +
+		"· 도시 계획 (왼쪽 아래): '도로'(G) — 길 종류(흙길·도로·대로·고속도로·통로·철도)를 고르고 점을 차례로 누른다, '곡선'은 " +
+		"이어 가던 길에서 굽는다. '구획'(Z) — 길로 둘러싸인 블록을 눌러 용도를 정한다. '땅'(T) — 파기·쌓기·평탄화·되돌리기 " +
+		"(굴착기나 로봇 정비소가 있어야 한다). 지구·타이탄에서 해수면 아래로 파면 물이 차서 그 위의 건물이 멈춘다.\n" +
+		"· 지구의 대도시 위로 가면 오른쪽 위 카드에서 우주 시설(산업 단지·이주 센터·연구소·홍보관·화물 터미널)을 " +
+		"지구 지원 점수로 짓는다 — 부품·정착민·연구·지원이 더 들어온다.\n" +
 		"· 조작: 끌기 = 땅을 잡아 옮기기(멀면 고정점 둘레 돌기), 오른쪽 끌기·Shift 끌기·두 손가락 비틀기 = 방위·기울기, " +
-		"휠·두 손가락 벌리기 = 확대·축소.",
+		"휠·두 손가락 벌리기 = 확대·축소. 그래픽 품질은 메뉴 › 설정.",
 		[["ok", "닫기", ""]])
 
 

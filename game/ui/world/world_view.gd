@@ -740,6 +740,7 @@ func _make_metro(m: Dictionary) -> void:
 		"layout": "open", "map_half_km": float(m["radius_km"]) + 10.0, "map_range_km": 2.0, "parks_map": true}
 	g.setup("earth", site, node, 6371.0, body_baker, moon)
 	var mc := MetroCity.new()
+	mc.mgr = mgr
 	g.city_root.add_child(mc)
 	mc.setup(m, g, quality_hi)
 	metro_grounds[String(m["key"])] = {"ground": g, "city": mc, "used": _clock}
@@ -921,6 +922,19 @@ func _step_descent(delta: float) -> void:
 
 
 ## 지구의 대도시 위로 날아가 시가지를 비스듬히 내려다본다
+## 카메라가 보는 대도시 (대도시 카드): 고정점으로 고른 대도시(지구 고도 3000 km 아래), 또는 시가지 위 400 km 아래로
+## 내려온 대도시. 없으면 ""
+func metro_focus() -> String:
+	if cam.focus != "earth" or cam.mode != "body" or not _bodies.has("earth"):
+		return ""
+	var alt := Astro.len3(Astro.sub3(cam.pos, _info("earth")["center"])) - 6371.0
+	if String(anchors.current.get("kind", "")) == "metro" and alt < 3000.0:
+		return String(anchors.current["id"])
+	if _metro_near != null and alt < 400.0:
+		return String(_metro_near.site_data.get("id", ""))
+	return ""
+
+
 func fly_to_metro(key: String) -> void:
 	var m := Metros.of(key)
 	if m.is_empty():
@@ -1270,6 +1284,7 @@ func _draw_overlay() -> void:
 	for i in colonies.size():
 		_label_colony(i, font, placed)
 	routes.draw_metros(font, placed)
+	_label_metro_facilities(font, placed)
 	var order := ["sun", "earth", "moon", "mars", "venus", "mercury", "jupiter", "saturn", "uranus", "neptune",
 		"pluto", "ceres", "io", "europa", "ganymede", "callisto", "titan", "triton", "phobos", "deimos", "charon"]
 	for id in order:
@@ -1286,6 +1301,50 @@ func _draw_overlay() -> void:
 	perf["overlay_us"] = Time.get_ticks_usec() - t0
 	if Settings.show_perf():
 		_draw_perf(font)
+
+
+## 대도시의 우주 시설 이름표 (내려다보는 대도시, 고도 150 km 아래)
+func _label_metro_facilities(font: Font, placed: Array) -> void:
+	if _metro_near == null:
+		return
+	var alt := Astro.len3(Astro.sub3(cam.pos, _info("earth")["center"])) - 6371.0
+	var a := 1.0 - smoothstep(80.0, 150.0, alt)
+	if a < 0.03:
+		return
+	var bold := ThemeFactory.bold if ThemeFactory.bold else font
+	for k in metro_grounds:
+		var me: Dictionary = metro_grounds[k]
+		if me["ground"] != _metro_near:
+			continue
+		var mc: MetroCity = me["city"]
+		for lb in mc.facility_labels():
+			var sp: Variant = screen_of(mc.global_transform * (lb[0] as Vector3))
+			if sp == null:
+				continue
+			var s2: Vector2 = sp
+			var text: String = lb[1]
+			var sub: String = lb[2]
+			var col: Color = lb[3]
+			var w := maxf(bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x,
+				font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x) + 22.0
+			var rect := Rect2(s2 - Vector2(w * 0.5, 34.0), Vector2(w, 34.0))
+			if not Rect2(Vector2.ZERO, size).intersects(rect):
+				continue
+			var clash := false
+			for o in placed:
+				if (o as Rect2).intersects(rect):
+					clash = true
+					break
+			if clash:
+				continue
+			placed.append(rect)
+			_overlay.draw_rect(rect, Color(0.04, 0.05, 0.08, 0.6 * a))
+			_overlay.draw_rect(Rect2(rect.position, Vector2(3.0, rect.size.y)), Color(col, 0.95 * a))
+			_overlay.draw_string(bold, rect.position + Vector2(10, 15), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
+				Color(col.lightened(0.4), a))
+			_overlay.draw_string(font, rect.position + Vector2(10, 29), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+				Color(0.85, 0.87, 0.9, 0.9 * a))
+			_overlay.draw_line(Vector2(s2.x, rect.end.y), s2 + Vector2(0, 10), Color(col, 0.7 * a), 1.5)
 
 
 func _apparent_px(center: PackedFloat64Array, radius_km: float) -> float:

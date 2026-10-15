@@ -11,6 +11,7 @@ static var list: Array = []          # [대도시] (데이터 순서) — 항목
 static var by_key := {}              # "metro_seoul" → 대도시
 static var styles := {}
 static var routes: Array = []        # 대도시 사이의 국제선 [[key, key]]
+static var functions := {}           # 대도시의 우주 시설 (MetroFunctions가 쓴다)
 static var _loaded := false
 
 
@@ -23,6 +24,7 @@ static func load_all() -> void:
 		push_error("대도시 자료를 읽지 못했다: " + PATH)
 		return
 	styles = data.get("styles", {})
+	functions = data.get("functions", {})
 	for m in data.get("cities", []):
 		var e: Dictionary = m
 		e["key"] = PREFIX + String(e["id"])
@@ -48,6 +50,12 @@ static func of(key: String) -> Dictionary:
 static func style_of(m: Dictionary) -> Dictionary:
 	load_all()
 	return styles.get(String(m.get("style", "dense")), styles.get("dense", {}))
+
+
+## 그 도시의 강점 시설 이름 ("" = 없음)
+static func strength_name(m: Dictionary) -> String:
+	load_all()
+	return String(functions.get(String(m.get("strength", "")), {}).get("name", ""))
 
 
 ## "도시권 2,600만"

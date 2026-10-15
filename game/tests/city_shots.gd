@@ -147,6 +147,29 @@ func _flood_setup(w: WorldView) -> void:
 	_aim(w, spot, 0.3, 48.0)
 
 
+## 서울에 우주 시설을 짓는다: 넷은 1~2단계까지 다 짓고, 하나는 짓는 중
+func _metro_setup() -> void:
+	var col: Colonies = main.colonies
+	var fn := col.metro_fn
+	var home: CitySim = col.list[0]["sim"]
+	home.support = 9000.0
+	for fac in ["space_park", "research", "cargo_hub", "outreach"]:
+		fn.build("metro_seoul", fac, col, 0)
+	_run_hours(24 * 31)
+	for fac in ["space_park", "research"]:
+		fn.build("metro_seoul", fac, col, 0)
+	_run_hours(24 * 46)
+	fn.build("metro_seoul", "emigration", col, 0)
+	_run_hours(24 * 6)
+	main._set_speed(0)
+
+
+func _metro_done(w: WorldView, key: String) -> bool:
+	if not _settled(w) or not w.metro_grounds.has(key):
+		return false
+	return (w.metro_grounds[key]["city"] as MetroCity)._phase == 3
+
+
 func _process(_delta: float) -> bool:
 	frame += 1
 	var w: WorldView = main.world if main else null
@@ -192,6 +215,15 @@ func _process(_delta: float) -> bool:
 					main.plan.edit_terrain(p + Vector2(70, -30), 12.0, "raise", 1.0)
 				tool.hover(p + Vector2(40, 0))
 				_aim(w, p + Vector2(30, -10), 0.3, 55.0), func(): return _settled(w)],
+			["metro_card", func():
+				tool.stop()
+				_metro_setup()
+				var m := Metros.of("metro_seoul")
+				w.anchors.go({"kind": "metro", "id": "metro_seoul", "name": m["name"], "body": "earth", "dir": m["dir"]}),
+				func(): return _metro_done(w, "metro_seoul")],
+			["metro_campus", func():
+				w.cam.dist = 9.0
+				w.cam.tilt = deg_to_rad(55.0), func(): return _settled(w)],
 			["flood", func():
 				tool.stop()
 				main._on_colony_view(main.colonies.index_of_site("earth_naro"))
@@ -227,6 +259,6 @@ func _process(_delta: float) -> bool:
 			_wait = 0
 	else:
 		@warning_ignore("integer_division")
-		_shot("city_%02d_%s" % [_step / 2 + 1, s[0]], String(s[0]).ends_with("_tool"))
+		_shot("city_%02d_%s" % [_step / 2 + 1, s[0]], String(s[0]).ends_with("_tool") or String(s[0]) == "metro_card")
 	_step += 1
 	return false

@@ -665,6 +665,44 @@ func _transport_check(col: Colonies) -> void:
 	_check(lots == slots and lots > 200, "구역의 필지 수가 자리 수와 다르다 (%d/%d)" % [lots, slots])
 	print("smoke: transport %d lines %s, trips %d, %.1f t, settlers %d, metros %d" % [tr.lines.size(), str(roles),
 		int(tr.totals["trips"]), float(tr.totals["t"]), int(tr.totals["settlers"]), Metros.list.size()])
+	_metro_fn_check(col)
+
+
+## 대도시의 우주 시설: 지원을 내고 짓고, 다 지으면 항공편이 더 싣고 더 자주 뜨며, 연구·지원이 들어온다. 저장 왕복
+func _metro_fn_check(col: Colonies) -> void:
+	var fn := col.metro_fn
+	var tr := col.transport
+	var payer: CitySim = col.list[0]["sim"]
+	payer.support = 5000.0
+	var key := "metro_seoul"
+	_check(MetroFunctions.defs().size() == 5, "대도시의 우주 시설이 다섯이 아니다")
+	_check(MetroFunctions.scale(key, "space_park") > MetroFunctions.scale(key, "research"), "서울의 강점(우주 산업)이 몫을 키우지 않는다")
+	var s0 := payer.support
+	_check(fn.build(key, "space_park", col, 0) and fn.building(key, "space_park"), "우주 산업 단지를 짓기 시작하지 못했다")
+	_check(absf(s0 - payer.support - 150.0) < 0.01, "짓는 데 지원 150이 빠지지 않았다")
+	_check(not fn.build(key, "space_park", col, 0), "짓는 중인 시설을 또 지었다")
+	_check(fn.build(key, "cargo_hub", col, 0) and fn.build(key, "research", col, 0) and fn.build(key, "outreach", col, 0)
+		and fn.build(key, "emigration", col, 0), "다른 시설을 짓기 시작하지 못했다")
+	for _i in 24 * 31:
+		col.step()
+	for fac in MetroFunctions.ORDER:
+		_check(fn.level(key, fac) == 1 and not fn.building(key, fac), "%s이(가) 1단계가 되지 않았다" % MetroFunctions.fac_name(fac))
+	var feeder := tr.line_by_id("feeder:earth_naro~metro_seoul")
+	_check(not feeder.is_empty() and int(feeder["every_h"]) == 16, "공항 화물 터미널이 항공편을 앞당기지 않았다 (%s)" %
+		str(feeder.get("every_h", "-")))
+	var fb := fn.feeder(key, 24)
+	_check(int(fb["settlers"]) > 20 and float(fb["parts"]) > 1.0, "항공편이 더 싣지 않는다 %s" % str(fb))
+	for _i in 24:
+		col.step()
+		if col.hour % 24 == 0:
+			break
+	var y: Dictionary = fn.last.get(key, {})
+	_check(float(y.get("rp", 0.0)) > 0.0 and float(y.get("support", 0.0)) > 0.0, "연구소·홍보관의 몫이 들어오지 않았다 %s" % str(y))
+	var back := MetroFunctions.new()
+	back.load_save(JSON.parse_string(JSON.stringify(fn.to_save())))
+	_check(back.level(key, "research") == 1 and back.active_keys() == [key], "대도시 시설이 저장되지 않았다")
+	print("smoke: metro functions %s — feeder every %dh, +%d settlers, +%.1f parts/flight" % [key, int(feeder.get("every_h", 0)),
+		int(fb["settlers"]), float(fb["parts"])])
 
 
 func _check(ok: bool, message: String) -> void:

@@ -668,11 +668,12 @@ func _terrain_plan(center: Vector2, radius: float, mode: String, step: float, ba
 	return {"changes": changes, "depth": depth, "reach": reach}
 
 
-## 고치지 않는 칸: 건물 밑과 길 밑 (계획이 바뀔 때만 다시 셈한다)
+## 고치지 않는 칸: 건물 밑과 길 밑 (건물·길이 바뀔 때만 다시 셈한다 — 땅·물·구획만 바뀐 것은 revision에서 뺀다)
 func _fixed_cells() -> Dictionary:
-	if _fixed_rev == revision:
+	var key := revision - terrain_rev - flood_rev - zone_rev + road_rev * 100003
+	if _fixed_rev == key:
 		return _fixed
-	_fixed_rev = revision
+	_fixed_rev = key
 	var c := cell_m()
 	var out := {}
 	for e in buildings:

@@ -165,7 +165,7 @@ func rebuild(col: Colonies) -> void:
 					best_km = km2
 					best = s
 			var lf := _line(key, best, String(md.get("mode", "airliner")), "feeder", "earth", best_km)
-			lf["every_h"] = int(md.get("every_h", 24))
+			lf["every_h"] = int(col.metro_fn.feeder(key, int(md.get("every_h", 24)))["every_h"])
 			want.append(lf)
 	# 대도시끼리: 가장 가까운 두 도시와 국제선
 	var pairs := {}
@@ -381,16 +381,20 @@ func _depart(col: Colonies, l: Dictionary, dir: int) -> void:
 			pax = _pax(l, md, col.hour)
 		"feeder":
 			if d_sim != null:
-				# 대도시 → 우주항: 빈 주거만큼 정착민, 부품이 모자라면 부품
+				# 대도시 → 우주항: 빈 주거만큼 정착민, 부품이 모자라면 부품. 대도시의 우주 시설이 더 싣는다
+				# (이주 지원 센터: 정착민, 우주 산업 단지: 부품 — 모자라지 않아도)
 				var mt: Dictionary = D.get("metro", {})
+				var fb: Dictionary = col.metro_fn.feeder(src, int(mt.get("every_h", 24)))
 				var inc := incoming(dst)
-				var n := mini(int(mt.get("settlers", 40)), _room(d_sim) - int(inc.get("people", 0)))
+				var n := mini(int(mt.get("settlers", 40)) + int(fb["settlers"]), _room(d_sim) - int(inc.get("people", 0)))
 				if n > 0:
 					people.append([float(n), 0.0])
 				var want_p := minf(float(mt.get("parts", 30)), _need(d_sim, cargo_rule("parts")) - float(d_sim.stock.get("parts", 0.0))
 					- float(inc.get("parts", 0.0)))
-				if want_p >= 1.0:
-					cargo["parts"] = floorf(want_p)
+				var extra := float(fb["parts"])
+				if maxf(want_p, 0.0) + extra >= 1.0:
+					cargo["parts"] = floorf(maxf(want_p, 0.0) + extra)
+				col.metro_fn.note_flight(src, extra, maxi(0, mini(n, int(fb["settlers"]))))
 			pax = _pax(l, md, col.hour)
 		_:
 			if s_sim != null and d_sim != null:

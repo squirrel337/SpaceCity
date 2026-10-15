@@ -39,6 +39,11 @@ var _cursor := 0
 var _chunks := {}                # Vector2i → {xf: Array[Transform3D], col: PackedColorArray, cus: PackedColorArray}
 var _rng := RandomNumberGenerator.new()
 var _shadows := true
+var mgr: Colonies                # 우주 시설 (도시 기능)을 읽는다
+var _fac_root: Node3D
+var _fac_sig := ""
+var _fac_labels: Array = []      # [[모형 좌표 Vector3 (부모 로컬), 이름, 둘째 줄, 색]]
+var _beacons: Array = []
 
 
 func setup(m: Dictionary, g: SiteSurface, hi: bool) -> void:
@@ -113,6 +118,10 @@ func _influence(en: Vector2) -> float:
 func update(_view: WorldView) -> void:
 	if _mat:
 		_mat.set_shader_parameter("night", ground.night_k)
+	if _phase == 3 and mgr != null:
+		_update_facilities()
+	for bm in _beacons:
+		(bm as ShaderMaterial).set_shader_parameter("night", ground.night_k)
 	match _phase:
 		0:
 			if ground.baked():
@@ -359,6 +368,156 @@ func _commit() -> void:
 			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi)
 	_chunks.clear()
+
+
+# ── 우주 시설 (도시 기능) ────────────────────────────────────────
+## 시설이 바뀌거나 짓는 몫이 오르면 다시 놓는다: 시설마다 도심에서 몇 km 떨어진 땅에 단지(색 외벽의 건물 몇 채)와 빛기둥
+func _update_facilities() -> void:
+	var fn := mgr.metro_fn
+	var key := String(metro["key"])
+	var parts := PackedStringArray([str(fn.rev)])
+	for fac in MetroFunctions.ORDER:
+		parts.append("%d%s%d" % [fn.level(key, fac), "b" if fn.building(key, fac) else "", int(fn.progress(key, fac, mgr.hour) * 4.0)])
+	var sig := ",".join(parts)
+	if sig == _fac_sig:
+		return
+	_fac_sig = sig
+	if _fac_root != null:
+		_fac_root.queue_free()
+	_fac_root = Node3D.new()
+	add_child(_fac_root)
+	_fac_labels.clear()
+	_beacons.clear()
+	var xs: Array = []
+	var cols := PackedColorArray()
+	var cus := PackedColorArray()
+	for i in MetroFunctions.ORDER.size():
+		var fac: String = MetroFunctions.ORDER[i]
+		var lvl := fn.level(key, fac)
+		var busy := fn.building(key, fac)
+		if lvl == 0 and not busy:
+			continue
+		var en := _facility_site(i)
+		if en.x == INF:
+			continue
+		var grow := lvl + (fn.progress(key, fac, mgr.hour) if busy else 0.0)
+		var top := _campus(fac, en, maxf(grow, 0.35), xs, cols, cus)
+		var col := MetroFunctions.fac_color(fac)
+		var p := _model(en)
+		var gy := ground.local_height_m(p) - p.length_squared() / (2.0 * ground.radius_m())
+		_beacon(Vector3(p.x, gy, -p.y), col, busy)
+		var sub := "%d단계" % lvl if not busy else ("짓는 중 %d%%" % int(fn.progress(key, fac, mgr.hour) * 100.0)
+			+ (" (%d단계로)" % (lvl + 1) if lvl > 0 else ""))
+		_fac_labels.append([Vector3(p.x, gy + top + 30.0, -p.y), MetroFunctions.fac_name(fac), sub, col])
+	if xs.is_empty():
+		return
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.use_custom_data = true
+	mm.mesh = _box
+	mm.instance_count = xs.size()
+	for k in xs.size():
+		mm.set_instance_transform(k, xs[k])
+		mm.set_instance_color(k, cols[k])
+		mm.set_instance_custom_data(k, cus[k])
+	var mi := MultiMeshInstance3D.new()
+	mi.multimesh = mm
+	mi.material_override = _mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_fac_root.add_child(mi)
+
+
+## 시설 i의 자리 (동·북 m): 도시마다 다른 방향에서 72°씩, 도심에서 시가지 반지름의 20% (1.8~4.5 km) — 물·공원이면 가까운 땅
+func _facility_site(i: int) -> Vector2:
+	var base := float(absi(String(metro["id"]).hash()) % 360)
+	var a := deg_to_rad(base + 72.0 * i)
+	var r := clampf(_radius_m * 0.2, 1800.0, 4500.0)
+	var en := Vector2(sin(a), cos(a)) * r
+	for _try in 8:
+		var s := _sample(en)
+		if s.x >= 0.12 and s.y < 0.4:
+			return en
+		en = en.rotated(0.18) * 1.06
+	return _land_near(en)
+
+
+## 단지 하나 (시설마다 모양이 다르다). grow = 단계 (짓는 중이면 소수). 가장 높은 건물의 높이를 돌려준다
+func _campus(fac: String, en: Vector2, grow: float, xs: Array, cols: PackedColorArray, cus: PackedColorArray) -> float:
+	var col := MetroFunctions.fac_color(fac)
+	var wall := Color(0.86, 0.87, 0.88).lerp(col, 0.55)
+	var g := clampf(grow, 0.0, 3.0)
+	var top := 0.0
+	# [동·북 자리 (m, 단지 가운데에서), 너비, 깊이, 높이, 유리 몫]
+	var parts: Array = []
+	match fac:
+		"space_park":
+			for k in 3:
+				parts.append([Vector2(-120.0 + 120.0 * k, -70.0), 100.0, 46.0, 16.0 + 3.0 * g, 0.2])
+			parts.append([Vector2(-40.0, 60.0), 26.0, 26.0, 50.0 + 28.0 * g, 0.3])
+			parts.append([Vector2(40.0, 60.0), 26.0, 26.0, 40.0 + 24.0 * g, 0.3])
+			if g > 1.5:
+				parts.append([Vector2(140.0, 40.0), 120.0, 50.0, 22.0, 0.2])
+		"emigration":
+			parts.append([Vector2(0.0, 0.0), 120.0, 70.0, 18.0 + 6.0 * g, 0.6])
+			for k in int(1 + g):
+				parts.append([Vector2(-110.0 + 75.0 * k, 90.0), 60.0, 15.0, 26.0 + 10.0 * g, 0.35])
+		"research":
+			for k in int(3 + g):
+				var aa := TAU * k / (3.0 + floorf(g))
+				parts.append([Vector2(cos(aa), sin(aa)) * 95.0, 46.0, 40.0, 14.0 + 7.0 * g, 0.7])
+			parts.append([Vector2.ZERO, 24.0, 24.0, 50.0 + 25.0 * g, 0.8])
+		"outreach":
+			parts.append([Vector2.ZERO, 20.0, 20.0, 90.0 + 55.0 * g, 0.85])
+			parts.append([Vector2(0.0, -70.0), 90.0, 60.0, 10.0 + 3.0 * g, 0.6])
+		"cargo_hub":
+			for k in int(1 + ceilf(g * 0.67)):
+				parts.append([Vector2(-150.0 + 170.0 * k, 0.0), 150.0, 64.0, 20.0 + 3.0 * g, 0.15])
+			parts.append([Vector2(0.0, 90.0), 14.0, 14.0, 46.0 + 6.0 * g, 0.7])
+	var p0 := _model(en)
+	var dir_m := _model(en + _vv) - p0
+	var yaw := atan2(dir_m.y, dir_m.x)
+	for q in parts:
+		var e2 := _local_en(en, q[0])
+		var p := _model(e2)
+		var gy := ground.local_height_m(p) - p.length_squared() / (2.0 * ground.radius_m())
+		var h: float = q[3]
+		top = maxf(top, h)
+		xs.append(Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(q[1], h + 3.0, q[2])), Vector3(p.x, gy - 3.0, -p.y)))
+		var c := wall * (0.9 + 0.1 * _hash(e2))
+		c.a = float(q[4])
+		cols.append(c)
+		cus.append(Color(h + 3.0, q[1], q[2], _hash(e2) * 100.0))
+	return top
+
+
+## 빛기둥 (멀리서도 보이게)
+func _beacon(at: Vector3, col: Color, busy: bool) -> void:
+	var cm := CylinderMesh.new()
+	cm.top_radius = 6.0
+	cm.bottom_radius = 16.0
+	cm.height = 900.0
+	cm.radial_segments = 12
+	cm.rings = 1
+	cm.cap_top = false
+	cm.cap_bottom = false
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://ui/world/shaders/beacon.gdshader")
+	mat.set_shader_parameter("color", Color(1.0, 0.62, 0.25) if busy else col)
+	mat.set_shader_parameter("height", 900.0)
+	mat.set_shader_parameter("blink", 1.0 if busy else 0.0)
+	var mi := MeshInstance3D.new()
+	mi.mesh = cm
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = at + Vector3(0, 450.0, 0)
+	_fac_root.add_child(mi)
+	_beacons.append(mat)
+
+
+## 시설 이름표: [[부모(땅의 도시 뿌리) 로컬 좌표, 이름, 둘째 줄, 색]]
+func facility_labels() -> Array:
+	return _fac_labels
 
 
 ## 단위 상자 (바닥 없음): x·z −0.5~0.5, y 0~1. UV = 면 안의 (가로, 세로), UV2.x = 면 (0 너비 쪽, 1 깊이 쪽, 2 지붕)

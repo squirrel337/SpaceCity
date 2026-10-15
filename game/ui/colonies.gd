@@ -25,6 +25,7 @@ var start_unix := 0                # 게임을 시작한 시각
 var seed_value := 2061
 var _windows := {}                 # 부지 → {best, start, end} (게임 일) — 창이 지나면 다시 셈한다
 var transport := Transport.new()   # 도시 사이 교통
+var metro_fn := MetroFunctions.new()   # 지구 대도시의 우주 시설 (도시 기능)
 
 
 ## 새 게임: 고향 도시와 천체마다의 기본 도시로 시작한다
@@ -36,6 +37,7 @@ func start(sim: CitySim, plan: CityPlan) -> void:
 	seed_value = sim.seed_value
 	_windows.clear()
 	found_defaults()
+	metro_fn.reset()
 	transport.reset()
 	transport.rebuild(self)
 
@@ -149,6 +151,7 @@ func step() -> Array:
 	transport.step(self)
 	if hour % 24 == 0:
 		share_techs()
+		metro_fn.step_day(self)
 	return arrived
 
 
@@ -423,7 +426,8 @@ func to_save() -> Dictionary:
 		cols.append({"name": c["name"], "site": c["site"], "founded": c["founded"],
 			"sim": (c["sim"] as CitySim).to_save(), "plan": (c["plan"] as CityPlan).to_save()})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
-		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save()}
+		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
+		"metro_fn": metro_fn.to_save()}
 
 
 ## 저장을 읽는다 (판 1 = 도시 하나뿐이던 저장, 판 2 = 교통이 없던 저장). 기본 도시가 없던 저장이면 지금 시각에 세운다.
@@ -440,6 +444,7 @@ func load_save(data: Dictionary) -> bool:
 		seed_value = s.seed_value
 		_windows.clear()
 		found_defaults()
+		metro_fn.reset()
 		transport.load_save({}, self)
 		return true
 	if (v != SAVE_VERSION and v != 2) or not data.get("colonies") is Array or (data["colonies"] as Array).is_empty():
@@ -463,6 +468,7 @@ func load_save(data: Dictionary) -> bool:
 	_windows.clear()
 	if not data.has("defaults"):
 		found_defaults()
+	metro_fn.load_save(data.get("metro_fn", {}) if data.get("metro_fn") is Dictionary else {})
 	transport.load_save(data.get("transport", {}) if data.get("transport") is Dictionary else {}, self)
 	return true
 

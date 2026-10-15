@@ -92,6 +92,7 @@ func rebuild() -> void:
 			_:
 				by_group["air"].append(l)
 	by_group["local"].sort_custom(func(a, b): return Colonies.BODY_ORDER.find(a["body"]) < Colonies.BODY_ORDER.find(b["body"]))
+	_metro_section()
 	for g in GROUPS:
 		var ls: Array = by_group[g[0]]
 		if ls.is_empty():
@@ -121,6 +122,66 @@ func rebuild() -> void:
 	if tr.lines.is_empty():
 		box.add_child(ThemeFactory.muted("아직 이을 도시가 없다."))
 	update_view()
+
+
+## 대도시의 우주 시설: 시설이 있는 대도시마다 단계와 어제의 몫, 그리고 26곳으로 가는 단추
+func _metro_section() -> void:
+	var fn := mgr.metro_fn
+	box.add_child(HSeparator.new())
+	var keys := fn.active_keys()
+	box.add_child(ThemeFactory.heading("대도시의 우주 시설 · %d곳" % keys.size(), 15))
+	box.add_child(ThemeFactory.muted("대도시 위로 가면 (아래 단추, 3D 지도의 대도시 이름) 오른쪽 위 카드에서 우주 산업 단지·이주 지원 센터·" +
+		"우주 연구소·우주 홍보관·공항 화물 터미널을 고른 식민지의 지구 지원 점수로 짓고 올린다. 큰 도시일수록, 그 도시의 강점(★)일수록 몫이 크다.", 12))
+	for key in keys:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		var lab := Label.new()
+		lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lab.add_theme_font_size_override("font_size", 13)
+		var k: String = key
+		var update := func():
+			var bits := PackedStringArray()
+			for fac in MetroFunctions.ORDER:
+				var lvl := fn.level(k, fac)
+				if lvl > 0 or fn.building(k, fac):
+					bits.append("%s %s%s" % [String(MetroFunctions.def(fac).get("short", fac)), "●".repeat(lvl),
+						"…" if fn.building(k, fac) else ""])
+			var y: Dictionary = fn.last.get(k, {})
+			var ys := PackedStringArray()
+			if float(y.get("parts", 0.0)) > 0.0:
+				ys.append("부품 %s" % Fmt.n(float(y["parts"]), 1))
+			if float(y.get("settlers", 0.0)) > 0.0:
+				ys.append("정착민 %d" % int(y["settlers"]))
+			if float(y.get("rp", 0.0)) > 0.0:
+				ys.append("연구 %s" % Fmt.n(float(y["rp"]), 1))
+			if float(y.get("support", 0.0)) > 0.0:
+				ys.append("지원 %s" % Fmt.n(float(y["support"]), 1))
+			lab.text = "%s — %s%s" % [String(Metros.of(k).get("name", k)), " · ".join(bits),
+				("\n어제: " + ", ".join(ys)) if not ys.is_empty() else ""]
+		update.call()
+		_live.append(update)
+		row.add_child(lab)
+		var go := Button.new()
+		go.text = "보기"
+		go.custom_minimum_size = Vector2(56, 32)
+		go.pressed.connect(func(): show_metro.emit(k))
+		row.add_child(go)
+		box.add_child(row)
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 4)
+	flow.add_theme_constant_override("v_separation", 4)
+	Metros.load_all()
+	for m in Metros.list:
+		var b := Button.new()
+		var mk := String(m["key"])
+		b.text = String(m["name"]) + (" ★" if fn.levels_total(mk) > 0 else "")
+		b.tooltip_text = "%s · %s · 강점: %s" % [String(m["country"]), Metros.pop_text(m), Metros.strength_name(m)]
+		b.custom_minimum_size = Vector2(0, 30)
+		b.add_theme_font_size_override("font_size", 12)
+		b.pressed.connect(func(): show_metro.emit(mk))
+		flow.add_child(b)
+	box.add_child(flow)
 
 
 ## 접힌 묶음: 운행 편수·누계 한 줄
