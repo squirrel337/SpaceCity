@@ -360,7 +360,7 @@ func _road_point() -> void:
 			_recheck_road()
 			changed.emit()
 		return
-	if reason != "" or preview.size() < 2:
+	if reason != "" or preview.size() < 2 or road_len < 0.5:
 		return
 	var added := false
 	for i in range(preview.size() - 1):
