@@ -9,10 +9,11 @@ extends RefCounted
 
 signal changed
 
-const VERSION := 1
+const VERSION := 2                                   # 2: 길 종류, 블록의 구획, 땅 고치기 (1도 읽는다)
 const SPECIAL := ["regolith_cover", "robot"]        # 자리가 없는 공사
 const SNAP_M := 6.0                                  # 길 끝을 꼭짓점·길에 붙이는 거리
 const ROAD_HALF := BaseLayout.ROAD_W * 0.5
+const SIDEWALK := 1.5                                # 길과 블록 사이 보도
 const PAD_CLEAR_M := 30.0                            # 착륙장 둘레: 다른 건물 금지 (착륙 분사가 레골리스를 날린다)
 const REACTOR_CLEAR_M := 60.0                        # 원자로와 사람이 사는 건물 사이
 const PEOPLE := ["habitat", "safety", "research", "social"]   # 사람이 머무는 분류
@@ -24,8 +25,15 @@ var layout: BaseLayout
 var buildings: Array = []          # {uid, id, x, y, rot, variant, seq(대기열 번호, 지어졌으면 -1), tile}
 var nodes: Array = []              # 길 꼭짓점 Vector2
 var edges: Array = []              # 길 Vector2i(꼭짓점, 꼭짓점)
+var etypes: Array = []             # 길마다의 종류 (data/city_layout.json의 roads: path·street·avenue·highway·tube·rail)
+var district_seeds: Array = []     # [[Vector2, 구획]] — 그 점이 든 블록의 용도 (길이 바뀌어도 블록이 이어받는다)
+var terrain := {}                  # 땅 고치기: Vector2i(칸) → 높이 차 m (칸 = LayoutData.terrain().cell_m)
 var revision := 0                  # 건물·길이 바뀔 때마다 +1
 var road_rev := 0                  # 길이 바뀔 때마다 +1
+var zone_rev := 0                  # 블록의 구획이 바뀔 때마다 +1
+var terrain_rev := 0               # 땅을 고칠 때마다 +1
+var _blocks: Array = []
+var _blocks_sig := ""
 var _next_uid := 1
 var _sig := ""
 var _adj: Array = []
@@ -46,11 +54,13 @@ static func create(sim: CitySim, p_layout: BaseLayout = null) -> CityPlan:
 
 
 func default_roads() -> void:
-	for road in layout.roads:
-		for i in range(road.size() - 1):
-			var a: Vector3 = road[i]
-			var b: Vector3 = road[i + 1]
-			add_road(Vector2(a.x, a.y), Vector2(b.x, b.y), 0.6)
+	for sg in layout.segments:
+		add_road(sg[0], sg[1], 0.6, String(sg[2]))
+	district_seeds.clear()
+	for b in layout.blocks:
+		if String(b["district"]) != "":
+			district_seeds.append([(b["cell"] as Rect2).get_center(), String(b["district"])])
+	zone_rev += 1
 
 
 func hub() -> Vector2:
@@ -240,6 +250,12 @@ func suggest(kind: String, tile: String = "") -> Dictionary:
 		var at := Vector2(p.x, p.y)
 		if check_spot(kind, at, 0).is_empty():
 			return {"at": at, "rot": 0, "variant": BaseScene.variant_of(kind, i), "tile": ""}
+	# 기본 자리가 다 찼으면: 그 구획으로 정한 블록 안 (플레이어가 새로 정한 블록도), 그다음 빈 블록
+	var district: String = layout.district_of.get(fam(kind), "")
+	if district != "" and not (district in BaseLayout.SPECIAL):
+		var bs := _block_spot(kind, district)
+		if not bs.is_empty():
+			return bs
 	var c := _anchor(kind)
 	var f := ArtLib.footprint(kind)
 	var step := clampf(minf(f.x, f.y) * 0.5, 2.0, 6.0)
@@ -335,10 +351,9 @@ func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1) -> St
 			return "이 원자로는 사람이 머무는 건물에서 %d m 넘게 떨어져야 한다" % int(clearance(kind))
 		if ofam in REACTORS and _people(kind) and _rect_dist(r, er) < clearance(other):
 			return "원자로(%s)에서 %d m 넘게 떨어져야 한다" % [GameData.module_name(other), int(clearance(other))]
-	for ed in edges:
-		var a: Vector2 = nodes[ed.x]
-		var c: Vector2 = nodes[ed.y]
-		if _seg_rect_dist(a, c, r) < ROAD_HALF - 0.05:
+	for k in edges.size():
+		var ed: Vector2i = edges[k]
+		if _seg_rect_dist(nodes[ed.x], nodes[ed.y], r) < edge_half(k) - 0.05:
 			return "길 위에는 지을 수 없다"
 	return ""
 
@@ -400,7 +415,7 @@ static func _seg_rect_dist(a: Vector2, b: Vector2, r: Rect2) -> float:
 
 # ── 길 ──────────────────────────────────────────────────────────
 ## 길 하나를 놓을 수 있나: "" 또는 까닭
-func road_check(a: Vector2, b: Vector2) -> String:
+func road_check(a: Vector2, b: Vector2, type: String = "street") -> String:
 	if a.distance_to(b) < 3.0:
 		return "길이 너무 짧다"
 	var bounds := BaseLayout.BOUNDS_UV.grow(-1.0)
@@ -408,10 +423,199 @@ func road_check(a: Vector2, b: Vector2) -> String:
 		var uv := BaseLayout.xy_to_uv(p)
 		if not bounds.has_point(uv) or uv.y < layout.crest_v - 2.0:
 			return "기지 밖이다"
+	var hw := LayoutData.road_half(type)
 	for e in buildings:
-		if _seg_rect_dist(a, b, entry_rect(e).grow(-0.3)) < ROAD_HALF:
+		if _seg_rect_dist(a, b, entry_rect(e).grow(-0.3)) < hw:
 			return "건물(%s)을 지나간다" % GameData.module_name(String(e["id"]))
 	return ""
+
+
+# ── 블록과 구획 ─────────────────────────────────────────────────
+## 길이 둘러싼 블록: [{poly: 보도 안쪽 다각형, face: 길 가운데선의 면, center, area, district}]. 길·구획이 바뀔 때만 다시 셈한다
+func blocks() -> Array:
+	var sig := "%d|%d" % [road_rev, zone_rev]
+	if sig == _blocks_sig:
+		return _blocks
+	_blocks_sig = sig
+	_blocks = []
+	var widest := 0.0
+	for k in edges.size():
+		widest = maxf(widest, edge_half(k))
+	for face in RoadNet.faces(nodes, edges):
+		var f: PackedVector2Array = face
+		if RoadNet.area(f) > 120000.0:
+			continue                # 기지를 다 감싸는 큰 면 (바깥 길로 둘러싸인 빈 땅) — 블록으로 보지 않는다
+		var d := _face_inset(f)
+		for poly in RoadNet.inset(f, d):
+			var c := RoadNet.centroid(poly)
+			_blocks.append({"poly": poly, "face": f, "center": c, "area": RoadNet.area(poly), "district": _seed_in(poly)})
+	return _blocks
+
+
+## 면을 줄일 거리: 그 면을 이루는 길 가운데 가장 넓은 것의 반폭 + 보도
+func _face_inset(f: PackedVector2Array) -> float:
+	var d := ROAD_HALF
+	for i in f.size():
+		var a := f[i]
+		var b := f[(i + 1) % f.size()]
+		for k in edges.size():
+			var e: Vector2i = edges[k]
+			var p: Vector2 = nodes[e.x]
+			var q: Vector2 = nodes[e.y]
+			if (p.distance_to(a) < 0.01 and q.distance_to(b) < 0.01) or (p.distance_to(b) < 0.01 and q.distance_to(a) < 0.01):
+				d = maxf(d, edge_half(k))
+				break
+	return d + SIDEWALK
+
+
+func _seed_in(poly: PackedVector2Array) -> String:
+	var best := ""
+	var best_d := INF
+	var c := RoadNet.centroid(poly)
+	for sd in district_seeds:
+		var p: Vector2 = sd[0]
+		if Geometry2D.is_point_in_polygon(p, poly):
+			var dd := p.distance_to(c)
+			if dd < best_d:
+				best_d = dd
+				best = String(sd[1])
+	return best
+
+
+## 이 점이 든 블록 (없으면 {})
+func block_at(p: Vector2) -> Dictionary:
+	for b in blocks():
+		if Geometry2D.is_point_in_polygon(p, b["poly"]):
+			return b
+	return {}
+
+
+func district_at(p: Vector2) -> String:
+	var b := block_at(p)
+	return String(b.get("district", "")) if not b.is_empty() else ""
+
+
+## 블록의 용도를 정한다 ("" = 비운다). 그 블록 안의 옛 씨앗은 지운다
+func set_district(p: Vector2, district: String) -> bool:
+	var b := block_at(p)
+	if b.is_empty():
+		return false
+	var poly: PackedVector2Array = b["poly"]
+	for i in range(district_seeds.size() - 1, -1, -1):
+		if Geometry2D.is_point_in_polygon(district_seeds[i][0], poly):
+			district_seeds.remove_at(i)
+	if district != "":
+		district_seeds.append([b["center"], district])
+	zone_rev += 1
+	_touch()
+	return true
+
+
+## 구획 블록 안에서 이 종류를 놓을 빈자리: 블록 가장자리(길 쪽)부터 줄지어 찾는다
+func _block_spot(kind: String, district: String) -> Dictionary:
+	var f := ArtLib.footprint(kind) + Vector2(BaseLayout.GAP, BaseLayout.GAP)
+	var hubp := hub()
+	var list := blocks().filter(func(b): return String(b["district"]) == district)
+	list.sort_custom(func(x, y): return (x["center"] as Vector2).distance_to(hubp) < (y["center"] as Vector2).distance_to(hubp))
+	for b in list:
+		var poly: PackedVector2Array = b["poly"]
+		var bb := Rect2(poly[0], Vector2.ZERO)
+		for q in poly:
+			bb = bb.expand(q)
+		var y := bb.position.y + f.y * 0.5
+		while y <= bb.end.y - f.y * 0.5 + 0.01:
+			var x := bb.position.x + f.x * 0.5
+			while x <= bb.end.x - f.x * 0.5 + 0.01:
+				var at := snap_center(kind, Vector2(x, y), 0)
+				if RoadNet.rect_inside(rect_of(kind, at, 0), poly) and check_spot(kind, at, 0).is_empty():
+					return {"at": at, "rot": 0, "variant": BaseScene.variant_of(kind, count_of(kind)), "tile": ""}
+				x += f.x
+			y += f.y
+	return {}
+
+
+# ── 땅 고치기 ───────────────────────────────────────────────────
+## 칸 크기 (m)
+static func cell_m() -> float:
+	return float(LayoutData.terrain()["cell_m"])
+
+
+## 이 점의 높이 차 (m, 칸 사이는 이어지게)
+func terrain_delta(p: Vector2) -> float:
+	if terrain.is_empty():
+		return 0.0
+	var c := cell_m()
+	var q := p / c
+	var i0 := int(floor(q.x))
+	var j0 := int(floor(q.y))
+	var fx := q.x - i0
+	var fy := q.y - j0
+	var h00 := float(terrain.get(Vector2i(i0, j0), 0.0))
+	var h10 := float(terrain.get(Vector2i(i0 + 1, j0), 0.0))
+	var h01 := float(terrain.get(Vector2i(i0, j0 + 1), 0.0))
+	var h11 := float(terrain.get(Vector2i(i0 + 1, j0 + 1), 0.0))
+	return lerpf(lerpf(h00, h10, fx), lerpf(h01, h11, fx), fy)
+
+
+## 땅을 고친다: mode "dig"(파기)·"raise"(쌓기)·"flatten"(평탄화 — 붓 가운데 높이로)·"restore"(되돌리기).
+## base_h(p)는 고치기 전 땅 높이 (평탄화가 쓴다). 고친 칸 수를 돌려준다
+func edit_terrain(center: Vector2, radius: float, mode: String, step: float, base_h: Callable = Callable()) -> int:
+	var t := LayoutData.terrain()
+	var c := cell_m()
+	var lo := -float(t["max_depth_m"])
+	var hi := float(t["max_raise_m"])
+	var target := 0.0
+	if mode == "flatten":
+		target = terrain_delta(center) + (float(base_h.call(center)) if base_h.is_valid() else 0.0)
+	var n := 0
+	var r_cells := int(ceil(radius / c)) + 1
+	var ci := Vector2i(int(round(center.x / c)), int(round(center.y / c)))
+	for dj in range(-r_cells, r_cells + 1):
+		for di in range(-r_cells, r_cells + 1):
+			var key := Vector2i(ci.x + di, ci.y + dj)
+			var p := Vector2(key) * c
+			var d := p.distance_to(center)
+			if d > radius:
+				continue
+			var w := 1.0 - smoothstep(radius * 0.55, radius, d)      # 가장자리는 비탈로
+			var old := float(terrain.get(key, 0.0))
+			var v := old
+			match mode:
+				"dig":
+					v = old - step * w
+				"raise":
+					v = old + step * w
+				"flatten":
+					var bh := float(base_h.call(p)) if base_h.is_valid() else 0.0
+					v = lerpf(old, target - bh, w)
+				"restore":
+					v = lerpf(old, 0.0, w)
+			v = clampf(v, lo, hi)
+			if absf(v - old) < 0.005:
+				continue
+			if absf(v) < 0.01:
+				terrain.erase(key)
+			else:
+				terrain[key] = snappedf(v, 0.01)
+			n += 1
+	if n > 0:
+		terrain_rev += 1
+		_touch()
+	return n
+
+
+## 고친 땅의 부피 (m³, 판 것·쌓은 것)
+func terrain_volume() -> Vector2:
+	var c2 := cell_m() * cell_m()
+	var dug := 0.0
+	var raised := 0.0
+	for k in terrain:
+		var v := float(terrain[k])
+		if v < 0.0:
+			dug -= v * c2
+		else:
+			raised += v * c2
+	return Vector2(dug, raised)
 
 
 ## 가까운 꼭짓점이나 길 위의 점으로 붙인다
@@ -443,7 +647,7 @@ func nearest_edge(p: Vector2, max_d: float = INF) -> int:
 	return best
 
 
-func add_road(a: Vector2, b: Vector2, snap_r: float = SNAP_M) -> bool:
+func add_road(a: Vector2, b: Vector2, snap_r: float = SNAP_M, type: String = "street") -> bool:
 	var ia := _attach(a, snap_r)
 	var ib := _attach(b, snap_r)
 	if ia == ib:
@@ -481,8 +685,13 @@ func add_road(a: Vector2, b: Vector2, snap_r: float = SNAP_M) -> bool:
 		chain.append(ib)
 	var added := false
 	for i in range(chain.size() - 1):
-		if not _has_edge(chain[i], chain[i + 1]):
+		var k := _edge_index(chain[i], chain[i + 1])
+		if k < 0:
 			edges.append(Vector2i(chain[i], chain[i + 1]))
+			etypes.append(type)
+			added = true
+		elif String(etypes[k]) != type:
+			etypes[k] = type          # 이미 난 길 위에 다른 종류로 다시 내면 그 종류로 바꾼다
 			added = true
 	if added:
 		_roads_changed()
@@ -493,8 +702,18 @@ func remove_edge(k: int) -> void:
 	if k < 0 or k >= edges.size():
 		return
 	edges.remove_at(k)
+	etypes.remove_at(k)
 	_tidy()
 	_roads_changed()
+
+
+func edge_type(k: int) -> String:
+	return String(etypes[k]) if k >= 0 and k < etypes.size() else "street"
+
+
+## 그 길의 반폭 (m)
+func edge_half(k: int) -> float:
+	return LayoutData.road_half(edge_type(k))
 
 
 func _roads_changed() -> void:
@@ -530,14 +749,20 @@ func _split_edge(k: int, p: Vector2) -> int:
 	var n := nodes.size() - 1
 	edges[k] = Vector2i(e.x, n)
 	edges.append(Vector2i(n, e.y))
+	etypes.append(edge_type(k))
 	return n
 
 
 func _has_edge(i: int, j: int) -> bool:
-	for e in edges:
+	return _edge_index(i, j) >= 0
+
+
+func _edge_index(i: int, j: int) -> int:
+	for k in edges.size():
+		var e: Vector2i = edges[k]
 		if (e.x == i and e.y == j) or (e.x == j and e.y == i):
-			return true
-	return false
+			return k
+	return -1
 
 
 ## 길을 지운 뒤: 홀로 남은 꼭짓점을 없애고, 곧게 이어지는 꼭짓점(둘만 잇는)은 합친다
@@ -564,10 +789,14 @@ func _tidy() -> void:
 			var o1 := e1.y if e1.x == n else e1.x
 			var d0 := (nodes[o0] - nodes[n]) as Vector2
 			var d1 := (nodes[o1] - nodes[n]) as Vector2
-			if d0.normalized().dot(d1.normalized()) < -0.9998 and not _has_edge(o0, o1):
+			var t0 := edge_type(ks[0])
+			if d0.normalized().dot(d1.normalized()) < -0.9998 and not _has_edge(o0, o1) and t0 == edge_type(ks[1]):
 				edges.remove_at(maxi(ks[0], ks[1]))
+				etypes.remove_at(maxi(ks[0], ks[1]))
 				edges.remove_at(mini(ks[0], ks[1]))
+				etypes.remove_at(mini(ks[0], ks[1]))
 				edges.append(Vector2i(o0, o1))
+				etypes.append(t0)
 				changed_any = true
 				break
 	# 쓰지 않는 꼭짓점 지우기
@@ -731,12 +960,19 @@ func to_save() -> Dictionary:
 	for e in edges:
 		es.append(e.x)
 		es.append(e.y)
-	return {"version": VERSION, "next_uid": _next_uid, "buildings": bs, "nodes": ns, "edges": es}
+	var zs := []
+	for sd in district_seeds:
+		zs.append([snappedf((sd[0] as Vector2).x, 0.1), snappedf((sd[0] as Vector2).y, 0.1), sd[1]])
+	var ts := []
+	for k in terrain:
+		ts.append_array([(k as Vector2i).x, (k as Vector2i).y, int(round(float(terrain[k]) * 100.0))])
+	return {"version": VERSION, "next_uid": _next_uid, "buildings": bs, "nodes": ns, "edges": es, "types": etypes.duplicate(),
+		"districts": zs, "terrain": ts}
 
 
 ## 저장한 계획을 되살리고 시뮬레이션과 맞춘다. 없거나 읽을 수 없으면 새 계획
 static func from_save(data: Variant, sim: CitySim, p_layout: BaseLayout = null) -> CityPlan:
-	if not data is Dictionary or int(data.get("version", 0)) != VERSION:
+	if not data is Dictionary or not int(data.get("version", 0)) in [1, VERSION]:
 		return create(sim, p_layout)
 	var plan := CityPlan.new(p_layout)
 	for b in data.get("buildings", []):
@@ -748,11 +984,28 @@ static func from_save(data: Variant, sim: CitySim, p_layout: BaseLayout = null) 
 	for i in range(0, ns.size() - 1, 2):
 		plan.nodes.append(Vector2(float(ns[i]), float(ns[i + 1])))
 	var es: Array = data.get("edges", [])
+	var ts: Array = data.get("types", [])
 	for i in range(0, es.size() - 1, 2):
 		var a := int(es[i])
 		var b := int(es[i + 1])
 		if a >= 0 and b >= 0 and a < plan.nodes.size() and b < plan.nodes.size() and a != b:
 			plan.edges.append(Vector2i(a, b))
+			@warning_ignore("integer_division")
+			var ti := i / 2
+			var t := String(ts[ti]) if ti < ts.size() else "street"
+			LayoutData.load_all()
+			plan.etypes.append(t if (LayoutData.data["roads"] as Dictionary).has(t) else "street")
+	for z in data.get("districts", []):
+		if z is Array and z.size() >= 3:
+			plan.district_seeds.append([Vector2(float(z[0]), float(z[1])), String(z[2])])
+	if not data.has("districts"):
+		# 옛 저장 (1판): 기본 배치의 블록 용도를 씨앗으로
+		for bl in plan.layout.blocks:
+			if String(bl["district"]) != "":
+				plan.district_seeds.append([(bl["cell"] as Rect2).get_center(), String(bl["district"])])
+	var tr: Array = data.get("terrain", [])
+	for i in range(0, tr.size() - 2, 3):
+		plan.terrain[Vector2i(int(tr[i]), int(tr[i + 1]))] = float(tr[i + 2]) / 100.0
 	plan._next_uid = maxi(int(data.get("next_uid", 1)), 1)
 	for e in plan.buildings:
 		plan._next_uid = maxi(plan._next_uid, int(e["uid"]) + 1)

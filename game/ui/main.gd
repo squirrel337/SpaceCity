@@ -37,10 +37,12 @@ var place_buttons := {}
 var road_button: Button
 var city_area: Control
 var view_buttons := {}
-var world_row: HBoxContainer       # 3D: 확대·축소, 기지·달·지구·달·태양계·별
+var world_row: HBoxContainer       # 3D: 확대·축소, 기지 (다른 고정점은 위쪽의 경로 막대)
+var anchor_bar: AnchorBar          # 3D: 카메라의 고정점 경로 (우주 › 태양계 › 지구 › 도시)
 var view_mode := "world"
 var forecast: ForecastBar
 var modal: Modal
+var settings_panel: SettingsPanel
 var toasts: VBoxContainer
 var speed_buttons: Array[Button] = []
 var auto_button: Button
@@ -119,6 +121,12 @@ func _build() -> void:
 	city_area.add_child(world)
 	city_area.add_child(_build_view_switch())
 	city_area.add_child(_build_place_bar())
+	anchor_bar = AnchorBar.new()
+	anchor_bar.world = world
+	anchor_bar.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	anchor_bar.offset_left = 8
+	anchor_bar.offset_top = 8
+	city_area.add_child(anchor_bar)
 	tool.changed.connect(_update_place_bar)
 	tool.placed.connect(_on_placed)
 	forecast = ForecastBar.new()
@@ -139,6 +147,9 @@ func _build() -> void:
 	modal = Modal.new()
 	modal.chosen.connect(_on_modal_choice)
 	add_child(modal)
+	settings_panel = SettingsPanel.new()
+	settings_panel.changed.connect(func(): world.apply_settings())
+	add_child(settings_panel)
 
 
 func _build_view_switch() -> Control:
@@ -175,9 +186,7 @@ func _build_view_switch() -> Control:
 	gap.custom_minimum_size.x = 8
 	world_row.add_child(gap)
 	for spec in [["−", "축소", func(): world.zoom_by(1.6)], ["+", "확대", func(): world.zoom_by(1.0 / 1.6)],
-			["기지", "고른 식민지의 도시 위로 (H)", func(): world.fly_to_colony()], ["달", "달 전체", func(): world.show_moon()],
-			["지구·달", "지구와 달", func(): world.show_earth_moon()], ["태양계", "태양계", func(): world.show_solar_system()],
-			["별", "이웃 별 (25광년)", func(): world.show_neighbors()]]:
+			["기지", "고른 식민지의 도시 위로 (H) — 다른 곳은 위쪽 경로(우주 › 태양계 › …)에서 고른다", func(): world.fly_to_colony()]]:
 		var wb := Button.new()
 		wb.text = spec[0]
 		wb.tooltip_text = spec[1]
@@ -699,6 +708,10 @@ func _start_jump() -> void:
 
 
 func _process(delta: float) -> void:
+	if anchor_bar:
+		anchor_bar.visible = view_mode == "world" and not tool.active()
+		if anchor_bar.visible:
+			anchor_bar.refresh()
 	if sim == null or modal.visible or _game_over:
 		return
 	var stepped := false
@@ -945,6 +958,7 @@ func _show_menu() -> void:
 	modal.open("menu", "메뉴", "일시정지", "저장은 앱을 닫거나 내릴 때 자동으로 된다.", [
 		["resume", "계속", ""],
 		["save", "지금 저장", ""],
+		["settings", "설정", "그래픽 품질 (GPU에 맞춰 자동) · 지도에 보일 것"],
 		["help", "도움말", ""],
 		["restart", "처음부터 다시", "저장한 게임을 덮어쓴다"],
 		["quit", "저장하고 끝내기", ""],
@@ -962,7 +976,12 @@ func _show_help() -> void:
 		"· 신뢰가 30 아래면 위임이 줄고, 10 아래로 1년이 지나면 시드가 정지된다.\n" +
 		"· 개척 탭(P): 화성·수성·세레스·칼리스토·타이탄으로 원정대를 보낸다. 필요한 기술, 고향의 부품·지원 점수, " +
 		"열린 발사 창이 있어야 떠난다. 도착하면 시드가 자동 운영으로 기지를 세우고, 모든 식민지가 같은 시계로 흐른다.\n" +
-		"· 3D 지도에서 행성을 보면 도시는 점과 이름뿐이다. 점이나 개척 탭의 '보기'를 누르면 그 도시로 날아가 내려앉는다.",
+		"· 3D 지도에서 행성을 보면 도시는 점과 이름뿐이다. 점이나 개척 탭의 '보기'를 누르면 그 도시로 날아가 내려앉는다.\n" +
+		"· 카메라의 고정점: 3D 화면 위쪽의 경로(우주 › 태양계 › 지구 › 도시)가 지금 카메라가 바라보고 도는 점이다. " +
+		"단계를 누르면 그곳으로, '›'·'▾'를 누르면 그 안의 행성·위성·도시·대도시·날아가는 수송선을 고른다. " +
+		"이름표를 눌러도 고정점이 되고, Backspace는 한 단계 위로. '우주'에서는 우리 은하 전체를 본다.\n" +
+		"· 조작: 끌기 = 땅을 잡아 옮기기(멀면 고정점 둘레 돌기), 오른쪽 끌기·Shift 끌기·두 손가락 비틀기 = 방위·기울기, " +
+		"휠·두 손가락 벌리기 = 확대·축소.",
 		[["ok", "닫기", ""]])
 
 
@@ -1042,6 +1061,8 @@ func _on_modal_choice(context: String, choice: String) -> void:
 					_toast("저장했다", "good")
 				"help":
 					_show_help()
+				"settings":
+					settings_panel.open()
 				"restart":
 					_show_start()
 				"quit":

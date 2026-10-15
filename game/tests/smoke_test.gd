@@ -194,10 +194,16 @@ func _world_check() -> void:
 	cam.zoom(1.0e4)
 	w._process(0.016)
 	_check(cam.mode == "space", "멀리서도 지구본 모드다")
+	# 고정점: 기본은 고른 천체에 머물고, '멀어지면 상위 천체로'를 켜면 태양계 거리에서 목표가 태양으로 옮겨 간다
 	cam.dist = 3.0e9
 	w._process(0.016)
+	var focus_gap := Astro.len3(Astro.sub3(cam.target, w._info(cam.focus)["center"]))
+	_check(cam.lock and focus_gap < 1.0, "고정점이 멀어져도 고른 천체에 머물지 않는다")
+	cam.lock = false
+	w._process(0.016)
 	var sun_gap := Astro.len3(Astro.sub3(cam.target, w._info("sun")["center"]))
-	_check(sun_gap < 1.0e8, "태양계 거리에서 목표가 태양으로 옮겨 가지 않았다")
+	_check(sun_gap < 1.0e8, "태양계 거리에서 목표가 태양으로 옮겨 가지 않았다 (자동)")
+	cam.lock = true
 	cam.dist = 20.0 * Astro.LY
 	w._process(0.016)
 	var star := w.to_render(Astro.systems[0]["pos"])
@@ -555,6 +561,23 @@ func _transport_check(col: Colonies) -> void:
 	main.tabs["transport"].rebuild()
 	main.tabs["transport"].update_view()
 	main.world.show_route(String(tr.lines[0]["id"]))
+	# 카메라의 고정점: 기지 위에서는 우주 › 태양계 › (행성 ›) 천체 › 도시, 아래로 고를 것들, 수송선을 따라가기
+	var wv: WorldView = main.world
+	wv.home(false)
+	wv._process(0.016)
+	var path := wv.anchors.path()
+	_check(path.size() >= 4 and String(path[0]["kind"]) == "galaxy" and String(path[-1]["kind"]) == "colony",
+		"고정점 경로가 기지까지 이어지지 않는다 %s" % str(path.map(func(x): return x["name"])))
+	_check(wv.anchors.children(CamAnchors.system()).size() >= 11, "태양계 아래 고를 것이 모자란다")
+	_check(wv.anchors.children(CamAnchors.body("earth")).filter(func(x): return x["kind"] == "metro").size() == 26,
+		"지구 아래 대도시가 26곳이 아니다")
+	var ships := wv.anchors.ships()
+	if not ships.is_empty():
+		wv.anchors.go(ships[0])
+		_check(wv.cam.track.is_valid(), "수송선을 고정점으로 골랐는데 따라가지 않는다")
+	wv.anchors.go({"kind": "galaxy", "id": "galaxy", "name": "우주"})
+	_check(wv.cam.focus == "galaxy" and not wv.cam.track.is_valid(), "우리 은하를 고정점으로 고르지 못했다")
+	wv.home(false)
 	# 기지의 교통 탈것: 한꺼번에 닿은 여객기 두 대는 진입로에 줄을 선다 (같은 길을 겹쳐 날지 않게)
 	var traffic: BaseTraffic = main.world.city.traffic
 	var feeder := tr.line_by_id("feeder:earth_naro~metro_seoul")

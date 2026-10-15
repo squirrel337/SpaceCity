@@ -29,6 +29,7 @@ var _event_n := 0
 var _off := {}             # 꺼 둔 노선 id → true
 var _state := {}           # 노선 id → {next, stats, last} (다시 짤 때 이어 간다)
 var _by_id := {}
+var rev := 0               # 노선·켜짐이 바뀔 때마다 +1 (지도의 노선 메시를 그때만 다시 만든다)
 
 
 static func data() -> Dictionary:
@@ -55,6 +56,7 @@ static func cargo_rule(key: String) -> Dictionary:
 
 ## 새 게임
 func reset() -> void:
+	rev += 1
 	enabled = true
 	lines = []
 	trips = []
@@ -107,6 +109,7 @@ static func _pair(a: String, b: String) -> String:
 # ── 노선 짜기 ────────────────────────────────────────────────────
 ## 노선을 다시 짠다 (도시가 생기거나 없어졌을 때, 새 게임, 불러오기)
 func rebuild(col: Colonies) -> void:
+	rev += 1
 	data()
 	Metros.load_all()
 	for l in lines:
@@ -334,6 +337,7 @@ func step(col: Colonies) -> void:
 ## 교통 전체를 켜고 끈다. 다시 켜면 지난 출발 시각을 지금부터 다시 센다 (한꺼번에 떠나지 않게)
 func set_enabled(col: Colonies, on: bool) -> void:
 	enabled = on
+	rev += 1
 	if on:
 		for l in lines:
 			_catch_up(col, l)
@@ -345,6 +349,7 @@ func set_line_on(col: Colonies, id: String, on: bool) -> void:
 	if l.is_empty():
 		return
 	l["on"] = on
+	rev += 1
 	if on:
 		_off.erase(id)
 		_catch_up(col, l)
@@ -728,6 +733,7 @@ func to_save() -> Dictionary:
 
 ## 저장을 읽고 노선을 다시 짠다 (교통이 없던 저장이면 새로)
 func load_save(data_in: Dictionary, col: Colonies) -> void:
+	rev += 1
 	reset()
 	if not data_in.is_empty():
 		enabled = bool(data_in.get("enabled", true))

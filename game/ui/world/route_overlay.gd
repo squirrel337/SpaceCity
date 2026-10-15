@@ -14,6 +14,11 @@ const LABEL_FS := 12
 var view: WorldView
 var hi_line := ""             # 교통 탭에서 '보기'로 고른 노선 (잠깐 밝게)
 var hi_until := 0.0
+var show := true              # 지도에 노선·탈것을 그리나 (설정 — 끄면 '보기'로 고른 노선만)
+var _near_alt := INF          # 이번 프레임: 카메라에서 가장 가까운 천체 표면까지 (km)
+var _near_c := PackedFloat64Array([0, 0, 0])
+var _near_r := 0.0
+var _ship_geo := {}           # 편(노선|떠난 시) → 전이 궤도의 두 끝
 
 
 func _init(v: WorldView) -> void:
@@ -78,6 +83,14 @@ func _node_pos(key: String) -> PackedFloat64Array:
 
 ## 행성 사이 전이 궤도 위의 점: 떠난 날의 출발 천체 → 닿는 날의 도착 천체, 황경은 순행으로, 거리는 매끄럽게
 func ship_point(t_rec: Dictionary, t: float) -> PackedFloat64Array:
+	return _ship_at(_ship_geo_of(t_rec), t)
+
+
+## 편마다 한 번 셈한 두 끝 (떠난 날·닿는 날의 천체 위치는 바뀌지 않는다 — 점마다 궤도를 다시 풀지 않게)
+func _ship_geo_of(t_rec: Dictionary) -> Dictionary:
+	var key := "%s|%d" % [t_rec["line"], int(t_rec["depart"])]
+	if _ship_geo.has(key):
+		return _ship_geo[key]
 	var mgr := view.mgr
 	var fb := Transport.window_body(Transport.node_body(String(t_rec["from"])))
 	var tb := Transport.window_body(Transport.node_body(String(t_rec["to"])))
@@ -85,16 +98,23 @@ func ship_point(t_rec: Dictionary, t: float) -> PackedFloat64Array:
 	var jd1 := Astro.jd_from_unix(float(mgr.start_unix) + float(t_rec["arrive"]) * 3600.0)
 	var a := Astro.position(fb, jd0)
 	var b := Astro.position(tb, jd1)
-	var ra := sqrt(a[0] * a[0] + a[1] * a[1])
-	var rb := sqrt(b[0] * b[0] + b[1] * b[1])
 	var th0 := atan2(a[1], a[0])
 	var dth := fposmod(atan2(b[1], b[0]) - th0, TAU)
 	if dth < 0.3:
 		dth += TAU
+	var g := {"ra": sqrt(a[0] * a[0] + a[1] * a[1]), "rb": sqrt(b[0] * b[0] + b[1] * b[1]), "th0": th0, "dth": dth,
+		"za": a[2], "zb": b[2]}
+	if _ship_geo.size() > 96:
+		_ship_geo.clear()
+	_ship_geo[key] = g
+	return g
+
+
+static func _ship_at(g: Dictionary, t: float) -> PackedFloat64Array:
 	var s := 0.5 - 0.5 * cos(PI * t)
-	var rr := lerpf(ra, rb, s)
-	var th := th0 + dth * t
-	return Astro.v3(rr * cos(th), rr * sin(th), lerpf(a[2], b[2], t))
+	var rr := lerpf(float(g["ra"]), float(g["rb"]), s)
+	var th := float(g["th0"]) + float(g["dth"]) * t
+	return Astro.v3(rr * cos(th), rr * sin(th), lerpf(float(g["za"]), float(g["zb"]), t))
 
 
 ## 카메라에서 p로 가는 시선이 천체(중심 c, 반지름 r)에 먼저 닿나
@@ -130,50 +150,68 @@ func _body_alpha(body: String) -> float:
 
 
 # ── 노선 ────────────────────────────────────────────────────────
+## 카메라에서 가장 가까운 천체 (표면까지의 거리) — 우주 노선은 천체 가까이에서 감춘다
+func _measure_near() -> void:
+	_near_alt = INF
+	for id in Astro.order:
+		var info := view._info(id)
+		if info.is_empty():
+			continue
+		var alt := Astro.len3(Astro.sub3(view.cam.pos, info["center"])) - float(info["radius"])
+		if alt < _near_alt:
+			_near_alt = alt
+			_near_c = info["center"]
+			_near_r = float(info["radius"])
+
+
+## 노선의 색·옅기·두께 (px): 화면 위 선과 GPU 띠가 함께 쓴다
+func line_style(l: Dictionary, tr: Transport) -> Dictionary:
+	var kind := String(l["kind"])
+	var hot := _hi(l["id"])
+	var col: Color = COLORS.get(kind, Color.WHITE)
+	var base_a := 0.85 if l["role"] in ["local", "shuttle"] else (0.3 if l["role"] == "feeder" else 0.2)
+	if l["role"] in ["feeder", "air"]:
+		base_a *= clampf(2500.0 / maxf(float(l["km"]), 1.0), 0.22, 1.0)     # 먼 항공편일수록 옅게
+	var width := 2.0 if l["role"] in ["local", "shuttle"] else 1.0
+	if not l["on"] or not tr.enabled:
+		base_a *= 0.3
+	if hot:
+		base_a = 1.0
+		width = 3.2
+		col = col.lightened(0.25)
+	return {"col": col, "alpha": base_a, "width": width, "hot": hot}
+
+
+## 화면 위로 그리는 것: 지구-달 셔틀 길과 행성 사이 수송선 (몇 개뿐이고 두 천체 사이에 걸친다).
+## 천체 위의 노선과 그 탈것은 RouteMeshes가 GPU로 그린다
 func draw_lines() -> void:
 	var mgr := view.mgr
 	if mgr == null:
 		return
 	var tr := mgr.transport
 	var hour_f := float(mgr.hour) + view.hour_frac
-	var alphas := {}
+	_measure_near()
 	for l in tr.lines:
-		var kind := String(l["kind"])
-		var hot := _hi(l["id"])
-		var col: Color = COLORS.get(kind, Color.WHITE)
-		var base_a := 0.85 if l["role"] in ["local", "shuttle"] else (0.3 if l["role"] == "feeder" else 0.2)
-		if l["role"] in ["feeder", "air"]:
-			base_a *= clampf(2500.0 / maxf(float(l["km"]), 1.0), 0.22, 1.0)     # 먼 항공편일수록 옅게
-		var width := 2.0 if l["role"] in ["local", "shuttle"] else 1.0
-		if not l["on"] or not tr.enabled:
-			base_a *= 0.3
-		if hot:
-			base_a = 1.0
-			width = 3.2
-			col = col.lightened(0.25)
-		if kind == "ship":
+		if String(l["kind"]) != "ferry":
 			continue
-		if kind == "ferry":
-			var ea := _ferry_alpha()
-			if ea > 0.02:
-				_polyline(func(t): return ferry_point(l, t), 48, col, base_a * ea, width, [])
+		var st := line_style(l, tr)
+		if not show and not st["hot"]:
 			continue
-		var body := String(l["body"])
-		if not alphas.has(body):
-			alphas[body] = _body_alpha(body)
-		var a: float = alphas[body]
-		if a < 0.02 and not hot:
-			continue
-		var info := view._info(body)
-		var n := clampi(int(float(l["km"]) / 120.0) + 8, 8, 64)
-		_polyline(func(t): return surface_point(l, info, t), n, col, base_a * maxf(a, 0.6 if hot else 0.0), width,
-			[info["center"], info["radius"]])
-	# 가는 중인 탈것
+		var ea := maxf(_ferry_alpha(), 0.6 if st["hot"] else 0.0)
+		if ea > 0.02:
+			_polyline(func(t): return ferry_point(l, t), 48, st["col"], float(st["alpha"]) * ea, float(st["width"]),
+				[_near_c, _near_r] if _near_r > 0.0 else [])
+	# 가는 중인 배·셔틀 (수송선은 남은 길도 — 여럿이면 옅게)
+	var ships := 0
+	for t_rec in tr.trips:
+		if String(t_rec["line"]).begins_with("ship:"):
+			ships += 1
+	var ship_k := minf(1.0, 6.0 / maxf(float(ships), 1.0))
 	for t_rec in tr.trips:
 		var l2 := tr.line_by_id(String(t_rec["line"]))
-		if l2.is_empty():
+		if l2.is_empty() or not (String(l2["kind"]) in ["ship", "ferry"]) or (not show and not _hi(l2["id"])):
 			continue
-		_draw_vehicle(l2, t_rec, hour_f, alphas)
+		_draw_vehicle(l2, t_rec, hour_f, ship_k)
 
 
 ## t(0~1)의 점 함수를 화면 선으로. 천체(occ = [중심, 반지름]) 뒤편과 카메라 뒤는 끊는다
@@ -196,25 +234,34 @@ func _polyline(f: Callable, n: int, col: Color, alpha: float, width: float, occ:
 		ov.draw_polyline(pts, c, width, true)
 
 
-## 지구-달 셔틀 길이 보일 만큼 (지구·달을 함께 볼 때)
+## 지구-달 셔틀 길이 보일 만큼 (지구·달을 함께 볼 때 — 어느 천체든 땅 가까이에서는 감춘다)
 func _ferry_alpha() -> float:
 	var e := view._info("earth")
 	var d := Astro.len3(Astro.sub3(view.cam.pos, e["center"]))
-	return smoothstep(2.5e4, 9.0e4, d) * (1.0 - smoothstep(4.0e6, 3.0e7, d))
+	return smoothstep(2.5e4, 9.0e4, d) * (1.0 - smoothstep(4.0e6, 3.0e7, d)) * smoothstep(1500.0, 12000.0, _near_alt)
 
 
+## 행성 사이 수송선의 길: 태양계를 볼 때만 (천체 가까이 — 도시를 확대해 볼 때 — 는 감춘다)
 func _ship_alpha() -> float:
 	var e := view._info("earth")
 	var d := Astro.len3(Astro.sub3(view.cam.pos, e["center"]))
-	return smoothstep(4.0e6, 4.0e7, d)
+	var d_sun := Astro.len3(view.cam.pos)
+	var follow := 1.0 if view.cam.track.is_valid() else 0.0      # 배를 따라갈 때는 가까이서도 그 길을 보인다
+	return maxf(smoothstep(4.0e6, 4.0e7, d) * smoothstep(2.0e5, 2.0e6, _near_alt), follow) \
+		* (1.0 - smoothstep(6.0e10, 6.0e11, d_sun))
 
 
 ## 탈것 하나: 싣고 내리는 시간을 빼고 노선 위를 간다
-func _draw_vehicle(l: Dictionary, t_rec: Dictionary, hour_f: float, alphas: Dictionary) -> void:
+## 편이 노선을 얼마나 갔나 (0~1): 싣고 내리는 시간은 양 끝에서 머문다
+static func progress(l: Dictionary, t_rec: Dictionary, hour_f: float) -> float:
 	var span := maxf(1.0, float(t_rec["arrive"]) - float(t_rec["depart"]))
 	var load_h := float(Transport.mode(l["mode"]).get("load_h", 1)) if l["kind"] != "ship" else 0.0
 	load_h = minf(load_h, span * 0.5)
-	var k := clampf((hour_f - float(t_rec["depart"]) - load_h * 0.5) / maxf(span - load_h, 0.5), 0.0, 1.0)
+	return clampf((hour_f - float(t_rec["depart"]) - load_h * 0.5) / maxf(span - load_h, 0.5), 0.0, 1.0)
+
+
+func _draw_vehicle(l: Dictionary, t_rec: Dictionary, hour_f: float, ship_k := 1.0) -> void:
+	var k := progress(l, t_rec, hour_f)
 	var fwd := String(t_rec["from"]) == String(l["a"])
 	var kk := k if fwd else 1.0 - k
 	var kind := String(l["kind"])
@@ -225,29 +272,29 @@ func _draw_vehicle(l: Dictionary, t_rec: Dictionary, hour_f: float, alphas: Dict
 	var step := 0.01 if fwd else -0.01
 	match kind:
 		"ship":
-			alpha = _ship_alpha()
+			var hot := _hi(l["id"])
+			alpha = maxf(_ship_alpha(), 0.6 if hot else 0.0)
 			if alpha < 0.02:
 				return
-			# 배의 길도 함께 (가는 중인 배만)
-			_polyline(func(t): return ship_point(t_rec, t), 64, col, 0.5 * alpha, 1.4, [])
-			p = ship_point(t_rec, k)
-			p2 = ship_point(t_rec, minf(k + 0.01, 1.0))
+			# 배의 남은 길 (지나온 길은 그리지 않는다 — 배가 여럿이어도 쌓이지 않게). '보기'로 고른 노선은 온 길까지
+			var k0 := 0.0 if hot else k
+			var n := maxi(8, int(64.0 * (1.0 - k0)))
+			var occ := [_near_c, _near_r] if _near_r > 0.0 else []
+			var geo := _ship_geo_of(t_rec)
+			_polyline(func(t): return _ship_at(geo, lerpf(k0, 1.0, t)), n, col,
+				(0.55 if hot else 0.45 * ship_k) * alpha, 1.4, occ)
+			p = _ship_at(geo, k)
+			p2 = _ship_at(geo, minf(k + 0.01, 1.0))
+			if not occ.is_empty() and _behind(_near_c, _near_r * 0.999, p):
+				return
 		"ferry":
-			alpha = _ferry_alpha()
+			alpha = maxf(_ferry_alpha(), 0.6 if _hi(l["id"]) else 0.0)
 			if alpha < 0.02:
 				return
 			p = ferry_point(l, kk)
 			p2 = ferry_point(l, clampf(kk + step, 0.0, 1.0))
 		_:
-			var body := String(l["body"])
-			alpha = float(alphas.get(body, _body_alpha(body)))
-			if alpha < 0.02:
-				return
-			var info := view._info(body)
-			p = surface_point(l, info, kk)
-			if _behind(info["center"], float(info["radius"]) * 0.999, p):
-				return
-			p2 = surface_point(l, info, clampf(kk + step, 0.0, 1.0))
+			return
 	var sp: Variant = _screen(p)
 	if sp == null:
 		return
@@ -258,7 +305,13 @@ func _draw_vehicle(l: Dictionary, t_rec: Dictionary, hour_f: float, alphas: Dict
 		dir = ((sq as Vector2) - s2).normalized()
 	if (kind in ["ship", "ferry"]) and k <= 0.0:
 		return
+	if kind == "ship" and view.cam.track.is_valid() and view.cam.dist < 30.0 \
+			and String(view.anchors.current.get("id", "")) == "%s|%d" % [t_rec["line"], int(t_rec["depart"])]:
+		return              # 따라가는 배는 가까이서 3D 모형으로 보인다
 	marker(view._overlay, s2, dir, kind, col, alpha * (1.0 if l["role"] in ["local", "shuttle", "ship"] else 0.75))
+	if kind == "ship" and alpha > 0.3:
+		# 누르면 이 배를 고정점으로 (따라간다)
+		view._labels.append([Rect2(s2 - Vector2(9, 9), Vector2(18, 18)), "ship:%s|%d" % [t_rec["line"], int(t_rec["depart"])]])
 
 
 ## 탈것 표시: 비행기 세모, 열차 네모, 호퍼 동그라미, 셔틀·배 마름모 (어두운 테두리)

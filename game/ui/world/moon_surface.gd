@@ -11,8 +11,6 @@ extends SiteGround
 
 const R_KM := 1737.4
 const PATCH_M := 60000.0
-const BAKE_SIZE_HI := 1024
-const BAKE_SIZE_LO := 512
 const CAP_DEG := 12.0                   # 남극 둘레를 따로 곱게 굽는 반지름 (도)
 const SHADER_DIR := "res://ui/world/shaders/"
 
@@ -28,10 +26,6 @@ var _loc := PackedVector4Array()
 var _ice := Vector4.ZERO
 var _base_rect := Vector4.ZERO
 var _view: WorldView
-var _segs := 192
-var _rings := 0                         # 고리 수 (중심 포함)
-var _grow := 1.0
-var _hgrid := PackedFloat32Array()      # 구운 높이 (기지 평지 기준 m) [고리 × 둘레]
 
 
 func _init() -> void:
@@ -239,7 +233,7 @@ func ring_radius(k: int) -> float:
 
 
 func _patch_mesh() -> ArrayMesh:
-	_segs = 144 if OS.has_feature("mobile") else 192
+	_segs = int(Settings.q("patch_segs"))
 	_grow = 1.0 + TAU / _segs
 	var k := 0
 	while ring_radius(k) < PATCH_M:
@@ -317,7 +311,7 @@ func _start_bake() -> void:
 
 
 func _bake_cap() -> void:
-	var size := 2048 if not OS.has_feature("mobile") else 1024
+	var size := int(Settings.bake_sizes()["cap"])
 	var rad := deg_to_rad(CAP_DEG)
 	var mat := ShaderMaterial.new()
 	mat.shader = load(SHADER_DIR + "moon_bake.gdshader")
@@ -395,7 +389,7 @@ func _bake_patch() -> void:
 
 
 func _bake_cube() -> void:
-	var size := BAKE_SIZE_HI if not OS.has_feature("mobile") else BAKE_SIZE_LO
+	var size := int(Settings.bake_sizes()["cube"])
 	var mat := ShaderMaterial.new()
 	mat.shader = load(SHADER_DIR + "moon_bake.gdshader")
 	_fill_bake_uniforms(mat, size)

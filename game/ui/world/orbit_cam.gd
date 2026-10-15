@@ -8,13 +8,15 @@ extends RefCounted
 ## space 모드 — 천체 반지름의 4배보다 멀 때: 목표는 천체 중심에서 상위 계(지구, 태양)로 옮겨 가고,
 ##   카메라는 황도 북쪽을 위로 하는 회전대(yaw·pitch)로 돈다.
 ## fly — 다른 천체·별로 날아간다 (멀어졌다가 다가간다).
+## 고정점 — 플레이어가 고른 천체·도시·수송선(lock): 멀어져도 목표가 상위 계로 옮겨 가지 않고 그 자리를 본다.
+##   움직이는 것(수송선)은 track이 매 프레임 자리를 알려 준다.
 
 signal focus_changed(id: String)
 
 const BODY_TO_SPACE := 4.0          # 반지름의 몇 배에서 space 모드로
 const SPACE_TO_BODY := 3.0
 const MIN_DIST_KM := 0.025
-const MAX_DIST_KM := 4.0e17         # 약 4만 광년
+const MAX_DIST_KM := 2.5e18         # 약 26만 광년 (우리 은하 전체)
 const FOV_DEG := 50.0
 
 var focus := "moon"
@@ -29,6 +31,9 @@ var yaw := 0.0
 var pitch := 0.6
 ## 날기
 var _fly := {}
+## 고정점
+var lock := false                             # 고른 고정점: 멀어져도 목표를 상위 계로 옮기지 않는다
+var track: Callable                           # 움직이는 고정점(수송선)의 자리 (km, 태양 중심) — 없으면 천체 중심
 
 ## 매 프레임 갱신되는 결과 (황도 좌표)
 var pos := PackedFloat64Array([0, 0, 0])      # 카메라 위치 km
@@ -55,6 +60,7 @@ func radius_of(id: String) -> float:
 func look_at_surface(id: String, dir_body: Vector3, distance_km: float, tilt_rad: float, heading_fwd: Vector3) -> void:
 	focus = id
 	mode = "body"
+	track = Callable()
 	t_dir = Astro.dvec(dir_body.normalized())
 	fwd = _tangent(dir_body.normalized(), heading_fwd)
 	tilt = tilt_rad
@@ -67,6 +73,7 @@ func look_at_surface(id: String, dir_body: Vector3, distance_km: float, tilt_rad
 func look_from_space(id: String, distance_km: float, yaw_rad: float, pitch_rad: float) -> void:
 	focus = id
 	mode = "space"
+	track = Callable()
 	dist = clampf(distance_km, MIN_DIST_KM, MAX_DIST_KM)
 	yaw = yaw_rad
 	pitch = clampf(pitch_rad, -1.55, 1.55)
@@ -80,7 +87,8 @@ func flying() -> bool:
 
 ## 다른 천체로 날아간다. 끝 거리는 반지름의 몇 배 (별은 km를 직접).
 ## land_dir(천체 고정 방향)을 주면 그 지점을 똑바로 내려다보며 도착한다 — 식민지로 갈 때
-func fly_to(id: String, end_dist_km: float, seconds: float = 2.6, land_dir: Vector3 = Vector3.ZERO) -> void:
+func fly_to(id: String, end_dist_km: float, seconds: float = 2.6, land_dir: Vector3 = Vector3.ZERO,
+		view_dir: Vector3 = Vector3.ZERO) -> void:
 	var b := _body(id)
 	if b.is_empty():
 		return
@@ -93,13 +101,27 @@ func fly_to(id: String, end_dist_km: float, seconds: float = 2.6, land_dir: Vect
 	var sun := _body("sun")
 	if land_dir != Vector3.ZERO:
 		v1 = Astro.dvec(((b["frame"] as Basis) * land_dir).normalized())
+	elif view_dir != Vector3.ZERO:
+		v1 = Astro.dvec(view_dir.normalized())         # 도착해서 바라볼 쪽을 정해 준다 (은하를 위에서 비스듬히)
 	elif id != "sun" and not sun.is_empty() and b.get("surface", true):
 		var to_sun := Astro.norm3(Astro.sub3(sun["center"], to_center))
 		v1 = Astro.norm3(Astro.lerp3(v1, to_sun, 0.55))
 	_fly = {"id": id, "t": 0.0, "dur": seconds, "a0": target.duplicate(), "v0": v0, "v1": v1,
 		"d0": dist, "d1": clampf(end_dist_km, MIN_DIST_KM, MAX_DIST_KM), "land": land_dir.normalized()}
 	focus = id
+	track = Callable()
 	focus_changed.emit(focus)
+
+
+## 움직이는 것(수송선)으로 날아가 따라간다: where()가 매 프레임 그 자리(km, 태양 중심)를 준다. near_id = 날기의 기준 천체
+func fly_to_track(near_id: String, where: Callable, end_dist_km: float, seconds: float = 2.6) -> void:
+	fly_to(near_id, end_dist_km, seconds)
+	if _fly.is_empty():
+		return
+	_fly["track"] = where
+	var p: PackedFloat64Array = where.call()
+	_fly["v1"] = Astro.norm3(Astro.sub3(pos, p)) if Astro.len3(Astro.sub3(pos, p)) > 1e-6 else _fly["v0"]
+	track = where
 
 
 # ── 조작 ────────────────────────────────────────────────────────
@@ -201,7 +223,7 @@ func update(delta: float, p_jd: float) -> void:
 	var r: float = b["radius"]
 	if mode == "body" and dist > BODY_TO_SPACE * r:
 		_to_space()
-	elif mode == "space" and dist < SPACE_TO_BODY * r and b.get("surface", true):
+	elif mode == "space" and dist < SPACE_TO_BODY * r and b.get("surface", true) and not track.is_valid():
 		_to_body()
 	if mode == "body":
 		_pose_body(b)
@@ -255,8 +277,12 @@ func _pose_body(b: Dictionary) -> void:
 
 
 func _anchor(d: float) -> PackedFloat64Array:
+	if track.is_valid():
+		return track.call()
 	var b := _body(focus)
 	var a: PackedFloat64Array = b["center"]
+	if lock:
+		return a
 	for step in b.get("chain", []):
 		var anc := _body(step[0])
 		if anc.is_empty():
@@ -320,6 +346,8 @@ func _step_fly(delta: float) -> void:
 	var e := t * t * (3.0 - 2.0 * t)
 	var b := _body(_fly["id"])
 	var c: PackedFloat64Array = b["center"]
+	if _fly.has("track"):
+		c = (_fly["track"] as Callable).call()
 	var a0: PackedFloat64Array = _fly["a0"]
 	var d0: float = _fly["d0"]
 	var d1: float = _fly["d1"]
@@ -343,7 +371,7 @@ func _step_fly(delta: float) -> void:
 		yaw = atan2(v.y, v.x)
 		pitch = asin(clampf(v.z, -1.0, 1.0))
 		dist = d1
-		if b.get("surface", true) and dist < SPACE_TO_BODY * float(b["radius"]):
+		if b.get("surface", true) and dist < SPACE_TO_BODY * float(b["radius"]) and not track.is_valid():
 			_to_body()
 
 

@@ -1,0 +1,52 @@
+{
+  "_meta": {
+    "title": "도시의 길과 구획 — 길 종류, 길로 나뉜 블록의 용도(구획), 기본 도시의 길 격자, 땅 고치기와 침수",
+    "source": "03-city-layer.md §기본 도시의 구획 — 길이 먼저, 블록이 그다음",
+    "roads": "길 종류: name, width_m(전체 폭), lanes(차로 — 0은 차가 다니지 않는 길), speed(탈것 속력 배율), cost_per_100m(100 m마다 드는 자재: parts·metal_t), surface(겉모습: dirt 다진 흙, paved 포장, tube 가압 통로, rail 철도), grade(가장 가파른 기울기 — 땅을 그만큼 깎고 메운다), lights(밤의 가로등), bodies(이 천체에서만 — 없으면 어디서나), turn_r_m(꺾이는 곳의 둥근 반지름)",
+    "zones": "구획(블록의 용도): name, color, families(그 구획에 서는 건물 계열과 기본 배치의 자리 수), center_uv(기본 도시에서 그 구획이 모이는 곳, 화면 좌표 u·v m), road(그 구획 둘레 길의 종류)",
+    "grid": "기본 도시의 길 격자: block_m(블록 한 변, m), avenue_every(몇 블록마다 대로), margin_m(지도 끝에서 띄우는 거리), plaza_r_m(가운데 광장)",
+    "terrain": "땅 고치기: cell_m(고친 높이를 적는 칸), brushes_m(붓 반지름), step_m(한 번에 파고 쌓는 깊이), max_depth_m(가장 깊이), need(필요한 건물 계열), flood(해수면 아래로 판 땅은 바다·물이 있는 천체에서 물에 잠긴다 — bodies), road_shoulder_m(길 옆에서 땅을 길 높이로 맞추는 폭)"
+  },
+  "roads": {
+    "path": {"name": "흙길", "width_m": 4.0, "lanes": 1, "speed": 0.6, "cost_per_100m": {}, "surface": "dirt",
+      "grade": 0.18, "lights": false, "turn_r_m": 4.0},
+    "street": {"name": "도로", "width_m": 7.0, "lanes": 2, "speed": 1.0, "cost_per_100m": {"parts": 1.0},
+      "surface": "paved", "grade": 0.12, "lights": true, "turn_r_m": 7.0},
+    "avenue": {"name": "대로", "width_m": 13.0, "lanes": 4, "speed": 1.4, "cost_per_100m": {"parts": 3.0},
+      "surface": "paved", "grade": 0.08, "lights": true, "turn_r_m": 12.0},
+    "highway": {"name": "고속도로", "width_m": 18.0, "lanes": 4, "speed": 2.0, "cost_per_100m": {"parts": 5.0},
+      "surface": "paved", "grade": 0.05, "lights": true, "turn_r_m": 30.0},
+    "tube": {"name": "가압 통로", "width_m": 6.0, "lanes": 0, "speed": 0.8, "cost_per_100m": {"parts": 2.0, "metal_t": 0.2},
+      "surface": "tube", "grade": 0.12, "lights": true, "turn_r_m": 6.0,
+      "bodies": ["moon", "mars", "mercury", "ceres", "callisto", "titan"]},
+    "rail": {"name": "화물 철도", "width_m": 5.0, "lanes": 0, "speed": 1.6, "cost_per_100m": {"parts": 3.0, "metal_t": 0.3},
+      "surface": "rail", "grade": 0.04, "lights": false, "turn_r_m": 40.0}
+  },
+  "zones": {
+    "core": {"name": "거주 구역", "color": "7aa7f0", "center_uv": [-20, -15], "road": "avenue",
+      "families": [["hab_module", 36]]},
+    "civic": {"name": "시민 광장·연구 단지", "color": "c86bfa", "center_uv": [92, -2], "road": "street",
+      "families": [["green_commons", 3], ["research_lab", 8], ["medical_bay", 4], ["comms_center", 2]]},
+    "domes": {"name": "돔·대피소", "color": "f4a6c6", "center_uv": [-111, -59], "road": "street",
+      "families": [["regolith_dome", 6], ["storm_shelter", 6]]},
+    "life": {"name": "생명유지 단지", "color": "3fb8af", "center_uv": [2, -122], "road": "street",
+      "families": [["electrolyzer", 6], ["co2_scrubber", 8], ["sabatier", 3], ["water_recycler", 6], ["tank_farm", 6]]},
+    "power": {"name": "축전·방열 단지", "color": "f2c14e", "center_uv": [118, -112], "road": "street",
+      "families": [["battery_bank", 16], ["rfc_unit", 40], ["radiator", 20]]},
+    "farm": {"name": "농업 구역", "color": "8fcf6e", "center_uv": [-122, 58], "road": "street",
+      "families": [["hydroponics", 40], ["algae_reactor", 8], ["food_store", 6]]},
+    "industry": {"name": "산업 단지", "color": "c9a77f", "center_uv": [88, 108], "road": "avenue",
+      "families": [["robot_bay", 3], ["parts_fab", 4], ["excavator", 2], ["regolith_printer", 2], ["mre_plant", 3],
+        ["propellant_plant", 2]]},
+    "reactor": {"name": "원자로 구역", "color": "e9875a", "center_uv": [-112, 180], "road": "street",
+      "families": [["fission_40kw", 12], ["fission_1mw", 3]]},
+    "ice": {"name": "얼음 채굴장", "color": "4cc9f0", "center_uv": [-140, -152], "road": "path",
+      "families": [["ice_miner", 3]]},
+    "pad": {"name": "우주항", "color": "aab3c8", "center_uv": [142, 208], "road": "avenue",
+      "families": [["landing_pad", 2]]}
+  },
+  "grid": {"block_m": 46.0, "avenue_every": 2, "margin_m": 12.0, "plaza_r_m": 13.0},
+  "terrain": {"cell_m": 2.0, "brushes_m": [6.0, 12.0, 24.0], "step_m": 1.0, "max_depth_m": 30.0, "max_raise_m": 12.0,
+    "need": ["excavator", "robot_bay"], "flood": {"bodies": ["earth", "titan"]}, "road_shoulder_m": 3.0,
+    "edit_radius_m": 700.0}
+}

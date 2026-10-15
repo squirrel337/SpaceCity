@@ -44,7 +44,7 @@ var _shadows := true
 func setup(m: Dictionary, g: SiteSurface, hi: bool) -> void:
 	metro = m
 	ground = g
-	budget = 26000 if hi else 9000
+	budget = int(Settings.q("metro_budget"))
 	_shadows = hi
 	_style = Metros.style_of(m)
 	var c: Vector3 = m["dir"]

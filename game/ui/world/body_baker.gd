@@ -21,11 +21,11 @@ var _fine_order: Array = []   # 곱게 구운 천체 (오래된 것부터)
 
 
 func _init() -> void:
-	if OS.has_feature("mobile"):
-		size_lo = 128
-		size_mid = 512
-		size_hi = 512
-		keep_fine = 1
+	var bs := Settings.bake_sizes()
+	size_lo = int(bs["lo"])
+	size_mid = int(bs["mid"])
+	size_hi = int(bs["hi"])
+	keep_fine = int(bs["keep"])
 	if OS.has_environment("WORLD_BAKE_SMALL"):
 		size_lo = 64
 		size_mid = 256

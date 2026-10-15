@@ -21,6 +21,20 @@ var _plateau_m := 0.0            # 평지 높이 (기준 구 위, m)
 var _cam_alt_km := 1e9
 var _dark_k := 0.0
 var raise_sun := true            # 기지 가까이에서 해를 지평선 위로 올린다 (대도시는 실제 밤을 그대로)
+## 지형 조각의 높이 격자 (극좌표: 300 m까지 6 m 고리, 그 바깥은 둘레 간격만큼 커진다) — 굽은 값에 땅 고치기를 더한다
+var _segs := 192
+var _rings := 0                         # 고리 수 (중심 포함)
+var _grow := 1.0
+var _hgrid := PackedFloat32Array()      # 높이 (기지 평지 기준 m) [고리 × 둘레] — 고친 땅·길 다듬기를 더한 값
+var _hbase := PackedFloat32Array()      # 구운 높이 (고치기 전)
+var _wet_base := PackedByteArray()      # 구운 물 몫 (0~255) — 물이 있는 천체의 땅만
+var _himg: Image                        # 지형 조각 셰이더가 읽는 높이 지도 (고친 값으로 다시 쓴다)
+var _htex: ImageTexture
+var sea_z := NAN                        # 해수면 (기지 평지 기준 m) — 바다가 있는 천체의 땅만
+var flooded := {}                       # 물에 잠긴 꼭짓점 번호 → true (해수면 아래로 판 땅)
+var _terrain_sig := ""
+
+signal flooded_changed(count: int)
 
 
 func site_dir() -> Vector3:
@@ -146,3 +160,210 @@ func _near_site(view: WorldView, info: Dictionary) -> bool:
 	var cam_rel := Astro.sub3(view.cam.pos, c)
 	var cam_d := Astro.len3(cam_rel)
 	return (f.inverse() * Astro.vec(Astro.scale3(cam_rel, 1.0 / cam_d))).dot(_site) > cos(0.6)
+
+
+# ── 땅 고치기 ───────────────────────────────────────────────────
+## 고리 k의 반지름 (m) — 지형 조각 메시와 같다
+func ring_m(k: int) -> float:
+	if k <= 50:
+		return 6.0 * k
+	return minf(300.0 * pow(_grow, k - 50), 60000.0)
+
+
+## 반지름 r(m)의 고리 번호 (소수)
+func _ring_of(r: float) -> float:
+	if r <= 300.0:
+		return r / 6.0
+	return 50.0 + log(r / 300.0) / log(_grow)
+
+
+func _vert_pos(k: int, i: int) -> Vector2:
+	var a := TAU * i / _segs
+	var r := ring_m(k)
+	return Vector2(cos(a) * r, sin(a) * r)
+
+
+## 굽은 높이를 받아 둔다 (굽기가 끝날 때 하위 클래스가 부른다). img = 지형 조각 셰이더의 높이 지도
+func _keep_baked(img: Image, tex: ImageTexture, wet_from_alpha: bool) -> void:
+	_hbase = _hgrid.duplicate()
+	_himg = img
+	_htex = tex
+	_terrain_sig = ""
+	sea_z = NAN
+	_wet_base = PackedByteArray()
+	if wet_from_alpha and img != null:
+		var data := img.get_data()
+		_wet_base.resize(_rings * _segs)
+		var lows := PackedFloat32Array()
+		for idx in _rings * _segs:
+			var w := data[idx * 4 + 3]
+			_wet_base[idx] = w
+			if w > 200:
+				lows.append(_hbase[idx])
+		if lows.size() > 8:
+			lows.sort()
+			sea_z = lows[lows.size() / 2]       # 바다 칸은 해수면으로 고르게 구워졌다
+
+
+## 계획의 땅 고치기와 길을 지형에 넣는다 (바뀌었을 때만): 구운 높이 + 고친 높이 → 길 밑 다듬기 → 해수면 아래로 판 땅은 물.
+## 바뀐 꼭짓점만 높이 지도에 다시 쓰고, 도시가 건물·길을 새 높이에 놓도록 알린다
+func apply_terrain(plan: CityPlan) -> void:
+	if _hbase.is_empty() or plan == null:
+		return
+	var sig := "%d|%d" % [plan.terrain_rev, plan.road_rev]
+	if sig == _terrain_sig:
+		return
+	_terrain_sig = sig
+	var t := LayoutData.terrain()
+	var kmax := mini(int(ceil(_ring_of(float(t["edit_radius_m"])))) + 1, _rings - 1)
+	var n := (kmax + 1) * _segs
+	var hh := _hbase.slice(0, n)
+	var dug := PackedByteArray()
+	dug.resize(n)
+	if not plan.terrain.is_empty():
+		for idx in n:
+			@warning_ignore("integer_division")
+			var p := _vert_pos(idx / _segs, idx % _segs)
+			var dlt := plan.terrain_delta(p)
+			if absf(dlt) > 0.004:
+				hh[idx] += dlt
+				dug[idx] = 1 if dlt < -0.05 else 0
+	_grade_roads(plan, hh, kmax, float(t["road_shoulder_m"]))
+	# 물: 바다가 있는 천체에서 해수면 아래로 판 땅
+	var new_flood := {}
+	if not is_nan(sea_z):
+		for idx in n:
+			if dug[idx] == 1 and hh[idx] < sea_z - 0.05:
+				new_flood[idx] = true
+	var changed := PackedInt32Array()
+	for idx in n:
+		var was_wet := flooded.has(idx)
+		if absf(hh[idx] - _hgrid[idx]) > 0.003 or was_wet != new_flood.has(idx):
+			changed.append(idx)
+	var n_before := flooded.size()
+	flooded = new_flood
+	for idx in changed:
+		_hgrid[idx] = hh[idx]
+	if not changed.is_empty():
+		_encode_heights(changed)
+		if _htex != null and _himg != null:
+			_htex.update(_himg)
+		terrain_ready.emit()
+	if flooded.size() != n_before:
+		flooded_changed.emit(flooded.size())
+
+
+## 길 밑 다듬기: 길을 따라 2 m마다 땅 높이를 재어 고르게 하고 (기울기는 길 종류의 한도까지), 길 폭 + 어깨 안의
+## 꼭짓점을 그 높이로 맞춘다 (가장자리는 비탈로). 평평한 땅이면 건너뛴다
+func _grade_roads(plan: CityPlan, hh: PackedFloat32Array, kmax: int, shoulder: float) -> void:
+	var target := {}
+	var weight := {}
+	for k in plan.edges.size():
+		var e: Vector2i = plan.edges[k]
+		var a: Vector2 = plan.nodes[e.x]
+		var b: Vector2 = plan.nodes[e.y]
+		var length := a.distance_to(b)
+		if length < 0.5:
+			continue
+		var type := plan.edge_type(k)
+		var hw := LayoutData.road_half(type)
+		var grade := float(LayoutData.road(type)["grade"])
+		var steps := maxi(1, int(ceil(length / 2.0)))
+		var prof := PackedFloat32Array()
+		var lo := INF
+		var hi := -INF
+		for j in steps + 1:
+			var hj := _sample(hh, a.lerp(b, float(j) / steps), kmax)
+			prof.append(hj)
+			lo = minf(lo, hj)
+			hi = maxf(hi, hj)
+		if hi - lo < 0.06:
+			continue            # 평평한 땅 (기지 평지): 다듬을 것이 없다
+		# 고르게: 앞뒤 5칸 평균, 그다음 기울기 한도 (앞으로·뒤로 한 번씩)
+		var sm := PackedFloat32Array()
+		sm.resize(prof.size())
+		for j in prof.size():
+			var acc := 0.0
+			var cnt := 0
+			for q in range(maxi(0, j - 5), mini(prof.size(), j + 6)):
+				acc += prof[q]
+				cnt += 1
+			sm[j] = acc / cnt
+		var dmax := grade * length / steps
+		for j in range(1, sm.size()):
+			sm[j] = clampf(sm[j], sm[j - 1] - dmax, sm[j - 1] + dmax)
+		for j in range(sm.size() - 2, -1, -1):
+			sm[j] = clampf(sm[j], sm[j + 1] - dmax, sm[j + 1] + dmax)
+		var reach := hw + shoulder
+		for j in sm.size():
+			var c := a.lerp(b, float(j) / steps)
+			for idx in _near_verts(c, reach + 4.0, kmax):
+				var p := _vert_pos(idx / _segs, idx % _segs)
+				var q := CityPlan._seg_point(a, b, p)
+				var d := q.distance_to(p)
+				if d > reach:
+					continue
+				var w := 1.0 - smoothstep(hw + 0.5, reach, d)
+				if w > float(weight.get(idx, 0.0)):
+					var tq := clampf(a.distance_to(q) / length, 0.0, 1.0) * steps
+					var j0 := int(floor(tq))
+					var j1 := mini(j0 + 1, steps)
+					weight[idx] = w
+					target[idx] = lerpf(sm[j0], sm[j1], tq - j0)
+	for idx in target:
+		hh[idx] = lerpf(hh[idx], float(target[idx]), float(weight[idx]))
+
+
+## 높이 배열 hh(고리 0~kmax)의 점 p 높이 (이중선형)
+func _sample(hh: PackedFloat32Array, p: Vector2, kmax: int) -> float:
+	var rk := clampf(_ring_of(p.length()), 0.0, float(kmax))
+	var k0 := int(floor(rk))
+	var k1 := mini(k0 + 1, kmax)
+	var fk := rk - k0
+	var a := fposmod(atan2(p.y, p.x), TAU) / TAU * _segs
+	var i0 := int(floor(a)) % _segs
+	var i1 := (i0 + 1) % _segs
+	var fi := a - floor(a)
+	return lerpf(lerpf(hh[k0 * _segs + i0], hh[k0 * _segs + i1], fi), lerpf(hh[k1 * _segs + i0], hh[k1 * _segs + i1], fi), fk)
+
+
+## 점 p에서 r(m) 안의 꼭짓점 번호들 (고리 0~kmax)
+func _near_verts(p: Vector2, r: float, kmax: int) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	var rr := p.length()
+	var k_lo := maxi(0, int(floor(_ring_of(maxf(rr - r, 0.0)))))
+	var k_hi := mini(kmax, int(ceil(_ring_of(rr + r))))
+	var a := fposmod(atan2(p.y, p.x), TAU)
+	var da := r / maxf(rr, r) + 0.0001
+	var i_c := int(round(a / TAU * _segs))
+	var i_r := int(ceil(da / TAU * _segs)) + 1
+	if rr < r * 1.5:
+		i_r = _segs / 2
+	for k in range(k_lo, k_hi + 1):
+		if k == 0:
+			out.append(0)
+			continue
+		for di in range(-i_r, i_r + 1):
+			out.append(k * _segs + posmod(i_c + di, _segs))
+	return out
+
+
+## 이 점이 물에 잠겼나 (둘레 꼭짓점 넷 중 하나라도)
+func flooded_at(p: Vector2) -> bool:
+	if flooded.is_empty() or _rings == 0:
+		return false
+	var rk := _ring_of(p.length())
+	var k0 := int(floor(rk))
+	var a := fposmod(atan2(p.y, p.x), TAU) / TAU * _segs
+	var i0 := int(floor(a)) % _segs
+	for k in [k0, k0 + 1]:
+		for i in [i0, (i0 + 1) % _segs]:
+			if flooded.has(k * _segs + i):
+				return true
+	return false
+
+
+## 바뀐 꼭짓점을 높이 지도에 다시 쓴다 (하위 클래스: 달은 16비트 높이 + 법선, 다른 천체는 24비트 높이 + 물 몫)
+func _encode_heights(_changed: PackedInt32Array) -> void:
+	pass
+

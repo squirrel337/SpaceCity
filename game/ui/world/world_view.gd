@@ -64,8 +64,6 @@ var _unit := 1.0                     # 렌더 단위 1 = _unit km
 var _local := 1.0                    # 실제 비율로 그리는 거리 (km)
 var _near_s := 1.0                   # 가장 가까운 천체의 축척 공간 배율
 var _labels: Array = []              # [Rect2, id] — 눌러서 날아가기
-var _orbit_cache := {}
-var _orbit_jd := -1e9
 var _scale_px := 1.0
 var _touches := {}
 var _press := Vector2.ZERO
@@ -81,6 +79,17 @@ var plan: CityPlan
 var tool: PlaceTool
 var mgr: Colonies                    # 모든 도시와 교통 (노선·탈것을 그린다)
 var routes: RouteOverlay
+var routes3d: RouteMeshes            # 천체 위 노선과 탈것 (GPU)
+var orbits: OrbitLines               # 행성·위성의 궤도선 (GPU)
+var galaxy: GalaxyView               # 우리 은하 전체 ('우주' 고정점)
+var _galaxy_k := 0.0                 # 은하가 보이는 정도 (해에서 수백 광년 넘게 멀어질 때)
+var anchors: CamAnchors              # 카메라의 고정점 (경로·고르기)
+var _ship_model: MeshInstance3D      # 따라가는 수송선의 3D 모형
+var perf := {}                       # 이번 프레임의 CPU 시간 (μs): place·city·overlay·routes — 성능 측정용
+var _fq_t := 0.0                     # 자동 품질: 재는 구간의 시간·프레임 수, 느린 구간이 이어진 수
+var _fq_n := 0
+var _fq_slow := 0
+var _fq_fast := 0
 var metro_grounds := {}              # 대도시 key → {ground: SiteSurface, city: MetroCity, used} (가까이 갈 때 만든다, 둘까지)
 var _metro_near: SiteSurface         # 카메라가 내려다보는 대도시의 땅 (없으면 null)
 
@@ -90,11 +99,11 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_CLICK
 	Astro.load_data()
-	quality_hi = not OS.has_feature("mobile")
+	quality_hi = Settings.level() in ["high", "ultra"]
 	_vp = SubViewport.new()
 	_vp.own_world_3d = true
 	_vp.transparent_bg = false
-	_vp.msaa_3d = Viewport.MSAA_2X if quality_hi else Viewport.MSAA_DISABLED
+	_vp.msaa_3d = _msaa_of(int(Settings.q("msaa")))
 	_vp.positional_shadow_atlas_size = 0
 	_vp.render_target_update_mode = SubViewport.UPDATE_WHEN_PARENT_VISIBLE
 	add_child(_vp)
@@ -111,6 +120,7 @@ func _init() -> void:
 	_overlay.draw.connect(_draw_overlay)
 	add_child(_overlay)
 	routes = RouteOverlay.new(self)
+	anchors = CamAnchors.new(self)
 	_build_scene()
 	cam.body_info = _info
 	cam.terrain = _terrain_km
@@ -122,6 +132,26 @@ func _ready() -> void:
 	# 게임을 고르기 전(시작 카드 뒤)에도 기지 위 시점으로
 	_update_time(0.0)
 	home(false)
+	apply_settings()
+
+
+static func _msaa_of(n: int) -> Viewport.MSAA:
+	return {2: Viewport.MSAA_2X, 4: Viewport.MSAA_4X, 8: Viewport.MSAA_8X}.get(n, Viewport.MSAA_DISABLED)
+
+
+## 설정을 3D 화면에 적용한다 (품질 단계, 지도 표시). 지형 격자·굽기 해상도는 다음에 땅을 만들 때 쓴다
+func apply_settings() -> void:
+	quality_hi = Settings.level() in ["high", "ultra"]
+	_vp.msaa_3d = _msaa_of(int(Settings.q("msaa")))
+	var splits := int(Settings.q("shadow_splits"))
+	if _sun_light:
+		_sun_light.shadow_enabled = splits > 0
+		_sun_light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if splits >= 4 \
+			else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	RenderingServer.directional_shadow_atlas_set_size(int(Settings.q("shadow_size")), true)
+	routes.show = Settings.show_routes()
+	cam.lock = not bool(Settings.value("camera/auto_parent", false))
+	_on_resized()
 
 
 func set_sim(new_sim: CitySim, p_plan: CityPlan = null, p_tool: PlaceTool = null) -> void:
@@ -214,8 +244,8 @@ func _build_scene() -> void:
 	_sun_light = DirectionalLight3D.new()
 	_sun_light.light_color = Color(1.0, 0.97, 0.92)
 	_sun_light.light_energy = 1.6
-	_sun_light.shadow_enabled = true
-	_sun_light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if quality_hi \
+	_sun_light.shadow_enabled = int(Settings.q("shadow_splits")) > 0
+	_sun_light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if int(Settings.q("shadow_splits")) >= 4 \
 		else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	_sun_light.shadow_bias = 0.04
 	_sun_light.shadow_normal_bias = 1.2
@@ -241,6 +271,12 @@ func _build_scene() -> void:
 		_make_body(id)
 	_sun_glow = SkyBuilder.glow_sprite()
 	_vp.add_child(_sun_glow)
+	routes3d = RouteMeshes.new(self)
+	_space.add_child(routes3d)
+	orbits = OrbitLines.new(self)
+	_space.add_child(orbits)
+	galaxy = GalaxyView.new()
+	_space.add_child(galaxy)
 	moon = MoonSurface.new()
 	_space.add_child(moon)
 	moon.setup(_bodies["moon"]["node"])
@@ -305,6 +341,10 @@ func _info(id: String) -> Dictionary:
 				float(s["dist_ly"]) * Astro.LY * 4.0]]}
 			_frame[id] = info2
 			return info2
+	if id == "galaxy" and galaxy != null:
+		var gi := galaxy.info()
+		_frame[id] = gi
+		return gi
 	return {}
 
 
@@ -423,6 +463,7 @@ static func _idle_unix() -> float:
 func _process(delta: float) -> void:
 	if not is_visible_in_tree():
 		return
+	var t0 := Time.get_ticks_usec()
 	_clock += delta
 	_update_time(delta)
 	_frame.clear()
@@ -430,16 +471,21 @@ func _process(delta: float) -> void:
 	_step_descent(delta)
 	_check_enter(delta)
 	_place_all()
+	var t1 := Time.get_ticks_usec()
 	if city and sim:
 		city.update(delta, speed_level)
 	_overlay.queue_redraw()
+	_auto_quality(delta)
+	var t2 := Time.get_ticks_usec()
+	perf["place_us"] = t1 - t0
+	perf["city_us"] = t2 - t1
 
 
 func _on_resized() -> void:
 	_scale_px = get_viewport().get_final_transform().get_scale().x if get_viewport() else 1.0
 	_scale_px = clampf(_scale_px, 0.5, 3.0)
 	var px := size * _scale_px
-	var cap := 2.2e6 if quality_hi else 1.3e6
+	var cap := float(Settings.q("render_px"))
 	if px.x * px.y > cap:
 		px *= sqrt(cap / (px.x * px.y))
 	_vp.size = Vector2i(maxi(16, int(px.x)), maxi(16, int(px.y)))
@@ -504,12 +550,17 @@ func _place_all() -> void:
 		var rel := Astro.sub3(cam.pos, near_info["center"])
 		var dir_b: Vector3 = (near_info["frame"] as Basis).inverse() * Astro.vec(Astro.norm3(rel))
 		h = Astro.len3(rel) - r - _terrain_km(near_id, dir_b)
+	# 따라가는 수송선이 천체보다 가까우면 그 배가 가장 가까운 것 (근평면에 잘리지 않게, 축척 공간 밖으로 줄이지 않게)
+	var ship_near := cam.track.is_valid() and cam.dist * 0.6 < h
+	if ship_near:
+		h = cam.dist * 0.6
+		r = 0.0
 	h = maxf(h, 0.0015)
 	var horizon := sqrt(h * (2.0 * r + h))
 	_local = maxf(horizon * 1.25, cam.dist * 3.0)
 	# 가장 가까운 천체도 중심이 근거리 범위 밖이면 카메라 쪽으로 줄어든다 — 가까운 면도 그만큼 다가온다
 	var d_near := Astro.len3(Astro.sub3(near_info["center"], cam.pos))
-	_near_s = _compress(d_near) / d_near if d_near > 0.0 else 1.0
+	_near_s = _compress(d_near) / d_near if d_near > 0.0 and not ship_near else 1.0
 	var near_km := clampf(h * 0.35, 0.0006, 1e30) * _near_s
 	# 렌더 단위: 가까운 면까지의 거리 × 0.35가 150 단위가 되게 (기지 가까이서 1 단위 ≈ 1 m — 그림자 계산이 편하다)
 	_unit = near_km / 150.0
@@ -556,6 +607,10 @@ func _place_all() -> void:
 		var me: Dictionary = metro_grounds[k]
 		(me["ground"] as SiteSurface).update_frame(self, _info("earth"), sun_c)
 		(me["city"] as MetroCity).update(self)
+	routes3d.update()
+	orbits.update()
+	_galaxy_k = galaxy.place(self)
+	_place_ship_model()
 
 
 static func g_basis_cam(b: Basis) -> Basis:
@@ -591,7 +646,8 @@ func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 	_sun_light.light_energy = energy
 	var shadow_km := clampf(cam.dist * 5.0, 0.2, 60.0)
 	_sun_light.directional_shadow_max_distance = shadow_km * _near_s / _unit
-	_sun_light.shadow_enabled = near_base > 0.05 and cam.mode == "body" and not OS.has_environment("WORLD_NO_SHADOW")
+	_sun_light.shadow_enabled = near_base > 0.05 and cam.mode == "body" and int(Settings.q("shadow_splits")) > 0 \
+		and not OS.has_environment("WORLD_NO_SHADOW")
 	# 반사광: 해의 방위 반대쪽, 높이 25°
 	if near_base > 0.01:
 		var f: Basis = _info(near_id)["frame"]
@@ -675,7 +731,7 @@ func _make_metro(m: Dictionary) -> void:
 	g.city_root.add_child(mc)
 	mc.setup(m, g, quality_hi)
 	metro_grounds[String(m["key"])] = {"ground": g, "city": mc, "used": _clock}
-	while metro_grounds.size() > 2:
+	while metro_grounds.size() > int(Settings.q("metro_keep")):
 		var oldest := ""
 		var t := INF
 		for k in metro_grounds:
@@ -736,6 +792,7 @@ func _place_air(g: SiteGround, energy: float) -> void:
 
 
 func _star_gain(v: float) -> void:
+	v *= 1.0 - 0.97 * _galaxy_k          # 은하 밖으로 멀어지면 해 둘레의 하늘(별·은하수 띠) 대신 은하 전체가 보인다
 	for mi in [_sky_stars, _milky, _near_stars]:
 		var m := (mi as MeshInstance3D).material_override as ShaderMaterial
 		if m:
@@ -770,6 +827,8 @@ func home(animate: bool = true) -> void:
 		return
 	_descent.clear()
 	cam.look_at_surface(g.body, g.site_dir(), 0.52, deg_to_rad(60.0), _home_heading(g))
+	cam.lock = not bool(Settings.value("camera/auto_parent", false))
+	anchors.current = anchors.for_ground(g)
 
 
 ## 해를 등지고 (35° 비껴) 바라보는 방향 — 건물의 해 받는 면이 보이게
@@ -787,6 +846,8 @@ func fly_to_colony() -> void:
 	var g: SiteGround = ground
 	if g == null:
 		return
+	cam.lock = not bool(Settings.value("camera/auto_parent", false))
+	anchors.current = anchors.for_ground(g)
 	var r := g.radius_km()
 	if cam.focus == g.body and cam.mode == "body" and not cam.flying() and cam.dist < r * 0.5:
 		_begin_descent(g)
@@ -996,6 +1057,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			cam.zoom(1.4)
 		KEY_H, KEY_HOME:
 			home()
+		KEY_BACKSPACE:
+			anchors.up()
 		_:
 			return
 	get_viewport().set_input_as_handled()
@@ -1120,9 +1183,19 @@ func _click(p: Vector2, touch: bool = false, keep: bool = false) -> void:
 			elif String(item[1]).begins_with("site:"):
 				site_picked.emit(String(item[1]).substr(5))
 			elif String(item[1]).begins_with("metro:"):
-				fly_to_metro(String(item[1]).substr(6))
+				var key := String(item[1]).substr(6)
+				var m := Metros.of(key)
+				anchors.go({"kind": "metro", "id": key, "name": String(m.get("name", key)), "body": "earth",
+					"dir": m.get("dir", Vector3.ZERO)})
+			elif String(item[1]).begins_with("ship:"):
+				var key2 := String(item[1]).substr(5)
+				for a in anchors.ships():
+					if String(a["id"]) == key2:
+						anchors.go(a)
+			elif Astro.bodies.has(String(item[1])):
+				anchors.go(CamAnchors.body(String(item[1])))
 			else:
-				_fly_to_label(item[1])
+				anchors.go({"kind": "star", "id": String(item[1]), "name": _star_name(String(item[1]))})
 			return
 	if city and city.visible_now():
 		var mid := city.pick(self, p)
@@ -1171,10 +1244,12 @@ func screen_of(rp: Vector3) -> Variant:
 
 
 func _draw_overlay() -> void:
+	var t0 := Time.get_ticks_usec()
 	_labels.clear()
 	var font := ThemeFactory.regular if ThemeFactory.regular else get_theme_default_font()
-	_draw_orbits()
+	var t1 := Time.get_ticks_usec()
 	routes.draw_lines()
+	perf["routes_us"] = Time.get_ticks_usec() - t1
 	var placed: Array = []
 	# 태양계 천체
 	# 식민지: 행성 단위에서는 점과 이름만 (자세한 도시는 고른 식민지에 내려앉을 때)
@@ -1185,13 +1260,18 @@ func _draw_overlay() -> void:
 		"pluto", "ceres", "io", "europa", "ganymede", "callisto", "titan", "triton", "phobos", "deimos", "charon"]
 	for id in order:
 		_label_body(id, font, placed)
-	# 이웃 별
-	if cam.dist > 2.0e9 or not Astro.bodies.has(cam.focus):
+	# 이웃 별 (은하 전체를 볼 때는 해 둘레에 겹치므로 감춘다)
+	if (cam.dist > 2.0e9 or not Astro.bodies.has(cam.focus)) and _galaxy_k < 0.3:
 		for s in Astro.systems:
 			_label_star(s, font, placed)
+	if _galaxy_k > 0.3:
+		_label_galaxy(font, placed)
 	if city and city.visible_now():
 		city.draw_overlay(self, _overlay, font)
 	_draw_readout(font)
+	perf["overlay_us"] = Time.get_ticks_usec() - t0
+	if Settings.show_perf():
+		_draw_perf(font)
 
 
 func _apparent_px(center: PackedFloat64Array, radius_km: float) -> float:
@@ -1255,6 +1335,8 @@ func _label_body(id: String, font: Font, placed: Array) -> void:
 		dot_col.a = alpha
 		_overlay.draw_circle(pos2, 2.5, dot_col)
 	var text: String = String(b["name"])
+	if id == "sun" and _galaxy_k > 0.3:
+		text = "태양계 — 우리가 사는 곳 (은하 중심에서 2만 6,670광년)"
 	var n_col := 0
 	for col_d in colonies:
 		if String(col_d.get("body", "")) == id and not col_d.get("candidate", false) and not col_d.get("transit", false):
@@ -1347,6 +1429,48 @@ func _label_colony(i: int, font: Font, placed: Array) -> void:
 	_labels.append([rect, id])
 
 
+## 수송선을 고정점으로 따라갈 때: 그 배의 3D 모형 (가까이 — 수백 km 안 — 에서만), 가는 쪽으로 돌린다
+func _place_ship_model() -> void:
+	var on := cam.track.is_valid() and String(anchors.current.get("kind", "")) == "ship" and cam.dist < 400.0
+	if not on:
+		if _ship_model:
+			_ship_model.visible = false
+		return
+	if _ship_model == null:
+		_ship_model = MeshInstance3D.new()
+		_ship_model.mesh = ModelLib.mesh("vehicles", "transport_ship")
+		_ship_model.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_space.add_child(_ship_model)
+	var key := String(anchors.current["id"])
+	var p: PackedFloat64Array = cam.track.call()
+	var ahead := anchors.ship_pos(key, 6.0)
+	var fwd := Astro.vec(Astro.norm3(Astro.sub3(ahead, p)))
+	if fwd.length_squared() < 0.5:
+		fwd = Vector3(1, 0, 0)
+	var x := g_vec(fwd).normalized()
+	var up := Vector3.UP if absf(x.y) < 0.95 else Vector3.RIGHT
+	var z := x.cross(up).normalized()
+	var y := z.cross(x).normalized()
+	var d := maxf(Astro.len3(Astro.sub3(p, cam.pos)), 1e-6)
+	var sc := _compress(d) / d / _unit * 0.001          # 모형은 미터
+	_ship_model.global_transform = Transform3D(Basis(x, y, z).scaled(Vector3.ONE * sc), to_render(p))
+	_ship_model.visible = true
+
+
+## 우리 은하 전체를 볼 때: 은하 중심의 이름
+func _label_galaxy(font: Font, placed: Array) -> void:
+	var sp: Variant = screen_of(to_render(galaxy.center))
+	if sp == null:
+		return
+	var text := "우리 은하 중심 · 궁수자리 A* (블랙홀)"
+	var pos2: Vector2 = (sp as Vector2) + Vector2(10, -10)
+	var tsize := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT)
+	placed.append(Rect2(pos2 - Vector2(0, tsize.y), tsize))
+	var a := clampf((_galaxy_k - 0.3) / 0.4, 0.0, 1.0)
+	_overlay.draw_string(font, pos2 + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT, Color(0, 0, 0, 0.7 * a))
+	_overlay.draw_string(font, pos2, text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT, Color(1.0, 0.86, 0.62, a))
+
+
 func _label_star(s: Dictionary, font: Font, placed: Array) -> void:
 	var p: PackedFloat64Array = s["pos"]
 	var sp: Variant = screen_of(to_render(p))
@@ -1379,63 +1503,10 @@ func _label_star(s: Dictionary, font: Font, placed: Array) -> void:
 	_labels.append([rect, s["id"]])
 
 
-func _draw_orbits() -> void:
-	if absf(jd - _orbit_jd) > 5.0:
-		_orbit_cache.clear()
-		_orbit_jd = jd
-	var planets := ["mercury", "venus", "earth", "mars", "ceres", "jupiter", "saturn", "uranus", "neptune", "pluto"]
-	var a_sys := smoothstep(1.5e7, 1.2e8, cam.dist)
-	for id in planets:
-		var col: Color = PlanetLook.dot_color(id)
-		var aa := a_sys
-		if id in ["uranus", "neptune", "pluto"]:
-			aa *= 1.0 - smoothstep(Astro.LY * 0.05, Astro.LY * 0.5, cam.dist)
-		else:
-			aa *= 1.0 - smoothstep(Astro.LY * 0.002, Astro.LY * 0.05, cam.dist)
-		if aa > 0.02:
-			_orbit_line(id, Astro.v3(0, 0, 0), Color(col.r, col.g, col.b, 0.42 * aa))
-	# 달의 궤도 (지구-달을 볼 때)
-	var a_moon := smoothstep(1.5e4, 1.2e5, cam.dist) * (1.0 - smoothstep(2.0e7, 2.0e8, cam.dist))
-	if a_moon > 0.02:
-		_orbit_line("moon", _info("earth")["center"], Color(0.8, 0.8, 0.78, 0.4 * a_moon))
-	# 다른 행성의 위성
-	for id in ["io", "europa", "ganymede", "callisto", "titan", "triton", "phobos", "deimos", "charon"]:
-		var b: Dictionary = Astro.bodies[id]
-		var pc: PackedFloat64Array = _info(b["parent"])["center"]
-		var pd := Astro.len3(Astro.sub3(pc, cam.pos))
-		var orb := float(b["orbit_km"])
-		var am := smoothstep(orb * 0.2, orb * 1.2, pd) * (1.0 - smoothstep(orb * 25.0, orb * 80.0, pd))
-		# 그 위성 가까이에서는 제 궤도선이 화면을 가로지르지 않게
-		var md := Astro.len3(Astro.sub3(_info(id)["center"], cam.pos))
-		am *= smoothstep(orb * 0.02, orb * 0.12, md)
-		if am > 0.02:
-			_orbit_line(id, pc, Color(0.75, 0.78, 0.82, 0.32 * am))
-
-
-func _orbit_line(id: String, origin: PackedFloat64Array, col: Color) -> void:
-	if not _orbit_cache.has(id):
-		_orbit_cache[id] = Astro.orbit_points(id, jd, 160 if id in ["moon"] else 256)
-	var pts: PackedFloat64Array = _orbit_cache[id]
-	var line := PackedVector2Array()
-	var n := pts.size() / 3
-	for k in n + 1:
-		var i := (k % n) * 3
-		var p := PackedFloat64Array([origin[0] + pts[i], origin[1] + pts[i + 1], origin[2] + pts[i + 2]])
-		var rp := to_render(p)
-		if _camera.is_position_behind(rp):
-			if line.size() >= 2:
-				_overlay.draw_polyline(line, col, 1.2, true)
-			line.clear()
-			continue
-		line.append(_camera.unproject_position(rp) / px_scale())
-	if line.size() >= 2:
-		_overlay.draw_polyline(line, col, 1.2, true)
-
-
 func _draw_readout(font: Font) -> void:
 	var text := ""
 	var info := _info(cam.focus)
-	if cam.mode == "body" and not info.is_empty():
+	if cam.mode == "body" and not info.is_empty() and Astro.bodies.has(cam.focus):
 		var rel := Astro.sub3(cam.pos, info["center"])
 		var alt := Astro.len3(rel) - float(info["radius"])
 		if _ground_on(cam.focus) != null:
@@ -1444,6 +1515,8 @@ func _draw_readout(font: Font) -> void:
 		text = "%s 위 고도 %s" % [String(Astro.bodies[cam.focus]["name"]), Fmt.distance_km(alt)]
 	else:
 		var name := String(Astro.bodies[cam.focus]["name"]) if Astro.bodies.has(cam.focus) else _star_name(cam.focus)
+		if cam.track.is_valid():
+			name = "수송선"
 		text = "%s에서 %s" % [name, Fmt.distance_km(cam.dist)]
 	var pos2 := Vector2(14, size.y - 66)
 	_overlay.draw_string(font, pos2 + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0, 0, 0, 0.7))
@@ -1460,7 +1533,55 @@ func _draw_readout(font: Font) -> void:
 		_overlay.draw_string(font, tip + Vector2(-4, -4), "N", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 1, 1, 0.8))
 
 
+## 성능 표시 (설정): 초당 프레임, 이번 프레임의 CPU 시간(배치·도시·화면 위 그리기), 그리기 호출, 품질 단계
+func _draw_perf(font: Font) -> void:
+	var fps := Engine.get_frames_per_second()
+	var lines := [
+		"%d FPS · %s" % [fps, Settings.LEVEL_NAMES[Settings.level()] + (" (자동)" if Settings.preset() == "auto" else "")],
+		"배치 %.1f · 도시 %.1f · 화면 %.1f ms" % [float(perf.get("place_us", 0)) / 1000.0, float(perf.get("city_us", 0)) / 1000.0,
+			float(perf.get("overlay_us", 0)) / 1000.0],
+		"그리기 %d · 물체 %d · 삼각형 %s" % [int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+			int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)),
+			Fmt.n(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))],
+	]
+	var y := 64.0
+	for line in lines:
+		var w := font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
+		var p := Vector2(size.x - w - 14.0, y)
+		_overlay.draw_rect(Rect2(p - Vector2(6, 13), Vector2(w + 12, 18)), Color(0, 0, 0, 0.55))
+		_overlay.draw_string(font, p, line, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.75, 0.95, 0.8))
+		y += 19.0
+
+
+## 자동 품질: 2초마다 평균 프레임 시간을 보고, 느린 구간(24 FPS 아래)이 세 번 이어지면 한 단계 내리고,
+## 넉넉한 구간(55 FPS 위)이 30초 이어지면 한 단계 올린다
+func _auto_quality(delta: float) -> void:
+	if Settings.preset() != "auto" or DisplayServer.get_name() == "headless":
+		return
+	_fq_t += delta
+	_fq_n += 1
+	if _fq_t < 2.0:
+		return
+	var avg := _fq_t / maxf(float(_fq_n), 1.0)
+	_fq_t = 0.0
+	_fq_n = 0
+	if cam.flying() or not _descent.is_empty():
+		return                  # 날아가는 동안(굽기·짓기)은 세지 않는다
+	_fq_slow = _fq_slow + 1 if avg > 1.0 / 24.0 else 0
+	_fq_fast = _fq_fast + 1 if avg < 1.0 / 55.0 else 0
+	if _fq_slow >= 3:
+		_fq_slow = 0
+		if Settings.step_auto(-1):
+			apply_settings()
+	elif _fq_fast >= 15:
+		_fq_fast = 0            # 30초 넘게 넉넉하면 한 단계 올린다 (GPU 추천 단계까지)
+		if Settings.step_auto(1):
+			apply_settings()
+
+
 func _star_name(id: String) -> String:
+	if id == "galaxy":
+		return "우리 은하 중심"
 	for s in Astro.systems:
 		if s["id"] == id:
 			return String(s["name"])

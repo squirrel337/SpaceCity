@@ -44,10 +44,6 @@ var _loc := PackedVector4Array()  # 굽는 조각의 작은 크레이터 (모형
 var _seed := 1
 var _base_rect := Vector4.ZERO
 var _ridge_c := Vector2.ZERO      # 극지 크레이터 중심 (모형 좌표)
-var _segs := 192
-var _rings := 0
-var _grow := 1.0
-var _hgrid := PackedFloat32Array()    # 구운 높이 (기지 평지 기준 m) [고리 × 둘레]
 var _baked := false
 var _baking := false
 var _cap_tex: ImageTexture
@@ -361,7 +357,7 @@ func _ring_radius(k: int) -> float:
 
 
 func _patch_mesh() -> ArrayMesh:
-	_segs = 144 if OS.has_feature("mobile") else 192
+	_segs = int(Settings.q("patch_segs"))
 	_grow = 1.0 + TAU / _segs
 	var k := 0
 	while _ring_radius(k) < PATCH_M:
@@ -566,9 +562,7 @@ func _bake_patch() -> void:
 
 
 func _bake_cap() -> void:
-	var size := 2048
-	if OS.has_feature("mobile"):
-		size = 1024
+	var size := int(Settings.bake_sizes()["cap"])
 	if OS.has_environment("WORLD_BAKE_SMALL"):
 		size = 512
 	_cap_rad = clampf(CAP_KM / _r_km, 0.02, 0.3)
