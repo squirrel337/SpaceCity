@@ -550,15 +550,23 @@ func _bake_patch() -> void:
 	var data := img.get_data()
 	var grid := PackedFloat32Array()
 	grid.resize(_rings * _segs)
+	var fix := false
 	for k in _rings:
 		for i in _segs:
 			grid[k * _segs + i] = Baker.h24(data, (k * _segs + i) * 4)
+			if data[(k * _segs + i) * 4 + 3] == 254:
+				data[(k * _segs + i) * 4 + 3] = 255          # 254는 판 땅에 찬 물의 표시로 남겨 둔다
+				fix = true
+	if fix:
+		img.set_data(img.get_width(), img.get_height(), false, img.get_format(), data)
 	_hgrid = grid
 	_plateau_m = site_m - ref
 	var tex := ImageTexture.create_from_image(img)
 	_keep_baked(img, tex, body in LayoutData.terrain()["flood"]["bodies"])
 	if body == "earth" and is_nan(sea_z):
 		sea_z = -site_m           # 조각 안에 바다가 없으면 해발 0 m (지구의 기준 구 = 해수면)
+	if not is_nan(sea_z):
+		patch_mat.set_shader_parameter("flood_z", sea_z)
 	patch_mat.set_shader_parameter("hmap", tex)
 	patch_mat.set_shader_parameter("has_hmap", true)
 	_baked = true
@@ -577,7 +585,7 @@ func _encode_heights(changed: PackedInt32Array) -> void:
 		var wet: int = _hbytes[o + 3]
 		if flooded.has(idx):
 			h = maxf(h, sea_z)
-			wet = 255
+			wet = 254             # 셰이더: 판 땅에 찬 물 (물낯은 해수면 높이에서 자른다)
 		elif not is_nan(sea_z) and wet > 127 and h > sea_z + 0.25 and h > _hbase[idx] + 0.1:
 			wet = 0
 		var c := clampi(int(round((h + 32768.0) * 256.0)), 0, 16777215)

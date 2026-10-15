@@ -46,7 +46,7 @@
       "families": [["landing_pad", 2]]}
   },
   "grid": {"block_m": 46.0, "avenue_every": 2, "margin_m": 12.0, "plaza_r_m": 13.0},
-  "terrain": {"cell_m": 2.0, "brushes_m": [6.0, 12.0, 24.0], "step_m": 1.0, "max_depth_m": 30.0, "max_raise_m": 12.0,
+  "terrain": {"cell_m": 2.0, "brushes_m": [6.0, 12.0, 24.0], "step_m": 1.0, "max_depth_m": 60.0, "max_raise_m": 12.0,
     "need": ["excavator", "robot_bay"], "flood": {"bodies": ["earth", "titan"]}, "road_shoulder_m": 3.0,
     "edit_radius_m": 700.0}
 }

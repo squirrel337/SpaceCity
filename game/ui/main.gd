@@ -252,7 +252,7 @@ func _build_place_bar() -> Control:
 	place_buttons["erase"].toggle_mode = true
 	place_bar.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	place_bar.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	place_bar.offset_top = 8
+	place_bar.offset_top = 70                # 위쪽 경로 막대(우주 › 태양계 › …) 아래
 	place_bar.visible = false
 	return place_bar
 
@@ -303,6 +303,7 @@ func _update_place_bar() -> void:
 	place_buttons["erase"].visible = tool.mode in ["road", "erase"]
 	place_buttons["erase"].set_pressed_no_signal(tool.mode == "erase")
 	place_bar.reset_size()
+	place_bar.call_deferred("reset_size")
 
 
 ## 도구의 고를 것: 모드가 바뀔 때만 단추를 새로 만들고, 눌린 상태는 매번 맞춘다
@@ -316,6 +317,7 @@ func _update_place_opts() -> void:
 	if key != _opts_mode:
 		_opts_mode = key
 		for c in place_opts.get_children():
+			place_opts.remove_child(c)
 			c.queue_free()
 		_opt_buttons.clear()
 		match group:
@@ -371,7 +373,7 @@ func _update_place_opts() -> void:
 			on = k == "op:" + tool.terrain_op or k == "br:%d" % int(tool.brush)
 		b.set_pressed_no_signal(on)
 	place_opts.visible = group != ""
-	place_opts.custom_minimum_size.x = clampf(city_area.size.x - 60.0, 280.0, 760.0) if group != "" else 0.0
+	place_opts.custom_minimum_size.x = clampf(city_area.size.x - 120.0, 280.0, 640.0) if group != "" else 0.0
 
 
 func _opt(key: String, text: String, tip: String, group: ButtonGroup, on_press: Callable) -> Button:

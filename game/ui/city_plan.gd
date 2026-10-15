@@ -18,6 +18,7 @@ const PAD_CLEAR_M := 30.0                            # 착륙장 둘레: 다른 
 const REACTOR_CLEAR_M := 60.0                        # 원자로와 사람이 사는 건물 사이
 const PEOPLE := ["habitat", "safety", "research", "social"]   # 사람이 머무는 분류
 const REACTORS := ["fission_40kw", "fission_1mw"]             # 원자로 계열
+const REPOSE := 0.8                                  # 판 비탈·쌓은 비탈의 가장 가파른 기울기 (흙의 안식각 약 39°)
 ## 모듈 데이터의 clearance_m가 있으면 그 거리를 쓴다 (매립형 원자로 20 m, 방벽 착륙장 15 m …)
 const TILE_NAMES := {"A": "A 100%", "B": "B 85%", "C": "C 70%"}
 
@@ -40,6 +41,8 @@ var _next_uid := 1
 var _sig := ""
 var _adj: Array = []
 var _adj_rev := -1
+var _fixed := {}
+var _fixed_rev := -1
 
 
 func _init(p_layout: BaseLayout = null) -> void:
@@ -564,50 +567,131 @@ func terrain_delta(p: Vector2) -> float:
 
 
 ## 땅을 고친다: mode "dig"(파기)·"raise"(쌓기)·"flatten"(평탄화 — 붓 가운데 높이로)·"restore"(되돌리기).
+## 파기·쌓기는 붓 가운데(반지름의 55%)를 한 걸음(step m) 더 깊게·높게 하고, 둘레는 비탈로 — 깊어질수록 비탈이
+## 안식각(REPOSE)보다 가파르지 않게 넓어진다 (깊이 판 구덩이는 넓은 노천 구덩이가 된다).
+## 비탈이 건물·길 밑에 닿으면 고치지 않는다 (terrain_block이 까닭을 말한다). 평탄화·되돌리기는 건물·길 밑 칸을 건너뛴다.
 ## base_h(p)는 고치기 전 땅 높이 (평탄화가 쓴다). 고친 칸 수를 돌려준다
 func edit_terrain(center: Vector2, radius: float, mode: String, step: float, base_h: Callable = Callable()) -> int:
+	var plan_e := _terrain_plan(center, radius, mode, step, base_h)
+	if plan_e.is_empty():
+		return 0
+	var changes: Dictionary = plan_e["changes"]
+	var keep := _fixed_cells()
+	if mode in ["dig", "raise"]:
+		for key in changes:
+			if keep.has(key):
+				return 0
+	var n := 0
+	for key in changes:
+		if keep.has(key):
+			continue
+		var v := float(changes[key])
+		if absf(v) < 0.01:
+			terrain.erase(key)
+		else:
+			terrain[key] = snappedf(v, 0.01)
+		n += 1
+	if n > 0:
+		terrain_rev += 1
+		_touch()
+	return n
+
+
+## 파기·쌓기를 막는 까닭 ("" = 고칠 수 있다): 비탈이 건물·길 밑에 닿거나, 한도에 닿았다
+func terrain_block(center: Vector2, radius: float, mode: String, step: float) -> String:
+	if not mode in ["dig", "raise"]:
+		return ""
+	var plan_e := _terrain_plan(center, radius, mode, step)
+	if plan_e.is_empty():
+		return "더 팔 수 없다 (%d m까지)" % int(LayoutData.terrain()["max_depth_m"]) if mode == "dig" \
+			else "더 쌓을 수 없다 (%d m까지)" % int(LayoutData.terrain()["max_raise_m"])
+	var keep := _fixed_cells()
+	for key in plan_e["changes"]:
+		if keep.has(key):
+			return "비탈(폭 %d m)이 건물·길에 닿는다 — 깊이 %d m까지 파려면 둘레를 비운다" % [
+				int(float(plan_e["reach"]) - radius * 0.55), int(ceil(float(plan_e["depth"])))] if mode == "dig" \
+				else "비탈(폭 %d m)이 건물·길에 닿는다" % int(float(plan_e["reach"]) - radius * 0.55)
+	return ""
+
+
+## 한 번 고칠 때 바뀌는 칸들: {changes: Vector2i → 새 높이 차, depth, reach}. 바뀌는 것이 없으면 {}
+func _terrain_plan(center: Vector2, radius: float, mode: String, step: float, base_h: Callable = Callable()) -> Dictionary:
 	var t := LayoutData.terrain()
 	var c := cell_m()
 	var lo := -float(t["max_depth_m"])
 	var hi := float(t["max_raise_m"])
-	var target := 0.0
-	if mode == "flatten":
-		target = terrain_delta(center) + (float(base_h.call(center)) if base_h.is_valid() else 0.0)
-	var n := 0
-	var r_cells := int(ceil(radius / c)) + 1
+	var core := radius * 0.55
 	var ci := Vector2i(int(round(center.x / c)), int(round(center.y / c)))
+	var depth := 0.0
+	var reach := radius
+	var target := 0.0
+	if mode in ["dig", "raise"]:
+		# 붓 가운데의 지금 깊이·높이 → 한 걸음 더
+		var r_core := int(ceil(core / c))
+		var cur := 0.0
+		for dj in range(-r_core, r_core + 1):
+			for di in range(-r_core, r_core + 1):
+				var key := Vector2i(ci.x + di, ci.y + dj)
+				if (Vector2(key) * c).distance_to(center) <= core:
+					var v0 := float(terrain.get(key, 0.0))
+					cur = minf(cur, v0) if mode == "dig" else maxf(cur, v0)
+		depth = clampf(absf(cur) + step, 0.0, -lo if mode == "dig" else hi)
+		reach = core + maxf(radius - core, 1.5 * depth / REPOSE)
+	elif mode == "flatten":
+		target = terrain_delta(center) + (float(base_h.call(center)) if base_h.is_valid() else 0.0)
+	var changes := {}
+	var r_cells := int(ceil(reach / c)) + 1
 	for dj in range(-r_cells, r_cells + 1):
 		for di in range(-r_cells, r_cells + 1):
 			var key := Vector2i(ci.x + di, ci.y + dj)
 			var p := Vector2(key) * c
 			var d := p.distance_to(center)
-			if d > radius:
+			if d > reach:
 				continue
-			var w := 1.0 - smoothstep(radius * 0.55, radius, d)      # 가장자리는 비탈로
 			var old := float(terrain.get(key, 0.0))
 			var v := old
 			match mode:
 				"dig":
-					v = old - step * w
+					v = minf(old, -depth * (1.0 - smoothstep(core, reach, d)))
 				"raise":
-					v = old + step * w
+					v = maxf(old, depth * (1.0 - smoothstep(core, reach, d)))
 				"flatten":
 					var bh := float(base_h.call(p)) if base_h.is_valid() else 0.0
-					v = lerpf(old, target - bh, w)
+					v = lerpf(old, target - bh, 1.0 - smoothstep(core, radius, d))
 				"restore":
-					v = lerpf(old, 0.0, w)
+					v = lerpf(old, 0.0, 1.0 - smoothstep(core, radius, d))
 			v = clampf(v, lo, hi)
-			if absf(v - old) < 0.005:
-				continue
-			if absf(v) < 0.01:
-				terrain.erase(key)
-			else:
-				terrain[key] = snappedf(v, 0.01)
-			n += 1
-	if n > 0:
-		terrain_rev += 1
-		_touch()
-	return n
+			if absf(v - old) >= 0.005:
+				changes[key] = v
+	if changes.is_empty():
+		return {}
+	return {"changes": changes, "depth": depth, "reach": reach}
+
+
+## 고치지 않는 칸: 건물 밑과 길 밑 (계획이 바뀔 때만 다시 셈한다)
+func _fixed_cells() -> Dictionary:
+	if _fixed_rev == revision:
+		return _fixed
+	_fixed_rev = revision
+	var c := cell_m()
+	var out := {}
+	for e in buildings:
+		var r := entry_rect(e).grow(1.0)
+		for i in range(int(floor(r.position.x / c)), int(ceil(r.end.x / c)) + 1):
+			for j in range(int(floor(r.position.y / c)), int(ceil(r.end.y / c)) + 1):
+				out[Vector2i(i, j)] = true
+	for k in edges.size():
+		var a: Vector2 = nodes[edges[k].x]
+		var b: Vector2 = nodes[edges[k].y]
+		var hw := edge_half(k) + 1.0
+		var bb := Rect2(a, Vector2.ZERO).expand(b).grow(hw)
+		for i in range(int(floor(bb.position.x / c)), int(ceil(bb.end.x / c)) + 1):
+			for j in range(int(floor(bb.position.y / c)), int(ceil(bb.end.y / c)) + 1):
+				var p := Vector2(i, j) * c
+				if _seg_point(a, b, p).distance_to(p) < hw:
+					out[Vector2i(i, j)] = true
+	_fixed = out
+	return out
 
 
 ## 물에 잠긴 칸을 적는다 (땅이 해수면과 견주어 셈한 것). 바뀌면 true

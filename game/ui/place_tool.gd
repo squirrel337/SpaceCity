@@ -490,10 +490,9 @@ func _recheck_terrain() -> void:
 			reason = "길 밑은 고칠 수 없다 — 길을 지우고 고친다 (길 둘레는 길이 스스로 고른다)"
 			return
 	var now := plan.terrain_delta(at)
-	if terrain_op == "dig" and now <= -float(t["max_depth_m"]) + 0.01:
-		reason = "더 팔 수 없다 (%d m까지)" % int(t["max_depth_m"])
-	elif terrain_op == "raise" and now >= float(t["max_raise_m"]) - 0.01:
-		reason = "더 쌓을 수 없다 (%d m까지)" % int(t["max_raise_m"])
+	reason = plan.terrain_block(at, brush, terrain_op, float(t["step_m"]))
+	if reason != "":
+		return
 	if ground != null and not is_nan(ground.sea_z):
 		var h := ground.base_height_m(at) + now - (float(t["step_m"]) if terrain_op == "dig" else 0.0)
 		if h < ground.sea_z:

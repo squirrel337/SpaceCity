@@ -39,9 +39,12 @@ uniform float soft_k = 0.0;                          // 대기가 해 질 녘 �
 uniform float gain = 1.0;
 uniform float night_glow = 0.0;                      // 지구: 그 자리의 밤 (시가지 불빛)
 uniform int debug = 0;
+uniform float flood_z = -1e9;                        // 판 땅에 차는 물의 높이 (해수면, 모형 좌표 m)
 varying vec3 bdir;
 varying vec2 mpos;
 varying float wet_v;
+varying float flood_v;                               // 해수면 아래로 판 땅의 꼭짓점 (물 몫 254로 적는다)
+varying float mz;                                    // 모형 좌표의 높이 (m, 기지 평지 기준)
 varying vec3 up_v;                                   // 이 자리의 천체 위쪽 (뷰 좌표) — 구와 같은 빛을 셈하려고
 
 const float SQ = 0.70710678118;
@@ -106,9 +109,12 @@ void vertex() {
 	float h = 0.0;
 	vec3 n = vec3(0.0, 0.0, 1.0);
 	wet_v = 0.0;
+	flood_v = 0.0;
 	if (has_hmap) {
 		h = grid_h(i, k);
-		wet_v = texelFetch(hmap, ivec2(i, k), 0).a;
+		float a8 = floor(texelFetch(hmap, ivec2(i, k), 0).a * 255.0 + 0.5);
+		flood_v = a8 == 254.0 ? 1.0 : 0.0;
+		wet_v = a8 == 254.0 ? 0.0 : a8 / 255.0;
 		if (k > 0) {
 			vec3 ta = grid_p(i + 1, k) - grid_p(i - 1, k);
 			vec3 tr = grid_p(i, k + 1) - grid_p(i, k - 1);
@@ -118,6 +124,7 @@ void vertex() {
 	float r2 = dot(p, p);
 	float drop = r2 / (2.0 * r_m) + r2 * r2 / (8.0 * r_m * r_m * r_m);
 	float shrink = 1.0 - r2 / (6.0 * r_m * r_m);
+	mz = h;
 	vec3 m = vec3(p * shrink, h - drop - UV2.x * 450.0);
 	VERTEX = vec3(m.x, m.z, -m.y);
 	n = normalize(n + vec3(p / r_m, 0.0));
@@ -160,6 +167,8 @@ void fragment() {
 	float shore_n = (fbm(vec3(mpos * 0.004, 7.0), 4, 9.0) - 0.5) * 0.5
 		+ (fbm(vec3(mpos * 0.05, 8.0), 3, 10.0) - 0.5) * 0.3 * (1.0 - smoothstep(5.0, 40.0, mpp));
 	float wet = step(0.5, wet_v + shore_n);
+	// 판 땅에 찬 물: 해수면 높이에서 고른 물낯 (구덩이 벽을 타고 오르지 않는다)
+	wet = max(wet, flood_v > 0.001 ? 1.0 - step(flood_z + 0.15, mz) : 0.0);
 	if (mode == 1 && cl_parks) {
 		// 대도시 지도(강을 그린 고운 지도) 안에서는 조각마다 해안 거리로 — 꼭짓점 사이보다 좁은 강도 끊기지 않는다
 		// (시가지의 땅은 거의 해수면이다)
