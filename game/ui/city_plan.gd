@@ -28,10 +28,12 @@ var edges: Array = []              # 길 Vector2i(꼭짓점, 꼭짓점)
 var etypes: Array = []             # 길마다의 종류 (data/city_layout.json의 roads: path·street·avenue·highway·tube·rail)
 var district_seeds: Array = []     # [[Vector2, 구획]] — 그 점이 든 블록의 용도 (길이 바뀌어도 블록이 이어받는다)
 var terrain := {}                  # 땅 고치기: Vector2i(칸) → 높이 차 m (칸 = LayoutData.terrain().cell_m)
+var flood := {}                    # 물에 잠긴 칸: Vector2i(칸) → 물 깊이 m (해수면 아래로 판 칸 — 땅이 셈해 적는다)
 var revision := 0                  # 건물·길이 바뀔 때마다 +1
 var road_rev := 0                  # 길이 바뀔 때마다 +1
 var zone_rev := 0                  # 블록의 구획이 바뀔 때마다 +1
 var terrain_rev := 0               # 땅을 고칠 때마다 +1
+var flood_rev := 0                 # 물에 잠긴 칸이 바뀔 때마다 +1
 var _blocks: Array = []
 var _blocks_sig := ""
 var _next_uid := 1
@@ -355,6 +357,8 @@ func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1) -> St
 		var ed: Vector2i = edges[k]
 		if _seg_rect_dist(nodes[ed.x], nodes[ed.y], r) < edge_half(k) - 0.05:
 			return "길 위에는 지을 수 없다"
+	if flooded_in(r) > 0:
+		return "물에 잠긴 땅이다 — 먼저 메운다"
 	return ""
 
 
@@ -427,6 +431,8 @@ func road_check(a: Vector2, b: Vector2, type: String = "street") -> String:
 	for e in buildings:
 		if _seg_rect_dist(a, b, entry_rect(e).grow(-0.3)) < hw:
 			return "건물(%s)을 지나간다" % GameData.module_name(String(e["id"]))
+	if flooded_along(a, b, hw):
+		return "물에 잠긴 땅을 지나간다 — 먼저 메운다"
 	return ""
 
 
@@ -602,6 +608,64 @@ func edit_terrain(center: Vector2, radius: float, mode: String, step: float, bas
 		terrain_rev += 1
 		_touch()
 	return n
+
+
+## 물에 잠긴 칸을 적는다 (땅이 해수면과 견주어 셈한 것). 바뀌면 true
+func set_flood(cells: Dictionary) -> bool:
+	if cells.size() == flood.size() and cells.keys().all(func(k): return flood.has(k)):
+		flood = cells
+		return false
+	flood = cells
+	flood_rev += 1
+	_touch()
+	return true
+
+
+## 이 점(칸)이 물에 잠겼나
+func flooded_at(p: Vector2) -> bool:
+	if flood.is_empty():
+		return false
+	var c := cell_m()
+	return flood.has(Vector2i(int(round(p.x / c)), int(round(p.y / c))))
+
+
+## 사각형 안의 물에 잠긴 칸 수
+func flooded_in(r: Rect2) -> int:
+	if flood.is_empty():
+		return 0
+	var c := cell_m()
+	var n := 0
+	for i in range(int(floor(r.position.x / c)), int(ceil(r.end.x / c)) + 1):
+		for j in range(int(floor(r.position.y / c)), int(ceil(r.end.y / c)) + 1):
+			if flood.has(Vector2i(i, j)) and r.has_point(Vector2(i, j) * c):
+				n += 1
+	return n
+
+
+## 선분(폭 hw)이 지나는 물에 잠긴 칸이 있나
+func flooded_along(a: Vector2, b: Vector2, hw: float) -> bool:
+	if flood.is_empty():
+		return false
+	var c := cell_m()
+	for k in flood:
+		var p := Vector2(k) * c
+		if _seg_point(a, b, p).distance_to(p) < hw + c * 0.5:
+			return true
+	return false
+
+
+## 지어진 건물 가운데 물에 잠긴 것: 종류 → 수
+func flooded_built() -> Dictionary:
+	var out := {}
+	if flood.is_empty():
+		return out
+	for e in buildings:
+		if int(e["seq"]) != -1:
+			continue
+		if flooded_in(entry_rect(e)) > 0:
+			var k := String(e["id"])
+			out[k] = int(out.get(k, 0)) + 1
+	return out
 
 
 ## 고친 땅의 부피 (m³, 판 것·쌓은 것)
@@ -966,8 +1030,11 @@ func to_save() -> Dictionary:
 	var ts := []
 	for k in terrain:
 		ts.append_array([(k as Vector2i).x, (k as Vector2i).y, int(round(float(terrain[k]) * 100.0))])
+	var fs := []
+	for k in flood:
+		fs.append_array([(k as Vector2i).x, (k as Vector2i).y, int(round(float(flood[k]) * 10.0))])
 	return {"version": VERSION, "next_uid": _next_uid, "buildings": bs, "nodes": ns, "edges": es, "types": etypes.duplicate(),
-		"districts": zs, "terrain": ts}
+		"districts": zs, "terrain": ts, "flood": fs}
 
 
 ## 저장한 계획을 되살리고 시뮬레이션과 맞춘다. 없거나 읽을 수 없으면 새 계획
@@ -1006,6 +1073,9 @@ static func from_save(data: Variant, sim: CitySim, p_layout: BaseLayout = null) 
 	var tr: Array = data.get("terrain", [])
 	for i in range(0, tr.size() - 2, 3):
 		plan.terrain[Vector2i(int(tr[i]), int(tr[i + 1]))] = float(tr[i + 2]) / 100.0
+	var fl: Array = data.get("flood", [])
+	for i in range(0, fl.size() - 2, 3):
+		plan.flood[Vector2i(int(fl[i]), int(fl[i + 1]))] = float(fl[i + 2]) / 10.0
 	plan._next_uid = maxi(int(data.get("next_uid", 1)), 1)
 	for e in plan.buildings:
 		plan._next_uid = maxi(plan._next_uid, int(e["uid"]) + 1)

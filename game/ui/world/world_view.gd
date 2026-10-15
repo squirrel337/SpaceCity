@@ -70,6 +70,8 @@ var _press := Vector2.ZERO
 var _pressed := false
 var _dragging := false
 var _drag_button := 0
+var _hold_t := 0.0                # 땅 고치기: 누르고 있는 시간 (0.3초마다 한 번 더 고친다)
+var _held := false
 var _pinch := {}
 var _last_click_ms := 0
 var _hover_label := ""
@@ -161,6 +163,8 @@ func set_sim(new_sim: CitySim, p_plan: CityPlan = null, p_tool: PlaceTool = null
 		p_plan = CityPlan.create(sim, g.layout)
 	plan = p_plan
 	tool = p_tool
+	if tool != null:
+		tool.ground = g
 	if g != ground or city == null:
 		_mount_city(g)
 	city.transport = mgr.transport if mgr != null else null
@@ -467,6 +471,14 @@ func _process(delta: float) -> void:
 	_clock += delta
 	_update_time(delta)
 	_frame.clear()
+	if _pressed and not _dragging and _drag_button == MOUSE_BUTTON_LEFT and _tool_on() and tool.mode == "terrain":
+		_hold_t += delta
+		if _hold_t >= 0.3:
+			_hold_t = 0.0
+			_held = true
+			_click(get_local_mouse_position())
+	else:
+		_hold_t = 0.0
 	cam.update(delta, jd)
 	_step_descent(delta)
 	_check_enter(delta)
@@ -995,12 +1007,14 @@ func _gui_input(event: InputEvent) -> void:
 				_press = mb.position
 				_pressed = true
 				_dragging = false
+				_held = false
+				_hold_t = 0.0
 				_drag_button = mb.button_index
 				if mb.double_click and mb.button_index == MOUSE_BUTTON_LEFT:
 					_zoom_at(mb.position, 0.35)
 					_pressed = false
 			else:
-				if _pressed and not _dragging and mb.button_index == MOUSE_BUTTON_LEFT:
+				if _pressed and not _dragging and mb.button_index == MOUSE_BUTTON_LEFT and not _held:
 					_click(mb.position, false, mb.shift_pressed)
 				elif _pressed and not _dragging and mb.button_index == MOUSE_BUTTON_RIGHT and _tool_on():
 					_tool_back()

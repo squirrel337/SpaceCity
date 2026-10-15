@@ -160,7 +160,7 @@ static func setbacks(nodes: Array, inc: Array) -> Array:
 			for j in n:
 				var e: Dictionary = list[j]
 				var best := float(e["hw"])
-				for side in [-1, 1]:
+				for side: int in [-1, 1]:
 					var o: Dictionary = list[(j + side + n) % n]
 					var de: Vector2 = e["dir"]
 					var do: Vector2 = o["dir"]

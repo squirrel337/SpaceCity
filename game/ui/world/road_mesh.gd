@@ -56,7 +56,7 @@ func ribbon(a: Vector2, b: Vector2, hw: float, type: String, uv_y0 := 0.0, total
 		var o := base + k * 2
 		idx.append_array(PackedInt32Array([o, o + 1, o + 2, o + 1, o + 3, o + 2]))
 	# 옆면: 가장자리에서 땅 속으로
-	for s in [-1.0, 1.0]:
+	for s: float in [-1.0, 1.0]:
 		var sb := v.size()
 		var out := Vector3(side.x * s, 0.0, -side.y * s)
 		for k in steps + 1:

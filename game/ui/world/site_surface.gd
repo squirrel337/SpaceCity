@@ -555,10 +555,37 @@ func _bake_patch() -> void:
 			grid[k * _segs + i] = Baker.h24(data, (k * _segs + i) * 4)
 	_hgrid = grid
 	_plateau_m = site_m - ref
-	patch_mat.set_shader_parameter("hmap", ImageTexture.create_from_image(img))
+	var tex := ImageTexture.create_from_image(img)
+	_keep_baked(img, tex, body in LayoutData.terrain()["flood"]["bodies"])
+	if body == "earth" and is_nan(sea_z):
+		sea_z = -site_m           # 조각 안에 바다가 없으면 해발 0 m (지구의 기준 구 = 해수면)
+	patch_mat.set_shader_parameter("hmap", tex)
 	patch_mat.set_shader_parameter("has_hmap", true)
 	_baked = true
 	terrain_ready.emit()
+
+
+## 고친 꼭짓점의 높이(RGB 24비트)와 물 몫(A)을 높이 지도에 다시 쓴다 (법선은 셰이더가 이웃 꼭짓점으로 셈한다).
+## 물에 잠긴 땅은 물낯을 해수면에 그린다 (땅은 그 아래). 바다를 해수면 위로 메우면 뭍이 된다 (간척)
+func _encode_heights(changed: PackedInt32Array) -> void:
+	if _himg == null:
+		return
+	var data := _himg.get_data()
+	for idx in changed:
+		var o := idx * 4
+		var h := _hgrid[idx]
+		var wet: int = _hbytes[o + 3]
+		if flooded.has(idx):
+			h = maxf(h, sea_z)
+			wet = 255
+		elif not is_nan(sea_z) and wet > 127 and h > sea_z + 0.25 and h > _hbase[idx] + 0.1:
+			wet = 0
+		var c := clampi(int(round((h + 32768.0) * 256.0)), 0, 16777215)
+		data[o] = c >> 16
+		data[o + 1] = (c >> 8) & 255
+		data[o + 2] = c & 255
+		data[o + 3] = wet
+	_himg.set_data(_himg.get_width(), _himg.get_height(), false, _himg.get_format(), data)
 
 
 func _bake_cap() -> void:

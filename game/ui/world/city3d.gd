@@ -43,6 +43,7 @@ var _pad_mat: ShaderMaterial
 var _pen: MeshInstance3D
 var _pen_mesh: ImmediateMesh
 var _pen_mat: ShaderMaterial
+var _pen_sig := "-"
 var _zones: MeshInstance3D
 var _districts: MeshInstance3D
 var _district_mat: ShaderMaterial
@@ -129,6 +130,7 @@ func update(delta: float, speed_level: int) -> void:
 		return
 	_t += delta
 	plan.sync(sim)
+	ground.apply_terrain(plan)
 	if plan.road_rev != _road_rev:
 		_road_rev = plan.road_rev
 		if _roads:
@@ -394,23 +396,68 @@ func _update_tool() -> void:
 		var f := CityPlan.foot_of(tool.kind, tool.rot)
 		_pad.transform = Transform3D(Basis().scaled(Vector3(f.x + 2.0, 1.0, f.y + 2.0)), _local(tool.at, 0.15))
 		_pad_mat.set_shader_parameter("tint", Color(c, 0.4 + 0.15 * pulse))
-	_pen_mesh.clear_surfaces()
-	if tool == null:
+	var psig := ""
+	if tool != null and tool.has_at:
+		psig = "%s|%s|%s|%d|%s|%s|%s|%s|%d|%d|%s" % [tool.mode, str(tool.at), str(ok), tool.hover_edge, tool.road_type,
+			tool.zone_kind, tool.terrain_op, str(tool.brush), plan.road_rev, plan.terrain_rev, str(tool.preview)]
+		if tool.mode == "zone" and not tool.hover_block.is_empty():
+			psig += str(tool.hover_block["center"])
+	if psig == _pen_sig:
 		return
-	if tool.mode == "road" and tool.has_at:
-		_pen_mat.set_shader_parameter("tint", Color(good if ok else bad, 0.6))
-		_pen_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-		if tool.road_from != null:
-			_strip(tool.road_from, tool.at, BaseLayout.ROAD_W * 0.5)
-			_disc(tool.road_from, 2.2)
-		_disc(tool.at, 2.2)
-		_pen_mesh.surface_end()
-	elif tool.mode == "erase" and tool.hover_edge >= 0 and tool.hover_edge < plan.edges.size():
-		_pen_mat.set_shader_parameter("tint", Color(bad, 0.65))
-		var e: Vector2i = plan.edges[tool.hover_edge]
-		_pen_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-		_strip(plan.nodes[e.x], plan.nodes[e.y], BaseLayout.ROAD_W * 0.5 + 0.6)
-		_pen_mesh.surface_end()
+	_pen_sig = psig
+	_pen_mesh.clear_surfaces()
+	if tool == null or not tool.has_at:
+		return
+	_pen_mat.set_shader_parameter("tint", Color(1, 1, 1, 1))
+	match tool.mode:
+		"road":
+			# 놓을 길: 종류의 폭으로, 곡선이면 원호를 따라. 꺾이는 점은 둥글게
+			var hw := LayoutData.road_half(tool.road_type)
+			_pen_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+			_pen_mesh.surface_set_color(Color(good if ok else bad, 0.6))
+			var pts := tool.preview
+			for i in range(pts.size() - 1):
+				_strip(pts[i], pts[i + 1], hw)
+			for i in range(1, pts.size() - 1):
+				_disc(pts[i], hw)
+			_pen_mesh.surface_set_color(Color(good if ok else bad, 0.95))
+			if tool.road_from != null:
+				_disc(tool.road_from, 2.2)
+			_disc(tool.at, 2.2)
+			_pen_mesh.surface_end()
+		"erase":
+			if tool.hover_edge >= 0 and tool.hover_edge < plan.edges.size():
+				var e: Vector2i = plan.edges[tool.hover_edge]
+				_pen_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+				_pen_mesh.surface_set_color(Color(bad, 0.65))
+				_strip(plan.nodes[e.x], plan.nodes[e.y], plan.edge_half(tool.hover_edge) + 0.6)
+				_pen_mesh.surface_end()
+		"zone":
+			# 고를 블록: 칠할 구획의 색으로 채우고 테두리
+			if tool.hover_block.is_empty():
+				return
+			var col := LayoutData.zone_color(tool.zone_kind) if tool.zone_kind != "" else Color(0.82, 0.84, 0.88)
+			var poly: PackedVector2Array = tool.hover_block["poly"]
+			_pen_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+			_pen_mesh.surface_set_color(Color(col, 0.42))
+			_fill_poly(poly)
+			_pen_mesh.surface_set_color(Color(col.lightened(0.25), 0.95))
+			for i in poly.size():
+				_strip(poly[i], poly[(i + 1) % poly.size()], 0.45)
+			_pen_mesh.surface_end()
+		"terrain":
+			# 붓: 바깥 고리(비탈이 끝나는 곳)와 안쪽 고리(다 고치는 곳)
+			var oc := {"dig": Color(1.0, 0.62, 0.3), "raise": Color(0.5, 0.92, 0.45), "flatten": Color(0.45, 0.75, 1.0),
+				"restore": Color(0.85, 0.85, 0.85)}
+			var c: Color = oc.get(tool.terrain_op, Color.WHITE) if ok else bad
+			_pen_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+			_pen_mesh.surface_set_color(Color(c, 0.9))
+			_ring_strip(tool.at, tool.brush, 0.6)
+			_pen_mesh.surface_set_color(Color(c, 0.55))
+			_ring_strip(tool.at, tool.brush * 0.55, 0.35)
+			_pen_mesh.surface_set_color(Color(c, 0.18))
+			_disc(tool.at, tool.brush * 0.55)
+			_pen_mesh.surface_end()
 
 
 func _strip(a: Vector2, b: Vector2, w: float) -> void:
@@ -423,18 +470,61 @@ func _strip(a: Vector2, b: Vector2, w: float) -> void:
 	for k in steps:
 		var c0 := a.lerp(b, float(k) / steps)
 		var c1 := a.lerp(b, float(k + 1) / steps)
-		var q := [_local(c0 - n, 0.25), _local(c0 + n, 0.25), _local(c1 + n, 0.25), _local(c1 - n, 0.25)]
+		var q := [_local(c0 - n, 0.3), _local(c0 + n, 0.3), _local(c1 + n, 0.3), _local(c1 - n, 0.3)]
 		for i in [0, 1, 2, 0, 2, 3]:
 			_pen_mesh.surface_add_vertex(q[i])
 
 
 func _disc(c: Vector2, r: float) -> void:
-	for k in 12:
-		var a0 := TAU * k / 12.0
-		var a1 := TAU * (k + 1) / 12.0
-		_pen_mesh.surface_add_vertex(_local(c, 0.3))
-		_pen_mesh.surface_add_vertex(_local(c + Vector2(cos(a0), sin(a0)) * r, 0.3))
-		_pen_mesh.surface_add_vertex(_local(c + Vector2(cos(a1), sin(a1)) * r, 0.3))
+	var segs := clampi(int(r * 1.5), 12, 40)
+	var rings := maxi(1, int(ceil(r / 6.0)))
+	for j in rings:
+		var r0 := r * j / rings
+		var r1 := r * (j + 1) / rings
+		for k in segs:
+			var a0 := TAU * k / segs
+			var a1 := TAU * (k + 1) / segs
+			var p00 := _local(c + Vector2(cos(a0), sin(a0)) * r0, 0.35)
+			var p01 := _local(c + Vector2(cos(a1), sin(a1)) * r0, 0.35)
+			var p10 := _local(c + Vector2(cos(a0), sin(a0)) * r1, 0.35)
+			var p11 := _local(c + Vector2(cos(a1), sin(a1)) * r1, 0.35)
+			for q in [p00, p10, p11, p00, p11, p01]:
+				_pen_mesh.surface_add_vertex(q)
+
+
+## 땅을 따라가는 고리 (반지름 r, 폭 w)
+func _ring_strip(c: Vector2, r: float, w: float) -> void:
+	var segs := clampi(int(r * 2.0), 24, 96)
+	for k in segs:
+		var a0 := TAU * k / segs
+		var a1 := TAU * (k + 1) / segs
+		var d0 := Vector2(cos(a0), sin(a0))
+		var d1 := Vector2(cos(a1), sin(a1))
+		var q := [_local(c + d0 * (r - w), 0.35), _local(c + d0 * (r + w), 0.35), _local(c + d1 * (r + w), 0.35),
+			_local(c + d1 * (r - w), 0.35)]
+		for i in [0, 1, 2, 0, 2, 3]:
+			_pen_mesh.surface_add_vertex(q[i])
+
+
+## 다각형 채우기: 세모로 나눈 뒤 6 m보다 큰 세모는 잘게 (땅을 따라가게)
+func _fill_poly(poly: PackedVector2Array) -> void:
+	var tri := Geometry2D.triangulate_polygon(poly)
+	for i in range(0, tri.size() - 2, 3):
+		var a := poly[tri[i]]
+		var b := poly[tri[i + 1]]
+		var c := poly[tri[i + 2]]
+		var n := clampi(int(ceil(maxf(a.distance_to(b), maxf(b.distance_to(c), c.distance_to(a))) / 6.0)), 1, 24)
+		for u in n:
+			for v in n - u:
+				var p0 := a + (b - a) * (float(u) / n) + (c - a) * (float(v) / n)
+				var p1 := a + (b - a) * (float(u + 1) / n) + (c - a) * (float(v) / n)
+				var p2 := a + (b - a) * (float(u) / n) + (c - a) * (float(v + 1) / n)
+				for q in [p0, p1, p2]:
+					_pen_mesh.surface_add_vertex(_local(q, 0.3))
+				if u + v < n - 1:
+					var p3 := a + (b - a) * (float(u + 1) / n) + (c - a) * (float(v + 1) / n)
+					for q in [p1, p3, p2]:
+						_pen_mesh.surface_add_vertex(_local(q, 0.3))
 
 
 ## 화면 점 → 땅 위의 점 (모형 좌표 m). 땅을 맞히지 않으면 null

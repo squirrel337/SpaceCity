@@ -280,29 +280,92 @@ func _plan_check() -> void:
 		tool.commit(false)
 		_check(int(sim.tiles.get("B", 0)) == tiles_b + 1, "B 구역 타워가 B 칸을 쓰지 않았다")
 	tool.stop()
-	# 길: 두 점을 이어 길을 내고, 지운다
+	# 길: 종류를 골라 두 점을 잇고 (자재가 든다), 이어서 곡선으로 굽히고, 지운다
 	var e0 := plan.edges.size()
 	var r0 := plan.road_rev
-	tool.start_road()
-	var a := plan.hub() + Vector2(0, -60)
-	var b := a + Vector2(-30, 0)
-	var free_a := plan.road_check(a, b) == ""
-	if free_a:
+	var a := _free_road_spot(plan, 16.0)
+	_check(a != Vector2.INF, "길을 낼 빈 땅을 찾지 못했다")
+	if a != Vector2.INF:
+		var b := a + Vector2(-16, 0)
+		var parts0: float = sim.stock["parts"]
+		tool.start_road("avenue")
 		tool.click(a)
 		tool.click(b)
-		_check(plan.edges.size() > e0 and plan.road_rev > r0, "길이 생기지 않았다")
+		_check(plan.edges.size() > e0 and plan.road_rev > r0, "길이 생기지 않았다: " + tool.reason)
+		_check(plan.etypes.has("avenue") and plan.edge_type(plan.nearest_edge(a.lerp(b, 0.5), 1.0)) == "avenue",
+			"고른 길 종류(대로)가 아니다")
+		_check(float(sim.stock["parts"]) < parts0, "길에 자재가 들지 않았다")
+		_check(tool.road_dir != null, "이어 가던 길의 방향을 모른다")
+		tool.set_curve(true)
+		tool.hover(b + Vector2(-28, 16))
+		_check(tool.preview.size() > 2, "곡선 길이 원호로 나뉘지 않았다 (%d점)" % tool.preview.size())
+		_check(tool.curve_radius() > 12.0 and tool.curve_radius() < 200.0, "곡선 반지름이 이상하다: %s" % tool.curve_radius())
+		var n_before := plan.edges.size()
+		if tool.reason == "":
+			tool.click(b + Vector2(-28, 16))
+			_check(plan.edges.size() >= n_before + 2, "곡선 길이 여러 토막으로 놓이지 않았다")
+		tool.hover(b + Vector2(-2, 1))
+		tool.set_curve(false)
+		tool.end_chain()
 		tool.start_erase()
 		tool.hover(a.lerp(b, 0.5))
 		_check(tool.hover_edge >= 0, "지울 길을 찾지 못했다")
 		tool.erase_hovered()
+		# 급한 곡선은 막는다 (고속도로는 반지름 30 m 이상)
+		tool.start_road("highway")
+		tool.set_curve(true)
+		tool.road_from = a
+		tool.road_dir = Vector2(-1, 0)
+		tool.hover(a + Vector2(-12, 8))
+		_check(tool.reason.contains("급히 굽는다"), "고속도로의 급한 곡선을 막지 않았다: " + tool.reason)
+		tool.set_curve(false)
+		tool.end_chain()
 	tool.stop()
+	# 구획: 블록을 눌러 용도를 정한다
+	var blk := {}
+	for bl in plan.blocks():
+		if Geometry2D.is_point_in_polygon(bl["center"], bl["poly"]) and String(bl["district"]) != "farm":
+			blk = bl
+			break
+	_check(not blk.is_empty(), "구획을 정할 블록이 없다")
+	if not blk.is_empty():
+		tool.start_zone("farm")
+		tool.click(blk["center"])
+		_check(plan.district_at(blk["center"]) == "farm", "블록의 구획이 바뀌지 않았다: " + plan.district_at(blk["center"]))
+		tool.stop()
+	# 땅 고치기: 판 땅은 낮아지고, 되돌리면 처음으로
+	var dig_at := Vector2.INF
+	tool.start_terrain("dig")
+	for ang in range(0, 360, 20):
+		for rr in [150.0, 220.0, 300.0]:
+			var cand: Vector2 = plan.hub() + Vector2(cos(deg_to_rad(ang)), sin(deg_to_rad(ang))) * rr
+			tool.hover(cand)
+			if dig_at == Vector2.INF and (tool.reason == "" or tool.reason.contains("굴착기")):
+				dig_at = cand
+	_check(dig_at != Vector2.INF, "땅을 고칠 빈 땅을 찾지 못했다")
+	if dig_at != Vector2.INF:
+		tool.hover(dig_at)
+		if tool.reason == "":
+			var nd := tool.edit_ground()
+			_check(nd > 10 and plan.terrain_delta(dig_at) < -0.9, "파기가 땅을 낮추지 않았다 (%d칸)" % nd)
+		else:
+			plan.edit_terrain(dig_at, 12.0, "dig", 1.0)
+		_check(plan.terrain_delta(dig_at) < -0.9, "판 땅이 낮아지지 않았다")
+		for _i in 6:
+			plan.edit_terrain(dig_at, 12.0, "restore", 1.0)
+		_check(absf(plan.terrain_delta(dig_at)) < 0.05, "되돌리기가 땅을 처음으로 돌리지 않았다")
+	tool.stop()
+	_flood_check()
 	var path := plan.route(plan.layout.gates["pad"], plan.layout.gates["ice"])
 	_check(path.size() >= 3, "착륙장에서 얼음 분화구까지 길을 찾지 못했다")
-	# 저장 왕복
+	# 저장 왕복 (길 종류·구획·고친 땅까지)
+	plan.edit_terrain(plan.hub() + Vector2(260, 260), 6.0, "raise", 1.0)
 	var text := JSON.stringify(plan.to_save())
 	var back := CityPlan.from_save(JSON.parse_string(text), sim)
 	_check(back.buildings.size() == plan.buildings.size() and back.edges.size() == plan.edges.size(),
 		"저장한 계획이 다르게 돌아왔다")
+	_check(back.etypes == plan.etypes and back.terrain.size() == plan.terrain.size()
+		and back.district_seeds.size() == plan.district_seeds.size(), "길 종류·고친 땅·구획이 저장되지 않았다")
 	# 공사가 끝나면 지어진 건물이 된다
 	var uid := int(e["uid"])
 	for _i in range(24 * 40):
@@ -635,3 +698,56 @@ func _world_surface_check(wv: WorldView) -> void:
 	main._on_colony_view(col.index_of_sim(keep))
 	print("smoke: worlds — 굽는 천체 %d, 타이탄 바다 %d, 화성 산 %d·협곡 %d, 지구 해안 %s" % [wv.body_baker.surfaces.size(),
 		int(titan.u["sea_n"]), int(mars.u["mnt_n"]), int(mars.u["tro_n"]), "있음" if bool(earth_mat.get_shader_parameter("has_coast")) else "없음"])
+
+
+## 침수: 평평한 땅(해수면 3 m 아래)을 5 m 파면 물이 차고, 그 위에는 지을 수 없고, 메우면 물이 빠진다 (굽지 않은 격자로)
+func _flood_check() -> void:
+	var sg := SiteGround.new()
+	sg._segs = 48
+	sg._grow = 1.0 + TAU / 48.0
+	var k := 0
+	while sg.ring_m(k) < 2000.0:
+		k += 1
+	sg._rings = k + 1
+	sg._hgrid = PackedFloat32Array()
+	sg._hgrid.resize(sg._rings * sg._segs)
+	sg._keep_baked(null, null, false)
+	sg.sea_z = -3.0
+	var lay := BaseLayout.new()
+	var p2 := CityPlan.new(lay)
+	var spot := Vector2(240, 30)
+	for _i in 5:
+		p2.edit_terrain(spot, 12.0, "dig", 1.0)
+	sg.apply_terrain(p2)
+	_check(not p2.flood.is_empty() and not sg.flooded.is_empty(), "해수면 아래로 판 땅에 물이 차지 않았다")
+	_check(sg._sample(sg._hgrid, spot, sg._rings - 1) < -4.0, "판 땅의 높이가 격자에 들어가지 않았다")
+	_check(p2.check_spot("hab_module", spot, 0).contains("물에 잠긴"), "물에 잠긴 땅에 지을 수 있다")
+	_check(p2.road_check(spot + Vector2(-20, 0), spot + Vector2(20, 0)).contains("물에 잠긴"), "물에 잠긴 땅으로 길을 낼 수 있다")
+	for _i in 8:
+		p2.edit_terrain(spot, 12.0, "restore", 1.0)
+	sg.apply_terrain(p2)
+	_check(p2.flood.is_empty() and sg.flooded.is_empty(), "메운 땅에서 물이 빠지지 않았다")
+	sg.free()
+	print("smoke: terrain dug %d cells, flood ok" % p2.terrain.size())
+
+
+## 길 시험에 쓸 빈 땅: 블록 안에서 (길·건물과 떨어져) 동쪽에서 서쪽으로 length m를 낼 수 있는 시작점
+func _free_road_spot(plan: CityPlan, length: float) -> Vector2:
+	for bl in plan.blocks():
+		var poly: PackedVector2Array = bl["poly"]
+		var bb := Rect2(poly[0], Vector2.ZERO)
+		for q in poly:
+			bb = bb.expand(q)
+		var y := bb.position.y + 2.0
+		while y < bb.end.y - 2.0:
+			var x := bb.end.x - 2.0
+			while x > bb.position.x + length + 2.0:
+				var ca := Vector2(x, y)
+				var cb := ca + Vector2(-length, 0)
+				if Geometry2D.is_point_in_polygon(ca, poly) and Geometry2D.is_point_in_polygon(cb, poly) \
+						and plan.nearest_edge(ca, 7.5) < 0 and plan.nearest_edge(cb, 7.5) < 0 \
+						and plan.road_check(ca, cb, "avenue") == "":
+					return ca
+				x -= 3.0
+			y += 3.0
+	return Vector2.INF

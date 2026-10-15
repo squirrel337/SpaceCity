@@ -30,6 +30,7 @@ var _hbase := PackedFloat32Array()      # 구운 높이 (고치기 전)
 var _wet_base := PackedByteArray()      # 구운 물 몫 (0~255) — 물이 있는 천체의 땅만
 var _himg: Image                        # 지형 조각 셰이더가 읽는 높이 지도 (고친 값으로 다시 쓴다)
 var _htex: ImageTexture
+var _hbytes := PackedByteArray()        # 구운 높이 지도의 바이트 (고치기 전 — 달은 법선, 다른 천체는 물 몫을 되살린다)
 var sea_z := NAN                        # 해수면 (기지 평지 기준 m) — 바다가 있는 천체의 땅만
 var flooded := {}                       # 물에 잠긴 꼭짓점 번호 → true (해수면 아래로 판 땅)
 var _terrain_sig := ""
@@ -75,6 +76,13 @@ func covers(dir_b: Vector3) -> bool:
 ## 기지 둘레의 높이 (m, 기지 평지 기준, 모형 좌표 x, y)
 func local_height_m(_p: Vector2) -> float:
 	return 0.0
+
+
+## 고치기 전 땅 높이 (m, 기지 평지 기준) — 평탄화·침수 안내가 쓴다
+func base_height_m(p: Vector2) -> float:
+	if _hbase.is_empty():
+		return local_height_m(p)
+	return _sample(_hbase, p, _rings - 1)
 
 
 ## 천체 고정 방향의 지형 높이 (km, 기준 구 위)
@@ -183,25 +191,30 @@ func _vert_pos(k: int, i: int) -> Vector2:
 	return Vector2(cos(a) * r, sin(a) * r)
 
 
-## 굽은 높이를 받아 둔다 (굽기가 끝날 때 하위 클래스가 부른다). img = 지형 조각 셰이더의 높이 지도
+## 굽은 높이를 받아 둔다 (굽기가 끝날 때 하위 클래스가 부른다). img = 지형 조각 셰이더의 높이 지도.
+## wet_from_alpha: 알파가 물 몫인 지도 (다른 천체) — 물에 잠긴 꼭짓점의 높이 가운데값을 해수면으로 본다
 func _keep_baked(img: Image, tex: ImageTexture, wet_from_alpha: bool) -> void:
 	_hbase = _hgrid.duplicate()
 	_himg = img
 	_htex = tex
+	_hbytes = img.get_data() if img != null else PackedByteArray()
 	_terrain_sig = ""
 	sea_z = NAN
+	flooded = {}
 	_wet_base = PackedByteArray()
 	if wet_from_alpha and img != null:
-		var data := img.get_data()
 		_wet_base.resize(_rings * _segs)
 		var lows := PackedFloat32Array()
 		for idx in _rings * _segs:
-			var w := data[idx * 4 + 3]
+			var w := _hbytes[idx * 4 + 3]
 			_wet_base[idx] = w
-			if w > 200:
+			@warning_ignore("integer_division")
+			var k := idx / _segs
+			if w > 200 and ring_m(k) < 0.8 * patch_radius_m():
 				lows.append(_hbase[idx])
 		if lows.size() > 8:
 			lows.sort()
+			@warning_ignore("integer_division")
 			sea_z = lows[lows.size() / 2]       # 바다 칸은 해수면으로 고르게 구워졌다
 
 
@@ -210,7 +223,7 @@ func _keep_baked(img: Image, tex: ImageTexture, wet_from_alpha: bool) -> void:
 func apply_terrain(plan: CityPlan) -> void:
 	if _hbase.is_empty() or plan == null:
 		return
-	var sig := "%d|%d" % [plan.terrain_rev, plan.road_rev]
+	var sig := "%d|%d|%d" % [plan.get_instance_id(), plan.terrain_rev, plan.road_rev]
 	if sig == _terrain_sig:
 		return
 	_terrain_sig = sig
@@ -229,12 +242,27 @@ func apply_terrain(plan: CityPlan) -> void:
 				hh[idx] += dlt
 				dug[idx] = 1 if dlt < -0.05 else 0
 	_grade_roads(plan, hh, kmax, float(t["road_shoulder_m"]))
-	# 물: 바다가 있는 천체에서 해수면 아래로 판 땅
+	for i in range(1, _segs):
+		hh[i] = hh[0]            # 고리 0은 한 점 (가운데)
+	# 물: 바다가 있는 천체에서 해수면 아래로 판 땅 (꼭짓점은 그림, 칸은 계획 — 건물·길이 본다)
 	var new_flood := {}
+	var cells := {}
 	if not is_nan(sea_z):
 		for idx in n:
 			if dug[idx] == 1 and hh[idx] < sea_z - 0.05:
 				new_flood[idx] = true
+		var cm := CityPlan.cell_m()
+		for key in plan.terrain:
+			var dv := float(plan.terrain[key])
+			if dv >= -0.05:
+				continue
+			var p := Vector2(key) * cm
+			if p.length() > ring_m(kmax):
+				continue
+			var depth := sea_z - (_sample(_hbase, p, kmax) + dv)
+			if depth > 0.05:
+				cells[key] = snappedf(depth, 0.1)
+	plan.set_flood(cells)
 	var changed := PackedInt32Array()
 	for idx in n:
 		var was_wet := flooded.has(idx)
@@ -298,6 +326,7 @@ func _grade_roads(plan: CityPlan, hh: PackedFloat32Array, kmax: int, shoulder: f
 		for j in sm.size():
 			var c := a.lerp(b, float(j) / steps)
 			for idx in _near_verts(c, reach + 4.0, kmax):
+				@warning_ignore("integer_division")
 				var p := _vert_pos(idx / _segs, idx % _segs)
 				var q := CityPlan._seg_point(a, b, p)
 				var d := q.distance_to(p)
@@ -323,7 +352,7 @@ func _sample(hh: PackedFloat32Array, p: Vector2, kmax: int) -> float:
 	var a := fposmod(atan2(p.y, p.x), TAU) / TAU * _segs
 	var i0 := int(floor(a)) % _segs
 	var i1 := (i0 + 1) % _segs
-	var fi := a - floor(a)
+	var fi := a - floorf(a)
 	return lerpf(lerpf(hh[k0 * _segs + i0], hh[k0 * _segs + i1], fi), lerpf(hh[k1 * _segs + i0], hh[k1 * _segs + i1], fi), fk)
 
 
@@ -338,6 +367,7 @@ func _near_verts(p: Vector2, r: float, kmax: int) -> PackedInt32Array:
 	var i_c := int(round(a / TAU * _segs))
 	var i_r := int(ceil(da / TAU * _segs)) + 1
 	if rr < r * 1.5:
+		@warning_ignore("integer_division")
 		i_r = _segs / 2
 	for k in range(k_lo, k_hi + 1):
 		if k == 0:

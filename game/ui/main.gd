@@ -34,7 +34,12 @@ var place_bar: PanelContainer
 var place_text: Label
 var place_reason: Label
 var place_buttons := {}
+var place_note: Label
+var place_opts: HFlowContainer         # 도구의 고를 것: 길 종류·곡선, 구획, 땅 고치기의 방법·붓
+var _opts_mode := ""
+var _opt_buttons := {}
 var road_button: Button
+var plan_buttons := {}                 # 도시 계획 도구: 도로 · 구획 · 땅
 var city_area: Control
 var view_buttons := {}
 var world_row: HBoxContainer       # 3D: 확대·축소, 기지 (다른 고정점은 위쪽의 경로 막대)
@@ -166,17 +171,23 @@ func _build_view_switch() -> Control:
 		b.pressed.connect(_set_view.bind(pair[0]))
 		row.add_child(b)
 		view_buttons[pair[0]] = b
-	road_button = Button.new()
-	road_button.text = "도로"
-	road_button.toggle_mode = true
-	road_button.tooltip_text = "길 내기 — 점을 차례로 눌러 길을 잇는다 (G)"
-	road_button.custom_minimum_size = Vector2(58, 40)
-	road_button.toggled.connect(func(on: bool):
-		if on:
-			_begin_road()
-		elif tool.mode in ["road", "erase"]:
-			tool.stop())
-	row.add_child(road_button)
+	for spec in [["road", "도로", "길 내기 — 종류(흙길·도로·대로·고속도로·통로·철도)를 고르고 점을 차례로 눌러 잇는다. 곡선도 된다 (G)"],
+			["zone", "구획", "구획 — 길로 둘러싸인 블록을 눌러 용도(거주·산업·농업 …)를 정한다 (Z)"],
+			["terrain", "땅", "땅 고치기 — 파기·쌓기·평탄화·되돌리기 (T). 바다가 있는 천체에서 해수면 아래로 파면 물이 찬다"]]:
+		var pb := Button.new()
+		pb.text = spec[1]
+		pb.toggle_mode = true
+		pb.tooltip_text = spec[2]
+		pb.custom_minimum_size = Vector2(52, 40)
+		var which: String = spec[0]
+		pb.toggled.connect(func(on: bool):
+			if on:
+				_begin_tool(which)
+			elif tool.mode == which or (which == "road" and tool.mode == "erase"):
+				tool.stop())
+		row.add_child(pb)
+		plan_buttons[which] = pb
+	road_button = plan_buttons["road"]
 	view_buttons["world"].tooltip_text = "식민지의 도시 — 끌어서 돌리고, 휠·두 손가락으로 확대해 행성과 별까지 (M)"
 	view_buttons["list"].tooltip_text = "모듈 목록 (M)"
 	world_row = HBoxContainer.new()
@@ -216,6 +227,14 @@ func _build_place_bar() -> Control:
 	place_reason.add_theme_font_size_override("font_size", 13)
 	place_reason.add_theme_color_override("font_color", Color(1.0, 0.62, 0.5))
 	v.add_child(place_reason)
+	place_note = Label.new()
+	place_note.add_theme_font_size_override("font_size", 13)
+	place_note.add_theme_color_override("font_color", Palette.AMBER)
+	v.add_child(place_note)
+	place_opts = HFlowContainer.new()
+	place_opts.add_theme_constant_override("h_separation", 4)
+	place_opts.add_theme_constant_override("v_separation", 4)
+	v.add_child(place_opts)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
 	v.add_child(row)
@@ -263,13 +282,17 @@ func _update_place_bar() -> void:
 	if place_bar == null:
 		return
 	place_bar.visible = tool.active()
-	road_button.set_pressed_no_signal(tool.mode in ["road", "erase"])
+	for k in plan_buttons:
+		(plan_buttons[k] as Button).set_pressed_no_signal(tool.mode == k or (k == "road" and tool.mode == "erase"))
 	if not tool.active():
 		return
 	var building := tool.mode == "build"
 	place_text.text = tool.status()
 	place_reason.text = tool.reason if tool.has_at else ""
 	place_reason.visible = place_reason.text != ""
+	place_note.text = tool.note if tool.has_at and tool.reason == "" else ""
+	place_note.visible = place_note.text != ""
+	_update_place_opts()
 	place_buttons["here"].visible = building
 	place_buttons["here"].disabled = not tool.has_at or tool.reason != ""
 	place_buttons["rotate"].visible = building
@@ -277,9 +300,105 @@ func _update_place_bar() -> void:
 	place_buttons["auto"].visible = building
 	place_buttons["end"].visible = tool.mode == "road"
 	place_buttons["end"].disabled = tool.road_from == null
-	place_buttons["erase"].visible = not building
+	place_buttons["erase"].visible = tool.mode in ["road", "erase"]
 	place_buttons["erase"].set_pressed_no_signal(tool.mode == "erase")
 	place_bar.reset_size()
+
+
+## 도구의 고를 것: 모드가 바뀔 때만 단추를 새로 만들고, 눌린 상태는 매번 맞춘다
+func _update_place_opts() -> void:
+	var group := tool.mode
+	if group == "erase":
+		group = "road"
+	if group == "build":
+		group = ""
+	var key := group + "|" + tool.body()
+	if key != _opts_mode:
+		_opts_mode = key
+		for c in place_opts.get_children():
+			c.queue_free()
+		_opt_buttons.clear()
+		match group:
+			"road":
+				var g := ButtonGroup.new()
+				for t in LayoutData.road_types(tool.body()):
+					var rd := LayoutData.road(t)
+					var type: String = t
+					_opt(type, String(rd["name"]), "폭 %s m · 차로 %d · 속력 ×%s · 100 m마다 %s · 가장 가파른 기울기 %d%%" % [
+						Fmt.n(float(rd["width_m"]), 0), int(rd["lanes"]), str(rd["speed"]),
+						PlaceTool._cost_text(LayoutData.road_cost(type, 100.0)), int(float(rd["grade"]) * 100.0)], g,
+						func():
+							if tool.mode == "erase":
+								tool.start_road(type)
+							else:
+								tool.set_road_type(type))
+				_opt_gap()
+				_opt("curve", "곡선", "이어 가던 길에서 매끄럽게 굽는다 (반지름은 길 종류의 한도 이상)", null,
+					func(): tool.set_curve(not tool.curve))
+				_opt("snap", "각도 맞춤", "방향을 15°마다 맞춘다 (기본 격자의 축과 나란하게)", null,
+					func(): tool.set_angle_snap(not tool.angle_snap))
+			"zone":
+				var g2 := ButtonGroup.new()
+				var zs := LayoutData.zones()
+				for z in zs:
+					var zk: String = z
+					var b := _opt("z:" + zk, LayoutData.zone_name(zk), "이 블록을 '%s'(으)로" % LayoutData.zone_name(zk), g2,
+						func(): tool.set_zone_kind(zk))
+					b.icon = _swatch(LayoutData.zone_color(zk))
+				_opt("z:", "비우기", "블록의 용도를 지운다 (빈 블록)", g2, func(): tool.set_zone_kind(""))
+			"terrain":
+				var g3 := ButtonGroup.new()
+				for op in PlaceTool.TERRAIN_OPS:
+					var o: String = op
+					_opt("op:" + o, PlaceTool.OP_NAMES[o], {"dig": "누를 때마다 1 m 판다 (가장자리는 비탈)",
+						"raise": "누를 때마다 1 m 쌓는다 — 바다를 해수면 위로 메우면 뭍이 된다",
+						"flatten": "붓 가운데 높이로 고른다", "restore": "고친 땅을 처음 높이로 되돌린다"}[o], g3,
+						func(): tool.set_terrain_op(o))
+				_opt_gap()
+				var g4 := ButtonGroup.new()
+				for r in LayoutData.terrain()["brushes_m"]:
+					var rr := float(r)
+					_opt("br:%d" % int(rr), "붓 %d m" % int(rr), "붓의 반지름", g4, func(): tool.set_brush(rr))
+	# 눌린 상태
+	for k in _opt_buttons:
+		var b: Button = _opt_buttons[k]
+		var on := false
+		if group == "road":
+			on = k == tool.road_type or (k == "curve" and tool.curve) or (k == "snap" and tool.angle_snap)
+		elif group == "zone":
+			on = k == "z:" + tool.zone_kind
+		elif group == "terrain":
+			on = k == "op:" + tool.terrain_op or k == "br:%d" % int(tool.brush)
+		b.set_pressed_no_signal(on)
+	place_opts.visible = group != ""
+	place_opts.custom_minimum_size.x = clampf(city_area.size.x - 60.0, 280.0, 760.0) if group != "" else 0.0
+
+
+func _opt(key: String, text: String, tip: String, group: ButtonGroup, on_press: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.tooltip_text = tip
+	b.toggle_mode = true
+	if group != null:
+		b.button_group = group
+	b.custom_minimum_size = Vector2(0, 36)
+	b.add_theme_font_size_override("font_size", 13)
+	b.pressed.connect(on_press)
+	place_opts.add_child(b)
+	_opt_buttons[key] = b
+	return b
+
+
+func _opt_gap() -> void:
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(10, 4)
+	place_opts.add_child(gap)
+
+
+static func _swatch(c: Color) -> Texture2D:
+	var img := Image.create(14, 14, false, Image.FORMAT_RGBA8)
+	img.fill(c)
+	return ImageTexture.create_from_image(img)
 
 
 ## 건물 자리 고르기를 시작한다 (건설 탭의 '짓기', 모듈 카드의 '1기 더 짓기')
@@ -298,13 +417,24 @@ func _begin_place(mid: String) -> void:
 
 
 func _begin_road() -> void:
+	_begin_tool("road")
+
+
+## 도시 계획 도구: "road" 길 내기 · "zone" 구획 · "terrain" 땅 고치기
+func _begin_tool(which: String) -> void:
 	if sim == null:
 		return
 	if view_mode == "list":
 		_set_view("world")
 	if view_mode == "world":
 		world.ensure_near_base()
-	tool.start_road()
+	match which:
+		"road":
+			tool.start_road()
+		"zone":
+			tool.start_zone()
+		"terrain":
+			tool.start_terrain()
 
 
 func _on_placed(kind: String, ok: bool, text: String) -> void:
@@ -330,7 +460,8 @@ func _set_view(mode: String) -> void:
 	world_row.visible = mode == "world"
 	for k in view_buttons:
 		view_buttons[k].set_pressed_no_signal(k == mode)
-	road_button.visible = mode != "list"
+	for k in plan_buttons:
+		(plan_buttons[k] as Button).visible = mode != "list"
 	if mode == "list" and tool.active():
 		tool.stop()
 	city_view.queue_redraw()
@@ -674,6 +805,16 @@ func _unhandled_input(event: InputEvent) -> void:
 				tool.stop()
 			else:
 				_begin_road()
+		KEY_Z:
+			if tool.mode == "zone":
+				tool.stop()
+			else:
+				_begin_tool("zone")
+		KEY_T:
+			if tool.mode == "terrain":
+				tool.stop()
+			else:
+				_begin_tool("terrain")
 		KEY_SPACE:
 			_set_speed(0 if speed > 0 else maxi(1, _last_speed))
 		KEY_1:
@@ -781,6 +922,8 @@ func _on_new_day(day: int) -> void:
 			_end_game(why, text)
 			return
 		_lose_colony(i, why)
+	for c in colonies.list:
+		_flood_damage(c)
 	var pop := sim.population()
 	if pop <= 0:
 		return
@@ -794,6 +937,22 @@ func _on_new_day(day: int) -> void:
 		_report_shown = true
 		_set_speed(0)
 		_show_report()
+
+
+## 침수: 해수면 아래로 판 땅에 선 건물은 날마다 물에 잠겨 멈춘다 (고장 — 고쳐도 다음 날 다시). 땅을 메우면 그친다
+func _flood_damage(c: Dictionary) -> void:
+	var cp: CityPlan = c["plan"]
+	if cp == null or cp.flood.is_empty():
+		return
+	var cs: CitySim = c["sim"]
+	var fb := cp.flooded_built()
+	for kind in fb:
+		var n := mini(int(fb[kind]), int(cs.counts.get(kind, 0)))
+		var was := int(cs.broken.get(kind, 0))
+		if was < n:
+			cs.broken[kind] = n
+			cs.note("침수 — %s %d동이 물에 잠겨 멈췄다. 땅을 메우거나(쌓기) 다른 곳에 짓는다" % [GameData.module_name(kind), n - was],
+				"warn")
 
 
 ## 원정대가 도착해 새 식민지가 섰다

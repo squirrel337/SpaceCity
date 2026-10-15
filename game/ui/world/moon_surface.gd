@@ -382,10 +382,61 @@ func _bake_patch() -> void:
 	_plateau_m = (data[m] * 256 + data[m + 1]) / 65535.0 * 20000.0 - 10000.0
 	_hgrid = grid
 	var tex := ImageTexture.create_from_image(img)
+	_keep_baked(img, tex, false)
 	patch_mat.set_shader_parameter("hmap", tex)
 	patch_mat.set_shader_parameter("has_hmap", true)
 	patch_mat.set_shader_parameter("plateau_m", _plateau_m)
 	terrain_ready.emit()
+
+
+## 고친 꼭짓점의 높이(RG 16비트)와 법선(BA)을 높이 지도에 다시 쓴다. 법선은 구운 법선에 고친 높이 차의 기울기를 더한다
+## (구운 잔 굴곡은 그대로) — 고친 꼭짓점과 그 이웃
+func _encode_heights(changed: PackedInt32Array) -> void:
+	if _himg == null:
+		return
+	var data := _himg.get_data()
+	var todo := {}
+	for idx in changed:
+		todo[idx] = true
+		@warning_ignore("integer_division")
+		var k := idx / _segs
+		var i := idx % _segs
+		for q in [Vector2i(k - 1, i), Vector2i(k + 1, i), Vector2i(k, i - 1), Vector2i(k, i + 1)]:
+			if q.x >= 0 and q.x < _rings:
+				todo[q.x * _segs + posmod(q.y, _segs)] = true
+	for idx in todo:
+		var o: int = idx * 4
+		var c := clampi(int(round((_hgrid[idx] + 6000.0) * 8.192)), 0, 65535)
+		data[o] = c >> 8
+		data[o + 1] = c & 255
+		var g := _delta_grad(idx)
+		var nx := _hbytes[o + 2] / 255.0 * 2.0 - 1.0
+		var ny := _hbytes[o + 3] / 255.0 * 2.0 - 1.0
+		var nz := sqrt(maxf(1.0 - nx * nx - ny * ny, 0.02))
+		var n := Vector3(nx / nz - g.x, ny / nz - g.y, 1.0).normalized()
+		data[o + 2] = clampi(int(round((n.x * 0.5 + 0.5) * 255.0)), 0, 255)
+		data[o + 3] = clampi(int(round((n.y * 0.5 + 0.5) * 255.0)), 0, 255)
+	_himg.set_data(_himg.get_width(), _himg.get_height(), false, _himg.get_format(), data)
+
+
+## 고친 높이 차(지금 높이 − 구운 높이)의 기울기 (모형 좌표 x·y, m/m)
+func _delta_grad(idx: int) -> Vector2:
+	@warning_ignore("integer_division")
+	var k := idx / _segs
+	if k == 0:
+		return Vector2.ZERO
+	var i := idx % _segs
+	var k0 := k - 1
+	var k1 := mini(k + 1, _rings - 1)
+	var d_r := (_dd(k1, i) - _dd(k0, i)) / maxf(ring_m(k1) - ring_m(k0), 0.5)
+	var d_t := (_dd(k, i + 1) - _dd(k, i - 1)) / maxf(2.0 * ring_m(k) * TAU / _segs, 0.5)
+	var a := TAU * i / _segs
+	return Vector2(cos(a), sin(a)) * d_r + Vector2(-sin(a), cos(a)) * d_t
+
+
+func _dd(k: int, i: int) -> float:
+	var idx := k * _segs + posmod(i, _segs)
+	return _hgrid[idx] - _hbase[idx]
 
 
 func _bake_cube() -> void:
