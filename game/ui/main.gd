@@ -910,7 +910,7 @@ func _update_metro_card() -> void:
 	metro_card.visible = mk != "" and mk != metro_card.dismissed and not modal.visible
 	if metro_card.visible:
 		metro_card.payer_index = active
-		metro_card.show_metro(mk, city_area.size.x < 820.0)
+		metro_card.show_metro(mk, OS.has_feature("mobile"))       # 휴대폰은 접힌 채로 연다 (화면을 덜 가리게)
 
 
 func _on_metro_build(key: String, fac: String) -> void:

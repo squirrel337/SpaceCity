@@ -922,16 +922,20 @@ func _step_descent(delta: float) -> void:
 
 
 ## 지구의 대도시 위로 날아가 시가지를 비스듬히 내려다본다
-## 카메라가 보는 대도시 (대도시 카드): 고정점으로 고른 대도시(지구 고도 3000 km 아래), 또는 시가지 위 400 km 아래로
-## 내려온 대도시. 없으면 ""
+## 카메라가 보는 대도시 (대도시 카드): 고정점으로 고른 대도시(지구 고도 3000 km 아래), 또는 그 시가지(반지름의 1.5배) 위
+## 400 km 아래로 내려온 대도시. 없으면 "" (가까운 지구 식민지를 볼 때는 뜨지 않는다)
 func metro_focus() -> String:
 	if cam.focus != "earth" or cam.mode != "body" or not _bodies.has("earth"):
 		return ""
 	var alt := Astro.len3(Astro.sub3(cam.pos, _info("earth")["center"])) - 6371.0
-	if String(anchors.current.get("kind", "")) == "metro" and alt < 3000.0:
+	var kind := String(anchors.current.get("kind", ""))
+	if kind == "metro" and alt < 3000.0:
 		return String(anchors.current["id"])
 	if _metro_near != null and alt < 400.0:
-		return String(_metro_near.site_data.get("id", ""))
+		var key := String(_metro_near.site_data.get("id", ""))
+		var m := Metros.of(key)
+		if not m.is_empty() and Metros.km_between(m["dir"], Astro.vec(cam.t_dir)) < float(m.get("radius_km", 20.0)) * 1.5:
+			return key
 	return ""
 
 

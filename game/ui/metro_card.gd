@@ -63,7 +63,7 @@ func _init() -> void:
 	_body.add_child(_foot)
 
 
-## compact: 좁은 화면 (휴대폰) — 다른 대도시로 가면 접힌 채로 연다
+## compact: 휴대폰 — 다른 대도시로 가면 접힌 채로 연다
 func show_metro(k: String, compact: bool = false) -> void:
 	if k != key:
 		key = k
@@ -100,9 +100,12 @@ func refresh() -> void:
 		_flight.text = "지구에 우주항 도시가 없다 — 우주항 항공편이 뜨지 않는다 (연구소·홍보관의 몫은 들어온다)"
 	else:
 		var y: Dictionary = fn.last.get(key, {})
-		var yest := ""
-		if float(y.get("settlers", 0.0)) > 0.0 or float(y.get("parts", 0.0)) > 0.0:
-			yest = " · 어제 더 실은 것: 정착민 %d명, 부품 %s" % [int(y.get("settlers", 0.0)), Fmt.n(float(y.get("parts", 0.0)), 1)]
+		var more := PackedStringArray()
+		if float(y.get("settlers", 0.0)) > 0.0:
+			more.append("정착민 %d명" % int(y["settlers"]))
+		if float(y.get("parts", 0.0)) > 0.0:
+			more.append("부품 %s" % Fmt.n(float(y["parts"]), 1))
+		var yest := (" · 어제 더 실은 것: " + ", ".join(more)) if not more.is_empty() else ""
 		_flight.text = "우주항 항공편: %s까지 %s · %d시간마다%s" % [Transport.node_name(String(feeder["b"])),
 			Fmt.distance_km(float(feeder.get("km", 0.0))), int(feeder["every_h"]), yest]
 	for c in _rows.get_children():
