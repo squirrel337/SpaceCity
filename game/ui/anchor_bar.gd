@@ -93,6 +93,8 @@ static func _group_name(kind: String, k: Dictionary) -> String:
 			return "도시"
 		"metro":
 			return "대도시"
+		"tech":
+			return "첨단 산업 지역"
 		"ship":
 			return "날아가는 수송선"
 		"star":

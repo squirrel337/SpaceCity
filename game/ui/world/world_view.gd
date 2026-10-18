@@ -706,14 +706,33 @@ func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 
 
 ## 지구의 대도시: 카메라가 내려다보는 곳(고도 1500 km 아래)에서 가까운 대도시의 땅(지형 조각)과 시가지를 만든다.
-## 둘까지 두고 (오래 안 본 것부터 치운다), 지형 조각은 내려다보는 대도시 하나만 그린다
+## 반도체·AI 데이터센터 지역(대도시 시가지 밖)도 같은 자리를 나눠 쓴다 — 가까운 쪽 (시가지·단지 크기로 나눈 거리, 지금 보이는 쪽을
+## 15% 더 붙든다). 품질 설정만큼 두고 (오래 안 본 것부터 치운다), 지형 조각은 내려다보는 곳 하나만 그린다
 func _update_metros() -> void:
 	var near_key := ""
 	if cam.mode == "body" and cam.focus == "earth" and _bodies.has("earth"):
 		var alt := Astro.len3(Astro.sub3(cam.pos, _info("earth")["center"])) - 6371.0
 		if alt < 1500.0:
-			var m := Metros.nearest(Astro.vec(cam.t_dir), 250.0)
+			var t := Astro.vec(cam.t_dir)
+			var m := Metros.nearest(t, 250.0)
+			var r := Metros.nearest_region(t, 150.0)
+			var dm := INF
+			var dr := INF
 			if not m.is_empty():
+				dm = Metros.km_between(t, m["dir"]) / maxf(float(m["radius_km"]), 1.0)
+			if not r.is_empty():
+				dr = Metros.km_between(t, r["dir"]) / (float(r["radius_km"]) + 8.0)
+			if _metro_near != null:
+				var cur := String(_metro_near.site_data.get("id", ""))
+				if not m.is_empty() and cur == String(m["key"]):
+					dm /= 1.15
+				elif not r.is_empty() and cur == String(r["key"]):
+					dr /= 1.15
+			if dr < dm:
+				near_key = String(r["key"])
+				if not metro_grounds.has(near_key):
+					_make_region(r)
+			elif not m.is_empty():
 				near_key = String(m["key"])
 				if not metro_grounds.has(near_key):
 					_make_metro(m)
@@ -746,11 +765,35 @@ func _make_metro(m: Dictionary) -> void:
 	g.city_root.add_child(mc)
 	mc.setup(m, g, quality_hi)
 	metro_grounds[String(m["key"])] = {"ground": g, "city": mc, "used": _clock}
+	_trim_grounds(String(m["key"]))
+
+
+## 반도체·AI 데이터센터 지역의 땅과 단지 (대도시 땅과 같은 자리를 나눠 쓴다)
+func _make_region(r: Dictionary) -> void:
+	var node: MeshInstance3D = _bodies["earth"]["node"]
+	if not _fine_sphere.has("earth"):
+		node.mesh = SkyBuilder.sphere(256, 128)
+		_fine_sphere["earth"] = true
+	var g := SiteSurface.new()
+	g.standalone = true
+	_space.add_child(g)
+	var site := {"id": String(r["key"]), "name": String(r["name"]), "lat": float(r["lat"]), "lon": float(r["lon"]),
+		"layout": "open", "map_half_km": float(r["radius_km"]) + 10.0, "map_range_km": 2.0, "parks_map": true}
+	g.setup("earth", site, node, 6371.0, body_baker, moon)
+	var ts := TechSite.new()
+	ts.mgr = mgr
+	g.city_root.add_child(ts)
+	ts.setup_region(r, g, quality_hi)
+	metro_grounds[String(r["key"])] = {"ground": g, "city": ts, "used": _clock}
+	_trim_grounds(String(r["key"]))
+
+
+func _trim_grounds(keep_key: String) -> void:
 	while metro_grounds.size() > int(Settings.q("metro_keep")):
 		var oldest := ""
 		var t := INF
 		for k in metro_grounds:
-			if float(metro_grounds[k]["used"]) < t and k != String(m["key"]):
+			if float(metro_grounds[k]["used"]) < t and k != keep_key:
 				t = float(metro_grounds[k]["used"])
 				oldest = k
 		if oldest == "":
@@ -945,14 +988,39 @@ func fly_to_metro(key: String) -> void:
 	var m := Metros.of(key)
 	if m.is_empty():
 		return
-	var dir: Vector3 = m["dir"]
+	fly_to_place(m["dir"], maxf(14.0, float(m.get("radius_km", 20.0)) * 0.9), deg_to_rad(58.0))
+
+
+## 반도체·AI 데이터센터 지역 위로 날아가 단지를 비스듬히 내려다본다
+func fly_to_region(key: String) -> void:
+	var r := Metros.region(key)
+	if r.is_empty():
+		return
+	fly_to_place(r["dir"], clampf(float(r.get("radius_km", 3.0)) * 1.3, 4.0, 9.0), deg_to_rad(58.0))
+
+
+## 지구의 한 곳 위로: 멀면 지구로 날아간 뒤 그 자리로 내려간다 (d1 km, 기울기)
+func fly_to_place(dir: Vector3, d1: float, tilt: float) -> void:
 	var r := 6371.0
-	_descent = {"wait": true, "body": "earth", "dir": dir, "d1": maxf(14.0, float(m.get("radius_km", 20.0)) * 0.9),
-		"tilt": deg_to_rad(58.0)}
+	_descent = {"wait": true, "body": "earth", "dir": dir, "d1": d1, "tilt": tilt}
 	if cam.focus == "earth" and cam.mode == "body" and not cam.flying() and cam.dist < r * 0.5:
-		_begin_descent_at("earth", dir, float(_descent["d1"]), float(_descent["tilt"]))
+		_begin_descent_at("earth", dir, d1, tilt)
 		return
 	cam.fly_to("earth", r * 2.4, 2.4, dir)
+
+
+## 카메라가 보는 첨단 산업 지역 (지역 카드): 고정점으로 고른 지역(고도 3000 km 아래), 또는 그 단지 위 400 km 아래
+func region_focus() -> String:
+	if cam.focus != "earth" or cam.mode != "body" or not _bodies.has("earth"):
+		return ""
+	var alt := Astro.len3(Astro.sub3(cam.pos, _info("earth")["center"])) - 6371.0
+	if String(anchors.current.get("kind", "")) == "tech" and alt < 3000.0:
+		return String(anchors.current["id"])
+	if alt < 400.0:
+		var r := Metros.nearest_region(Astro.vec(cam.t_dir), INF, false)
+		if not r.is_empty() and Metros.km_between(r["dir"], Astro.vec(cam.t_dir)) < maxf(float(r["radius_km"]) * 2.5, 6.0):
+			return String(r["key"])
+	return ""
 
 
 ## 교통 탭의 '보기': 노선 전체가 보이게 날아가고 잠깐 밝게 그린다
@@ -1221,6 +1289,11 @@ func _click(p: Vector2, touch: bool = false, keep: bool = false) -> void:
 				var m := Metros.of(key)
 				anchors.go({"kind": "metro", "id": key, "name": String(m.get("name", key)), "body": "earth",
 					"dir": m.get("dir", Vector3.ZERO)})
+			elif String(item[1]).begins_with("tech:"):
+				var key3 := String(item[1]).substr(5)
+				var rg := Metros.region(key3)
+				anchors.go({"kind": "tech", "id": key3, "name": String(rg.get("name", key3)), "body": "earth",
+					"dir": rg.get("dir", Vector3.ZERO)})
 			elif String(item[1]).begins_with("ship:"):
 				var key2 := String(item[1]).substr(5)
 				for a in anchors.ships():
@@ -1290,6 +1363,7 @@ func _draw_overlay() -> void:
 	for i in colonies.size():
 		_label_colony(i, font, placed)
 	routes.draw_metros(font, placed)
+	routes.draw_regions(font, placed)
 	_label_metro_facilities(font, placed)
 	var order := ["sun", "earth", "moon", "mars", "venus", "mercury", "jupiter", "saturn", "uranus", "neptune",
 		"pluto", "ceres", "io", "europa", "ganymede", "callisto", "titan", "triton", "phobos", "deimos", "charon"]

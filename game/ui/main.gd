@@ -52,7 +52,8 @@ var city_area: Control
 var view_buttons := {}
 var world_row: HBoxContainer       # 3D: 확대·축소, 기지 (다른 고정점은 위쪽의 경로 막대)
 var anchor_bar: AnchorBar          # 3D: 카메라의 고정점 경로 (우주 › 태양계 › 지구 › 도시)
-var metro_card: MetroCard          # 3D: 지구의 대도시 위에서 — 그 도시의 우주 시설 (도시 기능)
+var metro_card: MetroCard          # 3D: 지구의 대도시 위에서 — 그 도시의 우주 시설 (도시 기능)·운영 방식·경제
+var region_card: RegionCard        # 3D: 반도체·AI 데이터센터 지역 위에서 — 그 지역과 협력
 var view_mode := "world"
 var forecast: ForecastBar
 var modal: Modal
@@ -149,7 +150,18 @@ func _build() -> void:
 	metro_card.offset_right = -12
 	metro_card.offset_top = 64
 	metro_card.build_requested.connect(_on_metro_build)
+	metro_card.mode_requested.connect(_on_metro_mode)
+	metro_card.ops_requested.connect(_on_metro_ops)
 	city_area.add_child(metro_card)
+	region_card = RegionCard.new()
+	region_card.mgr = colonies
+	region_card.visible = false
+	region_card.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	region_card.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	region_card.offset_right = -12
+	region_card.offset_top = 64
+	region_card.region_ops.connect(_on_region_ops)
+	city_area.add_child(region_card)
 	tool.changed.connect(_update_place_bar)
 	tool.placed.connect(_on_placed)
 	tool.bought.connect(func(ok: bool, text: String):
@@ -1005,17 +1017,37 @@ func _process(delta: float) -> void:
 			tabs[current_tab].rebuild()
 
 
-## 대도시 카드: 카메라가 대도시 위에 있으면 (닫지 않았으면) 그 도시의 우주 시설을 보인다
+## 대도시 카드·지역 카드: 카메라가 대도시(또는 반도체·AI 데이터센터 지역) 위에 있으면 (닫지 않았으면) 그곳의 카드를 보인다.
+## 고정점으로 지역을 골랐으면 (대도시 시가지 안의 지역이라도) 지역 카드가 먼저다. 처음 찾아온 지역은 견학 — 연구 점수
 func _update_metro_card() -> void:
 	if metro_card == null:
 		return
-	var mk := world.metro_focus() if view_mode == "world" and sim != null and not tool.active() else ""
+	var on := view_mode == "world" and sim != null and not tool.active() and not modal.visible
+	var rk := world.region_focus() if on else ""
+	var mk := world.metro_focus() if on and String(world.anchors.current.get("kind", "")) != "tech" else ""
+	if mk != "":
+		rk = ""
 	if mk != metro_card.dismissed:
 		metro_card.dismissed = ""
-	metro_card.visible = mk != "" and mk != metro_card.dismissed and not modal.visible
+	if rk != region_card.dismissed:
+		region_card.dismissed = ""
+	metro_card.visible = mk != "" and mk != metro_card.dismissed
+	region_card.visible = rk != "" and rk != region_card.dismissed
 	if metro_card.visible:
 		metro_card.payer_index = active
+		metro_card.max_h = maxf(240.0, city_area.size.y - metro_card.offset_top - 12.0)
 		metro_card.show_metro(mk, OS.has_feature("mobile"))       # 휴대폰은 접힌 채로 연다 (화면을 덜 가리게)
+	if region_card.visible:
+		if rk != region_card.key:
+			region_card.visit_text = ""
+		if colonies.metro_fn.modes.visit(rk, sim):
+			var r := Metros.region(rk)
+			region_card.visit_text = "견학 — %s 연구 +%d" % [_colony_tag(sim), int(Metros.tech_bonus.get("visit_rp", 30))]
+			_toast("견학 — %s (%s). %s연구 +%d" % [String(r.get("name", rk)), Metros.kinds_text(r), _colony_tag(sim),
+				int(Metros.tech_bonus.get("visit_rp", 30))], "good")
+			_dirty = true
+		region_card.payer_index = active
+		region_card.show_region(rk, OS.has_feature("mobile"))
 
 
 func _on_metro_build(key: String, fac: String) -> void:
@@ -1027,7 +1059,90 @@ func _on_metro_build(key: String, fac: String) -> void:
 			int(MetroFunctions.level_def(fac, lvl).get("days", 0))], "good")
 	else:
 		_toast("%s — 지을 수 없다 (%s)" % [name, why], "warn")
+	_after_metro_ops()
+
+
+## 운영 방식을 고른다 ("" = 직접 운영으로 — 남은 운영비·비상 창고는 후원 식민지로 돌아간다)
+func _on_metro_mode(key: String, mode: String) -> void:
+	var name := String(Metros.of(key).get("name", key))
+	var modes := colonies.metro_fn.modes
+	var was := modes.mode_of(key)
+	var why := modes.set_mode(key, mode, colonies, active)
+	if why != "":
+		_toast("%s — %s" % [name, why], "warn")
+	elif mode == "":
+		_toast("%s — 「%s」을(를) 멈췄다. 남은 운영비는 후원 식민지로 돌아갔다" % [name, Metros.mode_name(was)], "info")
+	else:
+		_toast("%s — 「%s」 %s. %d일 준비한 뒤 움직인다 — 운영비를 맡긴다" % [name, Metros.mode_name(mode),
+			"시작" if was == "" else "로 바꿨다", int(MetroModes.rule("ready_days", 3))], "good")
+	_after_metro_ops()
+
+
+## 대도시 카드의 운영·경제 단추 (운영비 맡기기·자동 채움·협력 지역·동맹 과제·상점가·채권·펀드)
+func _on_metro_ops(key: String, action: String, arg: Variant) -> void:
+	var fn := colonies.metro_fn
+	var name := String(Metros.of(key).get("name", key))
+	var why := ""
+	var ok := ""
+	match action:
+		"deposit":
+			why = fn.modes.deposit(key, float(arg), colonies, fn)
+			ok = "운영비 +%s" % Fmt.n(float(arg))
+		"auto_fill":
+			fn.modes.set_auto_fill(key, bool(arg))
+			ok = "자동 채움 %s" % ("켬 — 후원 식민지의 지원이 넉넉할 때 하루 %s씩" % Fmt.n(float(MetroModes.rule("auto_fill", {}).get("per_day", 20)))
+				if bool(arg) else "끔")
+		"partner":
+			why = fn.modes.set_partner(key, String(arg), colonies)
+			ok = "협력 지역: %s" % String(Metros.region(String(arg)).get("name", "없음")) if String(arg) != "" else "협력 지역을 끝냈다"
+		"project":
+			why = fn.modes.set_project(String(arg), colonies)
+			ok = "동맹 과제: %s" % (MetroModes.project_name(String(arg)) if String(arg) != "" else "자동 (고향의 연구 순서)")
+		"commerce":
+			why = fn.econ.open_commerce(key, colonies, active)
+			ok = "우주 상점가를 열었다 — 날마다 상권 수입"
+		"commerce_close":
+			fn.econ.close_commerce(key)
+			ok = "우주 상점가 계약을 끝냈다"
+		"borrow":
+			why = fn.econ.borrow(key, colonies, active)
+			ok = "우주 채권을 발행했다"
+		"invest":
+			why = fn.econ.invest(key, float(arg), colonies, active)
+			ok = "우주 펀드에 %s를 넣었다" % Fmt.n(float(arg))
+		"withdraw":
+			var back := float(fn.econ.funds.get(key, {}).get("value", 0.0)) * (1.0 - float(MetroEconomy.cfg("fund").get("fee", 0.01)))
+			why = fn.econ.withdraw(key, colonies)
+			ok = "우주 펀드를 찾았다 — 약 %s" % Fmt.n(back)
+		_:
+			return
+	_toast("%s — %s" % [name, ok if why == "" else why], "good" if why == "" else "warn")
+	_after_metro_ops()
+
+
+## 지역 카드의 단추: 협력(그 대도시의 운영비로 계약) · 가까운 대도시로 가기
+func _on_region_ops(region_key: String, action: String, metro_key: String) -> void:
+	var r := Metros.region(region_key)
+	match action:
+		"partner":
+			var name := String(Metros.of(metro_key).get("name", metro_key))
+			var why := colonies.metro_fn.modes.set_partner(metro_key, region_key, colonies)
+			if why == "":
+				var bt := MetroModes.bonus_text(colonies.metro_fn.modes.mode_of(metro_key), r)
+				_toast("%s — %s와(과) 협력한다%s" % [name, String(r.get("name", region_key)), (" (" + bt + ")") if bt != "" else ""], "good")
+			else:
+				_toast("%s — %s" % [name, why], "warn")
+			_after_metro_ops()
+		"go":
+			var m := Metros.of(metro_key)
+			if not m.is_empty():
+				world.anchors.go({"kind": "metro", "id": metro_key, "name": String(m.get("name", metro_key)), "body": "earth",
+					"dir": m.get("dir", Vector3.ZERO)})
+
+
+func _after_metro_ops() -> void:
 	metro_card.refresh()
+	region_card.refresh()
 	if current_tab == "transport":
 		tabs["transport"].rebuild()
 	_dirty = true
@@ -1298,7 +1413,11 @@ func _show_help() -> void:
 		"이어 가던 길에서 굽는다. '구획'(Z) — 길로 둘러싸인 블록을 눌러 용도를 정한다. '땅'(T) — 파기·쌓기·평탄화·되돌리기 " +
 		"(굴착기나 로봇 정비소가 있어야 한다). 지구·타이탄에서 해수면 아래로 파면 물이 차서 그 위의 건물이 멈춘다.\n" +
 		"· 지구의 대도시 위로 가면 오른쪽 위 카드에서 우주 시설(산업 단지·이주 센터·연구소·홍보관·화물 터미널)을 " +
-		"지구 지원 점수로 짓는다 — 부품·정착민·연구·지원이 더 들어온다.\n" +
+		"지구 지원 점수로 짓는다 — 부품·정착민·연구·지원이 더 들어온다. '운영' 탭에서 운영 방식(① 우주 산업 수도 · ③ 연구 동맹 · " +
+		"⑤ 비상 보급 기지)을 고르고 운영비를 맡기면 그 도시가 스스로 일하고, '경제' 탭에서 그 도시의 상권·금융가와 계약한다 " +
+		"(우주 상점가 · 우주 채권 · 우주 펀드).\n" +
+		"· 3D 지도의 ◆는 반도체·AI 데이터센터 지역이다 — 내려가면 단지가 보이고, 처음 찾아가면 견학으로 연구 점수를 받는다. " +
+		"운영 방식이 있는 대도시가 협력하면 그 방식의 몫이 커진다.\n" +
 		"· 조작: 끌기 = 땅을 잡아 옮기기(멀면 고정점 둘레 돌기), 오른쪽 끌기·Shift 끌기·두 손가락 비틀기 = 방위·기울기, " +
 		"휠·두 손가락 벌리기 = 확대·축소. 그래픽 품질은 메뉴 › 설정.",
 		[["ok", "닫기", ""]])

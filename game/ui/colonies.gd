@@ -38,6 +38,7 @@ func start(sim: CitySim, plan: CityPlan) -> void:
 	_windows.clear()
 	found_defaults()
 	metro_fn.reset()
+	metro_fn.econ.seed_value = seed_value
 	transport.reset()
 	transport.rebuild(self)
 
@@ -149,6 +150,7 @@ func step() -> Array:
 	if not arrived.is_empty():
 		transport.rebuild(self)
 	transport.step(self)
+	metro_fn.step_hour(self)
 	if hour % 24 == 0:
 		share_techs()
 		metro_fn.step_day(self)
@@ -179,6 +181,7 @@ func remove(index: int) -> Dictionary:
 	var c: Dictionary = list[index]
 	list.remove_at(index)
 	transport.rebuild(self)
+	metro_fn.on_colony_removed(String(c["site"]), self)
 	return c
 
 
@@ -445,6 +448,7 @@ func load_save(data: Dictionary) -> bool:
 		_windows.clear()
 		found_defaults()
 		metro_fn.reset()
+		metro_fn.econ.seed_value = seed_value
 		transport.load_save({}, self)
 		return true
 	if (v != SAVE_VERSION and v != 2) or not data.get("colonies") is Array or (data["colonies"] as Array).is_empty():
@@ -469,6 +473,7 @@ func load_save(data: Dictionary) -> bool:
 	if not data.has("defaults"):
 		found_defaults()
 	metro_fn.load_save(data.get("metro_fn", {}) if data.get("metro_fn") is Dictionary else {})
+	metro_fn.econ.seed_value = seed_value
 	transport.load_save(data.get("transport", {}) if data.get("transport") is Dictionary else {}, self)
 	return true
 

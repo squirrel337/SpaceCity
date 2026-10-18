@@ -316,6 +316,61 @@ func line_by_id(id: String) -> Dictionary:
 	return _by_id.get(id, {})
 
 
+## 지구 우주항 ↔ 달 고향 셔틀 ({} = 없다)
+func shuttle_line() -> Dictionary:
+	for l in lines:
+		if String(l["role"]) == "shuttle":
+			return l
+	return {}
+
+
+## 노선에서 지구 쪽이 떠나는 방향 (0 = a에서)
+static func earth_dir(l: Dictionary) -> int:
+	return 0 if node_body(String(l["a"])) == "earth" else 1
+
+
+## 지구-달 셔틀·수송선의 운임 (지원/t)
+static func freight_per_t() -> float:
+	return float(data().get("freight", {}).get("support_per_t", 7.5))
+
+
+## 특별편 (대도시 운영 방식의 부품 급송·비상편): 그 노선·방향으로 정기편과 따로 떠난다 — 다음 정기편은 그대로.
+## trip_h ≤ 0이면 노선의 시간. to: 노선 끝이 아닌 같은 천체의 도시로 (3D는 노선을 따라 그린다).
+## 교통이나 노선이 꺼졌으면 {}
+func dispatch(col: Colonies, line_id: String, dir: int, cargo: Dictionary, tag: String, trip_h: int = -1, to: String = "") -> Dictionary:
+	var l := line_by_id(line_id)
+	if l.is_empty() or not enabled or not bool(l["on"]):
+		return {}
+	var src := String(l["a"] if dir == 0 else l["b"])
+	var dst := to if to != "" else String(l["b"] if dir == 0 else l["a"])
+	# 같은 노선에 같은 시각에 떠난 편이 있으면 한 시간씩 앞당겨 적는다 (3D 표지·교통 탭의 열쇠가 겹치지 않게)
+	var dep := col.hour
+	var taken := true
+	while taken:
+		taken = false
+		for t0 in trips:
+			if String(t0["line"]) == line_id and int(t0["depart"]) == dep:
+				taken = true
+				dep -= 1
+				break
+	var t := {"line": line_id, "from": src, "to": dst, "depart": dep,
+		"arrive": col.hour + (trip_h if trip_h > 0 else int(l["trip_h"])), "cargo": cargo, "people": [], "pax": 0,
+		"mode": l["mode"], "kind": l["kind"], "tag": tag}
+	trips.append(t)
+	if _sim(col, src) != null:
+		_flow(src, "out_t", cargo_t(cargo))
+		_event("dep", src, dst, l)
+	return t
+
+
+## 그 도시로 가는 그 꼬리표의 특별편이 있나
+func has_tagged(site: String, tag: String) -> bool:
+	for t in trips:
+		if String(t["to"]) == site and String(t.get("tag", "")) == tag:
+			return true
+	return false
+
+
 # ── 한 시간 ─────────────────────────────────────────────────────
 func step(col: Colonies) -> void:
 	for t in trips.duplicate():
@@ -384,7 +439,7 @@ func _depart(col: Colonies, l: Dictionary, dir: int) -> void:
 				# 대도시 → 우주항: 빈 주거만큼 정착민, 부품이 모자라면 부품. 대도시의 우주 시설이 더 싣는다
 				# (이주 지원 센터: 정착민, 우주 산업 단지: 부품 — 모자라지 않아도)
 				var mt: Dictionary = D.get("metro", {})
-				var fb: Dictionary = col.metro_fn.feeder(src, int(mt.get("every_h", 24)))
+				var fb: Dictionary = col.metro_fn.feeder(src, int(mt.get("every_h", 24)), col.hour)
 				var inc := incoming(dst)
 				var n := mini(int(mt.get("settlers", 40)) + int(fb["settlers"]), _room(d_sim) - int(inc.get("people", 0)))
 				if n > 0:
@@ -400,10 +455,16 @@ func _depart(col: Colonies, l: Dictionary, dir: int) -> void:
 			if s_sim != null and d_sim != null:
 				var freight := 0.0
 				if String(l["kind"]) in ["ferry", "ship"]:
-					freight = float(D.get("freight", {}).get("support_per_t", 0.0))
+					freight = float(D.get("freight", {}).get("support_per_t", 0.0)) * col.metro_fn.modes.freight_k()
 				var inc2 := incoming(dst)
 				cargo = _plan_cargo(s_sim, d_sim, float(md.get("cap_t", 0.0)), freight, inc2)
 				_load(s_sim, cargo, freight)
+				# 먼 행성으로 가는 수송선: 우주 산업 수도가 그 천체의 모자란 부품을 사서 더 싣는다 (운영비로)
+				if String(l["kind"]) == "ship" and node_body(dst) != "moon":
+					var room := float(md.get("cap_t", 0.0)) - cargo_t(cargo)
+					var extra_p := col.metro_fn.modes.ship_parts(col, node_body(dst), room, col.metro_fn)
+					if extra_p > 0.0:
+						cargo["parts"] = float(cargo.get("parts", 0.0)) + extra_p
 				var n2 := _plan_people(s_sim, d_sim, int(md.get("seats", 0)), int(inc2.get("people", 0)))
 				if n2 > 0:
 					people = _take_people(s_sim, n2)
@@ -444,15 +505,25 @@ func _arrive(col: Colonies, t: Dictionary) -> void:
 		if not l0.is_empty():
 			_event("arr", dst, String(t["from"]) if dst != String(t["from"]) else String(t["to"]), l0)
 		for k in cargo:
+			if k == "kwh":
+				_charge(d_sim, float(cargo[k]))
+				continue
 			d_sim.stock[k] = float(d_sim.stock.get(k, 0.0)) + float(cargo[k])
 		for g in t["people"]:
 			d_sim.cohorts.append([float(g[0]), float(g[1]), false])
+		match String(t.get("tag", "")):
+			"emergency":
+				d_sim.note("비상 보급편 도착 — %s" % cargo_text(cargo), "good")
+			"rush":
+				d_sim.note("부품 급송 셔틀 도착 — %s" % cargo_text(cargo), "info")
 		if tons > 0.0 or settlers > 0:
 			_flow(dst, "in_t", tons)
 			_flow(dst, "in_p", settlers)
 			CitySim._add(d_sim.stats, "transport_in", 1)
 		if t["kind"] == "ship":
 			d_sim.note("행성간 수송선 도착 — %s에서 (%s)" % [node_name(String(t["from"])), load_text(cargo, settlers)], "good")
+	if Metros.is_metro(String(t["to"])) and int(t.get("pax", 0)) > 0:
+		col.metro_fn.econ.note_pax(String(t["to"]), int(t["pax"]))
 	var l := line_by_id(String(t["line"]))
 	if not l.is_empty():
 		var st: Dictionary = l["stats"]
@@ -470,6 +541,13 @@ func _arrive(col: Colonies, t: Dictionary) -> void:
 	totals["t"] = float(totals.get("t", 0.0)) + tons
 	totals["settlers"] = int(totals.get("settlers", 0)) + settlers
 	totals["pax"] = int(totals.get("pax", 0)) + int(t.get("pax", 0))
+
+
+## 비상 전지: 축전지부터, 넘치면 재생 연료 전지에
+static func _charge(sim: CitySim, kwh: float) -> void:
+	var b := clampf(kwh, 0.0, maxf(0.0, sim.bat_cap - sim.battery))
+	sim.battery += b
+	sim.rfc += clampf(kwh - b, 0.0, maxf(0.0, sim.rfc_cap - sim.rfc))
 
 
 func _event(type: String, site: String, other: String, l: Dictionary) -> void:
@@ -652,6 +730,9 @@ static func count_people(people: Array) -> int:
 static func cargo_t(cargo: Dictionary) -> float:
 	var t := 0.0
 	for k in cargo:
+		if String(k) == "kwh":
+			t += float(cargo[k]) * MetroModes.KWH_T
+			continue
 		t += float(cargo[k]) * float(cargo_rule(String(k)).get("t_per", 0.001))
 	return t
 
@@ -691,6 +772,8 @@ static func cargo_text(cargo: Dictionary) -> String:
 			bits.append("%s %s t" % [c["name"], Fmt.n(v, 1)])
 		else:
 			bits.append("%s %s t" % [c["name"], Fmt.n(v / 1000.0, 1)])
+	if cargo.has("kwh"):
+		bits.append("비상 전지 %s kWh" % Fmt.n(float(cargo["kwh"])))
 	return " · ".join(bits)
 
 
@@ -757,9 +840,12 @@ func load_save(data_in: Dictionary, col: Colonies) -> void:
 			var cd: Dictionary = t.get("cargo", {})
 			for k in cd:
 				cargo[String(k)] = float(cd[k])
-			trips.append({"line": String(t["line"]), "from": String(t["from"]), "to": String(t["to"]),
+			var tr := {"line": String(t["line"]), "from": String(t["from"]), "to": String(t["to"]),
 				"depart": int(t["depart"]), "arrive": int(t["arrive"]), "cargo": cargo, "people": people,
-				"pax": int(t.get("pax", 0)), "mode": String(t.get("mode", "")), "kind": String(t.get("kind", "ground"))})
+				"pax": int(t.get("pax", 0)), "mode": String(t.get("mode", "")), "kind": String(t.get("kind", "ground"))}
+			if String(t.get("tag", "")) != "":
+				tr["tag"] = String(t["tag"])
+			trips.append(tr)
 		var fl: Dictionary = data_in.get("flow", {})
 		for k in fl:
 			var f: Dictionary = fl[k]

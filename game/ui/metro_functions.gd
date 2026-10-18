@@ -5,6 +5,7 @@ extends RefCounted
 ## 지원을 낸 식민지에 날마다 보탠다. 공항 화물 터미널은 우주항 항공편을 더 자주 띄운다.
 ## 몫은 도시권 인구로 키우고 (√(인구/1000만)을 0.6~1.8로), 그 도시의 강점 시설이면 1.5배 더.
 ## 시뮬레이션(CitySim) 밖의 규칙이다 — 교통처럼 식민지의 비축·연구·지원에 더할 뿐이다.
+## 대도시 운영 방식(modes — MetroModes)과 상업·금융(econ — MetroEconomy)도 여기서 하루를 보낸다.
 
 const ORDER := ["space_park", "emigration", "research", "outreach", "cargo_hub"]
 const MAX_LEVEL := 3
@@ -14,6 +15,9 @@ var state := {}          # 대도시 key → 시설 id → {level, until(짓는 
 var last := {}           # 대도시 key → 어제의 몫 {parts, settlers, rp, support}
 var _today := {}         # 오늘 지금까지의 몫 (하루가 끝나면 last가 된다)
 var rev := 0             # 시설이 바뀔 때마다 +1 (3D 대도시·카드가 다시 그린다)
+var modes := MetroModes.new()        # 운영 방식 (①우주 산업 수도 ③연구 동맹 ⑤비상 보급 기지)
+var econ := MetroEconomy.new()       # 상업·금융
+var _in_day := false                 # step_day 안 — 몫을 어제(last)에 적는다
 
 
 static func defs() -> Dictionary:
@@ -52,7 +56,15 @@ func reset() -> void:
 	state = {}
 	last = {}
 	_today = {}
+	modes.reset()
+	econ.reset()
 	rev += 1
+
+
+## 식민지에서 자동으로 빼도 남겨야 하는 지원 — 그 식민지의 화물선·유인선 비용 (달 200, 화성 500, 타이탄 1,200)
+static func colony_floor(sim: CitySim) -> float:
+	var e: Dictionary = sim.C.get("earth", {})
+	return maxf(float(e.get("cargo_cost_support", 150.0)), float(e.get("crewed_cost_support", 200.0)))
 
 
 func _entry(key: String, fac: String) -> Dictionary:
@@ -77,8 +89,8 @@ func progress(key: String, fac: String, hour: int) -> float:
 	var u := until(key, fac)
 	if u < 0:
 		return 1.0
-	var days := float(level_def(fac, level(key, fac) + 1).get("days", 1))
-	return clampf(1.0 - float(u - hour) / (days * 24.0), 0.0, 1.0)
+	var days := float(_entry(key, fac).get("days", level_def(fac, level(key, fac) + 1).get("days", 1)))
+	return clampf(1.0 - float(u - hour) / (maxf(days, 1.0) * 24.0), 0.0, 1.0)
 
 
 ## 그 단계의 몫 (배수를 넣은 값): {parts_day, settlers, rp_day, support_day, every_h}
@@ -148,16 +160,23 @@ func build(key: String, fac: String, col: Colonies, payer_index: int) -> bool:
 	var lvl := level(key, fac)
 	var ld := level_def(fac, lvl + 1)
 	sim.support -= float(ld.get("cost", 0))
-	if not state.has(key):
-		state[key] = {}
-	state[key][fac] = {"level": lvl, "until": col.hour + int(ld.get("days", 10)) * 24,
-		"payer": String(col.list[payer_index]["site"])}
-	rev += 1
+	var days := start_level(key, fac, col, String(col.list[payer_index]["site"]), false)
 	var m := Metros.of(key)
 	sim.note("%s %s %s — 지원 −%d, %s 완공 예정" % [String(m.get("name", key)), fac_name(fac),
 		"짓기 시작" if lvl == 0 else "%d단계로 올리기 시작" % (lvl + 1), int(ld.get("cost", 0)),
-		col.date_text(float(col.hour + int(ld.get("days", 10)) * 24))], "info")
+		col.date_text(float(col.hour + days * 24))], "info")
 	return true
+
+
+## 다음 단계를 짓기 시작한다 (값은 부른 쪽이 이미 냈다) — 짓는 날을 돌려준다. auto: 운영 방식이 운영비로 지었다
+func start_level(key: String, fac: String, col: Colonies, payer_site: String, auto: bool) -> int:
+	var lvl := level(key, fac)
+	var days := maxi(1, int(round(float(level_def(fac, lvl + 1).get("days", 10)) * modes.build_days_k())))
+	if not state.has(key):
+		state[key] = {}
+	state[key][fac] = {"level": lvl, "until": col.hour + days * 24, "payer": payer_site, "days": days, "auto": auto}
+	rev += 1
+	return days
 
 
 ## 하루: 다 지은 시설은 다음 단계가 되고, 연구소·홍보관은 지원을 낸 식민지에 몫을 더한다
@@ -165,6 +184,7 @@ func step_day(col: Colonies) -> void:
 	var hub_changed := false
 	last = _today
 	_today = {}
+	_in_day = true
 	for key in state:
 		var facs: Dictionary = state[key]
 		for fac in facs:
@@ -177,8 +197,11 @@ func step_day(col: Colonies) -> void:
 					hub_changed = true
 				var ps := _payer(col, String(e.get("payer", "")))
 				if ps != null:
+					# 운영 방식이 운영비로 지은 것은 'info' (시간 건너뛰기를 멈추지 않게)
 					ps.note("%s %s %d단계 완공 — %s" % [String(Metros.of(key).get("name", key)), fac_name(fac), int(e["level"]),
-						output_text(output(key, fac))], "good")
+						output_text(output(key, fac))], "info" if bool(e.get("auto", false)) else "good")
+				e.erase("days")
+				e.erase("auto")
 			var o := output(key, fac)
 			if o.is_empty():
 				continue
@@ -186,13 +209,42 @@ func step_day(col: Colonies) -> void:
 			if sim == null:
 				continue
 			if o.has("rp_day"):
-				sim.rp_bank += float(o["rp_day"])
-				_tally(last, key, "rp", float(o["rp_day"]))
+				# 연구 동맹의 회원이면 동맹의 과제에 모은다 (과제가 없으면 식민지가 받는다)
+				if modes.ally_member(key, col.hour, self) and modes.add_share(key, float(o["rp_day"]), col):
+					_tally(last, key, "rp_ally", float(o["rp_day"]))
+				else:
+					sim.rp_bank += float(o["rp_day"])
+					_tally(last, key, "rp", float(o["rp_day"]))
 			if o.has("support_day"):
-				sim.support += float(o["support_day"])
-				_tally(last, key, "support", float(o["support_day"]))
+				# 우주 산업 수도는 그 도시 홍보관의 지원을 받지 않는다
+				if modes.forfeits_outreach(key, col.hour):
+					_tally(last, key, "forfeit", float(o["support_day"]))
+				else:
+					sim.support += float(o["support_day"])
+					_tally(last, key, "support", float(o["support_day"]))
+	modes.step_day(col, self)
+	econ.step_day(col, self)
+	_in_day = false
 	if hub_changed:
 		col.transport.rebuild(col)
+
+
+## 3시간마다 (Colonies.step이 교통 뒤에 부른다): 비상 보급 기지가 식민지를 살핀다
+func step_hour(col: Colonies) -> void:
+	if not modes.metros.is_empty():
+		modes.step_hour(col, self)
+
+
+## 운영 방식·상업·금융의 몫을 적는다 (하루 안에서는 어제 몫에, 아니면 오늘 몫에)
+func tally(key: String, what: String, v: float) -> void:
+	_tally(last if _in_day else _today, key, what, v)
+
+
+## 식민지를 잃었다 (Colonies.remove가 부른다)
+func on_colony_removed(site: String, col: Colonies) -> void:
+	modes.on_colony_removed(site, col)
+	econ.on_colony_removed(site, col)
+	rev += 1
 
 
 ## 지원을 낸 식민지 (없어졌으면 고향 — 목록의 처음)
@@ -209,8 +261,9 @@ static func _tally(into: Dictionary, key: String, what: String, v: float) -> voi
 	into[key][what] = float(into[key].get(what, 0.0)) + v
 
 
-## 우주항으로 가는 항공편: 한 편에 더 싣는 정착민·부품과 간격 (시설이 없으면 기본값)
-func feeder(key: String, base_every_h: int) -> Dictionary:
+## 우주항으로 가는 항공편: 한 편에 더 싣는 정착민·부품과 간격 (시설이 없으면 기본값).
+## 부품은 운영 방식(우주 산업 수도)·동맹 기술(칩 신속 생산 라인)의 배수를 탄다 — hour < 0이면 준비 중이어도 센다
+func feeder(key: String, base_every_h: int, hour: int = -1) -> Dictionary:
 	var every := base_every_h
 	var hub := output(key, "cargo_hub")
 	if hub.has("every_h"):
@@ -221,7 +274,7 @@ func feeder(key: String, base_every_h: int) -> Dictionary:
 		o["settlers"] = int(round(float(em["settlers"])))
 	var sp := output(key, "space_park")
 	if sp.has("parts_day"):
-		o["parts"] = float(sp["parts_day"]) * every / 24.0
+		o["parts"] = float(sp["parts_day"]) * every / 24.0 * modes.parts_k(key, hour)
 	return o
 
 
@@ -240,6 +293,21 @@ func levels_total(key: String) -> int:
 	return n
 
 
+## 시설·운영 방식·상권·채권·펀드가 하나라도 있는 대도시들 (교통 탭이 늘어놓는다)
+func keys_with_ops() -> Array:
+	var keys := {}
+	for k in active_keys():
+		keys[k] = true
+	for k2 in modes.metros:
+		keys[k2] = true
+	for d in [econ.commerce, econ.loans, econ.funds]:
+		for k3 in d:
+			keys[k3] = true
+	var out := keys.keys()
+	out.sort()
+	return out
+
+
 ## 시설이 있거나 짓는 중인 대도시들
 func active_keys() -> Array:
 	var out := []
@@ -252,23 +320,29 @@ func active_keys() -> Array:
 
 
 func to_save() -> Dictionary:
-	return {"state": state.duplicate(true)}
+	return {"state": state.duplicate(true), "modes": modes.to_save(), "econ": econ.to_save()}
 
 
 func load_save(data: Dictionary) -> void:
 	reset()
 	var st: Variant = data.get("state", {})
-	if not st is Dictionary:
-		return
-	for key in st:
-		if Metros.of(String(key)).is_empty() or not st[key] is Dictionary:
-			continue
-		for fac in st[key]:
-			var e: Variant = st[key][fac]
-			if not defs().has(String(fac)) or not e is Dictionary:
+	if st is Dictionary:
+		for key in st:
+			if Metros.of(String(key)).is_empty() or not st[key] is Dictionary:
 				continue
-			if not state.has(key):
-				state[key] = {}
-			state[key][String(fac)] = {"level": clampi(int(e.get("level", 0)), 0, MAX_LEVEL), "until": int(e.get("until", -1)),
-				"payer": String(e.get("payer", ""))}
+			for fac in st[key]:
+				var e: Variant = st[key][fac]
+				if not defs().has(String(fac)) or not e is Dictionary:
+					continue
+				if not state.has(key):
+					state[key] = {}
+				var ent := {"level": clampi(int(e.get("level", 0)), 0, MAX_LEVEL), "until": int(e.get("until", -1)),
+					"payer": String(e.get("payer", ""))}
+				if e.has("days"):
+					ent["days"] = maxi(1, int(e["days"]))
+				if bool(e.get("auto", false)):
+					ent["auto"] = true
+				state[key][String(fac)] = ent
+	modes.load_save(data.get("modes", {}) if data.get("modes") is Dictionary else {})
+	econ.load_save(data.get("econ", {}) if data.get("econ") is Dictionary else {})
 	rev += 1

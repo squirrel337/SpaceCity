@@ -390,6 +390,10 @@ func draw_metros(font: Font, placed: Array) -> void:
 		ov.draw_circle(pos2, 2.4, Color(col, a))
 		var text := String(m["name"])
 		var sub := Metros.pop_text(m) if show_pop else ""
+		# 운영 방식이 있으면 그 이름을 둘째 줄에 (지구가 꽤 크게 보일 때)
+		var mo_id := view.mgr.metro_fn.modes.mode_of(String(m["key"])) if view.mgr != null else ""
+		if mo_id != "" and rad_px > 250.0:
+			sub = String(Metros.mode_def(mo_id).get("short", "")) + ((" · " + sub) if sub != "" else "")
 		var fs := LABEL_FS
 		var tsize := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
 		var ssize := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2) if sub != "" else Vector2.ZERO
@@ -411,3 +415,70 @@ func draw_metros(font: Font, placed: Array) -> void:
 			ov.draw_string(font, at, sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2, Color(0.8, 0.82, 0.86, 0.9 * a))
 		view._labels.append([rect, id])
 
+
+# ── 반도체·AI 데이터센터 지역 ───────────────────────────────────
+## ◆와 이름 (대도시보다 지구가 더 크게 보일 때부터). 색은 종류: 반도체 하늘색 · 칩 설계 초록 · 데이터센터 보라.
+## 대도시 이름표가 먼저 자리를 잡는다. 지구가 아주 크면 둘째 줄에 종류
+func draw_regions(font: Font, placed: Array) -> void:
+	Metros.load_all()
+	var info := view._info("earth")
+	if info.is_empty():
+		return
+	var c: PackedFloat64Array = info["center"]
+	var r: float = info["radius"]
+	var rad_px := view._apparent_px(c, r)
+	var alpha := smoothstep(90.0, 180.0, rad_px)
+	if alpha < 0.03:
+		return
+	var alt := Astro.len3(Astro.sub3(view.cam.pos, c)) - r
+	var ov := view._overlay
+	var show_kind := rad_px > 650.0
+	for g in Metros.regions:
+		var p := Astro.add3(c, Astro.bmul(info["frame"], Astro.scale3(Astro.dvec(g["dir"]), r)))
+		if _behind(c, r - clampf(alt * 0.3, 0.02, r * 0.001), p):
+			continue
+		var sp: Variant = _screen(p)
+		if sp == null:
+			continue
+		var pos2: Vector2 = sp
+		if not Rect2(Vector2(-30, -30), view.size + Vector2(60, 60)).has_point(pos2):
+			continue
+		var a := alpha
+		var near_km := Metros.km_between(g["dir"], Astro.vec(view.cam.t_dir)) if view.cam.mode == "body" else 1e9
+		if near_km < maxf(float(g.get("radius_km", 3.0)) * 3.0, 8.0):
+			a *= smoothstep(6.0, 30.0, alt)
+		if a < 0.03:
+			continue
+		var id := "tech:" + String(g["key"])
+		var hot := view._hover_label == id
+		var col := Metros.region_color(g)
+		if hot:
+			col = col.lightened(0.35)
+		var d := 4.2
+		var pts := PackedVector2Array([pos2 + Vector2(0, -d), pos2 + Vector2(d, 0), pos2 + Vector2(0, d), pos2 + Vector2(-d, 0)])
+		ov.draw_colored_polygon(pts, Color(0, 0, 0, 0.6 * a))
+		var d2 := 2.9
+		ov.draw_colored_polygon(PackedVector2Array([pos2 + Vector2(0, -d2), pos2 + Vector2(d2, 0), pos2 + Vector2(0, d2),
+			pos2 + Vector2(-d2, 0)]), Color(col, a))
+		var text := String(g["name"])
+		var sub := Metros.kinds_text(g) if show_kind else ""
+		var fs := LABEL_FS - 1
+		var tsize := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
+		var ssize := font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2) if sub != "" else Vector2.ZERO
+		var off := Vector2(7, 4)
+		var rect := Rect2(pos2 + Vector2(-5, -tsize.y + 2), Vector2(maxf(tsize.x, ssize.x) + off.x + 8, tsize.y + ssize.y + 4))
+		var clash := false
+		for other in placed:
+			if (other as Rect2).intersects(rect):
+				clash = true
+				break
+		if clash:
+			continue
+		placed.append(rect)
+		ov.draw_string(font, pos2 + off + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0, 0, 0, 0.75 * a))
+		ov.draw_string(font, pos2 + off, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(col.lightened(0.15), a))
+		if sub != "":
+			var at := pos2 + off + Vector2(0, ssize.y + 1)
+			ov.draw_string(font, at + Vector2(1, 1), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2, Color(0, 0, 0, 0.7 * a))
+			ov.draw_string(font, at, sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2, Color(0.8, 0.82, 0.86, 0.9 * a))
+		view._labels.append([rect, id])

@@ -117,6 +117,56 @@ func _metro_done(w: WorldView, key: String) -> bool:
 	return (w.metro_grounds[key]["city"] as MetroCity)._phase == 3
 
 
+## 대도시 운영 방식·경제를 차려 두고 며칠 흘린다: 부산 ①(평택과 협력), 서울 ③, 도쿄 ⑤, 서울 상점가, 런던 채권, 뉴욕 펀드
+func _setup_ops() -> void:
+	var col: Colonies = main.colonies
+	var fn := col.metro_fn
+	var m := fn.modes
+	var home: CitySim = col.list[0]["sim"]
+	home.support += 20000.0
+	m.set_mode("metro_busan", "parts_capital", col, 0)
+	m.set_mode("metro_seoul", "research_alliance", col, 0)
+	m.set_mode("metro_tokyo", "emergency_depot", col, 0)
+	for k in ["metro_busan", "metro_seoul", "metro_tokyo"]:
+		m.deposit(k, 1500.0, col, fn)
+		m.set_auto_fill(k, true)
+	m.set_partner("metro_busan", "tech_pyeongtaek", col)
+	m.set_partner("metro_seoul", "tech_giheung_hwaseong", col)
+	fn.econ.open_commerce("metro_seoul", col, 0)
+	fn.econ.borrow("metro_london", col, 0)
+	fn.econ.invest("metro_newyork", 500.0, col, 0)
+	_run_hours(24 * 12)
+
+
+## 대도시 카드를 그 탭으로 연다 (카메라가 그 대도시 위에 있어야 뜬다)
+func _card(key: String, tab: String) -> bool:
+	main.metro_card.dismissed = ""
+	main.metro_card.show_metro(key)
+	main.metro_card.set_tab(tab)
+	return true
+
+
+## 운영 방식 단지 (시가지 안의 자리 — MetroCity._site_at)를 비스듬히
+func _mode_campus_look(w: WorldView, key: String, dist: float) -> bool:
+	if not _metro_done(w, key):
+		return false
+	var mc: MetroCity = w.metro_grounds[key]["city"]
+	var m := Metros.of(key)
+	var en := mc._site_at(float(absi(String(m["id"]).hash()) % 360) + 36.0)
+	var lat := float(m["lat"]) + en.y / 111195.0
+	var lon := float(m["lon"]) + en.x / (111195.0 * cos(deg_to_rad(float(m["lat"]))))
+	w._descent.clear()
+	w.cam.look_at_surface("earth", Astro.latlon(lat, lon), dist, deg_to_rad(58.0), Vector3(0, 0, 1))
+	return true
+
+
+## 지역 위로 내려앉았고 단지를 다 지었나
+func _region_done(w: WorldView, key: String) -> bool:
+	if w.cam.flying() or not w._descent.is_empty() or not w.metro_grounds.has(key):
+		return false
+	return (w.metro_grounds[key]["city"] as MetroCity)._phase == 3
+
+
 ## 대도시를 다 지었으면 카메라를 그 위도·경도로 (거리 km, 기울기 °, 북쪽을 보고) — 대도시 카드는 닫는다
 func _metro_look(w: WorldView, key: String, lat: float, lon: float, dist: float, tilt_deg: float) -> bool:
 	if not _metro_done(w, key):
@@ -161,6 +211,20 @@ func _process(_delta: float) -> bool:
 			["seoul_river_night", func(): _until_night("metro_seoul"); _metro_look(w, "metro_seoul", 37.517, 126.99, 3.2, 55.0)],
 			["newyork_river", func(): w.fly_to_metro("metro_newyork"), func(): return _metro_look(w, "metro_newyork", 40.742, -73.972, 2.6, 58.0)],
 			["tokyo_bay", func(): w.fly_to_metro("metro_tokyo"), func(): return _metro_look(w, "metro_tokyo", 35.655, 139.765, 2.6, 58.0)],
+			["ops_setup", func(): _setup_ops(); main._select_tab("transport")],
+			["seoul_ops", func(): w.fly_to_metro("metro_seoul"), func(): return _metro_done(w, "metro_seoul") and _card("metro_seoul", "ops")],
+			["seoul_econ", func(): _card("metro_seoul", "econ")],
+			["busan_ops", func(): w.fly_to_metro("metro_busan"), func(): return _metro_done(w, "metro_busan") and _card("metro_busan", "ops")],
+			["tokyo_depot", func(): w.fly_to_metro("metro_tokyo"), func(): return _metro_done(w, "metro_tokyo") and _card("metro_tokyo", "ops")],
+			["tokyo_campus", func(): main.metro_card.dismissed = "metro_tokyo"; _mode_campus_look(w, "metro_tokyo", 2.2)],
+			["pyeongtaek", func(): w.fly_to_region("tech_pyeongtaek"), func(): return _region_done(w, "tech_pyeongtaek")],
+			["pyeongtaek_low", func(): w.cam.dist = 3.2; w.cam.tilt = deg_to_rad(64.0)],
+			["hsinchu", func(): w.fly_to_region("tech_hsinchu"), func(): return _region_done(w, "tech_hsinchu")],
+			["ashburn", func(): w.fly_to_region("tech_ashburn"), func(): return _region_done(w, "tech_ashburn")],
+			["ashburn_night", func(): _until_night("tech_ashburn")],
+			["shanghai_zhangjiang", func(): main.world.anchors.go({"kind": "tech", "id": "tech_zhangjiang", "name": "장장", "body": "earth",
+				"dir": Metros.region("tech_zhangjiang")["dir"]}), func(): return _metro_done(w, "metro_shanghai")],
+			["transport_ops", func(): main._select_tab("transport")],
 			["naro", func(): _go_base("earth_naro"), func(): return not w.cam.flying() and w._descent.is_empty()],
 			["naro_runway", func(): _arrive("earth_naro", "feeder:earth_naro~metro_seoul"); _aim(w, "runway"),
 				func(): return _agent_close(w, "plane", 0.5, 0.35, 66.0)],
@@ -199,6 +263,6 @@ func _process(_delta: float) -> bool:
 			_until = s[2]
 			_wait = 0
 	else:
-		_shot("transport_%02d_%s" % [_step / 2 + 1, s[0]], s[0] == "transport_tab")
+		_shot("transport_%02d_%s" % [_step / 2 + 1, s[0]], s[0] == "transport_tab" or s[0] == "transport_ops")
 	_step += 1
 	return false

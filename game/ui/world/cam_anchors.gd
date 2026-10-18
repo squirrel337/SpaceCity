@@ -46,6 +46,8 @@ func go(a: Dictionary) -> void:
 			view.site_picked.emit(String(a["id"]))
 		"metro":
 			view.fly_to_metro(String(a["id"]))
+		"tech":
+			view.fly_to_region(String(a["id"]))
 		"ship":
 			var key := String(a["id"])
 			var near := String(a.get("body", "sun"))
@@ -106,7 +108,7 @@ func path() -> Array:
 		out.append(body(String(b["parent"])))
 	out.append(body(f))
 	var k := String(current.get("kind", ""))
-	if k in ["colony", "metro", "site"] and String(current.get("body", "")) == f and cam.mode == "body":
+	if k in ["colony", "metro", "site", "tech"] and String(current.get("body", "")) == f and cam.mode == "body":
 		var r := float(b["radius_km"])
 		var t := Astro.vec(cam.t_dir)
 		var d: Vector3 = current.get("dir", Vector3.ZERO)
@@ -169,6 +171,9 @@ func cities_on(id: String) -> Array:
 		for m in Metros.list:
 			out.append({"kind": "metro", "id": String(m["key"]), "name": "%s · %s" % [m["name"], Metros.pop_text(m)],
 				"body": "earth", "dir": m["dir"]})
+		for r in Metros.regions:
+			out.append({"kind": "tech", "id": String(r["key"]), "name": "%s · %s" % [r["name"], Metros.kinds_text(r)],
+				"body": "earth", "dir": r["dir"]})
 	return out
 
 

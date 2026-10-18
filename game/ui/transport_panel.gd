@@ -128,10 +128,19 @@ func rebuild() -> void:
 func _metro_section() -> void:
 	var fn := mgr.metro_fn
 	box.add_child(HSeparator.new())
-	var keys := fn.active_keys()
-	box.add_child(ThemeFactory.heading("대도시의 우주 시설 · %d곳" % keys.size(), 15))
+	var keys := fn.keys_with_ops()
+	box.add_child(ThemeFactory.heading("대도시 · 우주 시설 %d곳 · 운영 방식 %d곳" % [fn.active_keys().size(), fn.modes.metros.size()], 15))
 	box.add_child(ThemeFactory.muted("대도시 위로 가면 (아래 단추, 3D 지도의 대도시 이름) 오른쪽 위 카드에서 우주 산업 단지·이주 지원 센터·" +
-		"우주 연구소·우주 홍보관·공항 화물 터미널을 고른 식민지의 지구 지원 점수로 짓고 올린다. 큰 도시일수록, 그 도시의 강점(★)일수록 몫이 크다.", 12))
+		"우주 연구소·우주 홍보관·공항 화물 터미널을 고른 식민지의 지구 지원 점수로 짓고 올린다. 큰 도시일수록, 그 도시의 강점(★)일수록 몫이 크다. " +
+		"'운영' 탭에서 운영 방식(①우주 산업 수도 ③연구 동맹 ⑤비상 보급 기지)을 고르면 운영비로 스스로 일하고, '경제' 탭에서 " +
+		"그 도시의 상권·금융가와 계약한다. 반도체·AI 데이터센터 지역(◆)과 협력하면 운영 방식의 몫이 커진다.", 12))
+	var summary := ThemeFactory.muted("", 12)
+	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	summary.add_theme_color_override("font_color", Palette.TEXT.darkened(0.1))
+	box.add_child(summary)
+	var upd_sum := func(): summary.text = _ops_summary(fn)
+	upd_sum.call()
+	_live.append(upd_sum)
 	for key in keys:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
@@ -155,10 +164,32 @@ func _metro_section() -> void:
 				ys.append("정착민 %d" % int(y["settlers"]))
 			if float(y.get("rp", 0.0)) > 0.0:
 				ys.append("연구 %s" % Fmt.n(float(y["rp"]), 1))
+			if float(y.get("rp_ally", 0.0)) > 0.0:
+				ys.append("동맹 연구 %s" % Fmt.n(float(y["rp_ally"]), 1))
 			if float(y.get("support", 0.0)) > 0.0:
 				ys.append("지원 %s" % Fmt.n(float(y["support"]), 1))
-			lab.text = "%s — %s%s" % [String(Metros.of(k).get("name", k)), " · ".join(bits),
-				("\n어제: " + ", ".join(ys)) if not ys.is_empty() else ""]
+			if float(y.get("commerce", 0.0)) > 0.0:
+				ys.append("상권 +%s" % Fmt.n(float(y["commerce"]), 1))
+			if absf(float(y.get("fund", 0.0))) >= 0.05:
+				ys.append("펀드 %s%s" % ["+" if float(y["fund"]) >= 0.0 else "", Fmt.n(float(y["fund"]), 1)])
+			var lines := PackedStringArray(["%s — %s" % [String(Metros.of(k).get("name", k)),
+				" · ".join(bits) if not bits.is_empty() else "우주 시설 없음"]])
+			var md := fn.modes.mode_of(k)
+			if md != "":
+				lines.append("운영: %s · 운영비 %s · %s" % [Metros.mode_name(md), Fmt.n(fn.modes.budget(k)),
+					fn.modes.status_short(k, mgr, fn)])
+			var ec := PackedStringArray()
+			if fn.econ.commerce.has(k):
+				ec.append("우주 상점가")
+			if fn.econ.loans.has(k):
+				ec.append("우주 채권 %s일 남음" % Fmt.n(float(fn.econ.loans[k]["days_left"])))
+			if fn.econ.funds.has(k):
+				ec.append("우주 펀드 %s" % Fmt.n(float(fn.econ.funds[k]["value"])))
+			if not ec.is_empty():
+				lines.append("경제: " + " · ".join(ec))
+			if not ys.is_empty():
+				lines.append("어제: " + ", ".join(ys))
+			lab.text = "\n".join(lines)
 		update.call()
 		_live.append(update)
 		row.add_child(lab)
@@ -175,13 +206,55 @@ func _metro_section() -> void:
 	for m in Metros.list:
 		var b := Button.new()
 		var mk := String(m["key"])
-		b.text = String(m["name"]) + (" ★" if fn.levels_total(mk) > 0 else "")
-		b.tooltip_text = "%s · %s · 강점: %s" % [String(m["country"]), Metros.pop_text(m), Metros.strength_name(m)]
+		b.text = String(m["name"]) + (" ★" if fn.levels_total(mk) > 0 else "") + (" ◎" if fn.modes.mode_of(mk) != "" else "")
+		b.tooltip_text = "%s · %s · 강점: %s%s" % [String(m["country"]), Metros.pop_text(m), Metros.strength_name(m),
+			(" · 운영: " + Metros.mode_name(fn.modes.mode_of(mk))) if fn.modes.mode_of(mk) != "" else ""]
 		b.custom_minimum_size = Vector2(0, 30)
 		b.add_theme_font_size_override("font_size", 12)
 		b.pressed.connect(func(): show_metro.emit(mk))
 		flow.add_child(b)
 	box.add_child(flow)
+
+
+## 운영 방식·경제·첨단 산업 지역을 줄 몇 개로
+func _ops_summary(fn: MetroFunctions) -> String:
+	var m := fn.modes
+	var e := fn.econ
+	var out := PackedStringArray()
+	var ally := m.keys_of("research_alliance", -2)
+	if not ally.is_empty():
+		var id := m.project(mgr)
+		var cost := m.project_cost(id, mgr) if id != "" else 0.0
+		out.append("연구 동맹 %d곳 (회원 %d) — 과제 %s · 모은 점수 %s%s · 어제 +%s · 동맹 기술 %d/%d" % [ally.size(),
+			m.keys_of("research_alliance", mgr.hour).filter(func(k): return fn.level(String(k), "research") >= 1).size(),
+			("「%s」" % MetroModes.project_name(id)) if id != "" else "없음", Fmt.n(float(m.alliance["pool"])),
+			(" / " + Fmt.n(cost)) if cost > 0.0 else "", Fmt.n(m.last_gain, 1), m.alliance["done"].size(), Metros.alliance.size()])
+	var depots := m.keys_of("emergency_depot", -2)
+	if not depots.is_empty():
+		var sum := {}
+		for k in depots:
+			var dep := m.depot(String(k))
+			for kind in dep:
+				sum[kind] = float(sum.get(kind, 0.0)) + float(dep[kind])
+		out.append("비상 보급 기지 %d곳 — 창고: 산소 %s kg · 식량 %s kg · 물 %s kg · 부품 %s" % [depots.size(),
+			Fmt.n(float(sum.get("o2_kg", 0.0))), Fmt.n(float(sum.get("food_kg", 0.0))), Fmt.n(float(sum.get("water_kg", 0.0))),
+			Fmt.n(float(sum.get("parts", 0.0)))])
+	var pc := m.keys_of("parts_capital", -2)
+	if not pc.is_empty():
+		var miss := 0.0
+		for site in m.short:
+			miss += float(m.short[site])
+		out.append("우주 산업 수도 %d곳 — 우주 식민지에 모자란 부품 %s" % [pc.size(), Fmt.n(miss)])
+	var ch := e.index_change(7) * 100.0
+	out.append("우주 산업 지수 %s (7일 %s%s%%)%s · 우주 화제 %s · 우주 상점가 %d곳 · 우주 채권 %d건 · 우주 펀드 %d곳" % [
+		Fmt.n(e.index), "+" if ch >= 0.0 else "", Fmt.n(ch, 1), " — 폭락 중" if e.crash_left > 0 else "", Fmt.n(e.buzz, 2),
+		e.commerce.size(), e.loans.size(), e.funds.size()])
+	var partners := 0
+	for k2 in m.metros:
+		if m.partner_of(String(k2)) != "":
+			partners += 1
+	out.append("반도체·AI 데이터센터 지역 %d곳 · 둘러본 곳 %d곳 · 협력 %d건" % [Metros.regions.size(), m.visited.size(), partners])
+	return "\n".join(out)
 
 
 ## 접힌 묶음: 운행 편수·누계 한 줄

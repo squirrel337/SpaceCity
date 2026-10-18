@@ -6,6 +6,9 @@ extends Node3D
 ## 건물은 단위 상자 하나(tower 셰이더가 층·창·유리 외벽·지붕을 그린다)를 MultiMesh로 2 km 칸마다 묶는다. 밤에는 창이 켜진다.
 ## 물가에는 바닥 셰이더(earth_surface)가 호안·강변 공원·강변 도로·가로수의 띠를 긋는다 — 건물은 그 너머(SHORE_M)에 선다.
 ## 큰길 줄(약 1.6 km마다)이 강·운하를 건너는 곳에는 다리 (1.2 km가 넘는 넓은 물은 드문드문): 상판·접속 경사로·교각, 긴 다리 몇은 주탑. 밤에는 다리 길이 빛난다.
+## 실제 금융가·상권(districts)에는 이름표가 서고, 우주 상점가·채권·펀드가 있으면 그 지구에 빛기둥이 선다.
+## 운영 방식이 있으면 시설 단지 사이에 그 방식의 단지(물류 센터·동맹 연구탑·비상 창고)와 빛기둥이 선다.
+## 시가지 안의 첨단 산업 지역(상하이 장장·싱가포르 북부)은 그 자리의 블록을 비우고 TechCampus 단지를 짓는다.
 ## 땅(대도시의 SiteSurface)의 모형 좌표 위에 선다: 미터, 원점 = 도심. 땅을 구운 뒤 몇 프레임에 걸쳐 짓는다.
 
 const CHUNK_M := 2000.0
@@ -56,6 +59,11 @@ var _fac_root: Node3D
 var _fac_sig := ""
 var _fac_labels: Array = []      # [[모형 좌표 Vector3 (부모 로컬), 이름, 둘째 줄, 색]]
 var _beacons: Array = []
+var _districts: Array = []       # 금융가·상권 [[동·북, 이름, 종류, 무게, 이름표 자리 Vector3]]
+var _region_plots: Array = []    # 시가지 안의 첨단 산업 지역 [[지역, 묶음들]]
+var _reserved: Array = []        # 블록 건물을 짓지 않는 곳 [[동·북, 반지름 m]]
+var _region_labels: Array = []
+var _region_mat: ShaderMaterial
 var bridges := 0                 # 놓은 다리 수
 var _bridge_lines: Array = []    # [축 (0 = g.x가 일정한 줄 — 큰길 방향 uu로 뻗는다, 1 = g.y가 일정한 줄), 줄의 g]
 var _bridge_i := 0
@@ -145,6 +153,8 @@ func update(_view: WorldView) -> void:
 		_mat.set_shader_parameter("night", ground.night_k)
 	if _bmat:
 		_bmat.set_shader_parameter("night", ground.night_k)
+	if _region_mat:
+		_region_mat.set_shader_parameter("night", ground.night_k)
 	if _phase == 3 and mgr != null:
 		_update_facilities()
 	for bm in _beacons:
@@ -219,8 +229,48 @@ func _hash(g: Vector2) -> float:
 	return float(absi(hash(Vector3i(int(floor(g.x)), int(floor(g.y)), String(metro["id"]).hash()))) % 100000) / 100000.0
 
 
+## 땅의 높이 (m, 모형 좌표의 평면 기준 — 곡률은 _pos가 내린다)
+func _ground_y(en: Vector2) -> float:
+	return ground.local_height_m(_model(en))
+
+
+## 실제 금융가·상권의 자리 (이름표는 그 위 80 m)
+func _plan_districts() -> void:
+	_districts = []
+	for d in Metros.districts_of(String(metro["key"])):
+		var en := _en_of(float(d[2]), float(d[3]))
+		_districts.append([en, String(d[0]), String(d[1]), float(d[4]), _pos(en, _ground_y(en) + 80.0)])
+
+
+## 시가지 안의 첨단 산업 지역: 단지 묶음 자리를 정하고 그 둘레 블록을 비운다
+func _plan_regions() -> void:
+	_region_plots = []
+	for r in Metros.regions_in(String(metro["key"])):
+		var plots := TechCampus.plan(self, r, _en_of(float(r["lat"]), float(r["lon"])))
+		_region_plots.append([r, plots])
+		for p in plots:
+			_reserved.append([p["en"], 700.0 * clampf(float(r.get("scale", 1.0)), 0.7, 1.5)])
+
+
+func _is_reserved(en: Vector2) -> bool:
+	for rv in _reserved:
+		if en.distance_to(rv[0]) < float(rv[1]):
+			return true
+	return false
+
+
+## 시가지 안의 첨단 산업 단지를 짓는다 (사옥은 탑 상자로 — _commit 앞에서)
+func _build_regions() -> Dictionary:
+	var out := {"xf": [], "col": [], "cus": [], "labels": []}
+	for rp in _region_plots:
+		TechCampus.build(self, rp[0], rp[1], maxi(2400, int(budget / 10.0)), out)
+	return out
+
+
 ## 도심의 마천루: 무게 1이면 그 도시의 가장 높은 건물, 둘레에 몇 채 더 (물이면 가까운 땅으로)
 func _landmarks() -> void:
+	_plan_districts()
+	_plan_regions()
 	var max_h := float(metro.get("max_h", 200.0))
 	for c in _centers:
 		var w: float = c[2]
@@ -273,13 +323,18 @@ func _build_some() -> void:
 		_block_buildings(Vector2(c[1], c[2]), float(c[3]), float(c[4]), float(c[5]), float(c[6]))
 	_cursor = end
 	if _cursor >= _cands.size():
+		var reg := _build_regions()
 		_commit()
+		_region_mat = TechSite._plain_mesh(self, reg)
+		_region_labels = reg["labels"]
 		_phase = 3
 		_cands.clear()
 
 
 ## 블록 하나의 건물들 (시가지 모양에 따라). 도심에서 먼 블록(부도심 밖 5 km 너머)은 덩어리 건물 하나로
 func _block_buildings(en: Vector2, dens: float, infl: float, shore_km: float, dist: float) -> void:
+	if not _reserved.is_empty() and _is_reserved(en):
+		return
 	_rng.seed = absi(hash(Vector2i(int(en.x), int(en.y)))) + 7
 	var b := _block
 	# 길 폭을 뺀 블록: 골목 쪽은 STREET_M, 큰길 쪽은 AVENUE_M — 쓸 수 있는 네모의 가운데로 옮긴다
@@ -368,14 +423,14 @@ func _local_en(en: Vector2, off: Vector2) -> Vector2:
 
 
 ## 건물 하나: 동·북 자리, 너비(큰길과 나란한 가로), 깊이, 높이, 유리 몫, 돌림(라디안)
-func _add(en: Vector2, w: float, d: float, h: float, glass: float, turn: float) -> void:
+func _add(en: Vector2, w: float, d: float, h: float, glass: float, turn: float, y0: float = NAN) -> void:
 	if count >= budget + 64 or h < 3.0:
 		return
 	var p := _model(en)
-	var gy := ground.local_height_m(p) - p.length_squared() / (2.0 * ground.radius_m())
+	var gy := (ground.local_height_m(p) if is_nan(y0) else y0) - p.length_squared() / (2.0 * ground.radius_m())
 	var dir_m := _model(en + _vv) - p
 	var yaw := atan2(dir_m.y, dir_m.x) + turn
-	var xf := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(w, h + 3.0, d)), Vector3(p.x, gy - 3.0, -p.y))
+	var xf := Transform3D(Basis(Vector3.UP, yaw).scaled_local(Vector3(w, h + 3.0, d)), Vector3(p.x, gy - 3.0, -p.y))
 	var tones: Array = _style.get("tone", ["#c8c4bc"])
 	var col := Color(String(tones[_rng.randi() % tones.size()]))
 	col = col * _rng.randf_range(0.72, 0.95)
@@ -570,6 +625,10 @@ func _update_facilities() -> void:
 	var parts := PackedStringArray([str(fn.rev)])
 	for fac in MetroFunctions.ORDER:
 		parts.append("%d%s%d" % [fn.level(key, fac), "b" if fn.building(key, fac) else "", int(fn.progress(key, fac, mgr.hour) * 4.0)])
+	parts.append(fn.modes.mode_of(key))
+	parts.append(fn.modes.status_short(key, mgr, fn))
+	parts.append("%s%s%s" % ["c" if fn.econ.commerce.has(key) else "", "l" if fn.econ.loans.has(key) else "",
+		"f" if fn.econ.funds.has(key) else ""])
 	var sig := ",".join(parts)
 	if sig == _fac_sig:
 		return
@@ -601,6 +660,25 @@ func _update_facilities() -> void:
 		var sub := "%d단계" % lvl if not busy else ("짓는 중 %d%%" % int(fn.progress(key, fac, mgr.hour) * 100.0)
 			+ (" (%d단계로)" % (lvl + 1) if lvl > 0 else ""))
 		_fac_labels.append([Vector3(p.x, gy + top + 30.0, -p.y), MetroFunctions.fac_name(fac), sub, col])
+	# 운영 방식의 단지 (시설 단지 사이)
+	var md := fn.modes.mode_of(key)
+	if md != "":
+		var en2 := _site_at(float(absi(String(metro["id"]).hash()) % 360) + 36.0)
+		if en2.x != INF:
+			var top2 := _mode_campus(md, en2, xs, cols, cus)
+			var mcol := Metros.mode_color(md)
+			var gy2 := _ground_y(en2)
+			_beacon(_pos(en2, gy2), mcol, not fn.modes.working(key, mgr.hour))
+			_fac_labels.append([_pos(en2, gy2 + top2 + 30.0), "운영: " + Metros.mode_name(md), fn.modes.status_short(key, mgr, fn), mcol])
+	# 상권·금융가의 빛기둥 (우주 상점가 · 채권·펀드)
+	if fn.econ.commerce.has(key):
+		var dc := _top_district("commerce")
+		if not dc.is_empty():
+			_beacon(_pos(dc[0], _ground_y(dc[0])), Palette.AMBER, false)
+	if fn.econ.loans.has(key) or fn.econ.funds.has(key):
+		var df := _top_district("finance")
+		if not df.is_empty():
+			_beacon(_pos(df[0], _ground_y(df[0])), Palette.TEAL, false)
 	if xs.is_empty():
 		return
 	var mm := MultiMesh.new()
@@ -622,8 +700,12 @@ func _update_facilities() -> void:
 
 ## 시설 i의 자리 (동·북 m): 도시마다 다른 방향에서 72°씩, 도심에서 시가지 반지름의 20% (1.8~4.5 km) — 물·공원이면 가까운 땅
 func _facility_site(i: int) -> Vector2:
-	var base := float(absi(String(metro["id"]).hash()) % 360)
-	var a := deg_to_rad(base + 72.0 * i)
+	return _site_at(float(absi(String(metro["id"]).hash()) % 360) + 72.0 * i)
+
+
+## 그 방향(북에서 시계 방향 °)의 단지 자리 (시설·운영 방식)
+func _site_at(a_deg: float) -> Vector2:
+	var a := deg_to_rad(a_deg)
 	var r := clampf(_radius_m * 0.2, 1800.0, 4500.0)
 	var en := Vector2(sin(a), cos(a)) * r
 	for _try in 8:
@@ -675,7 +757,7 @@ func _campus(fac: String, en: Vector2, grow: float, xs: Array, cols: PackedColor
 		var gy := ground.local_height_m(p) - p.length_squared() / (2.0 * ground.radius_m())
 		var h: float = q[3]
 		top = maxf(top, h)
-		xs.append(Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(q[1], h + 3.0, q[2])), Vector3(p.x, gy - 3.0, -p.y)))
+		xs.append(Transform3D(Basis(Vector3.UP, yaw).scaled_local(Vector3(q[1], h + 3.0, q[2])), Vector3(p.x, gy - 3.0, -p.y)))
 		var c := wall * (0.9 + 0.1 * _hash(e2))
 		c.a = float(q[4])
 		cols.append(c)
@@ -707,9 +789,72 @@ func _beacon(at: Vector3, col: Color, busy: bool) -> void:
 	_beacons.append(mat)
 
 
-## 시설 이름표: [[부모(땅의 도시 뿌리) 로컬 좌표, 이름, 둘째 줄, 색]]
+## 가장 무거운 금융가·상권 [동·북, 이름, 종류, 무게, 자리] ({} = 없다)
+func _top_district(kind: String) -> Array:
+	var best: Array = []
+	for d in _districts:
+		if String(d[2]) == kind and (best.is_empty() or float(d[3]) > float(best[3])):
+			best = d
+	return best
+
+
+## 운영 방식의 단지: 우주 산업 수도 — 물류 센터(긴 창고 둘과 관제탑), 연구 동맹 — 동맹 연구탑(높은 유리 탑과 낮은 연구동),
+## 비상 보급 기지 — 비상 창고(창고 셋과 탱크). 가장 높은 건물의 높이를 돌려준다
+func _mode_campus(mode: String, en: Vector2, xs: Array, cols: PackedColorArray, cus: PackedColorArray) -> float:
+	var col := Metros.mode_color(mode)
+	var wall := Color(0.86, 0.87, 0.88).lerp(col, 0.5)
+	var parts: Array = []
+	match mode:
+		"parts_capital":
+			parts.append([Vector2(-80.0, 0.0), 230.0, 80.0, 24.0, 0.15])
+			parts.append([Vector2(-80.0, 105.0), 230.0, 80.0, 24.0, 0.15])
+			parts.append([Vector2(95.0, 52.0), 22.0, 22.0, 95.0, 0.8])
+		"research_alliance":
+			parts.append([Vector2.ZERO, 40.0, 40.0, 170.0, 0.85])
+			for k in 4:
+				var a := TAU * k / 4.0
+				parts.append([Vector2(cos(a), sin(a)) * 105.0, 60.0, 40.0, 22.0, 0.7])
+		"emergency_depot":
+			for k2 in 3:
+				parts.append([Vector2(-145.0 + 145.0 * k2, 0.0), 125.0, 66.0, 19.0, 0.1])
+			for k3 in 6:
+				parts.append([Vector2(-100.0 + 40.0 * k3, 92.0), 19.0, 19.0, 25.0, 0.0])
+	var p0 := _model(en)
+	var dir_m := _model(en + _vv) - p0
+	var yaw := atan2(dir_m.y, dir_m.x)
+	var top := 0.0
+	for q in parts:
+		var e2 := _local_en(en, q[0])
+		var p := _model(e2)
+		var gy := ground.local_height_m(p) - p.length_squared() / (2.0 * ground.radius_m())
+		var h: float = q[3]
+		top = maxf(top, h)
+		xs.append(Transform3D(Basis(Vector3.UP, yaw).scaled_local(Vector3(q[1], h + 3.0, q[2])), Vector3(p.x, gy - 3.0, -p.y)))
+		var c := wall * (0.9 + 0.1 * _hash(e2))
+		c.a = float(q[4])
+		cols.append(c)
+		cus.append(Color(h + 3.0, q[1], q[2], _hash(e2) * 100.0))
+	return top
+
+
+## 이름표: 시설·운영 방식 단지, 시가지 안의 첨단 산업 단지, 금융가·상권 — [[부모(땅의 도시 뿌리) 로컬 좌표, 이름, 둘째 줄, 색]]
 func facility_labels() -> Array:
-	return _fac_labels
+	var out: Array = _fac_labels.duplicate()
+	out.append_array(_region_labels)
+	var fn: MetroFunctions = mgr.metro_fn if mgr != null else null
+	var key := String(metro.get("key", ""))
+	for d in _districts:
+		var fin := String(d[2]) == "finance"
+		var sub := "금융 지구" if fin else "상업 지구"
+		if fn != null:
+			if not fin and fn.econ.commerce.has(key):
+				sub += " · 우주 상점가"
+			if fin and fn.econ.loans.has(key):
+				sub += " · 우주 채권"
+			if fin and fn.econ.funds.has(key):
+				sub += " · 우주 펀드"
+		out.append([d[4], String(d[1]), sub, Palette.TEAL if fin else Palette.AMBER])
+	return out
 
 
 ## 단위 상자 (바닥 없음): x·z −0.5~0.5, y 0~1. UV = 면 안의 (가로, 세로), UV2.x = 면 (0 너비 쪽, 1 깊이 쪽, 2 지붕)

@@ -540,6 +540,8 @@ func _colony_check() -> void:
 	_check(back.list.size() == col.list.size() and back.hour == col.hour, "불러온 도시·시각이 다르다")
 	_check(back.transport.lines.size() == col.transport.lines.size() and back.transport.trips.size() == col.transport.trips.size(),
 		"불러온 교통(노선·가는 편)이 다르다")
+	_check(back.metro_fn.modes.mode_of("metro_busan") == "parts_capital" and back.metro_fn.econ.commerce.has("metro_seoul")
+		and back.metro_fn.econ.seed_value == col.seed_value, "불러온 대도시 운영 방식·경제가 다르다")
 	# 판 2 저장(교통이 없던 저장)도 읽고 노선을 새로 짠다
 	var v2: Dictionary = JSON.parse_string(text)
 	v2["version"] = 2
@@ -669,6 +671,10 @@ func _transport_check(col: Colonies) -> void:
 		int(tr.totals["trips"]), float(tr.totals["t"]), int(tr.totals["settlers"]), Metros.list.size()])
 	_metro_fn_check(col)
 	_metro_map_check()
+	_metro_mode_check(col)
+	_economy_check(col)
+	_region_check(col)
+	_metro_ui_check(col)
 
 
 ## 대도시의 우주 시설: 지원을 내고 짓고, 다 지으면 항공편이 더 싣고 더 자주 뜨며, 연구·지원이 들어온다. 저장 왕복
@@ -745,6 +751,181 @@ func _metro_fn_check(col: Colonies) -> void:
 	_check(back.level(key, "research") == 1 and back.active_keys() == [key], "대도시 시설이 저장되지 않았다")
 	print("smoke: metro functions %s — feeder every %dh, +%d settlers, +%.1f parts/flight" % [key, int(feeder.get("every_h", 0)),
 		int(fb["settlers"]), float(fb["parts"])])
+
+
+## 대도시 운영 방식: 준비 기간 뒤에 운영비로 시설을 올린다 (①부산 · ③서울·런던 · ⑤도쿄). ①은 협력 지역과 함께 부품을 더 싣고,
+## ③은 회원(연구소가 있는 도시)의 연구를 과제에 모아 동맹 기술·식민지 기술을 마치며, ⑤는 창고를 채워 위급한 달 식민지에
+## 비상편을 띄운다. 운영비가 바닥나면 쉬고, 멈추면 남은 운영비가 돌아온다. 저장 왕복
+func _metro_mode_check(col: Colonies) -> void:
+	var fn := col.metro_fn
+	var m := fn.modes
+	var home: CitySim = col.list[0]["sim"]
+	home.support = 30000.0
+	_check(Metros.MODE_IDS.size() == 3 and Metros.modes.size() == 3, "운영 방식이 셋이 아니다")
+	var ok := m.set_mode("metro_busan", "parts_capital", col, 0) == "" and m.set_mode("metro_seoul", "research_alliance", col, 0) == "" \
+		and m.set_mode("metro_london", "research_alliance", col, 0) == "" and m.set_mode("metro_tokyo", "emergency_depot", col, 0) == ""
+	_check(ok, "운영 방식을 고르지 못했다")
+	for k in ["metro_busan", "metro_seoul", "metro_london", "metro_tokyo"]:
+		_check(m.deposit(k, 2000.0, col, fn) == "", "%s에 운영비를 맡기지 못했다" % k)
+	_check(m.deposit("metro_paris", 100.0, col, fn) != "", "운영 방식이 없는 도시에 운영비를 맡겼다")
+	var b0 := m.budget("metro_busan")
+	_check(m.set_partner("metro_busan", "tech_pyeongtaek", col) == "" and m.budget("metro_busan") < b0,
+		"협력 지역 계약이 운영비에서 빠지지 않았다")
+	_check(not m.working("metro_busan", col.hour), "준비 기간 없이 움직인다")
+	for _i in 24 * 4:
+		col.step()
+	_check(m.working("metro_busan", col.hour, "parts_capital") and m.parts_k("metro_busan", col.hour) > 1.5,
+		"우주 산업 수도가 부품을 더 싣지 않는다 (×%.2f)" % m.parts_k("metro_busan", col.hour))
+	_check(fn.building("metro_busan", "space_park") or fn.building("metro_busan", "cargo_hub"), "우주 산업 수도가 운영비로 짓지 않았다")
+	_check(fn.building("metro_london", "research"), "연구 동맹이 연구소를 짓지 않았다")
+	_check(m.ally_member("metro_seoul", col.hour, fn) and not m.ally_member("metro_london", col.hour, fn), "동맹 회원이 맞지 않다")
+	_check(float(m.alliance["pool"]) > 0.0 or m.last_gain > 0.0, "동맹이 연구 점수를 모으지 않았다")
+	var dep := m.depot("metro_tokyo")
+	_check(float(dep.get("o2_kg", 0.0)) > 0.0 and float(dep.get("parts", 0.0)) > 0.0, "비상 창고가 차지 않았다 %s" % str(dep))
+	# 동맹 기술: 위기 예측망 — 비상 경보를 이틀 일찍
+	var plus0 := m.alarm_plus(col.hour)
+	_check(m.set_project("crisis_forecast", col) == "", "동맹 과제를 고르지 못했다")
+	m.alliance["pool"] = float(Metros.alliance["crisis_forecast"]["cost"])
+	_day(col)
+	_check(m.done("crisis_forecast") and m.alarm_plus(col.hour) == plus0 + 2, "동맹 기술(위기 예측망)이 완성되지 않았다")
+	# 식민지 기술 (남아 있으면): 동맹이 마치면 모든 식민지가 안다
+	var tech := ""
+	for p in m.projects(col):
+		if not bool(p[3]):
+			tech = String(p[0])
+			break
+	if tech != "":
+		m.set_project(tech, col)
+		m.alliance["pool"] = m.project_cost(tech, col)
+		_day(col)
+		_check(col.list.all(func(c): return bool((c["sim"] as CitySim).techs.get(tech, false))), "동맹이 마친 기술을 모든 식민지가 알지 못한다")
+	# 비상 보급: 고향(달)의 산소를 사흘치로 — 3시간 안에 비상 셔틀이 뜬다
+	home.stock["o2_kg"] = home.population() * float(home.PER["o2_kg"]) * 3.0
+	for _i in 4:
+		col.step()
+	_check(col.transport.has_tagged(String(col.list[0]["site"]), "emergency"), "산소가 위급한데 비상편이 뜨지 않았다")
+	# 운영비가 바닥나면 쉰다 — 맡기면 다시 움직인다
+	m.metros["metro_busan"]["budget"] = 0.0
+	_day(col)
+	_check(m.paused("metro_busan") and not m.working("metro_busan", col.hour), "운영비가 바닥났는데 쉬지 않는다")
+	_check(m.deposit("metro_busan", 50.0, col, fn) == "" and not m.paused("metro_busan"), "운영비를 맡겼는데 다시 움직이지 않는다")
+	# 저장 왕복
+	var back := MetroFunctions.new()
+	back.load_save(JSON.parse_string(JSON.stringify(fn.to_save())))
+	_check(back.modes.mode_of("metro_busan") == "parts_capital" and back.modes.partner_of("metro_busan") == "tech_pyeongtaek"
+		and back.modes.done("crisis_forecast") and absf(back.modes.budget("metro_tokyo") - m.budget("metro_tokyo")) < 1e-6
+		and back.modes.depot("metro_tokyo").size() == m.depot("metro_tokyo").size(), "운영 방식이 저장되지 않았다")
+	var tokyo := m.status_short("metro_tokyo", col, fn)
+	# 멈추면 남은 운영비(비상 창고는 반값에 판다)가 후원 식민지로 돌아온다
+	var s0 := home.support
+	var refund := m.budget("metro_tokyo")
+	_check(m.set_mode("metro_tokyo", "", col, 0) == "" and m.mode_of("metro_tokyo") == "" and home.support >= s0 + refund - 1e-6,
+		"운영 방식을 멈췄는데 운영비가 돌아오지 않았다")
+	print("smoke: metro modes — 부산 ×%.2f (%s), 동맹 %s · 기술 %d, 도쿄 %s, 비상편 있음" % [m.parts_k("metro_busan", col.hour),
+		m.status_short("metro_busan", col, fn), m.status_short("metro_seoul", col, fn), m.alliance["done"].size(), tokyo])
+
+
+## 상업·금융: 우주 상점가는 계약 비용을 내고 날마다 수입, 채권은 빌린 만큼 받고 날마다 갚는다, 펀드는 지수를 따라 오르내리고
+## 찾으면 돌아온다. 펀드의 기대 수익(폭락까지 셈한)은 가장 싼 채권 이자보다 낮다 (빌려서 굴려 벌 수 없다). 저장 왕복
+func _economy_check(col: Colonies) -> void:
+	var fn := col.metro_fn
+	var e := fn.econ
+	var home: CitySim = col.list[0]["sim"]
+	home.support = 30000.0
+	var s0 := home.support
+	_check(e.open_commerce("metro_seoul", col, 0) == "" and absf(s0 - home.support - MetroEconomy.commerce_cost("metro_seoul")) < 1e-6,
+		"우주 상점가 계약 비용이 빠지지 않았다")
+	_check(e.open_commerce("metro_seoul", col, 0) != "", "같은 도시에 상점가를 두 번 열었다")
+	var t := MetroEconomy.loan_terms("metro_london")
+	var s1 := home.support
+	_check(e.borrow("metro_london", col, 0) == "" and absf(home.support - s1 - float(t["amount"])) < 1e-6, "채권으로 빌린 돈이 들어오지 않았다")
+	_check(e.invest("metro_newyork", 250.0, col, 0) == "", "펀드에 넣지 못했다")
+	var v0 := float(e.funds["metro_newyork"]["value"])
+	var left0 := int(e.loans["metro_london"]["days_left"])
+	_day(col)
+	_day(col)
+	var y: Dictionary = fn.last.get("metro_seoul", {})
+	_check(float(y.get("commerce", 0.0)) > 0.0, "상점가 수입이 들어오지 않았다 %s" % str(y))
+	_check(int(e.loans["metro_london"]["days_left"]) == left0 - 2, "채권을 날마다 갚지 않는다")
+	_check(float(e.funds["metro_newyork"]["value"]) != v0, "펀드가 오르내리지 않는다")
+	# 빌려서 굴려 벌 수 없다: 180일 기대 수익(폭락 포함) − 수수료 < 가장 싼 채권 이자
+	var fc := MetroEconomy.cfg("fund")
+	var cr: Dictionary = fc["crash"]
+	var net := float(fc["mu_day"]) - float(cr["chance"]) * float(cr["days"]) * float(cr["day_drop"])
+	var lc := MetroEconomy.cfg("loan")
+	var fund_k := pow(1.0 + net, float(lc["days"])) - 1.0 - float(fc["fee"])
+	_check(net > 0.0 and fund_k < float(lc["rate_min"]), "펀드 기대 수익이 맞지 않다 (하루 %.5f, 180일 %.3f)" % [net, fund_k])
+	var back := MetroEconomy.new()
+	back.load_save(JSON.parse_string(JSON.stringify(e.to_save())))
+	_check(back.commerce.has("metro_seoul") and back.loans.has("metro_london") and back.funds.has("metro_newyork")
+		and absf(back.index - e.index) < 1e-6, "상업·금융이 저장되지 않았다")
+	var s2 := home.support
+	_check(e.withdraw("metro_newyork", col) == "" and home.support > s2 and not e.funds.has("metro_newyork"), "펀드를 찾지 못했다")
+	print("smoke: economy — 지수 %.0f, 화제 %.2f, 서울 상권 %.1f/일, 런던 채권 %d (이자 %.0f%%), 펀드 180일 기대 %.1f%%" % [e.index, e.buzz,
+		float(y.get("commerce", 0.0)), int(t["amount"]), float(t["rate"]) * 100.0, fund_k * 100.0])
+
+
+## 반도체·AI 데이터센터 지역 24곳: 둘은 대도시 시가지 안 (상하이 장장·싱가포르 북부), 나머지는 해안 지도가 있다. 지구의 고정점,
+## 처음 찾아가면 견학 연구 점수 (한 번만), 지역마다 운영 방식에 주는 몫
+func _region_check(col: Colonies) -> void:
+	_check(Metros.regions.size() == 24, "첨단 산업 지역이 24곳이 아니다 (%d)" % Metros.regions.size())
+	var inside: Array = Metros.regions.filter(func(r): return String(r["in_metro"]) != "").map(func(r): return String(r["key"]))
+	inside.sort()
+	_check(inside == ["tech_singapore_north", "tech_zhangjiang"], "대도시 시가지 안의 지역이 맞지 않다 %s" % str(inside))
+	for r in Metros.regions:
+		if String(r["in_metro"]) == "":
+			_check(PlanetLook.coast_local(String(r["key"])) != null, "%s의 해안 지도가 없다" % r["name"])
+	var wv: WorldView = main.world
+	var tech := wv.anchors.children(CamAnchors.body("earth")).filter(func(x): return x["kind"] == "tech")
+	_check(tech.size() == 24, "지구 아래 첨단 산업 지역이 24곳이 아니다 (%d)" % tech.size())
+	var home: CitySim = col.list[0]["sim"]
+	var m := col.metro_fn.modes
+	var rp0 := home.rp_bank
+	_check(m.visit("tech_hsinchu", home) and not m.visit("tech_hsinchu", home) and absf(home.rp_bank - rp0 - 30.0) < 1e-6,
+		"견학 연구 점수가 한 번만 들어오지 않는다")
+	var hs := Metros.region("tech_hsinchu")
+	_check(MetroModes.bonus_for("parts_capital", hs) > 0.0 and MetroModes.bonus_for("research_alliance", hs) > 0.0,
+		"신주가 운영 방식에 주는 몫이 없다")
+	_check(MetroModes.alarm_days_for(Metros.region("tech_ashburn")) >= 1, "애슈번 데이터센터가 비상 경보를 앞당기지 않는다")
+	var near := Metros.nearest_region(Metros.of("metro_seoul")["dir"], 80.0)
+	_check(not near.is_empty() and String(near["country"]) == "대한민국", "서울 가까이에 반도체 지역이 없다")
+	print("smoke: regions %d (시가지 안 %d), 서울에서 가장 가까운 곳 %s" % [Metros.regions.size(), inside.size(), String(near.get("name", "-"))])
+
+
+## 대도시 카드의 세 탭과 단추, 지역 카드, 교통 탭의 요약이 오류 없이 그려진다
+func _metro_ui_check(col: Colonies) -> void:
+	var fn := col.metro_fn
+	var mc: MetroCard = main.metro_card
+	mc.payer_index = 0
+	mc.show_metro("metro_busan")
+	for t in ["ops", "econ", "fac"]:
+		mc.set_tab(t)
+	mc.set_tab("ops")
+	_check(mc._ops_rows.get_child_count() > 0 and mc._partner_pick.item_count > 1, "운영 탭이 비었다")
+	mc.set_tab("econ")
+	_check(mc._econ_box.get_child_count() > 0, "경제 탭이 비었다")
+	mc.set_tab("fac")
+	main._on_metro_ops("metro_busan", "auto_fill", true)
+	_check(bool(fn.modes.entry("metro_busan").get("auto_fill", false)), "자동 채움 단추가 듣지 않는다")
+	main._on_metro_mode("metro_paris", "research_alliance")
+	_check(fn.modes.mode_of("metro_paris") == "research_alliance", "운영 방식 단추가 듣지 않는다")
+	main._on_metro_ops("metro_paris", "deposit", 100.0)
+	_check(fn.modes.budget("metro_paris") >= 100.0, "운영비 단추가 듣지 않는다")
+	var rc: RegionCard = main.region_card
+	rc.show_region("tech_ashburn")
+	_check(rc._rows.get_child_count() > 0, "지역 카드가 비었다")
+	main._on_region_ops("tech_ashburn", "partner", "metro_london")
+	_check(fn.modes.partner_of("metro_london") == "tech_ashburn", "지역 카드의 협력 단추가 듣지 않는다")
+	main._select_tab("transport")
+	main.tabs["transport"].rebuild()
+	main.tabs["transport"].update_view()
+
+
+func _day(col: Colonies) -> void:
+	for _i in 24:
+		col.step()
+		if col.hour % 24 == 0:
+			return
 
 
 func _check(ok: bool, message: String) -> void:

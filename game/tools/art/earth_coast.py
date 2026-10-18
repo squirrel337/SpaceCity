@@ -4,6 +4,7 @@
     python3 game/tools/art/earth_coast.py --fetch        # Natural Earth v5.1.2 GeoJSON을 내려받아서
     python3 game/tools/art/earth_coast.py --ne DIR       # 이미 받아 둔 DIR/ne_10m_{land,minor_islands,lakes}.geojson으로
     python3 game/tools/art/earth_coast.py --ne DIR --only-metros   # 대도시 시가지 지도만 (강 지도도 DIR에서)
+    python3 game/tools/art/earth_coast.py --ne DIR --only-regions  # 반도체·AI 데이터센터 지역 지도만
 
 결과 (game/art/planets/):
   earth_coast.png         정거원통 4096 × 2048: 가장 가까운 해안까지의 거리 (땅 +, 바다 −).
@@ -16,6 +17,8 @@
                           G = 공원·산 (건물이 서지 않는다; 둥근 것은 반지름을 물결로 흔든 덩어리, 가장자리는 고운 격자에서
                           그려 부드럽다). 시가지 바닥과 3D 건물이 쓴다.
                           대도시 축척에서 각진 해안·강 중심선은 차이킨 다듬기로 둥글린다.
+  earth_coast_tech_<id>.png  대도시 시가지 밖의 반도체·AI 데이터센터 지역(earth_cities.json의 tech_regions) 둘레
+                          (단지 지름/2 + 10 km) × 2 네모, 512 × 512 — 대도시 지도와 같은 R·G·B (강·공원 없이 해안·호수만).
 
 거리는 4배(지역 지도는 2배) 고운 격자에서 땅·바다 경계까지 셈한 뒤 평균으로 줄인다 — 해안의 위치가 칸보다 곱다.
 make_art.py와 달리 CI에서 다시 만들지 않는다 (내려받기가 필요하다). 데이터를 바꾸면 이 도구로 다시 만든다.
@@ -295,11 +298,11 @@ def _river_key(props: dict) -> list:
     return keys
 
 
-def metro_map(data: dict, rivers: dict, city: dict) -> tuple[Image.Image, bool]:
+def metro_map(data: dict, rivers: dict, city: dict, n_px: int = METRO_N) -> tuple[Image.Image, bool]:
     lat, lon = float(city["lat"]), float(city["lon"])
     c, e, n = local_frame(lat, lon)
     half = float(city["radius_km"]) + METRO_PAD_KM
-    size = METRO_N * METRO_SS
+    size = n_px * METRO_SS
     reach = math.cos(min(math.pi / 2, half * 3.0 / R_KM))
 
     def proj(plon, plat):
@@ -398,6 +401,25 @@ def metro_map(data: dict, rivers: dict, city: dict) -> tuple[Image.Image, bool]:
     return Image.merge("RGB", (red, park, blue)), centre
 
 
+REGION_N = 512
+
+
+def region_list(cities_data: dict) -> list:
+    """대도시 시가지 밖의 첨단 산업 지역 (metros.gd와 같은 셈: 가장 가까운 대도시까지 + 반지름 < 그 대도시 반지름 + 9 km면 시가지 안).
+    지도 자료는 대도시 지도와 같은 모양으로 (radius_km = 단지 지름/2, 강·공원 없음)."""
+    out = []
+    cities = cities_data["cities"]
+    for r in cities_data.get("tech_regions", []):
+        lat, lon = float(r["lat"]), float(r["lon"])
+        d = latlon(lat, lon)
+        rad = float(r.get("size_km", 4.0)) * 0.5
+        near = min(cities, key=lambda c: float(d @ latlon(float(c["lat"]), float(c["lon"]))) * -1.0)
+        km = math.acos(max(-1.0, min(1.0, float(d @ latlon(float(near["lat"]), float(near["lon"])))))) * R_KM
+        if km + rad >= float(near["radius_km"]) + 9.0:
+            out.append({"id": r["id"], "lat": lat, "lon": lon, "radius_km": rad, "rivers": {}, "parks": []})
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="지구 해안 거리 지도 (Natural Earth 1:10m)")
     ap.add_argument("--ne", type=Path, help="ne_10m_*.geojson이 있는 폴더")
@@ -405,13 +427,25 @@ def main() -> None:
     ap.add_argument("--only-local", action="store_true", help="부지 지도만")
     ap.add_argument("--only-metros", action="store_true", help="대도시 시가지 지도만")
     ap.add_argument("--metro", action="append", help="이 대도시(id)의 지도만 (여러 번)")
+    ap.add_argument("--only-regions", action="store_true", help="반도체·AI 데이터센터 지역 지도만")
+    ap.add_argument("--region", action="append", help="이 지역(id)의 지도만 (여러 번)")
     args = ap.parse_args()
     if args.ne is None and not args.fetch:
         ap.error("--ne DIR 또는 --fetch")
     data = load_layers(None if args.fetch else args.ne)
     OUT.mkdir(parents=True, exist_ok=True)
     rivers = load_layers(None if args.fetch else args.ne, RIVERS)
-    for city in json.loads(CITIES.read_text(encoding="utf-8"))["cities"]:
+    cities_data = json.loads(CITIES.read_text(encoding="utf-8"))
+    if args.only_regions or args.region:
+        for reg in region_list(cities_data):
+            if args.region and reg["id"] not in args.region:
+                continue
+            img, on_land = metro_map(data, rivers, reg, REGION_N)
+            path = OUT / ("earth_coast_tech_%s.png" % reg["id"])
+            img.save(path, optimize=True)
+            print("썼다:", path, "" if on_land else "(단지 가운데가 물 위 — 지도를 확인할 것)")
+        return
+    for city in cities_data["cities"]:
         if args.metro and city["id"] not in args.metro:
             continue
         img, on_land = metro_map(data, rivers, city)
