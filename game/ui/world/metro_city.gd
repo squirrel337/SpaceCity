@@ -4,6 +4,8 @@ extends Node3D
 ## 짓고 물(해안·강)과 공원에는 짓지 않는다. 무게 1인 도심에는 그 도시의 가장 높은 건물(max_h)이 선다.
 ## 모양은 도시의 시가지 모양(styles)을 따른다: 아파트 단지의 판상 동, 옛 시가지의 중정형 블록, 연립의 긴 줄, 마천루, 낮은 집.
 ## 건물은 단위 상자 하나(tower 셰이더가 층·창·유리 외벽·지붕을 그린다)를 MultiMesh로 2 km 칸마다 묶는다. 밤에는 창이 켜진다.
+## 물가에는 바닥 셰이더(earth_surface)가 호안·강변 공원·강변 도로·가로수의 띠를 긋는다 — 건물은 그 너머(SHORE_M)에 선다.
+## 큰길 줄(약 1.6 km마다)이 강·운하를 건너는 곳에는 다리 (1.2 km가 넘는 넓은 물은 드문드문): 상판·접속 경사로·교각, 긴 다리 몇은 주탑. 밤에는 다리 길이 빛난다.
 ## 땅(대도시의 SiteSurface)의 모형 좌표 위에 선다: 미터, 원점 = 도심. 땅을 구운 뒤 몇 프레임에 걸쳐 짓는다.
 
 const CHUNK_M := 2000.0
@@ -11,6 +13,16 @@ const GEN_R := 12000.0           # 블록을 고르는 반지름 (그 밖의 부
 const FAR_CENTER_R := 2600.0
 const ROWS_PER_FRAME := 24
 const BLOCKS_PER_FRAME := 900
+const SHORE_M := 100.0           # 물가 띠 (호안 5 + 강변 공원 ~56 + 덤불 3 + 강변 도로 24 + 가로수 8 — earth_surface의 WF_*)
+const STREET_M := 8.0            # 블록 가장자리에서 건물까지: 골목 쪽
+const AVENUE_M := 16.0           # 큰길 쪽 (큰길 반폭 15 m + 보도)
+const BRIDGE_EVERY_M := 1600.0   # 다리를 놓는 큰길 줄의 간격 (큰길 다섯 블록의 배수로 올린다)
+const BRIDGE_W := 26.0           # 상판 폭 (왕복 4~6차로와 보도)
+const BRIDGE_MIN_M := 60.0       # 물 위 길이
+const BRIDGE_MAX_M := 1500.0
+const BRIDGES_MAX := 80
+const BRIDGE_LINES_PER_FRAME := 4
+const RAMP_GRADE := 0.055
 
 var metro: Dictionary
 var ground: SiteSurface
@@ -44,6 +56,13 @@ var _fac_root: Node3D
 var _fac_sig := ""
 var _fac_labels: Array = []      # [[모형 좌표 Vector3 (부모 로컬), 이름, 둘째 줄, 색]]
 var _beacons: Array = []
+var bridges := 0                 # 놓은 다리 수
+var _bridge_lines: Array = []    # [축 (0 = g.x가 일정한 줄 — 큰길 방향 uu로 뻗는다, 1 = g.y가 일정한 줄), 줄의 g]
+var _bridge_i := 0
+var _bxf: Array = []             # 다리 조각: Transform3D (단위 상자 BoxMesh)
+var _bcol := PackedColorArray()
+var _bcus := PackedColorArray()
+var _bmat: ShaderMaterial
 
 
 func setup(m: Dictionary, g: SiteSurface, hi: bool) -> void:
@@ -92,16 +111,22 @@ func _model(en: Vector2) -> Vector2:
 	return Vector2(t.dot(_ax), t.dot(_ay))
 
 
-## 시가지 지도: [해안·강까지의 거리 km (땅 +), 공원(0~1)]
+## 시가지 지도: [해안·강까지의 거리 km (땅 +), 공원(0~1)] — 셰이더처럼 이웃 네 칸을 섞어 읽는다 (B = R의 자투리)
 func _sample(en: Vector2) -> Vector2:
 	if _map == null:
 		return Vector2(2.0, 0.0)
-	var u := 0.5 + en.x / 1000.0 / (2.0 * _half_km)
-	var v := 0.5 - en.y / 1000.0 / (2.0 * _half_km)
-	if u < 0.0 or u >= 1.0 or v < 0.0 or v >= 1.0:
+	var w := _map.get_width()
+	var h := _map.get_height()
+	var x := (0.5 + en.x / 1000.0 / (2.0 * _half_km)) * w - 0.5
+	var y := (0.5 - en.y / 1000.0 / (2.0 * _half_km)) * h - 0.5
+	if x < 0.0 or y < 0.0 or x >= w - 1.0 or y >= h - 1.0:
 		return Vector2(2.0, 0.0)
-	var px := _map.get_pixel(int(u * _map.get_width()), int(v * _map.get_height()))
-	return Vector2((px.r - 0.5) * 4.0, px.g)
+	var x0 := int(x)
+	var y0 := int(y)
+	var fx := x - x0
+	var top := _map.get_pixel(x0, y0).lerp(_map.get_pixel(x0 + 1, y0), fx)
+	var px := top.lerp(_map.get_pixel(x0, y0 + 1).lerp(_map.get_pixel(x0 + 1, y0 + 1), fx), y - y0)
+	return Vector2((px.r + (px.b - 0.5) / 255.0 - 0.5) * 4.0, px.g)
 
 
 func _influence(en: Vector2) -> float:
@@ -118,6 +143,8 @@ func _influence(en: Vector2) -> float:
 func update(_view: WorldView) -> void:
 	if _mat:
 		_mat.set_shader_parameter("night", ground.night_k)
+	if _bmat:
+		_bmat.set_shader_parameter("night", ground.night_k)
 	if _phase == 3 and mgr != null:
 		_update_facilities()
 	for bm in _beacons:
@@ -156,6 +183,7 @@ func _pick_rows() -> void:
 		_phase = 2
 		_cursor = 0
 		_landmarks()
+		_plan_bridges()
 	_row = end
 
 
@@ -173,7 +201,7 @@ func _consider(g: Vector2, far: Array, only_far: bool) -> void:
 		if not ok or (only_far and dist <= _gen_r):
 			return
 	var s := _sample(en)
-	if s.x < 0.035 or s.y > 0.5:
+	if s.x < (SHORE_M + 6.0) / 1000.0 or s.y > 0.5:
 		return
 	var h := _hash(g)
 	# 가장자리는 성기게 (짓는 반지름의 75%부터) — 둥근 경계가 보이지 않게
@@ -209,7 +237,7 @@ func _landmarks() -> void:
 			var a := _rng.randf() * TAU
 			var r := _rng.randf_range(side * 1.4, 420.0)
 			var p := en + Vector2(cos(a), sin(a)) * r
-			if _sample(p).x < 0.06:
+			if _sample(p).x < (SHORE_M + 40.0) / 1000.0:
 				continue
 			var h2 := h * _rng.randf_range(0.3, 0.7)
 			var s2 := clampf(h2 * 0.14, 22.0, 60.0)
@@ -217,18 +245,25 @@ func _landmarks() -> void:
 
 
 func _land_near(en: Vector2) -> Vector2:
-	if _sample(en).x >= 0.08:
+	var need := (SHORE_M + 60.0) / 1000.0
+	if _sample(en).x >= need:
 		return en
 	for ring in range(1, 12):
 		for k in 12:
 			var a := TAU * k / 12.0
 			var p := en + Vector2(cos(a), sin(a)) * ring * 120.0
-			if _sample(p).x >= 0.08:
+			if _sample(p).x >= need:
 				return p
 	return Vector2(INF, INF)
 
 
 func _build_some() -> void:
+	if _bridge_i < _bridge_lines.size():
+		var end_b := mini(_bridge_i + BRIDGE_LINES_PER_FRAME, _bridge_lines.size())
+		for i in range(_bridge_i, end_b):
+			_scan_line(int(_bridge_lines[i][0]), float(_bridge_lines[i][1]))
+		_bridge_i = end_b
+		return
 	var end := mini(_cursor + BLOCKS_PER_FRAME, _cands.size())
 	for k in range(_cursor, end):
 		if count >= budget:
@@ -247,9 +282,17 @@ func _build_some() -> void:
 func _block_buildings(en: Vector2, dens: float, infl: float, shore_km: float, dist: float) -> void:
 	_rng.seed = absi(hash(Vector2i(int(en.x), int(en.y)))) + 7
 	var b := _block
-	var inner := b - 16.0                       # 길 폭을 뺀 블록
-	if shore_km < 0.12:
-		inner = minf(inner, shore_km * 1000.0 * 1.6)
+	# 길 폭을 뺀 블록: 골목 쪽은 STREET_M, 큰길 쪽은 AVENUE_M — 쓸 수 있는 네모의 가운데로 옮긴다
+	var gi := int(floor(en.dot(_vv) / b))
+	var gj := int(floor(en.dot(_uu) / b))
+	var ml := AVENUE_M if posmod(gi, 5) == 0 else STREET_M
+	var mr := AVENUE_M if posmod(gi + 1, 5) == 0 else STREET_M
+	var mb := AVENUE_M if posmod(gj, 5) == 0 else STREET_M
+	var mt := AVENUE_M if posmod(gj + 1, 5) == 0 else STREET_M
+	en += _vv * ((ml - mr) * 0.5) + _uu * ((mb - mt) * 0.5)
+	var inner := b - maxf(ml + mr, mb + mt)
+	# 물가 띠에 들어가지 않게 (네모의 모서리까지)
+	inner = minf(inner, (shore_km * 1000.0 - SHORE_M) * 1.41)
 	if inner < 12.0:
 		return
 	var mid_h := float(_style.get("mid_h", 25.0))
@@ -368,6 +411,155 @@ func _commit() -> void:
 			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi)
 	_chunks.clear()
+	if not _bxf.is_empty():
+		var bm := MultiMesh.new()
+		bm.transform_format = MultiMesh.TRANSFORM_3D
+		bm.use_colors = true
+		bm.use_custom_data = true
+		bm.mesh = BoxMesh.new()
+		bm.instance_count = _bxf.size()
+		for i in _bxf.size():
+			bm.set_instance_transform(i, _bxf[i])
+			bm.set_instance_color(i, _bcol[i])
+			bm.set_instance_custom_data(i, _bcus[i])
+		_bmat = ShaderMaterial.new()
+		_bmat.shader = load("res://ui/world/shaders/bridge.gdshader")
+		var bi := MultiMeshInstance3D.new()
+		bi.multimesh = bm
+		bi.material_override = _bmat
+		bi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _shadows \
+			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(bi)
+		_bxf.clear()
+
+
+# ── 다리 ─────────────────────────────────────────────────────────
+## 다리를 찾을 큰길 줄들: 큰길(다섯 블록)의 배수로 BRIDGE_EVERY_M쯤마다, 두 방향 모두
+func _plan_bridges() -> void:
+	var every := maxi(5, int(ceil(BRIDGE_EVERY_M / _block / 5.0)) * 5)
+	var nl := int(floor(_gen_r / (_block * every)))
+	for ax in 2:
+		for k in range(-nl, nl + 1):
+			_bridge_lines.append([ax, float(k * every)])
+
+
+## 줄 위의 자리 (동·북 m): 줄의 g, 줄을 따라 t (m)
+func _line_en(ax: int, g0: float, t: float) -> Vector2:
+	if ax == 0:
+		return _vv * (g0 * _block) + _uu * t
+	return _vv * t + _uu * (g0 * _block)
+
+
+## 큰길 줄 하나를 20 m씩 훑어 물을 건너는 구간마다 다리를 놓는다 (물가는 선형 보간으로)
+func _scan_line(ax: int, g0: float) -> void:
+	var step := 20.0
+	var t := -_gen_r
+	var prev := _sample(_line_en(ax, g0, t)).x
+	var wet_from := NAN
+	while t < _gen_r:
+		var t2 := t + step
+		var s2 := _sample(_line_en(ax, g0, t2)).x
+		if prev >= 0.0 and s2 < 0.0:
+			wet_from = t + step * prev / (prev - s2)
+		elif prev < 0.0 and s2 >= 0.0:
+			if not is_nan(wet_from):
+				_bridge(ax, g0, wet_from, t + step * prev / (prev - s2))
+			wet_from = NAN
+		prev = s2
+		t = t2
+
+
+## 다리 하나: 물 위 ta~tb (m, 줄을 따라). 시가지 안이고 양쪽 땅이 넉넉할 때만.
+## 상판은 물 위로 10~22 m (길수록 높게), 양쪽 땅으로 5.5% 경사로, 85 m쯤마다 교각, 긴 다리 몇은 주탑 한 쌍
+func _bridge(ax: int, g0: float, ta: float, tb: float) -> void:
+	var span := tb - ta
+	if span < BRIDGE_MIN_M or span > BRIDGE_MAX_M or bridges >= BRIDGES_MAX:
+		return
+	var mid := _line_en(ax, g0, (ta + tb) * 0.5)
+	var dist := mid.length()
+	if dist > _radius_m * 0.85:
+		return
+	if 1.0 - smoothstep(_radius_m * 0.08, _radius_m * 0.92, dist) < 0.12 and _influence(mid) < 0.1:
+		return
+	if _sample(_line_en(ax, g0, ta - 150.0)).x < 0.05 or _sample(_line_en(ax, g0, tb + 150.0)).x < 0.05:
+		return
+	# 넓은 물(1.2 km 넘게)은 드문드문
+	if _hash(Vector2(g0 * 3.0 + ax, ta * 0.013)) < smoothstep(1200.0, 1600.0, span) * 0.6:
+		return
+	var hw := INF
+	for f: float in [0.25, 0.5, 0.75]:
+		hw = minf(hw, ground.local_height_m(_model(_line_en(ax, g0, lerpf(ta, tb, f)))))
+	var ha := ground.local_height_m(_model(_line_en(ax, g0, ta - 40.0)))
+	var hb := ground.local_height_m(_model(_line_en(ax, g0, tb + 40.0)))
+	var deck := maxf(hw + clampf(9.0 + span * 0.01, 10.0, 22.0), maxf(ha, hb) + 2.0)
+	var a0 := ta - 30.0
+	var b0 := tb + 30.0
+	var concrete := Color(0.60, 0.59, 0.56)
+	var asphalt := Color(0.34, 0.34, 0.35)
+	_deck(ax, g0, a0, deck, b0, deck, concrete, asphalt)
+	# 접속 경사로 (양쪽 땅으로)
+	for side: float in [-1.0, 1.0]:
+		var t_top := a0 if side < 0.0 else b0
+		var h_land := ha if side < 0.0 else hb
+		var run := clampf((deck - h_land) / RAMP_GRADE, 40.0, 450.0)
+		var t_foot := t_top + side * run
+		var h_foot := ground.local_height_m(_model(_line_en(ax, g0, t_foot)))
+		_deck(ax, g0, t_foot, h_foot, t_top, deck, concrete, asphalt)
+	# 교각
+	var n := maxi(1, int(round(span / 85.0)))
+	for i in range(1, n):
+		_pillar(ax, g0, ta + span * i / n, hw - 3.0, deck - 2.4, 6.0, BRIDGE_W * 0.75, concrete.darkened(0.08))
+	# 주탑 (긴 다리 몇)
+	if span > 350.0 and _hash(Vector2(g0 * 7.0 + ax, ta * 0.01)) < 0.3:
+		var top := deck + 38.0 + span * 0.03
+		for f2: float in [0.3, 0.7]:
+			for off: float in [-1.0, 1.0]:
+				_pillar(ax, g0, lerpf(ta, tb, f2), hw - 3.0, top, 5.0, 4.0, Color(0.82, 0.82, 0.80), off * (BRIDGE_W * 0.5 + 2.5))
+	bridges += 1
+
+
+## 상판 한 조각: 줄의 ta(높이 ha)에서 tb(높이 hb)까지 — 콘크리트 판 위에 아스팔트 길 (양쪽 2 m는 보도)
+func _deck(ax: int, g0: float, ta: float, ha: float, tb: float, hb: float, slab: Color, road: Color) -> void:
+	var a := _line_en(ax, g0, ta)
+	var b := _line_en(ax, g0, tb)
+	_seg(a, ha, b, hb, BRIDGE_W, 2.4, slab, 0.0)
+	_seg(a, ha + 0.3, b, hb + 0.3, BRIDGE_W - 4.0, 0.3, road, 1.0)
+
+
+## 동·북 자리와 높이 (m, 땅의 평면 기준) → 모형 좌표 (곡률만큼 내린다)
+func _pos(en: Vector2, h: float) -> Vector3:
+	var p := _model(en)
+	return Vector3(p.x, h - p.length_squared() / (2.0 * ground.radius_m()), -p.y)
+
+
+## 윗면 가운데 선이 a(높이 ha)~b(높이 hb)인 상자 (폭 w, 두께 th)
+func _seg(a: Vector2, ha: float, b: Vector2, hb: float, w: float, th: float, col: Color, glow: float) -> void:
+	var pa := _pos(a, ha)
+	var pb := _pos(b, hb)
+	var x := pb - pa
+	var ln := x.length()
+	if ln < 0.5:
+		return
+	x /= ln
+	var z := x.cross(Vector3.UP).normalized()
+	var y := z.cross(x)
+	_bxf.append(Transform3D(Basis(x * ln, y * th, z * w), (pa + pb) * 0.5 - y * (th * 0.5)))
+	_bcol.append(col)
+	_bcus.append(Color(glow, 0.0, 0.0, 0.0))
+
+
+## 선 기둥 (교각·주탑): 줄의 t, 높이 h0~h1, 줄 방향 두께 along, 가로 폭 across, 줄에서 옆으로 off (m)
+func _pillar(ax: int, g0: float, t: float, h0: float, h1: float, along: float, across: float, col: Color, off: float = 0.0) -> void:
+	var dir_en := _uu if ax == 0 else _vv
+	var side_en := _vv if ax == 0 else _uu
+	var en := _line_en(ax, g0, t) + side_en * off
+	var d2 := _model(en + dir_en) - _model(en)
+	var x := Vector3(d2.x, 0.0, -d2.y).normalized()
+	var z := x.cross(Vector3.UP).normalized()
+	var c := _pos(en, (h0 + h1) * 0.5)
+	_bxf.append(Transform3D(Basis(x * along, Vector3.UP * (h1 - h0), z * across), c))
+	_bcol.append(col)
+	_bcus.append(Color(0.0, 0.0, 0.0, 0.0))
 
 
 # ── 우주 시설 (도시 기능) ────────────────────────────────────────
@@ -436,7 +628,7 @@ func _facility_site(i: int) -> Vector2:
 	var en := Vector2(sin(a), cos(a)) * r
 	for _try in 8:
 		var s := _sample(en)
-		if s.x >= 0.12 and s.y < 0.4:
+		if s.x >= (SHORE_M + 200.0) / 1000.0 and s.y < 0.4:
 			return en
 		en = en.rotated(0.18) * 1.06
 	return _land_near(en)

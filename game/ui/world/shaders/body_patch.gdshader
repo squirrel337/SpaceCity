@@ -144,16 +144,28 @@ void fragment() {
 	vec3 col;
 	float sd = 0.0;
 	float city_l = 0.0;
+	float mk = 0.0;
+	float sea = 0.0;                                     // 지구: 바다 해안의 몫 (강·운하는 0)
 	if (mode == 1) {
 		// 지구: 구와 같은 땅 색, 도시 둘레는 밭·숲·풀밭의 무늬
-		sd = earth_sd(bdir, max(mpp, 0.5) / 1000.0);
+		float tk = max(mpp, 0.5) / 1000.0;
+		float src_km;
+		float sd_glob;
+		float sd_map = earth_sd_map(bdir, tk, src_km, sd_glob);
+		sea = 1.0 - smoothstep(0.3, 1.5, abs(sd_glob));
+		sd = earth_sd_fine(bdir, sd_map, src_km, tk);
+		int which;
+		float ub = earth_urban(bdir, which);
+		mk = cl_parks ? earth_loc_k(bdir) : 0.0;
+		// 시가지의 물가는 다듬은 둑: 지도의 선 그대로 (잔 굴곡 없이 — 3D 건물·다리가 쓰는 선)
+		sd = mix(sd, sd_map, mk * smoothstep(0.0, 0.3, ub));
 		col = earth_ground(bdir, sd, eseed);
 		float f1 = fbm(vec3(mpos * 0.0021, 11.0), 4, 12.0);
 		float f2 = fbm(vec3(mpos * 0.017, 12.0), 3, 13.0);
 		col = mix(col, col * vec3(0.72, 0.86, 0.7), smoothstep(0.5, 0.62, f1) * 0.8);
 		col = mix(col, col * vec3(1.18, 1.12, 0.92), smoothstep(0.55, 0.7, f2) * 0.5 * (1.0 - smoothstep(4.0, 30.0, mpp)));
 		col *= 0.92 + 0.16 * n1;
-		col = earth_city(bdir, col, sd, max(mpp, 0.5) / 1000.0, city_l);
+		col = earth_city_u(bdir, col, sd, tk, ub, which, mk, sea, city_l);
 	} else {
 		a += 0.05 * (n1 - 0.5) + 0.04 * (n2 - 0.5) * (1.0 - smoothstep(4.0, 30.0, mpp));
 		col = pal_color(a);
@@ -172,17 +184,20 @@ void fragment() {
 	if (mode == 1 && cl_parks) {
 		// 대도시 지도(강을 그린 고운 지도) 안에서는 조각마다 해안 거리로 — 꼭짓점 사이보다 좁은 강도 끊기지 않는다
 		// (시가지의 땅은 거의 해수면이다)
-		wet = mix(wet, 1.0 - step(0.0, sd), step(0.5, earth_loc_k(bdir)));
+		float aw = max(mpp, 0.3) * 0.5 / 1000.0;
+		wet = mix(wet, 1.0 - smoothstep(-aw, aw, sd), step(0.5, mk));
 	}
-	col = mix(col, mode == 1 ? earth_sea(min(sd, -0.05)) : liq_col, wet);
+	col = mix(col, mode == 1 ? earth_water(bdir, sd, mk, mpp, sea) : liq_col, wet);
 	ALBEDO = col * gain;
 	EMISSION = vec3(1.0, 0.6, 0.24) * city_l * (1.0 - wet) * night_glow * 0.45;
 	ROUGHNESS = mix(1.0, 0.06, wet);
 	SPECULAR = 0.0;
-	// 가까이서 보이는 흙의 잔주름 (화면 미분으로 법선을 흔든다)
+	// 가까이서 보이는 흙의 잔주름과 물의 잔물결 (화면 미분으로 법선을 흔든다)
 	float fade = (1.0 - smoothstep(0.4, 3.0, mpp)) * (1.0 - wet);
-	if (fade > 0.0) {
-		float b = (fbm(vec3(mpos * 0.45, 3.0), 3, 7.0) - 0.5) * 0.5 * fade;
+	float wfade = mode == 1 ? wet * mk * (1.0 - smoothstep(5.0, 24.0, mpp)) : 0.0;
+	if (fade + wfade > 0.0) {
+		float b = (fbm(vec3(mpos * 0.45, 3.0), 3, 7.0) - 0.5) * 0.5 * fade
+			+ (fbm(vec3(mpos * 0.06 + vec2(TIME * 0.05, TIME * 0.03), 4.0), 3, 15.0) - 0.5) * 1.2 * wfade;
 		vec3 dpdx = dFdx(VERTEX);
 		vec3 dpdy = dFdy(VERTEX);
 		vec3 r1 = cross(dpdy, NORMAL);

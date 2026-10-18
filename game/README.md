@@ -64,7 +64,8 @@
 - **지구의 대도시 26곳**(서울·부산·도쿄·오사카·베이징·상하이·홍콩·싱가포르·방콕·자카르타·뭄바이·델리·두바이·이스탄불·카이로·라고스·모스크바·런던·파리·
   베를린·뉴욕·시카고·로스앤젤레스·멕시코시티·상파울루·시드니): 3D 지도의 점·이름·도시권 인구, 밤의 불빛. 이름을 누르면 그 도시 위로 날아가고,
   내려가면 실제 축척의 시가지가 선다 — 한강·센강·템스강·허드슨강, 남산·센트럴 파크 같은 공원, 블록 격자의 길, 도심·부도심의 마천루(서울 555 m …),
-  도시마다 시가지 모양(아파트 단지·옛 시가지의 중정형 블록·연립·마천루). 대도시는 가장 가까운 우주항으로 정착민과 부품을 보내는 항공편을 띄운다.
+  도시마다 시가지 모양(아파트 단지·옛 시가지의 중정형 블록·연립·마천루). 물가는 곧은 호안 → 강변 공원 → 강변 도로 → 가로수의 띠
+  (바다 쪽은 곳에 따라 모래사장·부두), 큰길이 강을 건너는 곳에는 3D 다리. 대도시는 가장 가까운 우주항으로 정착민과 부품을 보내는 항공편을 띄운다.
   **대도시의 우주 시설**: 대도시 위로 가면 오른쪽 위 카드에서 우주 산업 단지(부품)·이주 지원 센터(정착민)·우주 연구소(연구)·우주 홍보관(지원)·
   공항 화물 터미널(항공편 간격)을 고른 식민지의 지구 지원 점수로 짓고 3단계까지 올린다. 큰 도시일수록, 그 도시의 강점(★)일수록 몫이 크고,
   3D 시가지에 시설 단지와 빛기둥·이름표가 선다.
@@ -98,11 +99,11 @@
 |---|---|
 | `sim/` | 규칙. 노드·씬을 쓰지 않는 순수 GDScript — `CitySim`(도시, 부지 보정 포함), `GameData`(모듈·기술·부지 자료), `AutoPolicy`(자동 운영), `PyRandom`(파이썬과 같은 난수), `PyCompat`(파이썬의 반올림·합계 규칙) |
 | `ui/` | 화면. 씬 파일 없이 코드로 만든다 — 상단 바, `colonies`(여러 식민지: 함께 흐르는 시계, 원정·발사 창·도착, 기술 나누기, 저장), `transport`(도시 사이 교통: 노선 짜기·출발·도착·싣는 규칙·발사 창·저장), `metros`(지구의 대도시 자료), `metro_functions`·`metro_card`(대도시의 우주 시설과 카드), `settings`·`settings_panel`(그래픽 품질·GPU, 지도 표시, 조작), `anchor_bar`(카메라 고정점 경로), 기지의 건물·탈것 목록(`base_scene`·`base_traffic`, 3D 도시가 쓴다), 배치(`city_plan`: 건물마다의 자리·방향·모양과 길 그물(종류)·블록과 구획·땅 고치기와 물에 잠긴 칸·길 찾기·배치 규칙·저장, `base_layout`: 길 격자가 먼저인 기본 배치, `road_net`: 길 그물의 면(블록)·교차로 물러남, `layout_data`: 길 종류·구획·땅 고치기 자료, `place_tool`: 자리 고르기·길(종류·곡선)·구획·땅 도구), 모듈 목록, 일조 예보, 탭 7개(`colony_panel`: 개척, `transport_panel`: 교통), 결정 카드 |
-| `ui/world/` | 3D 세계 — `world_view`(화면·입력·이름표·식민지 점), `orbit_cam`(구글 어스식 카메라, 식민지로 날아가 내려앉기), `astro`(천체력: 행성·위성 궤도, 달 자전, 별 목록), `site_ground`(도시가 앉는 땅의 공통 틀), `moon_surface`(달 구·남극 지형), `site_surface`(다른 부지의 지형 조각·지역 지도 굽기, 지구는 해안 지도), `body_surface`·`body_baker`(암석·얼음 천체의 겉모습 자료와 정육면체 지도 굽기, 가까이 가면 곱게), `baker`(GPU 굽기를 한 번에 하나씩), `city3d`(고른 식민지의 기지 — 블록 판·구획 이름표, 도구 미리보기, 고속도로·활주로), `road_mesh`(길 종류마다의 띠·교차로 판·굽이·통로 껍질), `route_overlay`·`route_meshes`(3D 지도의 노선·탈것 — GPU 선과 표지, 대도시의 점·이름), `orbit_lines`·`galaxy_view`(궤도 선, 우리 은하), `cam_anchors`(카메라 고정점), `metro_city`(대도시의 실제 축척 건물과 우주 시설 단지), `model_lib`(그림 생성기의 3D 모델), `sky_builder`·`planet_look`(별·은하수·행성), `shaders/`(`body_field`: 천체의 높이·밝기 함수, `earth_surface`: 지구의 땅·바다·시가지, `tower`: 대도시 건물, `district`: 블록 판, `road`: 길 종류, `route_line`·`route_marker`·`orbit_line`·`galaxy_points`: GPU 선·표지, `beacon`: 우주 시설 빛기둥) |
+| `ui/world/` | 3D 세계 — `world_view`(화면·입력·이름표·식민지 점), `orbit_cam`(구글 어스식 카메라, 식민지로 날아가 내려앉기), `astro`(천체력: 행성·위성 궤도, 달 자전, 별 목록), `site_ground`(도시가 앉는 땅의 공통 틀), `moon_surface`(달 구·남극 지형), `site_surface`(다른 부지의 지형 조각·지역 지도 굽기, 지구는 해안 지도), `body_surface`·`body_baker`(암석·얼음 천체의 겉모습 자료와 정육면체 지도 굽기, 가까이 가면 곱게), `baker`(GPU 굽기를 한 번에 하나씩), `city3d`(고른 식민지의 기지 — 블록 판·구획 이름표, 도구 미리보기, 고속도로·활주로), `road_mesh`(길 종류마다의 띠·교차로 판·굽이·통로 껍질), `route_overlay`·`route_meshes`(3D 지도의 노선·탈것 — GPU 선과 표지, 대도시의 점·이름), `orbit_lines`·`galaxy_view`(궤도 선, 우리 은하), `cam_anchors`(카메라 고정점), `metro_city`(대도시의 실제 축척 건물·다리와 우주 시설 단지), `model_lib`(그림 생성기의 3D 모델), `sky_builder`·`planet_look`(별·은하수·행성), `shaders/`(`body_field`: 천체의 높이·밝기 함수, `earth_surface`: 지구의 땅·바다·시가지·물가 띠, `tower`: 대도시 건물, `bridge`: 대도시의 다리, `district`: 블록 판, `road`: 길 종류, `route_line`·`route_marker`·`orbit_line`·`galaxy_points`: GPU 선·표지, `beacon`: 우주 시설 빛기둥) |
 | `art/` | 건물·탈것의 3D 모델(`models.json`)과 크기 정보(`art.json`: 바닥 크기·높이·모양 수·이름), 지구 지도(`planets/`: 얼음·메마른 땅 `earth_land.png`, Natural Earth 1:10m에서 만든 해안 거리 지도 `earth_coast*.png`, 대도시의 해안·강·공원 지도 `earth_coast_metro_*.png`). 생성기가 만든 결과라 직접 고치지 않는다 |
 | `data/` | `docs/design/data/`(밝은 별·은하 좌표 `sky.json` 포함)와 근거리 항성(`docs/concept/examples/nearby_stars.json`)의 JSON 사본. 단일 출처는 문서 쪽이다 |
 | `fonts/` | Pretendard (SIL Open Font License 1.1, `Pretendard-LICENSE.txt`) |
-| `tests/` | `parity_dump.gd`(파이썬과 비교할 일별 상태, `--site`로 부지), `smoke_test.gd`(화면을 띄워 자동 운영으로 3년 보고서까지 돌리기, 배치·탈것·3D 카메라·고정점·자리 고르기·길 종류·곡선·구획·땅 파기·침수 점검, 화성 원정·도착·식민지 고르기·대도시 시설·저장 왕복), `perf_probe.gd`(장면마다 프레임 CPU 시간·그리기 호출·삼각형 수), `screenshots.gd`·`world_shots.gd`·`types_shots.gd`·`colony_shots.gd`·`body_shots.gd`·`transport_shots.gd`·`anchor_shots.gd`·`city_shots.gd`(화면 캡처 — 3D는 기지에서 이웃 별까지, 자리 고르기와 길, 새 종류 116종, 식민지 점·화성으로 날아가 내려앉기·개척 탭, 천체마다 행성 전체·지역·지형 조각·도시, 지구의 항공편·셔틀·수송선·교통 탭·서울·뉴욕·파리·도쿄 시가지·활주로의 여객기·달 셔틀, 고정점마다의 화면, 길 격자·교차로·길·구획·땅 도구·화성 구덩이·지구의 침수·서울의 우주 시설) |
+| `tests/` | `parity_dump.gd`(파이썬과 비교할 일별 상태, `--site`로 부지), `smoke_test.gd`(화면을 띄워 자동 운영으로 3년 보고서까지 돌리기, 배치·탈것·3D 카메라·고정점·자리 고르기·길 종류·곡선·구획·땅 파기·침수 점검, 화성 원정·도착·식민지 고르기·대도시 시설·시가지 지도(거리의 자투리·한강)·저장 왕복), `perf_probe.gd`(장면마다 프레임 CPU 시간·그리기 호출·삼각형 수), `screenshots.gd`·`world_shots.gd`·`types_shots.gd`·`colony_shots.gd`·`body_shots.gd`·`transport_shots.gd`·`anchor_shots.gd`·`city_shots.gd`(화면 캡처 — 3D는 기지에서 이웃 별까지, 자리 고르기와 길, 새 종류 116종, 식민지 점·화성으로 날아가 내려앉기·개척 탭, 천체마다 행성 전체·지역·지형 조각·도시, 지구의 항공편·셔틀·수송선·교통 탭·서울·뉴욕·파리·도쿄 시가지와 물가·다리·활주로의 여객기·달 셔틀, 고정점마다의 화면, 길 격자·교차로·길·구획·땅 도구·화성 구덩이·지구의 침수·서울의 우주 시설) |
 | `tools/` | `parity_check.py`, `sync_data.py`, `art/`(그림 생성기, `earth_coast.py`: Natural Earth에서 지구 해안 거리 지도와 대도시의 해안·강·공원 지도 만들기 — 내려받기가 필요해 CI에서는 다시 만들지 않는다) |
 
 ## 시험
@@ -136,7 +137,7 @@ godot --headless --path game --script res://tests/smoke_test.gd
 | `vehicles.py` | 탈것 14종과 우주비행사. 지상 탈것은 네 방향 |
 | `make_art.py` | `game/art/`에 `models.json`(3D 모델)·`art.json`(크기 정보)·지구 땅 지도를 쓴다. `--svg DIR`은 디자인 검토용 SVG를 게임 밖에 쓴다 |
 | `planets.py` | 지구 땅 지도(대륙·만년설·사막 다각형을 래스터화한 PNG — 게임은 만년설·사막 칸을 쓴다) |
-| `earth_coast.py` | 지구 해안 거리 지도 — Natural Earth 1:10m의 땅·작은 섬·호수에서 지구 전체(4096 × 2048, ±40 km)와 지구 부지 둘레(256 km, 125 m 칸, ±8 km), 대도시 26곳(시가지 반지름 + 10 km, 1024 칸, ±2 km — 강을 땅에서 파내고 G 채널에 공원)을 만든다 (numpy·Pillow, `--fetch`로 내려받기, `--only-metros`·`--metro ID`로 대도시만) |
+| `earth_coast.py` | 지구 해안 거리 지도 — Natural Earth 1:10m의 땅·작은 섬·호수에서 지구 전체(4096 × 2048, ±40 km)와 지구 부지 둘레(256 km, 125 m 칸, ±8 km), 대도시 26곳(시가지 반지름 + 10 km, 1024 칸, ±2 km — 4배 고운 격자에서 해안·강 중심선을 다듬어 강을 땅에서 파내고, B 채널에 거리의 자투리, G 채널에 공원)을 만든다 (numpy·Pillow, `--fetch`로 내려받기, `--only-metros`·`--metro ID`로 대도시만) |
 | `contact_sheet.gd` | 여러 SVG(`--svg`로 만든 것)를 한 장에 모아 본다 |
 | `model_sheet.gd` | 3D 모델을 게임과 같은 셰이더로 그려 한 장에 모아 본다 (화면이 필요하다 — `xvfb-run`) |
 

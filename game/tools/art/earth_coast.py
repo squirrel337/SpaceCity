@@ -12,7 +12,10 @@
                           2048 × 2048 (125 m 칸), ±8 km → 0..255. 도시 가까이서는 이 지도가 해안을 긋는다.
   earth_coast_metro_<id>.png  지구의 대도시(earth_cities.json) 둘레 (반지름 + 10 km) × 2 네모, 1024 × 1024:
                           R = 해안·강 거리 ±2 km (강은 Natural Earth 강 중심선을 도시 자료의 폭만큼 물로 판다),
-                          G = 공원·산 (건물이 서지 않는다). 시가지 바닥과 3D 건물이 쓴다.
+                          B = R의 자투리 (R + (B − 127.5)/255 칸 — 둘 다 선형이라 걸러 읽어도 맞다; 물가 띠가 m 단위로 곧다),
+                          G = 공원·산 (건물이 서지 않는다; 둥근 것은 반지름을 물결로 흔든 덩어리, 가장자리는 고운 격자에서
+                          그려 부드럽다). 시가지 바닥과 3D 건물이 쓴다.
+                          대도시 축척에서 각진 해안·강 중심선은 차이킨 다듬기로 둥글린다.
 
 거리는 4배(지역 지도는 2배) 고운 격자에서 땅·바다 경계까지 셈한 뒤 평균으로 줄인다 — 해안의 위치가 칸보다 곱다.
 make_art.py와 달리 CI에서 다시 만들지 않는다 (내려받기가 필요하다). 데이터를 바꾸면 이 도구로 다시 만든다.
@@ -45,7 +48,9 @@ LOCAL_RANGE_KM = 8.0
 CITIES = ROOT / "docs" / "design" / "data" / "earth_cities.json"
 RIVERS = ("ne_10m_rivers_lake_centerlines", "ne_10m_rivers_europe", "ne_10m_rivers_north_america")
 METRO_N = 1024
-METRO_SS = 2
+METRO_SS = 4
+METRO_SMOOTH = 2             # 해안 다각형을 다듬는 차이킨 횟수 (대도시 지도만)
+RIVER_SMOOTH = 3             # 강 중심선을 다듬는 횟수
 METRO_PAD_KM = 10.0          # 대도시 지도의 반 폭 = 시가지 반지름 + 이만큼 (game/ui/metros.gd와 같다)
 METRO_RANGE_KM = 2.0
 
@@ -70,8 +75,25 @@ def load_layers(src: Path | None, names=LAYERS) -> dict:
     return data
 
 
-def rasterize(data: dict, w: int, h: int, project) -> np.ndarray:
-    """땅 = True. 땅(구멍은 물) → 작은 섬 → 호수(구멍은 섬) 순서로 칠한다. project(경도, 위도) → (x, y) 또는 None"""
+def chaikin(pts: list, n: int, closed: bool) -> list:
+    """차이킨 모서리 깎기 n번 — 각진 선을 둥글린다 (열린 선은 끝점을 지킨다)"""
+    if n <= 0 or len(pts) < 3:
+        return pts
+    p = np.asarray(pts, dtype=np.float64)
+    for _ in range(n):
+        if closed:
+            nx = np.roll(p, -1, axis=0)
+            p = np.stack([0.75 * p + 0.25 * nx, 0.25 * p + 0.75 * nx], axis=1).reshape(-1, 2)
+        else:
+            a, b = p[:-1], p[1:]
+            mid = np.stack([0.75 * a + 0.25 * b, 0.25 * a + 0.75 * b], axis=1).reshape(-1, 2)
+            p = np.vstack([p[:1], mid, p[-1:]])
+    return [tuple(q) for q in p]
+
+
+def rasterize(data: dict, w: int, h: int, project, smooth: int = 0) -> np.ndarray:
+    """땅 = True. 땅(구멍은 물) → 작은 섬 → 호수(구멍은 섬) 순서로 칠한다. project(경도, 위도) → (x, y) 또는 None.
+    smooth: 고리를 다듬는 차이킨 횟수"""
     img = Image.new("L", (w, h), 0)
     dr = ImageDraw.Draw(img)
 
@@ -79,7 +101,7 @@ def rasterize(data: dict, w: int, h: int, project) -> np.ndarray:
         pts = [project(lon, lat) for lon, lat in ring]
         if any(p is None for p in pts):
             return None
-        return pts
+        return chaikin(pts, smooth, True)
 
     def fill(layer: str, outer_val: int):
         for outer, holes in polygons(data[layer]):
@@ -147,6 +169,14 @@ def shrink(a: np.ndarray, f: int) -> np.ndarray:
 def encode(sd: np.ndarray, rng: float) -> Image.Image:
     v = np.clip(np.rint(127.5 + sd / rng * 127.5), 0, 255).astype(np.uint8)
     return Image.fromarray(v, "L")
+
+
+def encode_fine(sd: np.ndarray, rng: float) -> tuple[Image.Image, Image.Image]:
+    """(R, B): R = 거친 값, B = 그 자투리 (127.5 + (값 − R) × 255) — 셰이더는 R + (B − 0.5)/255로 읽는다"""
+    v = np.clip(127.5 + sd / rng * 127.5, 0.0, 255.0)
+    r = np.rint(v)
+    b = np.clip(np.rint(127.5 + (v - r) * 255.0), 0, 255)
+    return Image.fromarray(r.astype(np.uint8), "L"), Image.fromarray(b.astype(np.uint8), "L")
 
 
 def global_map(data: dict) -> Image.Image:
@@ -304,7 +334,7 @@ def metro_map(data: dict, rivers: dict, city: dict) -> tuple[Image.Image, bool]:
             if keep:
                 feats.append({"geometry": {"type": "MultiPolygon", "coordinates": keep}})
         sub[name] = {"features": feats}
-    land = rasterize(sub, size, size, proj)
+    land = rasterize(sub, size, size, proj, METRO_SMOOTH)
     # 강: 중심선을 폭만큼 물로 판다
     px = 2 * half / size
     want = city.get("rivers", {})
@@ -319,24 +349,29 @@ def metro_map(data: dict, rivers: dict, city: dict) -> tuple[Image.Image, bool]:
                 if width is None:
                     continue
                 w_px = max(1, int(round(width / px)))
+                r = w_px / 2.0
                 for ln in lines:
-                    pts = [proj(p[0], p[1]) for p in ln]
-                    dr.line(pts, fill=0, width=w_px, joint="curve")
-                    r = w_px / 2.0
-                    for (x, y) in (pts[0], pts[-1]):
+                    pts = chaikin([proj(p[0], p[1]) for p in ln], RIVER_SMOOTH, False)
+                    # 굵은 선은 마디마다 틈이 남는다 — 마디마다 네모와 원으로 판다
+                    for (x0, y0), (x1, y1) in zip(pts[:-1], pts[1:]):
+                        dx, dy = x1 - x0, y1 - y0
+                        ln_ = math.hypot(dx, dy)
+                        if ln_ > 1e-9:
+                            ox, oy = -dy / ln_ * r, dx / ln_ * r
+                            dr.polygon([(x0 + ox, y0 + oy), (x1 + ox, y1 + oy), (x1 - ox, y1 - oy), (x0 - ox, y0 - oy)], fill=0)
+                    for (x, y) in pts:
                         dr.ellipse((x - r, y - r, x + r, y + r), fill=0)
         land = np.asarray(img) > 127
     k = int(math.ceil(METRO_RANGE_KM / px)) + 2
     sd = signed(land, np.full(size, px), px, k, k, False)
-    red = encode(shrink(sd, METRO_SS), METRO_RANGE_KM)
-    # 공원·산
-    park = Image.new("L", (METRO_N, METRO_N), 0)
+    red, blue = encode_fine(shrink(sd, METRO_SS), METRO_RANGE_KM)
+    # 공원·산: 고운 격자에 그려 줄인다 (가장자리가 부드럽게)
+    park = Image.new("L", (size, size), 0)
     pd = ImageDraw.Draw(park)
-    kpx = METRO_N / (2 * half)
+    kpx = size / (2 * half)
 
     def to_px(plat, plon):
-        x, y = proj(plon, plat)
-        return (x / METRO_SS, y / METRO_SS)
+        return proj(plon, plat)
 
     for pk in city.get("parks", []):
         x, y = to_px(float(pk[1]), float(pk[2]))
@@ -347,9 +382,18 @@ def metro_map(data: dict, rivers: dict, city: dict) -> tuple[Image.Image, bool]:
             corners = [(x + ux * a * hl + vx * b * hw, y + uy * a * hl + vy * b * hw) for a, b in ((1, 1), (1, -1), (-1, -1), (-1, 1))]
             pd.polygon(corners, fill=255)
         else:
+            # 둥근 공원·산: 반지름을 몇 겹의 물결로 흔든 덩어리 (산자락·숲 가장자리처럼; 이름마다 같은 모양)
             r = float(pk[3]) * kpx
-            pd.ellipse((x - r, y - r, x + r, y + r), fill=255)
-    blue = Image.new("L", (METRO_N, METRO_N), 0)
+            rng = np.random.default_rng(sum(ord(ch) for ch in str(pk[0])) * 7919 + 17)
+            amps = [0.16 / (k ** 0.8) for k in range(2, 8)]
+            phases = rng.uniform(0.0, 2.0 * math.pi, len(amps))
+            pts = []
+            for i in range(144):
+                th = 2.0 * math.pi * i / 144
+                rr = r * (1.0 + sum(a * math.sin((k + 2) * th + ph) for k, (a, ph) in enumerate(zip(amps, phases))))
+                pts.append((x + rr * math.cos(th), y + rr * math.sin(th)))
+            pd.polygon(pts, fill=255)
+    park = Image.fromarray(np.rint(shrink(np.asarray(park, dtype=np.float32), METRO_SS)).astype(np.uint8), "L")
     centre = bool(land[size // 2, size // 2])
     return Image.merge("RGB", (red, park, blue)), centre
 

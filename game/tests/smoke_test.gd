@@ -668,9 +668,49 @@ func _transport_check(col: Colonies) -> void:
 	print("smoke: transport %d lines %s, trips %d, %.1f t, settlers %d, metros %d" % [tr.lines.size(), str(roles),
 		int(tr.totals["trips"]), float(tr.totals["t"]), int(tr.totals["settlers"]), Metros.list.size()])
 	_metro_fn_check(col)
+	_metro_map_check()
 
 
 ## 대도시의 우주 시설: 지원을 내고 짓고, 다 지으면 항공편이 더 싣고 더 자주 뜨며, 연구·지원이 들어온다. 저장 왕복
+## 대도시 시가지 지도: 거리의 자투리(B)가 있고 (물가 띠가 m 단위로 곧다), 서울은 도심이 땅이고 남쪽으로 한강(폭 ~1 km)이
+## 가로지른다 (MetroCity가 이웃 네 칸을 섞어 읽는 거리로)
+func _metro_map_check() -> void:
+	for m in Metros.list:
+		var img := PlanetLook.coast_local(String(m["key"])).get_image()
+		if img.is_compressed():
+			img.decompress()
+		# 물가 ±2 km 안 (R이 끝에 닿지 않은 칸)에서만 자투리가 있다 — 물이 없는 도시(베이징·멕시코시티)는 건너뛴다
+		var fine := {}
+		var near := 0
+		for y in range(3, img.get_height(), 29):
+			for x in range(3, img.get_width(), 29):
+				var px := img.get_pixel(x, y)
+				if px.r8 > 2 and px.r8 < 253:
+					near += 1
+					fine[px.b8] = true
+		_check(near < 10 or fine.size() > 8, "%s 시가지 지도에 거리의 자투리(B)가 없다 — earth_coast.py로 다시 만들 것" % m["name"])
+	var mc := MetroCity.new()
+	var seoul := Metros.of("metro_seoul")
+	mc._map = PlanetLook.coast_local("metro_seoul").get_image()
+	mc._half_km = float(seoul["radius_km"]) + 10.0
+	_check(mc._sample(Vector2.ZERO).x > 0.3, "서울 도심이 물가에 있다")
+	var wet_from := INF
+	var width := 0.0
+	var prev := mc._sample(Vector2(1600.0, -3000.0)).x
+	for i in range(1, 300):
+		var y := -3000.0 - i * 20.0
+		var s := mc._sample(Vector2(1600.0, y)).x
+		if prev >= 0.0 and s < 0.0:
+			wet_from = y
+		elif prev < 0.0 and s >= 0.0 and wet_from < INF:
+			width = wet_from - y
+			break
+		prev = s
+	_check(width > 500.0 and width < 1800.0, "서울 도심 남쪽에 한강이 없다 (폭 %.0f m)" % width)
+	mc.free()
+	print("smoke: metro maps fine, 한강 폭 %.0f m (도심 남쪽 1.6 km 동쪽)" % width)
+
+
 func _metro_fn_check(col: Colonies) -> void:
 	var fn := col.metro_fn
 	var tr := col.transport

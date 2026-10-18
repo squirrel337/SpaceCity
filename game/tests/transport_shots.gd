@@ -117,6 +117,19 @@ func _metro_done(w: WorldView, key: String) -> bool:
 	return (w.metro_grounds[key]["city"] as MetroCity)._phase == 3
 
 
+## 대도시를 다 지었으면 카메라를 그 위도·경도로 (거리 km, 기울기 °, 북쪽을 보고) — 대도시 카드는 닫는다
+func _metro_look(w: WorldView, key: String, lat: float, lon: float, dist: float, tilt_deg: float) -> bool:
+	if not _metro_done(w, key):
+		return false
+	main.metro_card.dismissed = key
+	main.metro_card.visible = false
+	var mc: MetroCity = w.metro_grounds[key]["city"]
+	print("%s: buildings %d, bridges %d" % [key, mc.count, mc.bridges])
+	w._descent.clear()
+	w.cam.look_at_surface("earth", Astro.latlon(lat, lon), dist, deg_to_rad(tilt_deg), Vector3(0, 0, 1))
+	return true
+
+
 func _process(_delta: float) -> bool:
 	frame += 1
 	var w: WorldView = main.world if main else null
@@ -142,6 +155,12 @@ func _process(_delta: float) -> bool:
 			["newyork", func(): w.fly_to_metro("metro_newyork"), func(): return _metro_done(w, "metro_newyork")],
 			["paris", func(): w.fly_to_metro("metro_paris"), func(): return _metro_done(w, "metro_paris")],
 			["tokyo", func(): w.fly_to_metro("metro_tokyo"), func(): return _metro_done(w, "metro_tokyo")],
+			["seoul_river", func(): w.fly_to_metro("metro_seoul"), func(): return _metro_look(w, "metro_seoul", 37.517, 126.99, 2.4, 58.0)],
+			["seoul_bank", func(): _metro_look(w, "metro_seoul", 37.5235, 126.935, 0.8, 56.0)],
+			["seoul_bridges", func(): _metro_look(w, "metro_seoul", 37.525, 127.0, 9.0, 40.0)],
+			["seoul_river_night", func(): _until_night("metro_seoul"); _metro_look(w, "metro_seoul", 37.517, 126.99, 3.2, 55.0)],
+			["newyork_river", func(): w.fly_to_metro("metro_newyork"), func(): return _metro_look(w, "metro_newyork", 40.742, -73.972, 2.6, 58.0)],
+			["tokyo_bay", func(): w.fly_to_metro("metro_tokyo"), func(): return _metro_look(w, "metro_tokyo", 35.655, 139.765, 2.6, 58.0)],
 			["naro", func(): _go_base("earth_naro"), func(): return not w.cam.flying() and w._descent.is_empty()],
 			["naro_runway", func(): _arrive("earth_naro", "feeder:earth_naro~metro_seoul"); _aim(w, "runway"),
 				func(): return _agent_close(w, "plane", 0.5, 0.35, 66.0)],
