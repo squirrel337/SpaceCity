@@ -36,6 +36,12 @@ var hub := Vector3.ZERO
 var segments: Array = []   # [[Vector2 a, Vector2 b, 길 종류]] — 처음 길 (CityPlan이 길 그물로 바꾼다)
 var blocks: Array = []     # [{cell: Rect2 (길 가운데선 사이), inner: Rect2 (보도 안쪽), district: String}]
 var tower_slots: Array = []   # [Vector3, "A"|"B"|"C"]
+## 길 격자 (땅 구역도 이 격자를 따른다): 원점(거주 구역 가운데의 교차로), 격자 간격, 몇 줄마다 대로,
+## 기본 배치에서 블록이 된 칸 (원점에서 센 칸 번호 → true)
+var grid_o := Vector2.ZERO
+var pitch := 56.0
+var every := 2
+var open_cells := {}
 var ice_center := Vector3.ZERO
 var pad_rect := Rect2()    # 우주항 (착륙장 줄)
 ## 부지 종류: "ridge" — 능선의 일조 구역 A·B·C와 얼음 분화구 (달 남극·수성 극지),
@@ -87,6 +93,34 @@ func _cell(kind_id: String) -> Vector2:
 
 
 # ── 길 격자와 블록 ──────────────────────────────────────────────
+## 격자선 k(원점에서 센 번호)의 길 종류: 몇 줄마다 대로, 그 사이 도로
+func line_type(k: int) -> String:
+	return "avenue" if posmod(k, every) == 0 else "street"
+
+
+## 칸 (원점에서 센 번호)의 사각형 (모형 좌표)
+func cell_rect(c: Vector2i) -> Rect2:
+	return Rect2(grid_o + Vector2(c) * pitch, Vector2(pitch, pitch))
+
+
+## 처음 땅(기지 지도) 안인가: 지도 끝에서 margin 안쪽, 능선 마루에서 crest_off 아래
+func base_has(p: Vector2, margin: float = 0.0, crest_off: float = 0.0) -> bool:
+	var uv := xy_to_uv(p)
+	return BOUNDS_UV.grow(-margin).has_point(uv) and uv.y >= crest_v + crest_off
+
+
+## 일조 구역·얼음 분화구·우주항 (길 격자를 깔지 않는 곳)
+func special_at(p: Vector2, pad: float = 8.0) -> bool:
+	var uv := xy_to_uv(p)
+	for t in zones:
+		for r in zones[t]:
+			if (r as Rect2).grow(pad).has_point(uv):
+				return true
+	if p.distance_to(Vector2(ice_center.x, ice_center.y)) < ICE_CRATER_R + pad + 6.0:
+		return true
+	return pad_rect.grow(30.0).has_point(p)
+
+
 ## 이 점에 블록·길을 둘 수 있나 (지도 안, 능선 아래, 일조 구역·얼음 분화구·우주항 밖)
 func _open_at(p: Vector2, margin: float) -> bool:
 	var uv := xy_to_uv(p)
@@ -115,11 +149,13 @@ func _cell_open(r: Rect2, margin: float) -> bool:
 func _grid(core_c: Vector2) -> void:
 	var g := LayoutData.grid()
 	var block := float(g["block_m"])
-	var every := int(g["avenue_every"])
+	every = int(g["avenue_every"])
 	var margin := float(g["margin_m"])
 	var w_av := float(LayoutData.road("avenue")["width_m"])
 	var w_st := float(LayoutData.road("street")["width_m"])
-	var pitch := block + (w_av + w_st) * 0.5
+	pitch = block + (w_av + w_st) * 0.5
+	every = maxi(1, every)
+	grid_o = core_c
 	var n := 9
 	hub = Vector3(core_c.x, core_c.y, 0)
 	var xs: Array = []
@@ -128,7 +164,7 @@ func _grid(core_c: Vector2) -> void:
 		xs.append(core_c.x + k * pitch)
 		ys.append(core_c.y + k * pitch)
 	var half := func(k: int) -> float: return (w_av if posmod(k, every) == 0 else w_st) * 0.5
-	var open_cells := {}
+	var open_idx := {}
 	for i in range(xs.size() - 1):
 		for j in range(ys.size() - 1):
 			var r := Rect2(xs[i], ys[j], pitch, pitch)
@@ -137,11 +173,14 @@ func _grid(core_c: Vector2) -> void:
 			var inner := Rect2(Vector2(xs[i] + half.call(i - n) + WALK, ys[j] + half.call(j - n) + WALK),
 				Vector2(pitch - half.call(i - n) - half.call(i + 1 - n) - 2.0 * WALK,
 					pitch - half.call(j - n) - half.call(j + 1 - n) - 2.0 * WALK))
-			open_cells[Vector2i(i, j)] = blocks.size()
+			open_idx[Vector2i(i, j)] = blocks.size()
 			blocks.append({"cell": r, "inner": inner, "district": "", "ij": Vector2i(i, j)})
+	open_cells = {}
+	for key in open_idx:
+		open_cells[(key as Vector2i) - Vector2i(n, n)] = true
 	# 길: 열린 블록에 닿는 격자선 토막만
 	var seen := {}
-	for key in open_cells:
+	for key in open_idx:
 		var c: Vector2i = key
 		var corners := [Vector2i(c.x, c.y), Vector2i(c.x + 1, c.y), Vector2i(c.x + 1, c.y + 1), Vector2i(c.x, c.y + 1)]
 		for s in 4:
@@ -153,7 +192,7 @@ func _grid(core_c: Vector2) -> void:
 			seen[k] = true
 			var horizontal := a.y == b.y
 			var line_k := (a.y if horizontal else a.x) - n
-			var t := "avenue" if posmod(line_k, every) == 0 else "street"
+			var t := line_type(line_k)
 			segments.append([Vector2(xs[a.x], ys[a.y]), Vector2(xs[b.x], ys[b.y]), t])
 
 

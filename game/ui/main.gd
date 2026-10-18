@@ -4,8 +4,11 @@ extends Control
 ## 식민지가 여럿이면(Colonies) 모두 같은 시계로 흐르고, 화면·탭·도구는 고른 식민지 하나(sim)를 본다.
 
 const SAVE_PATH := "user://spacecity_save.json"
-const HOURS_PER_SECOND := [0.0, 3.0, 9.0, 30.0]   # 정지 · 1×(하루 8초) · 3×(2.7초) · 10×(0.8초)
-const SPEED_LABELS := ["정지", "1×", "3×", "10×"]
+const HOURS_PER_SECOND := [0.0, 3.0, 9.0, 30.0, 0.0]   # 정지 · 1×(하루 8초) · 3×(2.7초) · 10×(0.8초) · 최고(프레임 예산만큼)
+const SPEED_LABELS := ["정지", "1×", "3×", "10×", "최고"]
+const MAX_SPEED := 4
+const MAX_FRAME_US := 12000                         # 최고 속도: 한 프레임에 시뮬레이션에 쓰는 시간 (PC에서 하루 30일쯤)
+const AUTO_JUMP_PAUSE := 1.2                        # 다음 사건 계속 넘기기: 사건마다 알림을 보여 주는 틈 (초)
 const REPORT_DAY := 1096                            # 3년 보고서
 const JUMP_LIMIT_H := 24 * 30
 const TABS := [["life", "생명유지"], ["power", "전력"], ["build", "건설"], ["research", "연구"], ["colony", "개척"],
@@ -18,6 +21,11 @@ var speed := 0
 var _last_speed := 1
 var _acc := 0.0
 var _jumping := false
+var _auto_jump := false             # 다음 사건을 계속 넘긴다 (사건마다 잠깐 멈췄다 다음으로)
+var _auto_wait := 0.0
+var _panel_dirty := false           # 날이 바뀌어 탭을 다시 그릴 것 (빠를 때는 0.5초마다 한 번만)
+var _panel_clock := 0.0
+var auto_jump_button: Button
 var _jump_start := 0
 var _last_day := -1
 var _ui_clock := 0.0
@@ -144,6 +152,11 @@ func _build() -> void:
 	city_area.add_child(metro_card)
 	tool.changed.connect(_update_place_bar)
 	tool.placed.connect(_on_placed)
+	tool.bought.connect(func(ok: bool, text: String):
+		_toast(text, "good" if ok else "warn")
+		if ok and tabs[current_tab].has_method("rebuild"):
+			tabs[current_tab].rebuild()
+		_dirty = true)
 	forecast = ForecastBar.new()
 	forecast.custom_minimum_size.y = 46
 	left.add_child(forecast)
@@ -183,7 +196,8 @@ func _build_view_switch() -> Control:
 		view_buttons[pair[0]] = b
 	for spec in [["road", "도로", "길 내기 — 종류(흙길·도로·대로·고속도로·통로·철도)를 고르고 점을 차례로 눌러 잇는다. 곡선도 된다 (G)"],
 			["zone", "구획", "구획 — 길로 둘러싸인 블록을 눌러 용도(거주·산업·농업 …)를 정한다 (Z)"],
-			["terrain", "땅", "땅 고치기 — 파기·쌓기·평탄화·되돌리기 (T). 바다가 있는 천체에서 해수면 아래로 파면 물이 찬다"]]:
+			["terrain", "땅", "땅 고치기 — 파기·쌓기·평탄화·되돌리기 (T). 바다가 있는 천체에서 해수면 아래로 파면 물이 찬다"],
+			["land", "확장", "기지 넓히기 — 기지에 붙은 땅 구역(대로로 둘러싸인 블록 2×2)을 부품·지구 지원으로 산다 (X). 산 구역에는 길이 깔리고 빈 블록이 생긴다"]]:
 		var pb := Button.new()
 		pb.text = spec[1]
 		pb.toggle_mode = true
@@ -321,7 +335,7 @@ func _update_place_opts() -> void:
 	var group := tool.mode
 	if group == "erase":
 		group = "road"
-	if group == "build":
+	if group in ["build", "land"]:
 		group = ""
 	var key := group + "|" + tool.body()
 	if key != _opts_mode:
@@ -432,7 +446,7 @@ func _begin_road() -> void:
 	_begin_tool("road")
 
 
-## 도시 계획 도구: "road" 길 내기 · "zone" 구획 · "terrain" 땅 고치기
+## 도시 계획 도구: "road" 길 내기 · "zone" 구획 · "terrain" 땅 고치기 · "land" 땅 구역 사기 (확장)
 func _begin_tool(which: String) -> void:
 	if sim == null:
 		return
@@ -447,6 +461,8 @@ func _begin_tool(which: String) -> void:
 			tool.start_zone()
 		"terrain":
 			tool.start_terrain()
+		"land":
+			tool.start_land()
 
 
 func _on_placed(kind: String, ok: bool, text: String) -> void:
@@ -486,29 +502,45 @@ func _build_top_bar() -> Control:
 	row.add_theme_constant_override("separation", 6)
 	bar.add_child(row)
 	date_label = ThemeFactory.heading("", 18)
-	date_label.custom_minimum_size.x = 150
+	date_label.custom_minimum_size.x = 140
 	row.add_child(date_label)
 	colony_button = OptionButton.new()
-	colony_button.custom_minimum_size = Vector2(104, 42)
+	colony_button.custom_minimum_size = Vector2(96, 42)
 	colony_button.fit_to_longest_item = false
 	colony_button.clip_text = true
 	colony_button.tooltip_text = "식민지 고르기 — 그 도시로 날아간다"
 	colony_button.item_selected.connect(func(i: int): _on_colony_view(i))
 	row.add_child(colony_button)
-	for i in range(4):
+	for i in range(SPEED_LABELS.size()):
 		var b := Button.new()
 		b.text = SPEED_LABELS[i]
 		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(44, 42)
-		b.pressed.connect(_set_speed.bind(i))
+		b.pressed.connect(_on_speed_button.bind(i))
+		if i == MAX_SPEED:
+			b.tooltip_text = "최고 속도 (4) — 화면이 버티는 만큼 빨리 흐른다 (PC에서 하루에 한 달쯤). 결정할 일·위급하면 멈춘다"
 		row.add_child(b)
 		speed_buttons.append(b)
 	var jump := Button.new()
 	jump.text = "다음 사건"
-	jump.tooltip_text = "결정할 일이 생길 때까지 시간을 건너뛴다 (최대 30일)"
+	jump.tooltip_text = "알릴 일이 생길 때까지 시간을 건너뛴다 (최대 30일, F)"
 	jump.custom_minimum_size.y = 42
-	jump.pressed.connect(_start_jump)
+	jump.pressed.connect(func():
+		_stop_auto_jump()
+		_start_jump())
 	row.add_child(jump)
+	auto_jump_button = Button.new()
+	auto_jump_button.text = "계속"
+	auto_jump_button.toggle_mode = true
+	auto_jump_button.tooltip_text = "다음 사건을 계속 넘긴다 (Shift+F) — 사건마다 알림을 잠깐 보여 주고 다음 사건으로. " + \
+		"결정할 일(대피소 추첨 — 자동 운영이면 추첨으로 정한다)·위급(산소·식량 3일 아래)·사망이면 멈춘다"
+	auto_jump_button.custom_minimum_size = Vector2(52, 42)
+	auto_jump_button.toggled.connect(func(on: bool):
+		if on:
+			_begin_auto_jump()
+		else:
+			_stop_auto_jump())
+	row.add_child(auto_jump_button)
 	auto_button = Button.new()
 	auto_button.text = "자동 운영"
 	auto_button.tooltip_text = "시드가 문서의 추천 운영대로 짓고 연구한다"
@@ -520,7 +552,7 @@ func _build_top_bar() -> Control:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
 	var chip_row := HBoxContainer.new()
-	chip_row.add_theme_constant_override("separation", 12)
+	chip_row.add_theme_constant_override("separation", 8)
 	row.add_child(chip_row)
 	for key in ["o2", "co2", "soc", "food", "pop", "morale", "trust"]:
 		var chip := _chip()
@@ -537,7 +569,7 @@ func _build_top_bar() -> Control:
 func _chip() -> Dictionary:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 0)
-	box.custom_minimum_size.x = 58
+	box.custom_minimum_size.x = 54
 	var value := Label.new()
 	value.add_theme_font_override("font", ThemeFactory.bold)
 	value.add_theme_font_size_override("font_size", 16)
@@ -765,10 +797,43 @@ func _set_speed(i: int) -> void:
 	if speed > 0:
 		_last_speed = speed
 	speed = i
-	world.speed_level = i
+	world.speed_level = mini(i, 3)
 	_jumping = false
 	for k in range(speed_buttons.size()):
 		speed_buttons[k].set_pressed_no_signal(k == i)
+
+
+## 속도 단추를 눌렀다: 다음 사건 계속 넘기기는 그만둔다
+func _on_speed_button(i: int) -> void:
+	_stop_auto_jump()
+	_set_speed(i)
+
+
+func _begin_auto_jump() -> void:
+	if sim == null:
+		return
+	_auto_jump = true
+	if auto_jump_button:
+		auto_jump_button.set_pressed_no_signal(true)
+	_auto_wait = 0.0
+	_start_jump()
+
+
+## 다음 사건 계속 넘기기를 멈춘다 (why가 있으면 알린다)
+func _stop_auto_jump(why: String = "") -> void:
+	if not _auto_jump:
+		return
+	_auto_jump = false
+	_jumping = false
+	if auto_jump_button:
+		auto_jump_button.set_pressed_no_signal(false)
+	if why != "":
+		_toast("계속 넘기기를 멈췄다 — " + why, "warn")
+
+
+## 빠르게 흐르는 중인가 (최고 속도·계속 넘기기) — 자동 운영이면 결정 카드를 시드가 정한다
+func _fast() -> bool:
+	return speed == MAX_SPEED or _auto_jump
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -829,16 +894,32 @@ func _unhandled_input(event: InputEvent) -> void:
 				tool.stop()
 			else:
 				_begin_tool("terrain")
+		KEY_X:
+			if tool.mode == "land":
+				tool.stop()
+			else:
+				_begin_tool("land")
 		KEY_SPACE:
-			_set_speed(0 if speed > 0 else maxi(1, _last_speed))
+			var was := _auto_jump or _jumping
+			_stop_auto_jump()
+			_set_speed(0 if speed > 0 or was else maxi(1, _last_speed))
 		KEY_1:
-			_set_speed(1)
+			_on_speed_button(1)
 		KEY_2:
-			_set_speed(2)
+			_on_speed_button(2)
 		KEY_3:
-			_set_speed(3)
+			_on_speed_button(3)
+		KEY_4:
+			_on_speed_button(MAX_SPEED)
 		KEY_F:
-			_start_jump()
+			if event.shift_pressed:
+				if _auto_jump:
+					_stop_auto_jump()
+				else:
+					_begin_auto_jump()
+			else:
+				_stop_auto_jump()
+				_start_jump()
 		KEY_B:
 			_select_tab("build")
 		KEY_R:
@@ -871,7 +952,12 @@ func _process(delta: float) -> void:
 	if sim == null or modal.visible or _game_over:
 		return
 	var stepped := false
+	if _auto_jump and not _jumping:
+		_auto_wait -= delta
+		if _auto_wait <= 0.0:
+			_start_jump()
 	if _jumping:
+		var t_jump := Time.get_ticks_usec()
 		for _i in range(maxi(24, 96 / maxi(1, colonies.list.size()))):
 			_step()
 			stepped = true
@@ -879,7 +965,20 @@ func _process(delta: float) -> void:
 				break
 			if colonies.hour - _jump_start >= JUMP_LIMIT_H:
 				_jumping = false
+				_auto_wait = 0.0          # 30일 동안 아무 일도 없었다 — 계속 넘기는 중이면 바로 이어서
 				break
+			if _auto_jump and Time.get_ticks_usec() - t_jump > MAX_FRAME_US:
+				break
+	elif speed == MAX_SPEED:
+		# 최고 속도: 프레임 예산 안에서 될 만큼 (결정 카드·위급이면 멈춘다)
+		var t0 := Time.get_ticks_usec()
+		var budget := MAX_FRAME_US / (2 if OS.has_feature("mobile") else 1)
+		while true:
+			_step()
+			stepped = true
+			if speed != MAX_SPEED or modal.visible or _game_over or Time.get_ticks_usec() - t0 > budget:
+				break
+		_acc = 0.0
 	elif speed > 0:
 		_acc += delta * HOURS_PER_SECOND[speed]
 		var steps := 0
@@ -898,6 +997,12 @@ func _process(delta: float) -> void:
 	if _dirty and _ui_clock >= 0.1:
 		_ui_clock = 0.0
 		_refresh_live()
+	_panel_clock += delta
+	if _panel_dirty and _panel_clock >= (0.5 if _fast() or _jumping else 0.0):
+		_panel_dirty = false
+		_panel_clock = 0.0
+		if tabs[current_tab] is BuildPanel or tabs[current_tab] is ResearchPanel or tabs[current_tab] is ColonyPanel:
+			tabs[current_tab].rebuild()
 
 
 ## 대도시 카드: 카메라가 대도시 위에 있으면 (닫지 않았으면) 그 도시의 우주 시설을 보인다
@@ -933,10 +1038,15 @@ func _step() -> void:
 	for i in colonies.step():
 		_on_founded(i)
 	if not sim.pending_storm.is_empty():
-		_jumping = false
-		_set_speed(0)
-		_show_storm()
-		return
+		if sim.autopilot != null and _fast():
+			# 빠르게 흐르는 중이고 자동 운영이면: 시드가 추첨으로 정한다 (다른 식민지와 같은 규칙)
+			sim.resolve_storm("lottery")
+			_toast("자동 운영 — 태양 양성자 폭풍: 대피소 추첨으로 정했다", "warn")
+		else:
+			_jumping = false
+			_set_speed(0)
+			_show_storm()
+			return
 	@warning_ignore("integer_division")
 	var day := colonies.hour / 24
 	if day != _last_day:
@@ -945,8 +1055,7 @@ func _step() -> void:
 
 
 func _on_new_day(day: int) -> void:
-	if tabs[current_tab] is BuildPanel or tabs[current_tab] is ResearchPanel or tabs[current_tab] is ColonyPanel:
-		tabs[current_tab].rebuild()
+	_panel_dirty = true
 	# 식민지를 잃는다: 절멸, 또는 신뢰가 10 아래로 1년 — 고향을 잃으면 게임이 끝난다
 	for i in range(colonies.list.size() - 1, -1, -1):
 		var c: Dictionary = colonies.list[i]
@@ -974,6 +1083,7 @@ func _on_new_day(day: int) -> void:
 	var food_days: float = sim.stock["food_kg"] / (pop * sim.PER["food_kg"])
 	if ((o2_days < 3 and not sim.open_air) or food_days < 3) and day - _alarm_day > 2:
 		_alarm_day = day
+		_stop_auto_jump("위급")
 		_set_speed(0)
 		_toast("위급 — %s%s 비축이 3일 아래다" % [_colony_tag(sim), "산소" if o2_days < 3 else "식량"], "critical")
 	if day >= REPORT_DAY and not _report_shown:
@@ -1129,7 +1239,9 @@ func _on_note(_hour: int, text: String, kind: String) -> void:
 		_toast(text, kind)
 	if _jumping and kind in ["good", "warn", "critical", "death"]:
 		_jumping = false
+		_auto_wait = AUTO_JUMP_PAUSE          # 계속 넘기는 중이면 알림을 잠깐 보여 주고 다음으로
 	if kind == "death":
+		_stop_auto_jump("사망 사고")
 		_set_speed(0)
 		modal.open("death", "사망 사고", "정착민이 죽었다",
 			text + "\n\n첫 사망은 캠페인의 큰 사건이다. 신뢰가 크게 떨어지고, 사기는 오래 회복되지 않는다.",

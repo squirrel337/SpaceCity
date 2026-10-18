@@ -35,6 +35,11 @@ var road_rev := 0                  # 길이 바뀔 때마다 +1
 var zone_rev := 0                  # 블록의 구획이 바뀔 때마다 +1
 var terrain_rev := 0               # 땅을 고칠 때마다 +1
 var flood_rev := 0                 # 물에 잠긴 칸이 바뀔 때마다 +1
+var land := {}                     # 사들인 땅 구역: Vector2i(구역 번호) → true (구역 = 길 격자의 블록 cells×cells)
+var land_rev := 0                  # 땅을 살 때마다 +1
+var ground: SiteGround             # 이 도시의 땅 (높이·물 — 땅 구역의 비탈, 새 땅의 건물 비탈). 없으면 따지지 않는다
+var _cands: Array = []
+var _cands_sig := ""
 var _blocks: Array = []
 var _blocks_sig := ""
 var _next_uid := 1
@@ -117,7 +122,7 @@ func sync(sim: CitySim) -> void:
 		for e in fin:
 			buildings.erase(e)
 		while have < want:
-			_auto_place(kind, -1, _tile_for_built(sim, kind))
+			_auto_place(kind, -1, _tile_for_built(sim, kind), sim)
 			have += 1
 		while have > want:
 			for i in range(buildings.size() - 1, -1, -1):
@@ -132,7 +137,7 @@ func sync(sim: CitySim) -> void:
 	for item in sim.queue:
 		var seq := int(item["seq"])
 		if live.has(seq) and not planned.has(seq):
-			_auto_place(String(item["id"]), seq, String(item.get("tile", "")))
+			_auto_place(String(item["id"]), seq, String(item.get("tile", "")), sim)
 	_touch()
 
 
@@ -223,8 +228,11 @@ func entry_of_seq(seq: int) -> Dictionary:
 
 
 # ── 자동 배치 ───────────────────────────────────────────────────
-func _auto_place(kind: String, seq: int, tile: String) -> Dictionary:
+func _auto_place(kind: String, seq: int, tile: String, sim: CitySim = null) -> Dictionary:
 	var spot := suggest(kind, tile)
+	if spot.is_empty() and sim != null and sim.autopilot != null and fam(kind) != "solar_tower":
+		if _auto_expand(kind, sim):
+			spot = suggest(kind, tile)
 	if spot.is_empty():
 		# 놓을 곳이 없으면 구역 가운데에 겹쳐 둔다 (보이기만 하는 것이라 게임은 멈추지 않는다)
 		var c := _anchor(kind)
@@ -321,11 +329,9 @@ func zone_of(at: Vector2) -> String:
 ## 땅 모양과 다른 건물·길만 따진다 (자재·연구는 check에서). 놓을 수 있으면 "", 아니면 까닭
 func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1) -> String:
 	var r := rect_of(kind, at, rot)
-	var b := BaseLayout.BOUNDS_UV.grow(-2.0)
 	for corner in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
-		var uv := BaseLayout.xy_to_uv(corner)
-		if not b.has_point(uv) or uv.y < layout.crest_v + 2.0:
-			return "기지 밖이다"
+		if not in_land(corner, 2.0, 2.0):
+			return "기지 밖이다 — '확장'으로 땅 구역을 산다"
 	var zone := zone_of(at)
 	var kfam := fam(kind)
 	if kfam == "solar_tower":
@@ -362,7 +368,33 @@ func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1) -> St
 			return "길 위에는 지을 수 없다"
 	if flooded_in(r) > 0:
 		return "물에 잠긴 땅이다 — 먼저 메운다"
+	return _ground_reason(r)
+
+
+## 새 땅(처음 기지 밖)의 땅 모양: 물 위, 또는 너무 가파른 곳 (그보다 덜 가파르면 기초를 쌓아 앉힌다)
+func _ground_reason(r: Rect2) -> String:
+	if ground == null or _rect_in_base(r):
+		return ""
+	var pts := [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y), r.get_center()]
+	var lo := INF
+	var hi := -INF
+	for q in pts:
+		if ground.water_at(q):
+			return "물 위다 — '땅'(쌓기)으로 메운 뒤 짓는다"
+		var h := ground.local_height_m(q)
+		lo = minf(lo, h)
+		hi = maxf(hi, h)
+	var slope := (hi - lo) / maxf(maxf(r.size.x, r.size.y), 1.0)
+	if slope > float(LayoutData.land()["build_slope_max"]):
+		return "땅이 너무 가파르다 (%d%%) — '땅'(평탄화)으로 고른 뒤 짓는다" % int(slope * 100.0)
 	return ""
+
+
+func _rect_in_base(r: Rect2) -> bool:
+	for q in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
+		if not layout.base_has(q, 0.0, 0.0):
+			return false
+	return true
 
 
 ## 자재·연구·일조 칸까지 따진 결과: {reason, tile}
@@ -425,11 +457,9 @@ static func _seg_rect_dist(a: Vector2, b: Vector2, r: Rect2) -> float:
 func road_check(a: Vector2, b: Vector2, type: String = "street") -> String:
 	if a.distance_to(b) < 3.0:
 		return "길이 너무 짧다"
-	var bounds := BaseLayout.BOUNDS_UV.grow(-1.0)
-	for p in [a, b]:
-		var uv := BaseLayout.xy_to_uv(p)
-		if not bounds.has_point(uv) or uv.y < layout.crest_v - 2.0:
-			return "기지 밖이다"
+	for p in [a, b, a.lerp(b, 0.5)]:
+		if not in_land(p, 1.0, -2.0):
+			return "기지 밖이다 — '확장'으로 땅 구역을 산다"
 	var hw := LayoutData.road_half(type)
 	for e in buildings:
 		if _seg_rect_dist(a, b, entry_rect(e).grow(-0.3)) < hw:
@@ -437,6 +467,355 @@ func road_check(a: Vector2, b: Vector2, type: String = "street") -> String:
 	if flooded_along(a, b, hw):
 		return "물에 잠긴 땅을 지나간다 — 먼저 메운다"
 	return ""
+
+
+# ── 땅 구역 (기지 넓히기) ───────────────────────────────────────
+## 구역 한 변 (m) — 길 격자의 블록 cells개 (대로로 둘러싸인 블록 2×2)
+func parcel_size() -> float:
+	return layout.pitch * int(LayoutData.land()["cells"])
+
+
+## 점이 든 구역 번호 (원점 = 거주 구역 가운데의 교차로)
+func parcel_of(p: Vector2) -> Vector2i:
+	var q := (p - layout.grid_o) / parcel_size()
+	return Vector2i(int(floor(q.x)), int(floor(q.y)))
+
+
+func parcel_rect(c: Vector2i) -> Rect2:
+	var s := parcel_size()
+	return Rect2(layout.grid_o + Vector2(c) * s, Vector2(s, s))
+
+
+## 지을 수 있는 땅인가: 처음 기지(지도 끝에서 margin 안, 능선 마루에서 crest_off 아래) 또는 사들인 구역
+func in_land(p: Vector2, margin: float = 0.0, crest_off: float = 0.0) -> bool:
+	if layout.base_has(p, margin, crest_off):
+		return true
+	if land.is_empty() or not land.has(parcel_of(p)):
+		return false
+	return layout.kind != "ridge" or BaseLayout.xy_to_uv(p).y >= layout.crest_v + crest_off
+
+
+## 구역이 처음 기지와 얼마나 겹치나: 0 (안 겹친다) · 1 (조금) · 2 (다 기지 안)
+func _parcel_base(c: Vector2i) -> int:
+	var r := parcel_rect(c)
+	var n := 0
+	var pts := [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y), r.get_center()]
+	for q in pts:
+		if layout.base_has(q, 0.0, 0.0):
+			n += 1
+	return 2 if n == pts.size() else (1 if n > 0 else 0)
+
+
+## 가진 땅인가 (사들였거나 처음 기지와 겹친다) — 이웃 구역을 살 수 있게 하는 땅
+func parcel_owned(c: Vector2i) -> bool:
+	return land.has(c) or _parcel_base(c) > 0
+
+
+## 이 구역을 하나 더 사는 값 (부품·지원) — 길 값은 따로
+func parcel_price() -> Dictionary:
+	var ld := LayoutData.land()
+	var k := pow(float(ld["grow"]), land.size())
+	var out := {}
+	for key in ld["price"]:
+		out[key] = snappedf(float(ld["price"][key]) * k, 0.1)
+	return out
+
+
+## 살 수 있는 구역 후보 (가진 땅에 붙은 구역): [{cell, rect, ok, reason, cost, slope, wet, roads, road_m}] — 가까운 것부터.
+## 땅·길·건물이 바뀔 때만 다시 셈한다
+func land_candidates() -> Array:
+	var sig := "%d|%d|%d|%d|%s" % [land_rev, road_rev, terrain_rev, buildings.size(), str(ground != null and ground.baked_heights())]
+	if sig == _cands_sig:
+		return _cands
+	_cands_sig = sig
+	var owned := {}
+	var s := parcel_size()
+	# 처음 기지를 덮는 구역들
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	var b := BaseLayout.BOUNDS_UV
+	for uv in [b.position, Vector2(b.end.x, b.position.y), b.end, Vector2(b.position.x, b.end.y)]:
+		var xy := BaseLayout.uv_to_xy(uv)
+		lo = lo.min(xy)
+		hi = hi.max(xy)
+	var c0 := parcel_of(lo)
+	var c1 := parcel_of(hi)
+	for i in range(c0.x, c1.x + 1):
+		for j in range(c0.y, c1.y + 1):
+			var c := Vector2i(i, j)
+			if _parcel_base(c) > 0:
+				owned[c] = true
+	for c in land:
+		owned[c] = true
+	var seen := {}
+	var out: Array = []
+	for c in owned:
+		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var n: Vector2i = c + d
+			if seen.has(n) or land.has(n) or _parcel_base(n) == 2:
+				continue
+			seen[n] = true
+			out.append(parcel_status(n))
+	var hubp := hub()
+	out.sort_custom(func(x, y): return (x["rect"] as Rect2).get_center().distance_to(hubp) < (y["rect"] as Rect2).get_center().distance_to(hubp))
+	_cands = out
+	return out
+
+
+## 구역 하나를 살 수 있나: {cell, rect, ok, reason, cost, slope, wet, roads: [[a, b, 종류]], road_m}
+func parcel_status(c: Vector2i) -> Dictionary:
+	var ld := LayoutData.land()
+	var r := parcel_rect(c)
+	var st := {"cell": c, "rect": r, "ok": false, "reason": "", "cost": {}, "slope": 0.0, "wet": 0.0, "roads": [], "road_m": 0.0}
+	if land.has(c) or _parcel_base(c) == 2:
+		st["reason"] = "이미 가진 땅이다"
+		return st
+	var near := false
+	for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if parcel_owned(c + d):
+			near = true
+			break
+	if not near and _parcel_base(c) == 0:
+		st["reason"] = "가진 땅에 붙은 구역만 산다"
+		return st
+	var dist := r.get_center().distance_to(hub())
+	if dist > float(ld["max_r_m"]):
+		st["reason"] = "기지에서 너무 멀다 (구역 가운데 %d m까지)" % int(ld["max_r_m"])
+		return st
+	if layout.kind == "ridge":
+		for q in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
+			if BaseLayout.xy_to_uv(q).y < layout.crest_v:
+				st["reason"] = "능선 너머다 — 크레이터 안쪽 비탈은 지을 수 없다"
+				return st
+	# 땅 모양: 5×5 점의 자연 높이 (기울기), 물
+	if ground != null:
+		var hs: Array = []
+		var wet := 0
+		for j in 5:
+			var row: Array = []
+			for i in 5:
+				var q := r.position + r.size * Vector2(i / 4.0, j / 4.0)
+				row.append(ground.base_height_m(q))
+				if ground.water_at(q):
+					wet += 1
+			hs.append(row)
+		var step := s_div(r.size.x, 4.0)
+		var slope := 0.0
+		for j in 5:
+			for i in 5:
+				if i < 4:
+					slope = maxf(slope, absf(float(hs[j][i + 1]) - float(hs[j][i])) / step)
+				if j < 4:
+					slope = maxf(slope, absf(float(hs[j + 1][i]) - float(hs[j][i])) / step)
+		st["slope"] = slope
+		st["wet"] = wet / 25.0
+		if st["wet"] > float(ld["wet_max"]):
+			st["reason"] = "구역의 %d%%가 물이다 — 살 수 없다" % int(float(st["wet"]) * 100.0)
+			return st
+		if slope > float(ld["slope_max"]):
+			st["reason"] = "너무 가파르다 (비탈 %d%%, %d%%까지)" % [int(slope * 100.0), int(float(ld["slope_max"]) * 100.0)]
+			return st
+	# 깔릴 길: 구역의 블록마다 네 변 (이미 난 길·기지의 블록은 건너뛴다)
+	var roads: Array = []
+	var road_m := 0.0
+	var cells := int(ld["cells"])
+	var keyset := {}
+	for di in cells:
+		for dj in cells:
+			var cell := c * cells + Vector2i(di, dj)
+			if layout.open_cells.has(cell):
+				continue
+			var cr := layout.cell_rect(cell)
+			var corners := [cr.position, Vector2(cr.end.x, cr.position.y), cr.end, Vector2(cr.position.x, cr.end.y)]
+			var lines := [cell.y, cell.x + 1, cell.y + 1, cell.x]        # 위·오른쪽·아래·왼쪽 변이 놓인 격자선 번호
+			for k in 4:
+				var a: Vector2 = corners[k]
+				var e: Vector2 = corners[(k + 1) % 4]
+				var key := "%d,%d,%d,%d" % [int(round(minf(a.x, e.x))), int(round(minf(a.y, e.y))), int(round(maxf(a.x, e.x))),
+					int(round(maxf(a.y, e.y)))]
+				if keyset.has(key) or _has_road_between(a, e):
+					continue
+				keyset[key] = true
+				var mid := a.lerp(e, 0.5)
+				if layout.special_at(mid, 4.0) or road_check_shape(a, e, layout.line_type(int(lines[k]))) != "":
+					continue
+				roads.append([a, e, layout.line_type(int(lines[k]))])
+				road_m += a.distance_to(e)
+	# 길 그물과 이어지나: 깔 길의 끝이 기존 길에 닿거나 구역 변에 이미 길이 있으면 이어진다. 아니면 가장 가까운 길까지 연결로
+	var touches := false
+	var corners4 := [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]
+	for k in 4:
+		if _has_road_between(corners4[k], corners4[(k + 1) % 4]) or _node_near(corners4[k]) >= 0:
+			touches = true
+	for seg in roads:
+		for q in [seg[0], seg[1]]:
+			if _node_near(q) >= 0 or nearest_edge(q, 0.6) >= 0:
+				touches = true
+	if not touches and not nodes.is_empty():
+		var best_d := INF
+		var link: Array = []
+		for q in corners4:
+			for i in nodes.size():
+				var nd: Vector2 = nodes[i]
+				var d := (q as Vector2).distance_to(nd)
+				if d < best_d and d > 1.0 and road_check_shape(q, nd, "street") == "" and not layout.special_at(q.lerp(nd, 0.5), 4.0):
+					best_d = d
+					link = [q, nd, "street"]
+		if link.is_empty() or best_d > parcel_size() * 1.5:
+			st["reason"] = "길로 이을 수 없다 — 가까운 길이 없다"
+			return st
+		roads.append(link)
+		road_m += best_d
+	st["roads"] = roads
+	st["road_m"] = road_m
+	var cost := parcel_price()
+	for seg in roads:
+		var rc := LayoutData.road_cost(String(seg[2]), (seg[0] as Vector2).distance_to(seg[1]))
+		for k2 in rc:
+			cost[k2] = snappedf(float(cost.get(k2, 0.0)) + float(rc[k2]), 0.1)
+	st["cost"] = cost
+	st["ok"] = true
+	return st
+
+
+static func s_div(a: float, b: float) -> float:
+	return a / b if b != 0.0 else 0.0
+
+
+## 두 점 사이에 이미 길이 있나 (꼭짓점이 0.6 m 안에서 맞고 그 둘을 잇는 길)
+func _has_road_between(a: Vector2, b: Vector2) -> bool:
+	var ia := -1
+	var ib := -1
+	for i in nodes.size():
+		var p: Vector2 = nodes[i]
+		if ia < 0 and p.distance_to(a) < 0.6:
+			ia = i
+		elif ib < 0 and p.distance_to(b) < 0.6:
+			ib = i
+	if ia < 0 or ib < 0:
+		return false
+	return _edge_index(ia, ib) >= 0
+
+
+## 이 점에 붙은 길 꼭짓점 (0.6 m 안, 없으면 -1)
+func _node_near(p: Vector2) -> int:
+	for i in nodes.size():
+		if (nodes[i] as Vector2).distance_to(p) < 0.6:
+			return i
+	return -1
+
+
+## 땅 구역에 깔 길이 건물·물에 막히나 (기지 경계는 따지지 않는다)
+func road_check_shape(a: Vector2, b: Vector2, type: String) -> String:
+	var hw := LayoutData.road_half(type)
+	for e in buildings:
+		if _seg_rect_dist(a, b, entry_rect(e).grow(-0.3)) < hw:
+			return "건물"
+	if flooded_along(a, b, hw):
+		return "물"
+	return ""
+
+
+## 구역을 산다: 고른 식민지가 값을 내고, 구역의 블록 둘레에 길(격자 그대로 — 대로·도로)이 깔린다. 산 구역의 블록은 빈 블록
+func buy_parcel(c: Vector2i, sim: CitySim) -> bool:
+	var st := parcel_status(c)
+	if not bool(st["ok"]) or not can_pay(st["cost"], sim):
+		return false
+	pay(st["cost"], sim)
+	land[c] = true
+	land_rev += 1
+	for seg in st["roads"]:
+		add_road(seg[0], seg[1], 0.6, String(seg[2]))
+	_cands_sig = ""
+	_touch()
+	return true
+
+
+## 값을 낼 수 있나 (부품·금속은 비축, 지원은 지구 지원 점수). reserve: 남겨 둘 몫
+static func can_pay(cost: Dictionary, sim: CitySim, reserve: Dictionary = {}) -> bool:
+	if sim == null:
+		return true
+	for k in cost:
+		var have := sim.support if k == "support" else float(sim.stock.get(k, 0.0))
+		if have - float(cost[k]) < float(reserve.get(k, 0.0)) - 1e-6:
+			return false
+	return true
+
+
+static func pay(cost: Dictionary, sim: CitySim) -> void:
+	if sim == null:
+		return
+	for k in cost:
+		if k == "support":
+			sim.support -= float(cost[k])
+		else:
+			sim.stock[k] = float(sim.stock.get(k, 0.0)) - float(cost[k])
+
+
+static func cost_text(cost: Dictionary) -> String:
+	var parts := PackedStringArray()
+	for k in cost:
+		var v := float(cost[k])
+		if v <= 0.0:
+			continue
+		match k:
+			"parts":
+				parts.append("부품 %s" % Fmt.n(v, 1))
+			"metal_t":
+				parts.append("금속 %s t" % Fmt.n(v, 2))
+			"support":
+				parts.append("지원 %s" % Fmt.n(v, 0))
+			_:
+				parts.append("%s %s" % [k, Fmt.n(v, 1)])
+	return " · ".join(parts) if not parts.is_empty() else "무료"
+
+
+## 가진 땅의 가장 먼 곳까지 (m, 기지 가운데에서) — 땅 고치기가 닿는 반지름
+func land_radius() -> float:
+	var r := 0.0
+	for c in land:
+		var rect := parcel_rect(c)
+		for q in [rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)]:
+			r = maxf(r, (q as Vector2).distance_to(hub()))
+	return r
+
+
+## 땅 고치기가 닿는 반지름 (m): 자료의 반지름, 또는 사들인 땅의 끝 + 40 m
+func edit_radius() -> float:
+	return maxf(float(LayoutData.terrain()["edit_radius_m"]), land_radius() + 40.0)
+
+
+## 자동 운영: 기본 자리와 그 구획 블록이 다 찼으면 그 구획 가까이의 구역을 사서 블록을 그 구획으로 정한다 (남길 몫은 남긴다)
+func _auto_expand(kind: String, sim: CitySim) -> bool:
+	var district: String = layout.district_of.get(fam(kind), "")
+	if district == "" or district in BaseLayout.SPECIAL:
+		return false
+	var anchor := _anchor(kind)
+	var reserve: Dictionary = LayoutData.land()["auto_reserve"]
+	var best := {}
+	var best_d := INF
+	for st in land_candidates():
+		if not bool(st["ok"]) or not can_pay(st["cost"], sim, reserve):
+			continue
+		var d := (st["rect"] as Rect2).get_center().distance_to(anchor)
+		if d < best_d:
+			best_d = d
+			best = st
+	if best.is_empty():
+		return false
+	if not buy_parcel(best["cell"], sim):
+		return false
+	var rect: Rect2 = best["rect"]
+	var n := 0
+	for b in blocks():
+		if String(b["district"]) == "" and rect.has_point(b["center"]):
+			district_seeds.append([b["center"], district])
+			n += 1
+	zone_rev += 1
+	_touch()
+	sim.note("자동 운영 — 땅 구역을 사서 기지를 넓혔다 (%s · %s 블록 %d개)" % [cost_text(best["cost"]),
+		LayoutData.zone_name(district), n], "info")
+	return true
 
 
 # ── 블록과 구획 ─────────────────────────────────────────────────
@@ -1118,8 +1497,11 @@ func to_save() -> Dictionary:
 	var fs := []
 	for k in flood:
 		fs.append_array([(k as Vector2i).x, (k as Vector2i).y, int(round(float(flood[k]) * 10.0))])
+	var ls := []
+	for k in land:
+		ls.append([(k as Vector2i).x, (k as Vector2i).y])
 	return {"version": VERSION, "next_uid": _next_uid, "buildings": bs, "nodes": ns, "edges": es, "types": etypes.duplicate(),
-		"districts": zs, "terrain": ts, "flood": fs}
+		"districts": zs, "terrain": ts, "flood": fs, "land": ls}
 
 
 ## 저장한 계획을 되살리고 시뮬레이션과 맞춘다. 없거나 읽을 수 없으면 새 계획
@@ -1158,6 +1540,9 @@ static func from_save(data: Variant, sim: CitySim, p_layout: BaseLayout = null) 
 	var tr: Array = data.get("terrain", [])
 	for i in range(0, tr.size() - 2, 3):
 		plan.terrain[Vector2i(int(tr[i]), int(tr[i + 1]))] = float(tr[i + 2]) / 100.0
+	for l in data.get("land", []):
+		if l is Array and l.size() >= 2:
+			plan.land[Vector2i(int(l[0]), int(l[1]))] = true
 	var fl: Array = data.get("flood", [])
 	for i in range(0, fl.size() - 2, 3):
 		plan.flood[Vector2i(int(fl[i]), int(fl[i + 1]))] = float(fl[i + 2]) / 10.0

@@ -6,6 +6,7 @@ extends RefCounted
 
 signal changed
 signal placed(kind: String, ok: bool, text: String)
+signal bought(ok: bool, text: String)          # 땅 구역을 샀다 (또는 살 수 없었다)
 
 const TERRAIN_OPS := ["dig", "raise", "flatten", "restore"]
 const OP_NAMES := {"dig": "파기", "raise": "쌓기", "flatten": "평탄화", "restore": "되돌리기"}
@@ -16,7 +17,7 @@ const MAX_SWEEP_DEG := 200.0       # 한 번에 굽을 수 있는 각
 var sim: CitySim
 var plan: CityPlan
 var ground: SiteGround             # 땅 높이·해수면 (평탄화·침수 안내)
-var mode := ""                     # "" | "build" | "road" | "erase" | "zone" | "terrain"
+var mode := ""                     # "" | "build" | "road" | "erase" | "zone" | "terrain" | "land"
 var kind := ""
 var rot := 0
 var variant := 0
@@ -38,6 +39,8 @@ var zone_kind := "core"            # 구획 칠하기: 칠할 용도 ("" = 비�
 var hover_block := {}
 var terrain_op := "dig"
 var brush := 12.0
+var hover_parcel := Vector2i.ZERO      # 확장: 가리키는 땅 구역
+var parcel_info := {}
 
 
 func bind(p_sim: CitySim, p_plan: CityPlan) -> void:
@@ -62,6 +65,7 @@ func _reset(p_mode: String) -> void:
 	has_at = false
 	hover_edge = -1
 	hover_block = {}
+	parcel_info = {}
 	reason = ""
 	note = ""
 
@@ -104,6 +108,12 @@ func start_terrain(op: String = "") -> void:
 	kind = ""
 	if op in TERRAIN_OPS:
 		terrain_op = op
+	changed.emit()
+
+
+func start_land() -> void:
+	_reset("land")
+	kind = ""
 	changed.emit()
 
 
@@ -170,6 +180,11 @@ func hover(p: Vector2) -> void:
 			at = p
 			has_at = true
 			_recheck_terrain()
+		"land":
+			at = p
+			has_at = true
+			hover_parcel = plan.parcel_of(p)
+			_recheck_land()
 		_:
 			return
 	changed.emit()
@@ -189,6 +204,8 @@ func click(p: Vector2, keep: bool = false) -> void:
 			paint_zone()
 		"terrain":
 			edit_ground()
+		"land":
+			buy_land()
 
 
 ## 터치 누르기: 건물은 유령만 옮기고, 길은 점을 찍고, 구획·땅은 바로 고친다
@@ -203,6 +220,8 @@ func tap(p: Vector2) -> void:
 			paint_zone()
 		"terrain":
 			edit_ground()
+		"land":
+			buy_land()
 
 
 func commit(keep: bool = false) -> bool:
@@ -475,8 +494,8 @@ func _recheck_terrain() -> void:
 	if not _has_digger():
 		reason = "굴착기나 로봇 정비고가 있어야 땅을 고친다"
 		return
-	if at.distance_to(plan.hub()) > float(t["edit_radius_m"]):
-		reason = "기지에서 %d m 안만 고친다" % int(t["edit_radius_m"])
+	if at.distance_to(plan.hub()) > plan.edit_radius():
+		reason = "기지에서 %d m 안만 고친다 (땅 구역을 사면 넓어진다)" % int(plan.edit_radius())
 		return
 	var core := brush * 0.55
 	for e in plan.buildings:
@@ -514,10 +533,46 @@ func edit_ground() -> int:
 	return n
 
 
+# ── 땅 구역 사기 (확장) ─────────────────────────────────────────
+func _recheck_land() -> void:
+	note = ""
+	parcel_info = plan.parcel_status(hover_parcel)
+	reason = String(parcel_info["reason"])
+	if reason == "" and not CityPlan.can_pay(parcel_info["cost"], sim):
+		reason = "부품·지원이 모자란다 — %s 필요" % CityPlan.cost_text(parcel_info["cost"])
+	if reason == "" and float(parcel_info["slope"]) > float(LayoutData.land()["build_slope_max"]) * 0.6:
+		note = "비탈 %d%% — 가파른 곳은 '땅'(평탄화)으로 고른 뒤 짓는다" % int(float(parcel_info["slope"]) * 100.0)
+
+
+## 가리키는 구역을 산다
+func buy_land() -> bool:
+	if mode != "land" or not has_at:
+		return false
+	_recheck_land()
+	if reason != "":
+		bought.emit(false, reason)
+		return false
+	var cost: Dictionary = parcel_info["cost"]
+	var road_m := float(parcel_info["road_m"])
+	var rect: Rect2 = parcel_info["rect"]
+	if not plan.buy_parcel(hover_parcel, sim):
+		bought.emit(false, "살 수 없다")
+		return false
+	var n := 0
+	for b in plan.blocks():
+		if rect.has_point(b["center"]) and String(b["district"]) == "":
+			n += 1
+	_recheck_land()
+	changed.emit()
+	bought.emit(true, "땅 구역을 샀다 — %s · 길 %d m · 빈 블록 %d개 ('구획'으로 용도를 정한다)" % [CityPlan.cost_text(cost),
+		int(road_m), n])
+	return true
+
+
 func _in_bounds(p: Vector2) -> bool:
-	var uv := BaseLayout.xy_to_uv(p)
-	var crest := plan.layout.crest_v if plan else BaseLayout.CREST_V
-	return BaseLayout.BOUNDS_UV.grow(-1.0).has_point(uv) and uv.y >= crest - 2.0
+	if plan == null:
+		return BaseLayout.BOUNDS_UV.grow(-1.0).has_point(BaseLayout.xy_to_uv(p))
+	return plan.in_land(p, 1.0, -2.0)
 
 
 func _recheck() -> void:
@@ -563,6 +618,15 @@ func status() -> String:
 			var cur := String(hover_block.get("district", ""))
 			return "구획 — 이 블록: %s · %s m² → '%s'" % [LayoutData.zone_name(cur) if cur != "" else "빈 블록",
 				Fmt.n(float(hover_block["area"]), 0), what]
+		"land":
+			var size_m := int(round(plan.parcel_size())) if plan else 112
+			var head := "확장 — 기지에 붙은 땅 구역(블록 2×2, %d m)을 눌러 산다 · 산 구역 %d곳" % [size_m, plan.land.size() if plan else 0]
+			if parcel_info.is_empty() or not has_at:
+				return head
+			if bool(parcel_info["ok"]):
+				return "%s\n이 구역: %s · 길 %d m · 비탈 %d%%" % [head, CityPlan.cost_text(parcel_info["cost"]),
+					int(float(parcel_info["road_m"])), int(float(parcel_info["slope"]) * 100.0)]
+			return head
 		"terrain":
 			var vol := plan.terrain_volume() if plan else Vector2.ZERO
 			var here := plan.terrain_delta(at) if plan and has_at else 0.0

@@ -57,6 +57,7 @@ var runway := {}                  # {a, b, w} — 대기가 있는 천체의 비
 var bearings := {}                # 노선 id → 그 노선의 다른 도시 쪽 (모형 좌표 수평 단위 벡터)
 var _ways: MeshInstance3D
 var _ways_sig := "-"
+var _plinths: MultiMeshInstance3D   # 비탈에 선 건물 아래의 기초
 
 
 func setup(p_ground: SiteGround) -> void:
@@ -177,6 +178,7 @@ func _signature() -> String:
 
 func _rebuild() -> void:
 	_items = BaseScene.collect(sim, plan)
+	var plinths: Array = []
 	var by_key := {}
 	for it in _items:
 		if it["building"]:
@@ -205,8 +207,7 @@ func _rebuild() -> void:
 		var m := mmi.multimesh
 		m.instance_count = list.size()
 		for i in list.size():
-			var p: Vector3 = list[i]["pos"]
-			m.set_instance_transform(i, Transform3D(_yaw(int(list[i]["rot"])), _local(Vector2(p.x, p.y))))
+			m.set_instance_transform(i, _seat(list[i], plinths))
 	# 공사 현장 (비계): 따로
 	for c in _sites_root.get_children():
 		c.queue_free()
@@ -215,16 +216,55 @@ func _rebuild() -> void:
 			continue
 		var mi := MeshInstance3D.new()
 		mi.mesh = ModelLib.mesh("buildings", it["sprite"], 0)
-		var p2: Vector3 = it["pos"]
-		mi.transform = Transform3D(_yaw(int(it["rot"])), _local(Vector2(p2.x, p2.y)))
+		mi.transform = _seat(it, plinths)
 		_sites_root.add_child(mi)
 	# 누를 상자
 	_boxes.clear()
 	for it in _items:
 		var mesh := ModelLib.mesh("buildings", it["sprite"], it["variant"])
-		var p3: Vector3 = it["pos"]
-		var box := Transform3D(_yaw(int(it["rot"])), _local(Vector2(p3.x, p3.y))) * mesh.get_aabb()
+		var box := _seat(it, []) * mesh.get_aabb()
 		_boxes.append([box, it["id"], it])
+	_set_plinths(plinths)
+
+
+## 건물이 앉는 자리: 바닥 네 귀와 가운데의 땅 높이 가운데 가장 높은 곳 (처음 기지는 평평해 가운데 높이와 같다).
+## 땅이 0.25 m 넘게 기울었으면 그 아래에 기초(바닥보다 조금 넓은 판)를 쌓는다 — plinths에 더한다
+func _seat(it: Dictionary, plinths: Array) -> Transform3D:
+	var p3: Vector3 = it["pos"]
+	var c := Vector2(p3.x, p3.y)
+	var f := CityPlan.foot_of(String(it["id"]), int(it["rot"])) * 0.5
+	var pos := _local(c)
+	var top := pos.y
+	var low := pos.y
+	for q in [Vector2(-f.x, -f.y), Vector2(f.x, -f.y), Vector2(f.x, f.y), Vector2(-f.x, f.y)]:
+		var h := _local(c + q).y
+		top = maxf(top, h)
+		low = minf(low, h)
+	pos.y = top
+	if top - low > 0.25:
+		var hgt := top - low + 0.8
+		plinths.append(Transform3D(Basis().scaled(Vector3(f.x * 2.0 + 0.8, hgt, f.y * 2.0 + 0.8)),
+			Vector3(pos.x, top - hgt * 0.5 + 0.05, pos.z)))
+	return Transform3D(_yaw(int(it["rot"])), pos)
+
+
+func _set_plinths(list: Array) -> void:
+	if _plinths == null:
+		if list.is_empty():
+			return
+		_plinths = MultiMeshInstance3D.new()
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = BoxMesh.new()
+		_plinths.multimesh = mm
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.46, 0.45, 0.43)
+		mat.roughness = 1.0
+		_plinths.material_override = mat
+		add_child(_plinths)
+	_plinths.multimesh.instance_count = list.size()
+	for i in list.size():
+		_plinths.multimesh.set_instance_transform(i, list[i])
 
 
 ## 90° 단위 방향 (위에서 보아 시계 반대 방향)
@@ -397,7 +437,10 @@ func _update_tool() -> void:
 		_pad.transform = Transform3D(Basis().scaled(Vector3(f.x + 2.0, 1.0, f.y + 2.0)), _local(tool.at, 0.15))
 		_pad_mat.set_shader_parameter("tint", Color(c, 0.4 + 0.15 * pulse))
 	var psig := ""
-	if tool != null and tool.has_at:
+	if tool != null and tool.mode == "land":
+		psig = "land|%s|%s|%d|%d|%d|%s" % [str(tool.hover_parcel), str(ok), plan.land_rev, plan.road_rev, plan.terrain_rev,
+			str(tool.has_at)]
+	elif tool != null and tool.has_at:
 		psig = "%s|%s|%s|%d|%s|%s|%s|%s|%d|%d|%s" % [tool.mode, str(tool.at), str(ok), tool.hover_edge, tool.road_type,
 			tool.zone_kind, tool.terrain_op, str(tool.brush), plan.road_rev, plan.terrain_rev, str(tool.preview)]
 		if tool.mode == "zone" and not tool.hover_block.is_empty():
@@ -406,6 +449,9 @@ func _update_tool() -> void:
 		return
 	_pen_sig = psig
 	_pen_mesh.clear_surfaces()
+	if tool != null and tool.mode == "land":
+		_draw_land(ok, good, bad)
+		return
 	if tool == null or not tool.has_at:
 		return
 	_pen_mat.set_shader_parameter("tint", Color(1, 1, 1, 1))
@@ -454,6 +500,43 @@ func _update_tool() -> void:
 			_pen_mesh.surface_set_color(Color(c, 0.18))
 			_disc(tool.at, tool.brush * 0.55)
 			_pen_mesh.surface_end()
+
+
+## 확장 도구: 처음 기지의 끝(흰 선), 산 구역(청록), 살 수 있는 구역(초록)·없는 구역(옅은 빨강), 가리키는 구역(채움)
+func _draw_land(ok: bool, good: Color, bad: Color) -> void:
+	_pen_mat.set_shader_parameter("tint", Color(1, 1, 1, 1))
+	_pen_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	var b := BaseLayout.BOUNDS_UV
+	var corners: Array = []
+	for uv in [b.position, Vector2(b.end.x, b.position.y), b.end, Vector2(b.position.x, b.end.y)]:
+		corners.append(BaseLayout.uv_to_xy(uv))
+	_pen_mesh.surface_set_color(Color(1, 1, 1, 0.4))
+	for i in 4:
+		_strip(corners[i], corners[(i + 1) % 4], 0.5)
+	_pen_mesh.surface_set_color(Color(0.45, 0.85, 0.95, 0.7))
+	for c in plan.land:
+		_rect_outline(plan.parcel_rect(c), 0.9)
+	for st in plan.land_candidates():
+		var can: bool = st["ok"]
+		_pen_mesh.surface_set_color(Color(0.4, 0.95, 0.55, 0.8) if can else Color(1.0, 0.42, 0.32, 0.35))
+		_rect_outline((st["rect"] as Rect2).grow(-1.5), 0.7 if can else 0.45)
+	if tool.has_at and not tool.parcel_info.is_empty() and not plan.land.has(tool.hover_parcel):
+		var hr: Rect2 = tool.parcel_info["rect"]
+		var c := good if ok else bad
+		_pen_mesh.surface_set_color(Color(c, 0.28))
+		_fill_poly(PackedVector2Array([hr.position, Vector2(hr.end.x, hr.position.y), hr.end, Vector2(hr.position.x, hr.end.y)]))
+		_pen_mesh.surface_set_color(Color(c, 0.95))
+		_rect_outline(hr.grow(-1.5), 1.1)
+		for seg in tool.parcel_info.get("roads", []):
+			_pen_mesh.surface_set_color(Color(1.0, 0.86, 0.45, 0.75))
+			_strip(seg[0], seg[1], LayoutData.road_half(String(seg[2])))
+	_pen_mesh.surface_end()
+
+
+func _rect_outline(r: Rect2, w: float) -> void:
+	var q := [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]
+	for i in 4:
+		_strip(q[i], q[(i + 1) % 4], w)
 
 
 ## 길 미리보기: 점들을 잇는 띠 하나 — 꺾이는 점은 두 방향의 평균 법선으로 (토막이 겹쳐 진해지지 않게), 6 m마다 땅을 따라간다

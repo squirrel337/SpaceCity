@@ -165,6 +165,8 @@ func set_sim(new_sim: CitySim, p_plan: CityPlan = null, p_tool: PlaceTool = null
 	tool = p_tool
 	if tool != null:
 		tool.ground = g
+	if plan != null:
+		plan.ground = g
 	if g != ground or city == null:
 		_mount_city(g)
 	city.transport = mgr.transport if mgr != null else null

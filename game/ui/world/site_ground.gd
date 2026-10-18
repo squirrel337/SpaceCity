@@ -228,7 +228,7 @@ func apply_terrain(plan: CityPlan) -> void:
 		return
 	_terrain_sig = sig
 	var t := LayoutData.terrain()
-	var kmax := mini(int(ceil(_ring_of(float(t["edit_radius_m"])))) + 1, _rings - 1)
+	var kmax := mini(int(ceil(_ring_of(plan.edit_radius()))) + 1, _rings - 1)
 	var n := (kmax + 1) * _segs
 	var hh := _hbase.slice(0, n)
 	var dug := PackedByteArray()
@@ -376,6 +376,26 @@ func _near_verts(p: Vector2, r: float, kmax: int) -> PackedInt32Array:
 		for di in range(-i_r, i_r + 1):
 			out.append(k * _segs + posmod(i_c + di, _segs))
 	return out
+
+
+## 높이를 구웠나 (구운 높이가 있어야 땅 구역의 비탈·물을 제대로 잰다)
+func baked_heights() -> bool:
+	return not _hbase.is_empty()
+
+
+## 이 점이 물인가: 바다·호수(구운 물 몫, 메워 뭍이 된 곳은 뺀다) 또는 해수면 아래로 판 땅
+func water_at(p: Vector2) -> bool:
+	if _rings == 0 or _hgrid.is_empty():
+		return false
+	var rk := clampf(_ring_of(p.length()), 0.0, float(_rings - 1))
+	var k := int(round(rk))
+	var i := int(round(fposmod(atan2(p.y, p.x), TAU) / TAU * _segs)) % _segs
+	var idx := k * _segs + i
+	if flooded.has(idx):
+		return true
+	if _wet_base.is_empty() or idx >= _wet_base.size():
+		return false
+	return _wet_base[idx] > 127 and (is_nan(sea_z) or _hgrid[idx] <= sea_z + 0.25)
 
 
 ## 이 점이 물에 잠겼나 (둘레 꼭짓점 넷 중 하나라도)

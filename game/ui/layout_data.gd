@@ -76,3 +76,9 @@ static func grid() -> Dictionary:
 static func terrain() -> Dictionary:
 	load_all()
 	return data["terrain"]
+
+
+## 땅 구역 사기 (기지 넓히기)
+static func land() -> Dictionary:
+	load_all()
+	return data["land"]

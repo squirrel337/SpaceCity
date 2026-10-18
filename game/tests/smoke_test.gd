@@ -44,6 +44,7 @@ func _process(_delta: float) -> bool:
 		_world_check()
 		_plan_check()
 		_types_check()
+		_speed_check()
 		main._on_module_tapped("hab_module")
 		main._show_help()
 		main._show_report()
@@ -398,6 +399,7 @@ func _plan_check() -> void:
 	_check(tool.has_at and city._ghost.visible, "3D 유령 건물이 보이지 않는다")
 	tool.stop()
 	print("smoke: plan %d buildings, %d roads, route %d points" % [plan.buildings.size(), plan.edges.size(), path.size()])
+	_land_check()
 
 
 func _types_check() -> void:
@@ -789,3 +791,76 @@ func _free_road_spot(plan: CityPlan, length: float) -> Vector2:
 				x -= 3.0
 			y += 3.0
 	return Vector2.INF
+
+
+## 땅 구역: 기지에 붙은 구역을 사면 길이 깔리고 빈 블록이 생기고, 그 땅이 기지가 된다. 자동 운영은 스스로 넓힌다. 저장 왕복
+func _land_check() -> void:
+	var plan: CityPlan = main.plan
+	var sim: CitySim = main.sim
+	var cands := plan.land_candidates()
+	_check(not cands.is_empty(), "살 수 있는 땅 구역 후보가 없다")
+	var pick := {}
+	for st in cands:
+		if bool(st["ok"]):
+			pick = st
+			break
+	_check(not pick.is_empty(), "살 수 있는 땅 구역이 하나도 없다: %s" % str(cands.map(func(x): return x["reason"])))
+	if pick.is_empty():
+		return
+	_check(not plan.in_land((pick["rect"] as Rect2).get_center() + Vector2(0.1, 0.1)) or plan._parcel_base(pick["cell"]) > 0,
+		"사기 전에 구역이 땅이다")
+	sim.stock["parts"] = float(sim.stock["parts"]) + 500.0
+	sim.support += 1000.0
+	var e0 := plan.edges.size()
+	var b0 := plan.blocks().size()
+	var tool: PlaceTool = main.tool
+	main._begin_tool("land")
+	var rect: Rect2 = pick["rect"]
+	tool.click(rect.get_center())
+	_check(plan.land.has(pick["cell"]), "땅 구역을 사지 못했다: " + tool.reason)
+	_check(plan.edges.size() > e0 and plan.blocks().size() > b0, "산 구역에 길·블록이 생기지 않았다 (길 %d→%d, 블록 %d→%d)" % [
+		e0, plan.edges.size(), b0, plan.blocks().size()])
+	_check(plan.in_land(rect.get_center()), "산 구역이 땅이 아니다")
+	tool.click(rect.get_center())
+	_check(tool.reason.contains("이미 가진"), "가진 구역을 또 살 수 있다: " + tool.reason)
+	main.world.city.update(0.016, 0)
+	tool.stop()
+	var nb := plan.blocks().filter(func(b): return rect.has_point(b["center"]))
+	_check(not nb.is_empty(), "산 구역 안에 블록이 없다")
+	# 자동 운영: 자리가 모자라면 구획 가까이의 구역을 사서 그 구획 블록으로
+	var n_land := plan.land.size()
+	if sim.autopilot == null:
+		sim.autopilot = AutoPolicy.new("good")
+		sim.autopilot.configure(sim)
+	var ok := plan._auto_expand("hab_module", sim)
+	_check(ok and plan.land.size() == n_land + 1, "자동 운영이 땅을 넓히지 않았다")
+	var back := CityPlan.from_save(JSON.parse_string(JSON.stringify(plan.to_save())), sim, plan.layout)
+	_check(back.land.size() == plan.land.size(), "산 땅 구역이 저장되지 않았다")
+	print("smoke: land %d parcels, %d candidates (%d open), roads %d" % [plan.land.size(), cands.size(),
+		cands.filter(func(x): return bool(x["ok"])).size(), plan.edges.size()])
+
+
+## 시간: 최고 속도는 한 프레임에 여러 시간을 흘리고, 다음 사건 계속 넘기기는 사건을 지나서도 이어 간다
+func _speed_check() -> void:
+	var col: Colonies = main.colonies
+	main.modal.visible = false
+	var h0 := col.hour
+	main._on_speed_button(main.MAX_SPEED)
+	for _i in 5:
+		main._process(0.016)
+	var fast := col.hour - h0
+	_check(fast >= 10, "최고 속도가 빠르지 않다 (5프레임에 %d시간)" % fast)
+	main._on_speed_button(0)
+	var h1 := col.hour
+	main._begin_auto_jump()
+	for _i in 80:
+		if main.modal.visible:
+			if main.modal.context == "storm":
+				main._on_modal_choice("storm", "lottery")
+			main.modal.visible = false
+		main._process(0.5)
+	var jumped := col.hour - h1
+	_check(jumped >= 24 * 5, "다음 사건 계속 넘기기가 이어 가지 않았다 (%d시간)" % jumped)
+	main._stop_auto_jump()
+	main._set_speed(0)
+	print("smoke: speed — max %d h in 5 frames, auto-jump %d h" % [fast, jumped])

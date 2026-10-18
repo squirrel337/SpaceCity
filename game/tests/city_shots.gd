@@ -236,6 +236,54 @@ func _process(_delta: float) -> bool:
 					main.plan.edit_terrain(p + Vector2(70, -30), 12.0, "raise", 1.0)
 				tool.hover(p + Vector2(40, 0))
 				_aim(w, p + Vector2(30, -10), 0.3, 55.0), func(): return _settled(w)],
+			["land_tool", func():
+				# 확장: 기지 밖의 구역을 가리킨다
+				main._begin_tool("land")
+				var plan: CityPlan = main.plan
+				main.sim.stock["parts"] = float(main.sim.stock["parts"]) + 800.0
+				main.sim.support += 3000.0
+				var pick := {}
+				for st in plan.land_candidates():
+					if bool(st["ok"]) and plan._parcel_base(st["cell"]) == 0:
+						pick = st
+						break
+				var c: Vector2 = (pick["rect"] as Rect2).get_center() if not pick.is_empty() else plan.hub()
+				tool.hover(c)
+				_aim(w, c.lerp(plan.hub(), 0.4), 0.7, 48.0), func(): return _settled(w)],
+			["land_bought", func():
+				# 구역 넷을 사서 빈 블록에 농장을 세운다 (비탈이면 기초 위에)
+				_until_lit()
+				var plan: CityPlan = main.plan
+				var last := Rect2()
+				var n := 0
+				for st in plan.land_candidates():
+					if n >= 4:
+						break
+					if bool(st["ok"]) and plan._parcel_base(st["cell"]) == 0 and plan.buy_parcel(st["cell"], main.sim):
+						n += 1
+						last = st["rect"]
+				var fresh: Array = []
+				for b in plan.blocks():
+					if String(b["district"]) == "" and not plan.layout.base_has(b["center"]):
+						plan.set_district(b["center"], "farm")
+						fresh.append(b)
+				tool.stop()
+				main.sim.stock["parts"] = float(main.sim.stock["parts"]) + 800.0
+				for b in fresh:
+					for kind in ["hydroponics", "food_store"]:
+						var at := CityPlan.snap_center(kind, b["center"], 0)
+						if plan.check(kind, at, 0, main.sim)["reason"] == "":
+							tool.start_build(kind)
+							tool.hover(at)
+							tool.commit(false)
+							break
+				tool.stop()
+				var placed := 0
+				for e in plan.buildings:
+					if not plan.layout.base_has(Vector2(float(e["x"]), float(e["y"]))):
+						placed += 1
+				print("land shots: bought %d, fresh blocks %d, buildings on new land %d" % [n, fresh.size(), placed])
+				_aim(w, last.get_center().lerp(plan.hub(), 0.25), 0.5, 55.0), func(): return _settled(w)],
 			["metro_card", func():
 				tool.stop()
 				_metro_setup()
@@ -280,6 +328,6 @@ func _process(_delta: float) -> bool:
 			_wait = 0
 	else:
 		@warning_ignore("integer_division")
-		_shot("city_%02d_%s" % [_step / 2 + 1, s[0]], String(s[0]).ends_with("_tool") or String(s[0]) == "metro_card")
+		_shot("city_%02d_%s" % [_step / 2 + 1, s[0]], String(s[0]).ends_with("_tool") or String(s[0]) in ["metro_card", "land_bought"])
 	_step += 1
 	return false
