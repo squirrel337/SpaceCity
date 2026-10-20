@@ -9,13 +9,13 @@ extends Node3D
 ## 실제 금융가·상권(districts)에는 이름표가 서고, 우주 상점가·채권·펀드가 있으면 그 지구에 빛기둥이 선다.
 ## 운영 방식이 있으면 시설 단지 사이에 그 방식의 단지(물류 센터·동맹 연구탑·비상 창고)와 빛기둥이 선다.
 ## 시가지 안의 첨단 산업 지역(상하이 장장·싱가포르 북부)은 그 자리의 블록을 비우고 TechCampus 단지를 짓는다.
-## 땅(대도시의 SiteSurface)의 모형 좌표 위에 선다: 미터, 원점 = 도심. 땅을 구운 뒤 몇 프레임에 걸쳐 짓는다.
+## 땅(대도시의 SiteSurface)의 모형 좌표 위에 선다: 미터, 원점 = 도심. 땅을 구운 뒤 몇 프레임에 걸쳐 짓는다 —
+## 블록 고르기·정렬·랜드마크·다리·건물·첨단 산업 단지·2 km 칸마다의 묶음을 한 프레임에 BUILD_US까지만 (끊기지 않게).
 
 const CHUNK_M := 2000.0
 const GEN_R := 12000.0           # 블록을 고르는 반지름 (그 밖의 부도심은 둘레만)
 const FAR_CENTER_R := 2600.0
-const ROWS_PER_FRAME := 24
-const BLOCKS_PER_FRAME := 900
+const BUILD_US := 4000           # 시가지를 짓는 데 한 프레임에 쓰는 시간 (μs)
 const SHORE_M := 100.0           # 물가 띠 (호안 5 + 강변 공원 ~56 + 덤불 3 + 강변 도로 24 + 가로수 8 — earth_surface의 WF_*)
 const STREET_M := 8.0            # 블록 가장자리에서 건물까지: 골목 쪽
 const AVENUE_M := 16.0           # 큰길 쪽 (큰길 반폭 15 m + 보도)
@@ -24,7 +24,6 @@ const BRIDGE_W := 26.0           # 상판 폭 (왕복 4~6차로와 보도)
 const BRIDGE_MIN_M := 60.0       # 물 위 길이
 const BRIDGE_MAX_M := 1500.0
 const BRIDGES_MAX := 80
-const BRIDGE_LINES_PER_FRAME := 4
 const RAMP_GRADE := 0.055
 
 var metro: Dictionary
@@ -33,6 +32,7 @@ var budget := 26000
 var count := 0                   # 지은 건물 수
 var _style: Dictionary
 var _map: Image
+var _map_tex: Texture2D          # 해안 지도 — CPU 사본(_map)은 땅을 구운 뒤 따로 한 프레임에 읽는다
 var _half_km := 30.0
 var _mat: ShaderMaterial
 var _box: ArrayMesh
@@ -46,8 +46,15 @@ var _block := 120.0
 var _radius_m := 20000.0
 var _gen_r := 12000.0
 var _centers: Array = []         # [동, 북, 무게]
-var _cands: Array = []           # [점수, 동, 북, 밀도, 영향]
+var _cands: Array = []           # [점수, 동, 북, 밀도, 영향, 물가, 거리]
+var _ckeys := PackedInt64Array() # 짓는 차례: (4 − 점수)를 높은 자리에, 후보 번호를 낮은 24비트에 — 정수 정렬 한 번
 var _phase := 0                  # 0 땅 기다림 · 1 블록 고르기 · 2 짓기 · 3 끝
+var _tail := 0                   # 고르기·짓기의 마무리 단계 (한 프레임에 하나씩)
+var _far: Array = []             # 짓는 반지름 밖의 부도심 (둘레 블록을 따로 고른다)
+var _far_i := 0
+var _far_row := 0
+var _id_hash := 0
+var _commit_keys: Array = []     # 아직 MultiMesh로 묶지 않은 칸
 var _row := 0
 var _n := 0
 var _cursor := 0
@@ -85,11 +92,7 @@ func setup(m: Dictionary, g: SiteSurface, hi: bool) -> void:
 	_ax = g.site_frame().x
 	_ay = g.site_frame().y
 	_half_km = float(m["radius_km"]) + 10.0
-	var tex := PlanetLook.coast_local(String(m["key"]))
-	if tex != null:
-		_map = tex.get_image()
-		if _map != null and _map.is_compressed():
-			_map.decompress()
+	_map_tex = PlanetLook.coast_local(String(m["key"]))
 	var th := deg_to_rad(float(m.get("grid_deg", 0.0)))
 	_uu = Vector2(sin(th), cos(th))
 	_vv = Vector2(cos(th), -sin(th))
@@ -100,9 +103,19 @@ func setup(m: Dictionary, g: SiteSurface, hi: bool) -> void:
 		var en := _en_of(float(cc[1]), float(cc[2]))
 		_centers.append([en.x, en.y, float(cc[3])])
 	_n = int(ceil(_gen_r / _block)) + 1
+	_id_hash = String(m["id"]).hash()
 	_mat = ShaderMaterial.new()
 	_mat.shader = load("res://ui/world/shaders/tower.gdshader")
 	_box = _box_mesh()
+
+
+## 해안 지도의 CPU 사본 (GPU에서 되읽는다 — 땅을 만드는 프레임과 나눠서)
+func _read_map() -> void:
+	if _map == null and _map_tex != null:
+		_map = _map_tex.get_image()
+		if _map != null and _map.is_compressed():
+			_map.decompress()
+	_map_tex = null
 
 
 ## 위도·경도 → 도심에서 동·북 (m, 접평면)
@@ -170,31 +183,50 @@ func update(_view: WorldView) -> void:
 			_build_some()
 
 
-## 블록 고르기: 격자를 줄마다 훑어 물·공원이 아닌 블록에 점수를 매긴다 (도심 영향 + 밀도)
+## 블록 고르기: 격자를 줄마다 훑어 물·공원이 아닌 블록에 점수를 매긴다 (도심 영향 + 밀도). 한 프레임에 BUILD_US까지,
+## 그다음 먼 부도심 둘레를 하나씩, 그다음 정렬 · 랜드마크 · 다리 계획을 한 프레임에 하나씩
 func _pick_rows() -> void:
-	var end := mini(_row + ROWS_PER_FRAME, _n)
-	var far: Array = []
-	for c in _centers:
-		if Vector2(c[0], c[1]).length() > _gen_r - 600.0:
-			far.append(Vector2(c[0], c[1]))
-	for i in range(_row, end):
+	if _map_tex != null:
+		_read_map()
+		return
+	var t0 := Time.get_ticks_usec()
+	if _row == -_n and _cands.is_empty() and _far.is_empty():
+		for c in _centers:
+			if Vector2(c[0], c[1]).length() > _gen_r - 600.0:
+				_far.append(Vector2(c[0], c[1]))
+	while _row < _n:
 		for j in range(-_n, _n):
-			_consider(Vector2(i + 0.5, j + 0.5) * _block, far, false)
-	# 먼 부도심 둘레
-	if end >= _n:
-		for fc in far:
-			var nf := int(ceil(FAR_CENTER_R / _block)) + 1
-			var gi := int(floor((fc as Vector2).dot(_vv) / _block))
-			var gj := int(floor((fc as Vector2).dot(_uu) / _block))
-			for i2 in range(gi - nf, gi + nf):
-				for j2 in range(gj - nf, gj + nf):
-					_consider(Vector2(i2 + 0.5, j2 + 0.5) * _block, [fc], true)
-		_cands.sort_custom(func(a, b): return a[0] > b[0])
-		_phase = 2
-		_cursor = 0
-		_landmarks()
-		_plan_bridges()
-	_row = end
+			_consider(Vector2(_row + 0.5, j + 0.5) * _block, _far, false)
+		_row += 1
+		if Time.get_ticks_usec() - t0 > BUILD_US:
+			return
+	# 먼 부도심 둘레 (한 줄씩)
+	var nf := int(ceil(FAR_CENTER_R / _block)) + 1
+	while _far_i < _far.size():
+		var fc: Vector2 = _far[_far_i]
+		var only: Array = [fc]
+		var i2 := int(floor(fc.dot(_vv) / _block)) - nf + _far_row
+		var gj := int(floor(fc.dot(_uu) / _block))
+		for j2 in range(gj - nf, gj + nf):
+			_consider(Vector2(i2 + 0.5, j2 + 0.5) * _block, only, true)
+		_far_row += 1
+		if _far_row >= 2 * nf:
+			_far_row = 0
+			_far_i += 1
+		if Time.get_ticks_usec() - t0 > BUILD_US:
+			return
+	match _tail:
+		0:
+			_ckeys.sort()                       # 높은 점수부터 (같으면 먼저 본 블록부터)
+			_tail = 1
+		1:
+			_landmarks()
+			_tail = 2
+		_:
+			_plan_bridges()
+			_phase = 2
+			_cursor = 0
+			_tail = 0
 
 
 func _consider(g: Vector2, far: Array, only_far: bool) -> void:
@@ -222,11 +254,13 @@ func _consider(g: Vector2, far: Array, only_far: bool) -> void:
 	if dens < 0.04 and infl < 0.05:
 		return
 	# 도심에서 바깥으로 차례로 (부도심 둘레는 앞당긴다) — 예산이 다하면 바깥은 바닥의 시가지 무늬가 맡는다
-	_cands.append([dens + 0.9 * infl + h * 0.08, en.x, en.y, dens, infl, minf(s.x, 0.6), dist])
+	var score := dens + 0.9 * infl + h * 0.08
+	_ckeys.append((int((4.0 - clampf(score, 0.0, 3.99)) * 268435456.0) << 24) | _cands.size())
+	_cands.append([score, en.x, en.y, dens, infl, minf(s.x, 0.6), dist])
 
 
 func _hash(g: Vector2) -> float:
-	return float(absi(hash(Vector3i(int(floor(g.x)), int(floor(g.y)), String(metro["id"]).hash()))) % 100000) / 100000.0
+	return float(absi(hash(Vector3i(int(floor(g.x)), int(floor(g.y)), _id_hash))) % 100000) / 100000.0
 
 
 ## 땅의 높이 (m, 모형 좌표의 평면 기준 — 곡률은 _pos가 내린다)
@@ -308,27 +342,42 @@ func _land_near(en: Vector2) -> Vector2:
 
 
 func _build_some() -> void:
-	if _bridge_i < _bridge_lines.size():
-		var end_b := mini(_bridge_i + BRIDGE_LINES_PER_FRAME, _bridge_lines.size())
-		for i in range(_bridge_i, end_b):
-			_scan_line(int(_bridge_lines[i][0]), float(_bridge_lines[i][1]))
-		_bridge_i = end_b
-		return
-	var end := mini(_cursor + BLOCKS_PER_FRAME, _cands.size())
-	for k in range(_cursor, end):
+	var t0 := Time.get_ticks_usec()
+	while _bridge_i < _bridge_lines.size():
+		_scan_line(int(_bridge_lines[_bridge_i][0]), float(_bridge_lines[_bridge_i][1]))
+		_bridge_i += 1
+		if Time.get_ticks_usec() - t0 > BUILD_US:
+			return
+	while _cursor < _ckeys.size():
 		if count >= budget:
-			end = _cands.size()
+			_cursor = _ckeys.size()
 			break
-		var c: Array = _cands[k]
+		var c: Array = _cands[_ckeys[_cursor] & 0xFFFFFF]
 		_block_buildings(Vector2(c[1], c[2]), float(c[3]), float(c[4]), float(c[5]), float(c[6]))
-	_cursor = end
-	if _cursor >= _cands.size():
-		var reg := _build_regions()
-		_commit()
-		_region_mat = TechSite._plain_mesh(self, reg)
-		_region_labels = reg["labels"]
-		_phase = 3
-		_cands.clear()
+		_cursor += 1
+		if (_cursor & 15) == 0 and Time.get_ticks_usec() - t0 > BUILD_US:
+			return
+	# 마무리: 첨단 산업 단지 → 2 km 칸마다 MultiMesh로 (한 프레임에 BUILD_US까지) → 다리 → 끝
+	match _tail:
+		0:
+			var reg := _build_regions()
+			_region_mat = TechSite._plain_mesh(self, reg)
+			_region_labels = reg["labels"]
+			_commit_keys = _chunks.keys()
+			_tail = 1
+		1:
+			while not _commit_keys.is_empty():
+				_commit_chunk(_commit_keys.pop_back())
+				if Time.get_ticks_usec() - t0 > BUILD_US:
+					return
+			_tail = 2
+		_:
+			_commit_bridges()
+			_chunks.clear()
+			_cands.clear()
+			_ckeys = PackedInt64Array()
+			_phase = 3
+			_tail = 0
 
 
 ## 블록 하나의 건물들 (시가지 모양에 따라). 도심에서 먼 블록(부도심 밖 5 km 너머)은 덩어리 건물 하나로
@@ -445,47 +494,89 @@ func _add(en: Vector2, w: float, d: float, h: float, glass: float, turn: float, 
 	count += 1
 
 
+## 지은 것을 모두 MultiMesh로 (첨단 산업 지역의 땅 — TechSite가 한 번에 부른다)
 func _commit() -> void:
-	for key in _chunks:
-		var ch: Dictionary = _chunks[key]
-		var xs: Array = ch["xf"]
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.use_custom_data = true
-		mm.mesh = _box
-		mm.instance_count = xs.size()
-		for i in xs.size():
-			mm.set_instance_transform(i, xs[i])
-			mm.set_instance_color(i, ch["col"][i])
-			mm.set_instance_custom_data(i, ch["cus"][i])
-		var mi := MultiMeshInstance3D.new()
-		mi.multimesh = mm
-		mi.material_override = _mat
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _shadows \
-			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(mi)
+	for key in _chunks.keys():
+		_commit_chunk(key)
 	_chunks.clear()
-	if not _bxf.is_empty():
-		var bm := MultiMesh.new()
-		bm.transform_format = MultiMesh.TRANSFORM_3D
-		bm.use_colors = true
-		bm.use_custom_data = true
-		bm.mesh = BoxMesh.new()
-		bm.instance_count = _bxf.size()
-		for i in _bxf.size():
-			bm.set_instance_transform(i, _bxf[i])
-			bm.set_instance_color(i, _bcol[i])
-			bm.set_instance_custom_data(i, _bcus[i])
-		_bmat = ShaderMaterial.new()
-		_bmat.shader = load("res://ui/world/shaders/bridge.gdshader")
-		var bi := MultiMeshInstance3D.new()
-		bi.multimesh = bm
-		bi.material_override = _bmat
-		bi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _shadows \
-			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(bi)
-		_bxf.clear()
+	_commit_bridges()
+
+
+## 2 km 칸 하나의 건물을 MultiMesh 하나로 — 버퍼를 한 번에 채운다 (인스턴스마다 세 번 부르지 않게)
+func _commit_chunk(key: Vector2i) -> void:
+	var ch: Dictionary = _chunks[key]
+	var xs: Array = ch["xf"]
+	var cols: PackedColorArray = ch["col"]
+	var cus: PackedColorArray = ch["cus"]
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.use_custom_data = true
+	mm.mesh = _box
+	mm.instance_count = xs.size()
+	mm.buffer = _mm_buffer(xs, cols, cus)
+	var mi := MultiMeshInstance3D.new()
+	mi.multimesh = mm
+	mi.material_override = _mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _shadows \
+		else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	_chunks.erase(key)
+
+
+## MultiMesh 버퍼 (인스턴스마다 변환 12 · 색 4 · 사용자 자료 4 실수 — Godot의 3D 변환은 행 순서 basis 행 + 원점)
+static func _mm_buffer(xs: Array, cols: PackedColorArray, cus: PackedColorArray) -> PackedFloat32Array:
+	var buf := PackedFloat32Array()
+	buf.resize(xs.size() * 20)
+	var o := 0
+	for i in xs.size():
+		var t: Transform3D = xs[i]
+		var b := t.basis
+		buf[o] = b.x.x
+		buf[o + 1] = b.y.x
+		buf[o + 2] = b.z.x
+		buf[o + 3] = t.origin.x
+		buf[o + 4] = b.x.y
+		buf[o + 5] = b.y.y
+		buf[o + 6] = b.z.y
+		buf[o + 7] = t.origin.y
+		buf[o + 8] = b.x.z
+		buf[o + 9] = b.y.z
+		buf[o + 10] = b.z.z
+		buf[o + 11] = t.origin.z
+		var c := cols[i]
+		buf[o + 12] = c.r
+		buf[o + 13] = c.g
+		buf[o + 14] = c.b
+		buf[o + 15] = c.a
+		var u := cus[i]
+		buf[o + 16] = u.r
+		buf[o + 17] = u.g
+		buf[o + 18] = u.b
+		buf[o + 19] = u.a
+		o += 20
+	return buf
+
+
+func _commit_bridges() -> void:
+	if _bxf.is_empty():
+		return
+	var bm := MultiMesh.new()
+	bm.transform_format = MultiMesh.TRANSFORM_3D
+	bm.use_colors = true
+	bm.use_custom_data = true
+	bm.mesh = BoxMesh.new()
+	bm.instance_count = _bxf.size()
+	bm.buffer = _mm_buffer(_bxf, _bcol, _bcus)
+	_bmat = ShaderMaterial.new()
+	_bmat.shader = load("res://ui/world/shaders/bridge.gdshader")
+	var bi := MultiMeshInstance3D.new()
+	bi.multimesh = bm
+	bi.material_override = _bmat
+	bi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _shadows \
+		else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(bi)
+	_bxf.clear()
 
 
 # ── 다리 ─────────────────────────────────────────────────────────

@@ -54,25 +54,86 @@ static func set_night(k: float) -> void:
 		(m as ShaderMaterial).set_shader_parameter("night", k)
 
 
-## 건물(변형 v) 또는 탈것의 메시
+## 건물(변형 v) 또는 탈것의 메시 (다른 스레드에서 만드는 중이면 끝날 때까지 기다린다)
 static func mesh(group: String, id: String, v: int = 0) -> ArrayMesh:
 	var key := "%s/%s/%d" % [group, id, v]
 	if _cache.has(key):
 		return _cache[key]
-	var prims: Array = []
-	var g: Dictionary = data().get(group, {})
-	if g.has(id):
-		if group == "buildings":
-			var vs: Array = g[id]
-			prims = vs[clampi(v, 0, vs.size() - 1)]
-		else:
-			prims = g[id]
+	if _jobs.has(key):
+		WorkerThreadPool.wait_for_task_completion(_jobs[key])
+		_jobs.erase(key)
+		_lock.lock()
+		var made: ArrayMesh = _made.get(key)
+		_made.erase(key)
+		_lock.unlock()
+		_cache[key] = made
+		return made
 	var b := _Builder.new()
-	for p in prims:
+	for p in _prims(group, id, v):
 		b.prim(p)
 	var m := b.commit(materials())
 	_cache[key] = m
 	return m
+
+
+static func _prims(group: String, id: String, v: int) -> Array:
+	var g: Dictionary = data().get(group, {})
+	if not g.has(id):
+		return []
+	if group == "buildings":
+		var vs: Array = g[id]
+		return vs[clampi(v, 0, vs.size() - 1)]
+	return g[id]
+
+
+# ── 다른 스레드에서 만들기 ──────────────────────────────────────
+## 모형 하나에 수 ms (휴대폰은 몇 배) — 처음 보는 모형이 여럿이면 프레임이 멈춘다. 그래서 도시는 ready()로 묻고,
+## 아직이면 다른 스레드가 만드는 동안 그 모형만 빼고 그린 뒤 다 되면 다시 그린다
+static var _jobs := {}               # 열쇠 → 작업 번호
+static var _made := {}               # 열쇠 → 다 만든 메시 (작업이 넣는다 — _lock으로 지킨다)
+static var _lock := Mutex.new()
+
+
+## 메시가 있나 — 없으면 다른 스레드에서 만들기 시작한다
+static func ready(group: String, id: String, v: int = 0) -> bool:
+	var key := "%s/%s/%d" % [group, id, v]
+	if _cache.has(key):
+		return true
+	_collect()
+	if _cache.has(key):
+		return true
+	if not _jobs.has(key):
+		_jobs[key] = WorkerThreadPool.add_task(_make.bind(key, _prims(group, id, v), materials()), false, "model " + key)
+	return false
+
+
+## 다른 스레드에서 만드는 모형 수 (다 만든 것은 거둔다)
+static func pending() -> int:
+	_collect()
+	return _jobs.size()
+
+
+static func _make(key: String, prims: Array, mats: Array) -> void:
+	var b := _Builder.new()
+	for p in prims:
+		b.prim(p)
+	var m := b.commit(mats)
+	_lock.lock()
+	_made[key] = m
+	_lock.unlock()
+
+
+static func _collect() -> void:
+	if _jobs.is_empty():
+		return
+	_lock.lock()
+	var made := _made
+	_made = {}
+	_lock.unlock()
+	for key in made:
+		WorkerThreadPool.wait_for_task_completion(_jobs[key])
+		_jobs.erase(key)
+		_cache[key] = made[key]
 
 
 static func color(i: int) -> Color:

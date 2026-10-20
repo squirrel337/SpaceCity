@@ -8,6 +8,7 @@ extends Node3D
 signal module_tapped(mid: String)
 
 const VIS_SPEED := [0.0, 1.0, 1.6, 2.4]
+const MESH_US := 3000              # 길 그물·구획 판을 짓는 데 한 프레임에 쓰는 시간 (μs)
 const HEADING_DEG := {"se": 0.0, "sw": 90.0, "nw": 180.0, "ne": 270.0}
 
 var sim: CitySim
@@ -34,6 +35,10 @@ var _floods: Array = []
 var _night := 0.0
 var _t := 0.0
 var _boxes: Array = []            # [AABB(로컬), id, item]
+var _models_wait := false         # 다른 스레드가 아직 만드는 모형이 있다 (다 되면 다시 그린다)
+var _wait_h := 0.0                # 땅의 높이 격자를 기다린 시간 (s) — 굽기가 안 되면 2초 뒤 그냥 깐다
+var _road_job: RoadMesh           # 짓는 중인 길 그물 메시
+var _district_job: _Job           # 짓는 중인 구획 판 메시
 var _road_rev := -1
 var _ghost: MeshInstance3D
 var _ghost_key := ""
@@ -132,22 +137,33 @@ func update(delta: float, speed_level: int) -> void:
 	_t += delta
 	plan.sync(sim, CityPlan.SYNC_FRAME_US)          # 오래 안 본 도시는 프레임마다 조금씩 맞춘다
 	ground.apply_terrain(plan)
-	if plan.road_rev != _road_rev:
-		_road_rev = plan.road_rev
-		if _roads:
-			_roads.queue_free()
-			_roads = null
-		_build_roads()
-	var dsig := "%d|%d|%d" % [plan.road_rev, plan.zone_rev, plan.terrain_rev]
-	if dsig != _district_sig and _districts:
-		_district_sig = dsig
-		_districts.mesh = _district_mesh()
+	# 길·구획·바깥 길은 땅의 높이 격자를 구운 뒤에 깐다 (굽기 전 높이는 셈이 몇 배 느리고, 구운 뒤 다시 깔아야 한다).
+	# 길 그물·구획 판은 몇 프레임에 나눠 짓고 다 지으면 바꾼다 (그동안 옛 것이 보인다)
+	var heights_ok := ground.baked_heights() or not ground.will_bake() or _wait_h > 2.0
+	if not heights_ok:
+		_wait_h += delta
+	else:
+		if plan.road_rev != _road_rev:
+			_road_rev = plan.road_rev
+			_road_job = RoadMesh.start(plan, _local)
+		var dsig := "%d|%d|%d" % [plan.road_rev, plan.zone_rev, plan.terrain_rev]
+		if dsig != _district_sig and _districts:
+			_district_sig = dsig
+			_district_job = _district_mesh_job()
+		if _road_job != null:
+			if _road_job.step(MESH_US):
+				_set_roads(_road_job.mesh())
+				_road_job = null
+		elif _district_job != null and _district_job.run(MESH_US):
+			_districts.mesh = _district_job.geo.mesh()
+			_district_job = null
 	var sig := _signature()
-	if sig != _sig:
+	if sig != _sig or (_models_wait and ModelLib.pending() == 0):
 		_sig = sig
 		_rebuild()
 	_update_tool()
-	_update_ways()
+	if heights_ok:
+		_update_ways()
 	var sites := BaseScene.sites(sim, plan)
 	if transport != null:
 		traffic.intercity(transport, site_key, {"highways": highways, "runway": runway, "bearings": bearings})
@@ -178,16 +194,20 @@ func _signature() -> String:
 
 func _rebuild() -> void:
 	_items = BaseScene.collect(sim, plan)
+	_models_wait = false
 	var plinths: Array = []
+	var seats: Array = []             # 건물마다 앉는 자리 (한 번만 셈한다 — 땅 높이를 다섯 곳 읽는다)
 	var by_key := {}
-	for it in _items:
+	for i in _items.size():
+		var it: Dictionary = _items[i]
+		seats.append(_seat(it, plinths))
 		if it["building"]:
 			continue
 		var key := "%s/%d" % [it["sprite"], it["variant"]]
 		if not by_key.has(key):
 			by_key[key] = []
-		by_key[key].append(it)
-	# 멀티메시: 모양마다 하나
+		by_key[key].append(i)
+	# 멀티메시: 모양마다 하나 (처음 보는 모형은 다른 스레드가 만드는 동안 빼 두었다가 다 되면 다시 그린다)
 	for key in _groups.keys():
 		if not by_key.has(key):
 			(_groups[key] as Node).queue_free()
@@ -196,10 +216,13 @@ func _rebuild() -> void:
 		var list: Array = by_key[key]
 		var mmi: MultiMeshInstance3D = _groups.get(key)
 		if mmi == null:
+			var parts := String(key).split("/")
+			if not ModelLib.ready("buildings", parts[0], int(parts[1])):
+				_models_wait = true
+				continue
 			mmi = MultiMeshInstance3D.new()
 			var mm := MultiMesh.new()
 			mm.transform_format = MultiMesh.TRANSFORM_3D
-			var parts := String(key).split("/")
 			mm.mesh = ModelLib.mesh("buildings", parts[0], int(parts[1]))
 			mmi.multimesh = mm
 			add_child(mmi)
@@ -207,23 +230,32 @@ func _rebuild() -> void:
 		var m := mmi.multimesh
 		m.instance_count = list.size()
 		for i in list.size():
-			m.set_instance_transform(i, _seat(list[i], plinths))
+			m.set_instance_transform(i, seats[list[i]])
 	# 공사 현장 (비계): 따로
 	for c in _sites_root.get_children():
 		c.queue_free()
-	for it in _items:
+	for i in _items.size():
+		var it: Dictionary = _items[i]
 		if not it["building"]:
+			continue
+		if not ModelLib.ready("buildings", it["sprite"], 0):
+			_models_wait = true
 			continue
 		var mi := MeshInstance3D.new()
 		mi.mesh = ModelLib.mesh("buildings", it["sprite"], 0)
-		mi.transform = _seat(it, plinths)
+		mi.transform = seats[i]
 		_sites_root.add_child(mi)
-	# 누를 상자
+	# 누를 상자 (모형이 아직이면 바닥 크기의 낮은 상자)
 	_boxes.clear()
-	for it in _items:
-		var mesh := ModelLib.mesh("buildings", it["sprite"], it["variant"])
-		var box := _seat(it, []) * mesh.get_aabb()
-		_boxes.append([box, it["id"], it])
+	for i in _items.size():
+		var it: Dictionary = _items[i]
+		var aabb: AABB
+		if ModelLib.ready("buildings", it["sprite"], it["variant"]):
+			aabb = ModelLib.mesh("buildings", it["sprite"], it["variant"]).get_aabb()
+		else:
+			var f := CityPlan.foot_of(String(it["id"]), 0) * 0.5
+			aabb = AABB(Vector3(-f.x, 0.0, -f.y), Vector3(f.x * 2.0, 4.0, f.y * 2.0))
+		_boxes.append([(seats[i] as Transform3D) * aabb, it["id"], it])
 	_set_plinths(plinths)
 
 
@@ -330,15 +362,16 @@ func _sync_agents(delta: float) -> void:
 
 # ── 길 ──────────────────────────────────────────────────────────
 ## 길 그물: 종류마다의 폭·무늬, 교차로 판, 굽은 곳, 막다른 곳 (RoadMesh). 땅을 따라가고 깊이에서 땅보다 앞선다
-func _build_roads() -> void:
-	_roads = MeshInstance3D.new()
-	_roads.mesh = RoadMesh.build(plan, _local)
-	if _road_mat == null:
-		_road_mat = ShaderMaterial.new()
-		_road_mat.shader = load("res://ui/world/shaders/road.gdshader")
-	_roads.material_override = _road_mat
-	_roads.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(_roads)
+func _set_roads(mesh: ArrayMesh) -> void:
+	if _roads == null:
+		_roads = MeshInstance3D.new()
+		if _road_mat == null:
+			_road_mat = ShaderMaterial.new()
+			_road_mat.shader = load("res://ui/world/shaders/road.gdshader")
+		_roads.material_override = _road_mat
+		_roads.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_roads)
+	_roads.mesh = mesh
 
 
 # ── 자리 고르기 ─────────────────────────────────────────────────
@@ -960,35 +993,61 @@ func _make_districts() -> void:
 
 ## 블록 판: 길이 둘러싼 블록마다 (보도 안쪽) 구획 색이 옅게 섞인 다진 바닥과 빛나는 테두리 — 빈 블록은 옅은 회색.
 ## 기본 자리의 필지 금과 두 줄 사이 뒷길 (지금 같은 구획 블록 안의 것만), 우주항·얼음 분화구, 거주 구역 가운데 광장
-func _district_mesh() -> ArrayMesh:
+## 조각(블록 하나, 구획 하나의 필지 금…)으로 나눠 몇 프레임에 짓는다
+func _district_mesh_job() -> _Job:
 	var g := _Geo.new(self)
+	var job := _Job.new(g)
 	for b in plan.blocks():
-		var d := String(b["district"])
-		var col: Color = BaseLayout.district_info(d)[1]
-		var poly: PackedVector2Array = b["poly"]
-		var on := d != ""
-		g.poly(poly, 0.035, Color(Color(0.14, 0.14, 0.15).lerp(col, 0.22 if on else 0.04), 0.3 if on else 0.16))
-		g.outline_poly(poly, 1.0 if on else 0.45, 0.05, Color(col, 0.85 if on else 0.3), 1.0 if on else 0.0)
+		job.steps.append(func() -> void:
+			var d := String(b["district"])
+			var col: Color = BaseLayout.district_info(d)[1]
+			var poly: PackedVector2Array = b["poly"]
+			var on := d != ""
+			g.poly(poly, 0.035, Color(Color(0.14, 0.14, 0.15).lerp(col, 0.22 if on else 0.04), 0.3 if on else 0.16))
+			g.outline_poly(poly, 1.0 if on else 0.45, 0.05, Color(col, 0.85 if on else 0.3), 1.0 if on else 0.0))
 	for name in layout.lots:
-		for lot in layout.lots[name]:
-			var c := (lot as Rect2).get_center()
-			if name in BaseLayout.SPECIAL or plan.district_at(c) == name:
-				g.outline(lot, 0.3, 0.045, Color(0.85, 0.86, 0.88, 0.3))
+		job.steps.append(func() -> void:
+			for lot in layout.lots[name]:
+				var c := (lot as Rect2).get_center()
+				if name in BaseLayout.SPECIAL or plan.district_at(c) == name:
+					g.outline(lot, 0.3, 0.045, Color(0.85, 0.86, 0.88, 0.3)))
 	for name in layout.lanes:
-		for ln in layout.lanes[name]:
-			if plan.district_at((ln[0] + ln[1]) * 0.5) == name:
-				g.strip(ln[0], ln[1], 1.0, 0.04, Color(0.66, 0.64, 0.6, 0.28))
+		job.steps.append(func() -> void:
+			for ln in layout.lanes[name]:
+				if plan.district_at((ln[0] + ln[1]) * 0.5) == name:
+					g.strip(ln[0], ln[1], 1.0, 0.04, Color(0.66, 0.64, 0.6, 0.28)))
 	for name in BaseLayout.SPECIAL:
 		var r: Rect2 = layout.rects.get(name, Rect2())
 		if r.size != Vector2.ZERO:
-			var col2: Color = BaseLayout.district_info(name)[1]
-			g.grid(r.grow(4.0), 0.035, Color(Color(0.14, 0.14, 0.15).lerp(col2, 0.22), 0.3))
-			g.outline(r.grow(4.0), 1.1, 0.05, Color(col2, 0.85), 1.0)
-	var hub := Vector2(layout.hub.x, layout.hub.y)
-	g.disc(hub, BaseLayout.PLAZA_R, 0.26, Color(0.62, 0.6, 0.56, 0.75))
-	g.ring(hub, BaseLayout.PLAZA_R, 0.8, 0.27, Color(1.0, 0.78, 0.45, 0.8), 1.0)
-	g.ring(hub, BaseLayout.PLAZA_R * 0.45, 0.5, 0.27, Color(0.85, 0.86, 0.88, 0.45))
-	return g.mesh()
+			job.steps.append(func() -> void:
+				var col2: Color = BaseLayout.district_info(name)[1]
+				g.grid(r.grow(4.0), 0.035, Color(Color(0.14, 0.14, 0.15).lerp(col2, 0.22), 0.3))
+				g.outline(r.grow(4.0), 1.1, 0.05, Color(col2, 0.85), 1.0))
+	job.steps.append(func() -> void:
+		var hub := Vector2(layout.hub.x, layout.hub.y)
+		g.disc(hub, BaseLayout.PLAZA_R, 0.26, Color(0.62, 0.6, 0.56, 0.75))
+		g.ring(hub, BaseLayout.PLAZA_R, 0.8, 0.27, Color(1.0, 0.78, 0.45, 0.8), 1.0)
+		g.ring(hub, BaseLayout.PLAZA_R * 0.45, 0.5, 0.27, Color(0.85, 0.86, 0.88, 0.45)))
+	return job
+
+
+## 몇 프레임에 나눠 짓는 메시: 조각을 차례로 budget_us까지 (0이면 끝까지). 다 했으면 true
+class _Job:
+	var geo: _Geo
+	var steps: Array = []
+	var i := 0
+
+	func _init(g: _Geo) -> void:
+		geo = g
+
+	func run(budget_us: int) -> bool:
+		var t0 := Time.get_ticks_usec()
+		while i < steps.size():
+			(steps[i] as Callable).call()
+			i += 1
+			if budget_us > 0 and Time.get_ticks_usec() - t0 > budget_us:
+				break
+		return i >= steps.size()
 
 
 ## 구획마다 그 블록 위에 지어진 건물 수 (배치가 바뀔 때만 다시 센다)

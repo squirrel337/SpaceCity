@@ -16,6 +16,14 @@ var uv := PackedVector2Array()
 var uv2 := PackedVector2Array()
 var idx := PackedInt32Array()
 var h: Callable
+# 몇 프레임에 나눠 짓기 (start → step … → mesh): 시작할 때 베낀 길 그물
+var _nodes: Array = []
+var _edges: Array = []
+var _types: Array = []
+var _inc: Array = []
+var _back: Array = []
+var _k := 0
+var _i := 0
 
 
 func _init(p_h: Callable) -> void:
@@ -24,6 +32,15 @@ func _init(p_h: Callable) -> void:
 
 func _vert(p: Vector2, above: float, u: Vector2, code: float, length: float, nrm := Vector3.UP) -> int:
 	v.append(h.call(p, above))
+	n.append(nrm)
+	uv.append(u)
+	uv2.append(Vector2(code, length))
+	return v.size() - 1
+
+
+## 이미 잰 땅 위치 g(땅 높이 0)에서 above만큼 위 — 같은 점의 윗면·옆면이 땅 높이를 한 번만 잰다
+func _vert_g(g: Vector3, above: float, u: Vector2, code: float, length: float, nrm := Vector3.UP) -> int:
+	v.append(Vector3(g.x, g.y + above, g.z))
 	n.append(nrm)
 	uv.append(u)
 	uv2.append(Vector2(code, length))
@@ -46,24 +63,31 @@ func ribbon(a: Vector2, b: Vector2, hw: float, type: String, uv_y0 := 0.0, total
 	var tot := length if total < 0.0 else total
 	var code := code_of(type, 0)
 	var base := v.size()
+	var left := PackedVector3Array()      # 양쪽 가장자리의 땅 위치 (옆면이 다시 쓴다)
+	var right := PackedVector3Array()
 	for k in steps + 1:
 		var t := float(k) / steps
 		var c := a.lerp(b, t)
 		var yy := uv_y0 + t * length
-		for s in [-1.0, 1.0]:
-			_vert(c + side * hw * s, THICK, Vector2(0.5 + s * 0.5, yy), code, tot)
+		var gl: Vector3 = h.call(c - side * hw, 0.0)
+		var gr: Vector3 = h.call(c + side * hw, 0.0)
+		left.append(gl)
+		right.append(gr)
+		_vert_g(gl, THICK, Vector2(0.0, yy), code, tot)
+		_vert_g(gr, THICK, Vector2(1.0, yy), code, tot)
 	for k in steps:
 		var o := base + k * 2
 		idx.append_array(PackedInt32Array([o, o + 1, o + 2, o + 1, o + 3, o + 2]))
 	# 옆면: 가장자리에서 땅 속으로
-	for s: float in [-1.0, 1.0]:
+	for si in 2:
+		var s := -1.0 if si == 0 else 1.0
 		var sb := v.size()
 		var out := Vector3(side.x * s, 0.0, -side.y * s)
+		var pts := left if si == 0 else right
 		for k in steps + 1:
 			var t := float(k) / steps
-			var c := a.lerp(b, t) + side * hw * s
-			_vert(c, THICK, Vector2(0.0, uv_y0 + t * length), code_of(type, 2), tot, out)
-			_vert(c, -SKIRT, Vector2(1.0, uv_y0 + t * length), code_of(type, 2), tot, out)
+			_vert_g(pts[k], THICK, Vector2(0.0, uv_y0 + t * length), code_of(type, 2), tot, out)
+			_vert_g(pts[k], -SKIRT, Vector2(1.0, uv_y0 + t * length), code_of(type, 2), tot, out)
 		for k in steps:
 			var o := sb + k * 2
 			idx.append_array(PackedInt32Array([o, o + 2, o + 1, o + 1, o + 2, o + 3]))
@@ -102,23 +126,25 @@ func junction(center: Vector2, pts: PackedVector2Array, type: String) -> void:
 	var code := code_of(type, 1)
 	var c := _vert(center, THICK + 0.005, Vector2(0.5, 0.0), code, 0.0)
 	var first := v.size()
+	var gs := PackedVector3Array()
 	for p in pts:
-		_vert(p, THICK + 0.005, Vector2(0.5, 0.0), code, 0.0)
+		var g: Vector3 = h.call(p, 0.0)
+		gs.append(g)
+		_vert_g(g, THICK + 0.005, Vector2(0.5, 0.0), code, 0.0)
 	for i in pts.size():
 		var a := first + i
 		var b := first + (i + 1) % pts.size()
 		idx.append_array(PackedInt32Array([c, b, a]))
 	# 옆면
 	for i in pts.size():
-		var p: Vector2 = pts[i]
-		var q: Vector2 = pts[(i + 1) % pts.size()]
-		var e := (q - p).normalized()
+		var j := (i + 1) % pts.size()
+		var e := (pts[j] - pts[i]).normalized()
 		var out := Vector3(e.y, 0.0, e.x)
 		var sb := v.size()
-		_vert(p, THICK, Vector2(0.0, 0.0), code_of(type, 2), 0.0, out)
-		_vert(p, -SKIRT, Vector2(1.0, 0.0), code_of(type, 2), 0.0, out)
-		_vert(q, THICK, Vector2(0.0, 1.0), code_of(type, 2), 0.0, out)
-		_vert(q, -SKIRT, Vector2(1.0, 1.0), code_of(type, 2), 0.0, out)
+		_vert_g(gs[i], THICK, Vector2(0.0, 0.0), code_of(type, 2), 0.0, out)
+		_vert_g(gs[i], -SKIRT, Vector2(1.0, 0.0), code_of(type, 2), 0.0, out)
+		_vert_g(gs[j], THICK, Vector2(0.0, 1.0), code_of(type, 2), 0.0, out)
+		_vert_g(gs[j], -SKIRT, Vector2(1.0, 1.0), code_of(type, 2), 0.0, out)
 		idx.append_array(PackedInt32Array([sb, sb + 2, sb + 1, sb + 1, sb + 2, sb + 3]))
 
 
@@ -172,38 +198,67 @@ func mesh() -> ArrayMesh:
 # ── 길 그물 전체 ────────────────────────────────────────────────
 ## 계획의 길 그물을 한 메시로: 교차로의 물러남·판, 굽은 곳의 둥근 띠, 막다른 곳의 둥근 끝
 static func build(plan: CityPlan, p_h: Callable) -> ArrayMesh:
-	var rm := RoadMesh.new(p_h)
-	var nodes := plan.nodes
-	var inc := RoadNet.incident(nodes, plan.edges, plan.etypes)
-	var back := RoadNet.setbacks(nodes, inc)
-	for k in plan.edges.size():
-		var e: Vector2i = plan.edges[k]
-		var a: Vector2 = nodes[e.x]
-		var b: Vector2 = nodes[e.y]
-		var length := a.distance_to(b)
-		if length < 0.05:
-			continue
-		var dir := (b - a) / length
-		var sa := float((back[e.x] as Dictionary).get(k, 0.0))
-		var sb := float((back[e.y] as Dictionary).get(k, 0.0))
-		if sa + sb > length - 0.2:
-			var f := (length - 0.2) / maxf(sa + sb, 0.01)
-			sa *= f
-			sb *= f
-		var t := plan.edge_type(k)
-		rm.ribbon(a + dir * sa, b - dir * sb, LayoutData.road_half(t), t, sa)
-	for i in nodes.size():
-		var list: Array = inc[i]
-		var c: Vector2 = nodes[i]
-		match list.size():
-			1:
-				rm._cap(c, list[0])
-			2:
-				rm._bend(c, list[0], list[1], back[i])
-			_:
-				if list.size() >= 3:
-					rm._crossing(c, list, back[i])
+	var rm := start(plan, p_h)
+	rm.step(0)
 	return rm.mesh()
+
+
+## 나눠 짓기를 시작한다: 길 그물을 베껴 둔다 (짓는 동안 계획이 바뀌면 부르는 쪽이 새로 시작한다)
+static func start(plan: CityPlan, p_h: Callable) -> RoadMesh:
+	var rm := RoadMesh.new(p_h)
+	rm._nodes = plan.nodes.duplicate()
+	rm._edges = plan.edges.duplicate()
+	rm._types = plan.etypes.duplicate()
+	rm._inc = RoadNet.incident(rm._nodes, rm._edges, rm._types)
+	rm._back = RoadNet.setbacks(rm._nodes, rm._inc)
+	return rm
+
+
+## 길마다, 그다음 꼭짓점마다 budget_us까지 짓는다 (0이면 끝까지). 다 지었으면 true
+func step(budget_us: int) -> bool:
+	var t0 := Time.get_ticks_usec()
+	while _k < _edges.size():
+		_edge(_k)
+		_k += 1
+		if budget_us > 0 and Time.get_ticks_usec() - t0 > budget_us:
+			return false
+	while _i < _nodes.size():
+		_node(_i)
+		_i += 1
+		if budget_us > 0 and Time.get_ticks_usec() - t0 > budget_us:
+			return false
+	return true
+
+
+func _edge(k: int) -> void:
+	var e: Vector2i = _edges[k]
+	var a: Vector2 = _nodes[e.x]
+	var b: Vector2 = _nodes[e.y]
+	var length := a.distance_to(b)
+	if length < 0.05:
+		return
+	var dir := (b - a) / length
+	var sa := float((_back[e.x] as Dictionary).get(k, 0.0))
+	var sb := float((_back[e.y] as Dictionary).get(k, 0.0))
+	if sa + sb > length - 0.2:
+		var f := (length - 0.2) / maxf(sa + sb, 0.01)
+		sa *= f
+		sb *= f
+	var t := String(_types[k]) if k < _types.size() else "street"
+	ribbon(a + dir * sa, b - dir * sb, LayoutData.road_half(t), t, sa)
+
+
+func _node(i: int) -> void:
+	var list: Array = _inc[i]
+	var c: Vector2 = _nodes[i]
+	match list.size():
+		1:
+			_cap(c, list[0])
+		2:
+			_bend(c, list[0], list[1], _back[i])
+		_:
+			if list.size() >= 3:
+				_crossing(c, list, _back[i])
 
 
 ## 막다른 곳: 둥근 끝 (가압 통로는 연결 모듈)

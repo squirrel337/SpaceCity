@@ -69,10 +69,16 @@ static func plot_name(kind: String) -> String:
 ## 상자들을 짓는다 — out: {xf: Array[Transform3D], col: Array[Color], cus: Array[Color], labels: Array} (모두 Array — 꾸러미 배열은 값이라 사전 안에서 늘지 않는다).
 ## 사옥은 host._add로 (탑 셰이더). max_boxes를 넘으면 그만
 static func build(host: MetroCity, r: Dictionary, plots: Array, max_boxes: int, out: Dictionary) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = absi(String(r.get("id", "")).hash()) + 11
+	# 지역마다의 난수·이름표는 out에 둔다 — 묶음을 한 번에 하나씩 나눠 지어도 한 번에 지은 것과 같게
+	var rid := String(r.get("id", ""))
+	if not out.has("rng|" + rid):
+		var rng0 := RandomNumberGenerator.new()
+		rng0.seed = absi(rid.hash()) + 11
+		out["rng|" + rid] = rng0
+		out["named|" + rid] = {}
+	var rng: RandomNumberGenerator = out["rng|" + rid]
 	var sc := clampf(float(r.get("scale", 1.0)), 0.6, 1.5)
-	var named := {}
+	var named: Dictionary = out["named|" + rid]
 	for p in plots:
 		if _full(out, max_boxes):
 			break                                    # 빈 마당만 남기지 않게 묶음째로 그만

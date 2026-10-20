@@ -7,6 +7,9 @@ extends MetroCity
 var region: Dictionary
 var _plain: ShaderMaterial
 var _labels: Array = []
+var _plots: Array = []
+var _plot_i := 0
+var _out := {}
 
 
 ## 지역을 대도시처럼 꾸민 자료로 MetroCity를 준비한다 (블록 시가지는 짓지 않는다)
@@ -27,24 +30,43 @@ func update(_view: WorldView) -> void:
 	for bm in _beacons:
 		(bm as ShaderMaterial).set_shader_parameter("night", ground.night_k)
 	if _phase == 0 and ground.baked():
-		_build_region()
-		_phase = 3
+		_read_map()
+		_phase = 2
+		_tail = 0
+	elif _phase == 2:
+		_build_step()
 
 
-func _build_region() -> void:
-	var plots := TechCampus.plan(self, region, Vector2.ZERO)
-	var out := {"xf": [], "col": [], "cus": [], "labels": []}
-	var mx := maxi(2400, int(float(Settings.q("metro_budget")) / 10.0))
-	TechCampus.build(self, region, plots, mx, out)
-	_commit()
-	_plain = _plain_mesh(self, out)
-	_labels = out["labels"]
-	if _fac_root == null:
-		_fac_root = Node3D.new()
-		add_child(_fac_root)
-	if not plots.is_empty():
-		var en: Vector2 = plots[0]["en"]
-		_beacon(_pos(en, _ground_y(en)), Metros.region_color(region), false)
+## 몇 프레임에 나눠 짓는다: 자리 정하기 → 묶음을 BUILD_US 안에서 하나씩 → MultiMesh·이름표·빛기둥
+func _build_step() -> void:
+	match _tail:
+		0:
+			_plots = TechCampus.plan(self, region, Vector2.ZERO)
+			_out = {"xf": [], "col": [], "cus": [], "labels": []}
+			_plot_i = 0
+			_tail = 1
+		1:
+			var t0 := Time.get_ticks_usec()
+			var mx := maxi(2400, int(float(Settings.q("metro_budget")) / 10.0))
+			while _plot_i < _plots.size():
+				TechCampus.build(self, region, [_plots[_plot_i]], mx, _out)
+				_plot_i += 1
+				if Time.get_ticks_usec() - t0 > BUILD_US:
+					return
+			_tail = 2
+		_:
+			_commit()
+			_plain = _plain_mesh(self, _out)
+			_labels = _out["labels"]
+			if _fac_root == null:
+				_fac_root = Node3D.new()
+				add_child(_fac_root)
+			if not _plots.is_empty():
+				var en: Vector2 = _plots[0]["en"]
+				_beacon(_pos(en, _ground_y(en)), Metros.region_color(region), false)
+			_out = {}
+			_phase = 3
+			_tail = 0
 
 
 ## 단색 상자들 (공장·전산동·설비)을 MultiMesh 하나로 — 밤에는 보안등 (bridge 셰이더)
@@ -58,10 +80,7 @@ static func _plain_mesh(host: Node3D, out: Dictionary) -> ShaderMaterial:
 	mm.use_custom_data = true
 	mm.mesh = BoxMesh.new()
 	mm.instance_count = xs.size()
-	for i in xs.size():
-		mm.set_instance_transform(i, xs[i])
-		mm.set_instance_color(i, out["col"][i])
-		mm.set_instance_custom_data(i, out["cus"][i])
+	mm.buffer = MetroCity._mm_buffer(xs, PackedColorArray(out["col"]), PackedColorArray(out["cus"]))
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://ui/world/shaders/bridge.gdshader")
 	var mi := MultiMeshInstance3D.new()

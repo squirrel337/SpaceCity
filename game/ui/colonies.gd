@@ -22,6 +22,8 @@ var list: Array = []               # 도시 [{name, short, site, body, sim, plan
 var expeditions: Array = []        # 이동 중 [{site, depart, arrive, seed, mode, from}] — 게임 시각(시), from: 떠난 부지
 var hour := 0                      # 게임 시작부터 흐른 시간 (= 고향의 시간)
 var start_unix := 0                # 게임을 시작한 시각
+const DEFAULT_STAGGER_H := 3         # 기본 도시마다 하루 끝이 이만큼씩 어긋난다 (하루 넘김의 계산을 여러 시간에 나눈다)
+
 var seed_value := 2061
 var _windows := {}                 # 부지 → {best, start, end} (게임 일) — 창이 지나면 다시 셈한다
 var transport := Transport.new()   # 도시 사이 교통
@@ -43,14 +45,18 @@ func start(sim: CitySim, plan: CityPlan) -> void:
 	transport.rebuild(self)
 
 
-## 아직 없는 기본 도시를 지금 시각에 세운다 (새 게임, 기본 도시가 없던 옛 저장)
+## 아직 없는 기본 도시를 세운다 (새 게임, 기본 도시가 없던 옛 저장). 도시마다 몇 시간씩 앞서 세운 것으로 해
+## (DEFAULT_STAGGER_H × 순서 — 그만큼 미리 돌린다) 도시들의 하루 끝 계산이 같은 시간에 몰리지 않게 한다
 func found_defaults() -> Array:
 	var made := []
 	for id in GameData.SITES:
 		var s: Dictionary = GameData.SITES[id]
 		if not s.get("default_city", false) or index_of_site(id) >= 0 or not in_transit(id).is_empty():
 			continue
-		var c := _found_at(String(id), hour, _seed_for(String(id)))
+		var ahead := (DEFAULT_STAGGER_H * (made.size() + 1)) % 24
+		var c := _found_at(String(id), hour - ahead, _seed_for(String(id)))
+		for _h in ahead:
+			(c["sim"] as CitySim).advance_hour()
 		c["sim"].note("관리 기록 — %s 가동. 정착민 %d명. 시드가 자동 운영으로 돌본다." % [c["name"], int(c["sim"].population())], "info")
 		made.append(list.size() - 1)
 	return made

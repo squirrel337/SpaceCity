@@ -383,6 +383,11 @@ func baked_heights() -> bool:
 	return not _hbase.is_empty()
 
 
+## 높이 격자를 곧 굽나 — 그러면 도시는 길·구획을 구운 뒤에 깐다 (굽기 전 높이는 셈이 몇 배 느리고 다시 깔아야 한다)
+func will_bake() -> bool:
+	return false
+
+
 ## 이 점이 물인가: 바다·호수(구운 물 몫, 메워 뭍이 된 곳은 뺀다) 또는 해수면 아래로 판 땅
 func water_at(p: Vector2) -> bool:
 	if _rings == 0 or _hgrid.is_empty():

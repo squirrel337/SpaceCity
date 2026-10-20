@@ -59,10 +59,51 @@ static func coast_texture() -> Texture2D:
 	return _coast
 
 
-## 지구 부지 둘레의 고운 해안 지도 (없으면 null)
+## 지구 부지 둘레의 고운 해안 지도 (없으면 null). 미리 읽기 시작한 것은 그 결과를 받는다 (다 읽혔으면 바로)
 static func coast_local(site_id: String) -> Texture2D:
 	var path := "res://art/planets/earth_coast_%s.png" % site_id
+	var i := _coast_wait.find(path)
+	if i >= 0:
+		_coast_wait.remove_at(i)
+		var tex := ResourceLoader.load_threaded_get(path) as Texture2D
+		if tex != null:
+			return tex
 	return load(path) if ResourceLoader.exists(path) else null
+
+
+## 미리 읽는 중이 아니거나 다 읽혔나 (땅은 그다음에 만든다 — 몇 프레임 늦어도 보이지 않는다)
+static func coast_ready(site_id: String) -> bool:
+	var path := "res://art/planets/earth_coast_%s.png" % site_id
+	return not _coast_wait.has(path) or \
+		ResourceLoader.load_threaded_get_status(path) != ResourceLoader.THREAD_LOAD_IN_PROGRESS
+
+
+static var _coast_wait: Array = []       # 다른 스레드에서 미리 읽는 부지 해안 지도의 경로 (몇 장까지만)
+
+
+## 카메라가 다가가는 대도시·지역의 해안 지도를 다른 스레드에서 미리 읽는다 — 땅을 만드는 프레임이 파일을 풀며 기다리지 않게.
+## 목록에서 빠진 것은 다 읽혔으면 놓는다
+static func coast_prefetch(site_ids: PackedStringArray) -> void:
+	var want := PackedStringArray()
+	for id in site_ids:
+		want.append("res://art/planets/earth_coast_%s.png" % id)
+	for i in range(_coast_wait.size() - 1, -1, -1):
+		var p: String = _coast_wait[i]
+		if not want.has(p) and ResourceLoader.load_threaded_get_status(p) != ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			ResourceLoader.load_threaded_get(p)
+			_coast_wait.remove_at(i)
+	for p in want:
+		if _coast_wait.size() >= 6 or _coast_wait.has(p) or ResourceLoader.has_cached(p) or not ResourceLoader.exists(p):
+			continue
+		if ResourceLoader.load_threaded_request(p) == OK:
+			_coast_wait.append(p)
+
+
+## 미리 읽은 지도를 모두 받아 놓는다 (끝낼 때 — 읽는 스레드가 들고 있던 것이 남지 않게)
+static func coast_release() -> void:
+	for p in _coast_wait:
+		ResourceLoader.load_threaded_get(p)
+	_coast_wait.clear()
 
 
 ## 지구의 기지 자리 (방향, 반지름 km) — 해안 지도가 기지를 바다에 두더라도 그 둘레는 땅이다

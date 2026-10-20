@@ -94,6 +94,7 @@ var _fq_slow := 0
 var _fq_fast := 0
 var metro_grounds := {}              # 대도시 key → {ground: SiteSurface, city: MetroCity, used} (가까이 갈 때 만든다, 둘까지)
 var _metro_near: SiteSurface         # 카메라가 내려다보는 대도시의 땅 (없으면 null)
+var _ahead_sig := ""                 # 해안 지도를 미리 읽는 대도시·지역 (바뀔 때만 다시 부른다)
 
 
 func _init() -> void:
@@ -130,7 +131,15 @@ func _init() -> void:
 	resized.connect(_on_resized)
 
 
+func _exit_tree() -> void:
+	PlanetLook.coast_release()
+	SiteSurface.claim_patch(true)
+
+
 func _ready() -> void:
+	# 탈것 모형은 다른 스레드에서 미리 만든다 (처음 뜨는 탈것마다 프레임이 멈추지 않게)
+	for vid in ModelLib.data().get("vehicles", {}):
+		ModelLib.ready("vehicles", String(vid))
 	# 게임을 고르기 전(시작 카드 뒤)에도 기지 위 시점으로
 	_update_time(0.0)
 	home(false)
@@ -153,6 +162,7 @@ func apply_settings() -> void:
 	RenderingServer.directional_shadow_atlas_set_size(int(Settings.q("shadow_size")), true)
 	routes.show = Settings.show_routes()
 	cam.lock = not bool(Settings.value("camera/auto_parent", false))
+	SiteSurface.warm_patch()
 	_on_resized()
 
 
@@ -484,6 +494,7 @@ func _process(delta: float) -> void:
 	cam.update(delta, jd)
 	_step_descent(delta)
 	_check_enter(delta)
+	SiteSurface.claim_patch(false)
 	_place_all()
 	var t1 := Time.get_ticks_usec()
 	if city and sim:
@@ -710,10 +721,28 @@ func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 ## 15% 더 붙든다). 품질 설정만큼 두고 (오래 안 본 것부터 치운다), 지형 조각은 내려다보는 곳 하나만 그린다
 func _update_metros() -> void:
 	var near_key := ""
-	if cam.mode == "body" and cam.focus == "earth" and _bodies.has("earth"):
-		var alt := Astro.len3(Astro.sub3(cam.pos, _info("earth")["center"])) - 6371.0
-		if alt < 1500.0:
-			var t := Astro.vec(cam.t_dir)
+	# 해안 지도를 다른 스레드에서 미리 읽는다: 땅이 아직 없는 지구의 식민지 (고를 때 기다리지 않게), 다가가는 대도시·지역
+	var ahead := PackedStringArray()
+	if mgr != null:
+		for c in mgr.list:
+			var sid := String(c["site"])
+			if not grounds.has(sid) and String(GameData.site(sid).get("body", "")) == "earth":
+				ahead.append(sid)
+	var on_earth := cam.mode == "body" and cam.focus == "earth" and _bodies.has("earth")
+	var alt := Astro.len3(Astro.sub3(cam.pos, _info("earth")["center"])) - 6371.0 if on_earth else INF
+	var t := Astro.vec(cam.t_dir)
+	if alt < 4000.0:
+		var pm := Metros.nearest(t, 700.0)
+		var pr := Metros.nearest_region(t, 450.0)
+		if not pm.is_empty():
+			ahead.append(String(pm["key"]))
+		if not pr.is_empty():
+			ahead.append(String(pr["key"]))
+	var sig := ",".join(ahead)
+	if sig != _ahead_sig:
+		_ahead_sig = sig
+		PlanetLook.coast_prefetch(ahead)
+	if on_earth:
 			var m := Metros.nearest(t, 250.0)
 			var r := Metros.nearest_region(t, 150.0)
 			var dm := INF
@@ -730,11 +759,11 @@ func _update_metros() -> void:
 					dr /= 1.15
 			if dr < dm:
 				near_key = String(r["key"])
-				if not metro_grounds.has(near_key):
+				if not metro_grounds.has(near_key) and PlanetLook.coast_ready(near_key):
 					_make_region(r)
 			elif not m.is_empty():
 				near_key = String(m["key"])
-				if not metro_grounds.has(near_key):
+				if not metro_grounds.has(near_key) and PlanetLook.coast_ready(near_key):
 					_make_metro(m)
 	_metro_near = null
 	for k in metro_grounds:

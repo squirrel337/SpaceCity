@@ -43,10 +43,11 @@ func _init() -> void:
 	add_child(catalog)
 
 
+## 다른 식민지를 골라도 모듈 목록은 같다 — 모양이 같으면 글과 단추만 고친다
 func bind(p_sim: CitySim) -> void:
 	sim = p_sim
 	auto_sort.set_pressed_no_signal(sim.queue_by_priority)
-	rebuild()
+	refresh()
 
 
 func _on_sort(on: bool) -> void:
@@ -61,7 +62,7 @@ func _shape_sig() -> String:
 	for f in _open:
 		if _open[f]:
 			open.append(String(f))
-	return "%d|%s|%s" % [sim.get_instance_id(), str(sim.techs.has("robot_fabrication")), ",".join(open)]
+	return "%s|%s" % [str(sim.techs.has("robot_fabrication")), ",".join(open)]
 
 
 ## 날마다·탭을 고를 때: 목록의 모양이 그대로면 글과 단추만 고친다 (다시 만들면 100 ms 넘게 걸린다)
@@ -164,7 +165,7 @@ func _toggle_update(fam: String) -> void:
 
 ## 대기열: 같은 공사들이면 줄의 글·진척만 고치고, 바뀌었으면 줄을 다시 만든다
 func _refresh_queue() -> void:
-	var seqs := PackedStringArray()
+	var seqs := PackedStringArray([str(sim.get_instance_id())])
 	for item in sim.queue:
 		seqs.append(str(int(item["seq"])))
 	var qsig := ",".join(seqs)

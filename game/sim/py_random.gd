@@ -32,9 +32,25 @@ func set_seed(seed_value: int) -> void:
 
 
 func random() -> float:
-	## [0, 1) 실수. 53비트 정밀도 — random.random()과 같다.
-	var a: int = _next_u32() >> 5
-	var b: int = _next_u32() >> 6
+	## [0, 1) 실수. 53비트 정밀도 — random.random()과 같다. (_next_u32 두 번을 풀어 썼다 — 가장 자주 부르는 곳)
+	if _index >= N:
+		_twist()
+	var y: int = _mt[_index]
+	_index += 1
+	y ^= y >> 11
+	y ^= (y << 7) & 0x9D2C5680
+	y ^= (y << 15) & 0xEFC60000
+	y ^= y >> 18
+	var a: int = (y & MASK32) >> 5
+	if _index >= N:
+		_twist()
+	y = _mt[_index]
+	_index += 1
+	y ^= y >> 11
+	y ^= (y << 7) & 0x9D2C5680
+	y ^= (y << 15) & 0xEFC60000
+	y ^= y >> 18
+	var b: int = (y & MASK32) >> 6
 	return (a * 67108864.0 + b) * (1.0 / 9007199254740992.0)
 
 
@@ -109,12 +125,21 @@ func _init_by_array(key: PackedInt64Array) -> void:
 
 
 func _twist() -> void:
-	for kk in range(N):
-		var y: int = (_mt[kk] & UPPER) | (_mt[(kk + 1) % N] & LOWER)
-		var v: int = _mt[(kk + M) % N] ^ (y >> 1)
-		if y & 1:
-			v ^= MATRIX_A
-		_mt[kk] = v
+	## 참조 구현처럼 세 구간으로 나눠 나머지 셈을 없앴다 (결과는 같다)
+	var mt := _mt
+	var kk := 0
+	var y := 0
+	while kk < N - M:
+		y = (mt[kk] & UPPER) | (mt[kk + 1] & LOWER)
+		mt[kk] = mt[kk + M] ^ (y >> 1) ^ (MATRIX_A if y & 1 else 0)
+		kk += 1
+	while kk < N - 1:
+		y = (mt[kk] & UPPER) | (mt[kk + 1] & LOWER)
+		mt[kk] = mt[kk + M - N] ^ (y >> 1) ^ (MATRIX_A if y & 1 else 0)
+		kk += 1
+	y = (mt[N - 1] & UPPER) | (mt[0] & LOWER)
+	mt[N - 1] = mt[M - 1] ^ (y >> 1) ^ (MATRIX_A if y & 1 else 0)
+	_mt = mt
 	_index = 0
 
 

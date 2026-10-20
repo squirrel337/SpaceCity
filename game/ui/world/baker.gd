@@ -44,6 +44,14 @@ static func render(host: Node, mat: Material, size: Vector2i) -> Image:
 	return img
 
 
+## 다른 스레드의 작업이 끝날 때까지 프레임을 넘기며 기다린다 (host가 사라졌으면 false)
+static func wait_task(host: Node, task: int) -> bool:
+	while not WorkerThreadPool.is_task_completed(task):
+		await (Engine.get_main_loop() as SceneTree).process_frame
+	WorkerThreadPool.wait_for_task_completion(task)
+	return is_instance_valid(host) and host.is_inside_tree()
+
+
 ## 24비트 높이 ((m + 32768) × 256) 한 칸
 static func h24(data: PackedByteArray, o: int) -> float:
 	return (data[o] * 65536 + data[o + 1] * 256 + data[o + 2]) / 256.0 - 32768.0

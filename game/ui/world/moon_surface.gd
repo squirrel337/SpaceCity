@@ -71,6 +71,10 @@ func radius_km() -> float:
 	return R_KM
 
 
+func will_bake() -> bool:
+	return Baker.can_bake()
+
+
 func patch_radius_m() -> float:
 	return PATCH_M
 

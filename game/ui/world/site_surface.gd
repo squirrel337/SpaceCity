@@ -158,6 +158,10 @@ func baked() -> bool:
 	return _baked
 
 
+func will_bake() -> bool:
+	return Baker.can_bake() and (surface != null or moon_src != null or body == "earth")
+
+
 ## 도시 둘레 지역 지도를 굽나 (지구는 해안 거리 지도를 그대로 쓴다)
 func needs_cap() -> bool:
 	return body != "earth"
@@ -350,19 +354,62 @@ static func _fbm(p: Vector2, octaves: int, s: int) -> float:
 # ── 지형 조각 메시 ──────────────────────────────────────────────
 ## 극좌표 격자: 300 m까지는 6 m 간격, 그 바깥은 둘레 간격만큼 커진다.
 ## UV = (둘레 번호, 고리 번호) — 굽은 높이 격자의 칸, UV2.x = 1이면 치마 (구와의 틈을 가린다)
-func _ring_radius(k: int) -> float:
+static func _ring_r(k: int, grow: float) -> float:
 	if k <= 50:
 		return 6.0 * k
-	return minf(300.0 * pow(_grow, k - 50), PATCH_M)
+	return minf(300.0 * pow(grow, k - 50), PATCH_M)
+
+
+func _ring_radius(k: int) -> float:
+	return _ring_r(k, _grow)
+
+
+static func _ring_count(segs: int) -> int:
+	var grow := 1.0 + TAU / segs
+	var k := 0
+	while _ring_r(k, grow) < PATCH_M:
+		k += 1
+	return k + 1
+
+
+## 격자는 땅마다 같다 (높이는 셰이더가 굽힌다) — 둘레 칸 수마다 한 번만 만든다. 지금 품질의 것은 시작할 때
+## 다른 스레드에서 미리 (warm_patch) — 처음 땅을 만드는 프레임이 기다리지 않게
+static var _patch_cache := {}
+static var _patch_task := -1
+static var _patch_done: Array = []       # [둘레 칸 수, 메시] — 다른 스레드가 만든 것
+
+
+static func warm_patch() -> void:
+	var segs := int(Settings.q("patch_segs"))
+	if _patch_task >= 0 or _patch_cache.has(segs):
+		return
+	_patch_task = WorkerThreadPool.add_task(func() -> void: _patch_done = [segs, _build_patch(segs)], false, "ground patch")
+
+
+## 다른 스레드가 만든 격자를 받는다 (wait이면 끝날 때까지 기다린다)
+static func claim_patch(wait: bool) -> void:
+	if _patch_task < 0 or not (wait or WorkerThreadPool.is_task_completed(_patch_task)):
+		return
+	WorkerThreadPool.wait_for_task_completion(_patch_task)
+	_patch_task = -1
+	if not _patch_done.is_empty():
+		_patch_cache[int(_patch_done[0])] = _patch_done[1]
+		_patch_done = []
 
 
 func _patch_mesh() -> ArrayMesh:
 	_segs = int(Settings.q("patch_segs"))
 	_grow = 1.0 + TAU / _segs
-	var k := 0
-	while _ring_radius(k) < PATCH_M:
-		k += 1
-	_rings = k + 1
+	_rings = _ring_count(_segs)
+	claim_patch(true)
+	if not _patch_cache.has(_segs):
+		_patch_cache[_segs] = _build_patch(_segs)
+	return _patch_cache[_segs]
+
+
+static func _build_patch(segs: int) -> ArrayMesh:
+	var grow := 1.0 + TAU / segs
+	var rings := _ring_count(segs)
 	var verts := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	var uv2s := PackedVector2Array()
@@ -370,31 +417,31 @@ func _patch_mesh() -> ArrayMesh:
 	verts.append(Vector3.ZERO)
 	uvs.append(Vector2.ZERO)
 	uv2s.append(Vector2.ZERO)
-	for ring in range(1, _rings):
-		var rr := _ring_radius(ring)
-		for i in _segs:
-			var a := TAU * i / _segs
+	for ring in range(1, rings):
+		var rr := _ring_r(ring, grow)
+		for i in segs:
+			var a := TAU * i / segs
 			verts.append(Vector3(cos(a) * rr, 0.0, -sin(a) * rr))
 			uvs.append(Vector2(i, ring))
 			uv2s.append(Vector2.ZERO)
 	var rim_start := verts.size()
-	for i in _segs:
-		var a := TAU * i / _segs
+	for i in segs:
+		var a := TAU * i / segs
 		verts.append(Vector3(cos(a) * PATCH_M, 0.0, -sin(a) * PATCH_M))
-		uvs.append(Vector2(i, _rings - 1))
+		uvs.append(Vector2(i, rings - 1))
 		uv2s.append(Vector2(1.0, 0.0))
-	for i in _segs:
-		var j := (i + 1) % _segs
+	for i in segs:
+		var j := (i + 1) % segs
 		idx.append_array(PackedInt32Array([0, 1 + j, 1 + i]))
-	for ring in range(1, _rings - 1):
-		var a0 := 1 + (ring - 1) * _segs
-		var a1 := 1 + ring * _segs
-		for i in _segs:
-			var j := (i + 1) % _segs
+	for ring in range(1, rings - 1):
+		var a0 := 1 + (ring - 1) * segs
+		var a1 := 1 + ring * segs
+		for i in segs:
+			var j := (i + 1) % segs
 			idx.append_array(PackedInt32Array([a0 + i, a0 + j, a1 + j, a0 + i, a1 + j, a1 + i]))
-	var last := 1 + (_rings - 2) * _segs
-	for i in _segs:
-		var j := (i + 1) % _segs
+	var last := 1 + (rings - 2) * segs
+	for i in segs:
+		var j := (i + 1) % segs
 		idx.append_array(PackedInt32Array([last + i, last + j, rim_start + j, last + i, rim_start + j, rim_start + i]))
 	var arr := []
 	arr.resize(Mesh.ARRAY_MAX)
@@ -547,18 +594,16 @@ func _bake_patch() -> void:
 		return
 	if OS.has_environment("WORLD_SAVE_BAKE"):
 		img.save_png(OS.get_environment("WORLD_SAVE_BAKE").path_join("patch_%s.png" % site_data.get("id", body)))
+	# 높이 풀기는 칸이 수만 개라 다른 스레드에서 (끝날 때까지 프레임을 넘긴다)
+	var out: Array = []
 	var data := img.get_data()
-	var grid := PackedFloat32Array()
-	grid.resize(_rings * _segs)
-	var fix := false
-	for k in _rings:
-		for i in _segs:
-			grid[k * _segs + i] = Baker.h24(data, (k * _segs + i) * 4)
-			if data[(k * _segs + i) * 4 + 3] == 254:
-				data[(k * _segs + i) * 4 + 3] = 255          # 254는 판 땅에 찬 물의 표시로 남겨 둔다
-				fix = true
-	if fix:
-		img.set_data(img.get_width(), img.get_height(), false, img.get_format(), data)
+	var n := _rings * _segs
+	var task := WorkerThreadPool.add_task(func() -> void: out.append_array(_decode_grid(data, n)), false, "patch grid")
+	if not await Baker.wait_task(self, task):
+		return
+	var grid: PackedFloat32Array = out[0]
+	if out[2]:
+		img.set_data(img.get_width(), img.get_height(), false, img.get_format(), out[1])
 	_hgrid = grid
 	_plateau_m = site_m - ref
 	var tex := ImageTexture.create_from_image(img)
@@ -571,6 +616,20 @@ func _bake_patch() -> void:
 	patch_mat.set_shader_parameter("has_hmap", true)
 	_baked = true
 	terrain_ready.emit()
+
+
+## 구운 높이 격자 (RGB 24비트 높이) → [높이 m, 고친 바이트, 고쳤나]. 254는 판 땅에 찬 물의 표시로 남겨 둔다 (255로)
+static func _decode_grid(data: PackedByteArray, n: int) -> Array:
+	var grid := PackedFloat32Array()
+	grid.resize(n)
+	var fix := false
+	for i in n:
+		var o := i * 4
+		grid[i] = (data[o] * 65536 + data[o + 1] * 256 + data[o + 2]) / 256.0 - 32768.0
+		if data[o + 3] == 254:
+			data[o + 3] = 255
+			fix = true
+	return [grid, data, fix]
 
 
 ## 고친 꼭짓점의 높이(RGB 24비트)와 물 몫(A)을 높이 지도에 다시 쓴다 (법선은 셰이더가 이웃 꼭짓점으로 셈한다).
