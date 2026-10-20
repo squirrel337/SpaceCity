@@ -40,6 +40,7 @@ func _process(_delta: float) -> bool:
 		var built: int = main.sim.stats.get("built", 0)
 		_check(built > 0, "자동 운영이 아무것도 짓지 않았다")
 		_save_roundtrip()
+		_stall_check()
 		_map_check()
 		_world_check()
 		_plan_check()
@@ -91,6 +92,92 @@ func _save_roundtrip() -> void:
 		twin.advance_hour()
 	_check(absf(restored.stock["o2_kg"] - twin.stock["o2_kg"]) < 1e-9, "불러온 뒤 10일의 결과가 다르다")
 	_check(restored.rng.random() == twin.rng.random(), "난수 상태가 이어지지 않았다")
+
+
+## 멈춤 없애기 (1단계): 자리 찾기 색인은 다 훑을 때와 같은 답, 프레임 예산으로 나눠 맞춘 배치는 한 번에 맞춘 것과 같다,
+## 일별 기록을 작게 싼 저장이 되돌아온다, 날마다의 탭 새로 고침은 목록을 다시 만들지 않는다
+func _stall_check() -> void:
+	var sim: CitySim = main.sim
+	var plan: CityPlan = main.plan
+	plan.sync(sim)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	var kinds := ["hab_module", "landing_pad", "fission_40kw", "greenhouse", "research_lab"]
+	var diff := 0
+	for _i in 600:
+		var kind: String = kinds[rng.randi() % kinds.size()]
+		var at := Vector2(rng.randf_range(-220, 220), rng.randf_range(-220, 220)).snapped(Vector2.ONE)
+		var rot := rng.randi() % 2
+		var got := plan.check_spot(kind, at, rot)
+		var want := _scan_conflict(plan, kind, at, rot)
+		var conflict := got.contains("겹친다") or got.contains("착륙") or got.contains("원자로") or got == "길 위에는 지을 수 없다"
+		if (conflict and got != want) or (got == "" and want != ""):
+			diff += 1
+	_check(diff == 0, "자리 찾기 색인이 다 훑을 때와 다른 답을 냈다 (%d곳)" % diff)
+	# 배치 따라잡기: 저장에서 맞추지 않고 읽은 뒤 프레임 예산으로 나눠 맞춘다 — 한 번에 맞춘 것과 같은 자리
+	var data: Dictionary = JSON.parse_string(JSON.stringify(plan.to_save()))
+	for i in range(data["buildings"].size() - 1, -1, -1):
+		if i % 3 == 0:
+			data["buildings"].remove_at(i)                 # 오래 안 본 도시처럼 건물 셋에 하나를 뺀다
+	var full := CityPlan.from_save(data, sim, plan.layout)
+	var lazy := CityPlan.from_save(JSON.parse_string(JSON.stringify(data)), sim, plan.layout, false)
+	var frames := 0
+	var rev0 := lazy.revision
+	while lazy._sig == "" and frames < 500:
+		lazy._sync_frame = -1
+		lazy.sync(sim, CityPlan.SYNC_FRAME_US)
+		frames += 1
+	var same := lazy.buildings.size() == full.buildings.size()
+	for i in mini(lazy.buildings.size(), full.buildings.size()):
+		var a: Dictionary = lazy.buildings[i]
+		var b: Dictionary = full.buildings[i]
+		same = same and a["id"] == b["id"] and is_equal_approx(float(a["x"]), float(b["x"])) \
+			and is_equal_approx(float(a["y"]), float(b["y"])) and int(a["rot"]) == int(b["rot"])
+	_check(same and lazy.revision == rev0 + 1, "나눠 맞춘 배치가 한 번에 맞춘 것과 다르다 (%d프레임, 건물 %d/%d)" % [frames,
+		lazy.buildings.size(), full.buildings.size()])
+	# 저장: 일별 기록을 열과 정수로
+	var back := CitySim.from_save(JSON.parse_string(JSON.stringify(sim.to_save(), "", false, true)))
+	var ok := back.daily.size() == sim.daily.size() and not sim.daily.is_empty()
+	if ok:
+		var a2: Dictionary = sim.daily[-1]
+		var b2: Dictionary = back.daily[-1]
+		for k in a2:
+			ok = ok and absf(float(a2[k]) - float(b2[k])) <= 0.0006 + absf(float(a2[k])) * 1e-9
+	_check(ok, "일별 기록이 저장에서 되돌아오지 않았다")
+	# 탭: 날마다의 새로 고침은 목록을 다시 만들지 않는다 (같은 줄)
+	main._select_tab("build")
+	var bp: BuildPanel = main.tabs["build"]
+	var first: Control = bp.catalog.get_child(0)
+	bp.refresh()
+	_check(bp.catalog.get_child(0) == first, "건설 탭이 날마다 목록을 다시 만든다")
+	main._select_tab("life")
+	print("smoke: stalls — 색인 600곳 같은 답, 배치 따라잡기 %d프레임, 일별 기록 %d줄 되돌림" % [frames, back.daily.size()])
+
+
+## 옛 check_spot의 건물·길 부분 (다 훑는다) — 색인과 견준다
+func _scan_conflict(plan: CityPlan, kind: String, at: Vector2, rot: int) -> String:
+	var r := CityPlan.rect_of(kind, at, rot)
+	var kfam := CityPlan.fam(kind)
+	var inner := r.grow(-0.05)
+	for e in plan.buildings:
+		var er := plan.entry_rect(e)
+		if inner.intersects(er):
+			return "다른 건물(%s)과 겹친다" % GameData.module_name(String(e["id"]))
+		var other: String = e["id"]
+		var ofam := CityPlan.fam(other)
+		if kfam == "landing_pad" and ofam != "landing_pad" and CityPlan._rect_dist(r, er) < CityPlan.clearance(kind):
+			return "착륙장 둘레 %d m 안에 건물이 있다 (착륙 분사)" % int(CityPlan.clearance(kind))
+		if ofam == "landing_pad" and kfam != "landing_pad" and CityPlan._rect_dist(r, er) < CityPlan.clearance(other):
+			return "착륙장에서 %d m 넘게 떨어져야 한다 (착륙 분사)" % int(CityPlan.clearance(other))
+		if kfam in CityPlan.REACTORS and CityPlan._people(other) and CityPlan._rect_dist(r, er) < CityPlan.clearance(kind):
+			return "이 원자로는 사람이 머무는 건물에서 %d m 넘게 떨어져야 한다" % int(CityPlan.clearance(kind))
+		if ofam in CityPlan.REACTORS and CityPlan._people(kind) and CityPlan._rect_dist(r, er) < CityPlan.clearance(other):
+			return "원자로(%s)에서 %d m 넘게 떨어져야 한다" % [GameData.module_name(other), int(CityPlan.clearance(other))]
+	for k in plan.edges.size():
+		var ed: Vector2i = plan.edges[k]
+		if CityPlan._seg_rect_dist(plan.nodes[ed.x], plan.nodes[ed.y], r) < plan.edge_half(k) - 0.05:
+			return "길 위에는 지을 수 없다"
+	return ""
 
 
 func _map_check() -> void:

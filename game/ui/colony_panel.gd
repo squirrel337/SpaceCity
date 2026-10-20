@@ -15,6 +15,8 @@ var body_box := VBoxContainer.new()
 var _live: Array = []            # 새로 고칠 때마다 부르는 갱신 함수들 (Callable)
 var _cards := {}                 # 부지 id → 후보 카드 (점을 누르면 그리로)
 var _open := {}                  # 부지 id → 자세히 펼쳤나
+var _shape := ""                 # 도시·원정대·후보 부지 — 바뀔 때만 다시 만든다 (날마다 바뀌는 글은 _live가 고친다)
+var _live_ms := 0                # _live를 마지막으로 부른 때 (발사 창·비용 셈이 무거워 1초에 두세 번만)
 
 
 func _init() -> void:
@@ -37,6 +39,31 @@ func bind(p_sim: CitySim) -> void:
 	rebuild()
 
 
+func _shape_sig() -> String:
+	if mgr == null:
+		return ""
+	var parts := PackedStringArray([str(sim.get_instance_id() if sim != null else 0)])
+	for c in mgr.list:
+		parts.append(String(c["site"]))
+	parts.append("|")
+	for e in mgr.expeditions:
+		parts.append(String(e["site"]))
+	parts.append("|")
+	parts.append_array(PackedStringArray(mgr.candidates()))
+	return ",".join(parts)
+
+
+## 날마다·탭을 고를 때: 도시·원정대·후보가 그대로면 글만 고친다
+func refresh() -> void:
+	if mgr == null:
+		return
+	if _shape_sig() != _shape:
+		rebuild()
+	else:
+		_live_ms = 0
+		update_view()
+
+
 static func _clear(box: Node) -> void:
 	for c in box.get_children():
 		box.remove_child(c)
@@ -50,6 +77,10 @@ func update_view() -> void:
 	for c in mgr.list:
 		pop += (c["sim"] as CitySim).population()
 	status.text = "도시 %d곳 · 정착민 %s명 · 이동 중인 원정대 %d" % [mgr.list.size(), Fmt.n(pop), mgr.expeditions.size()]
+	var now := Time.get_ticks_msec()
+	if _live_ms > 0 and now - _live_ms < 400:
+		return
+	_live_ms = now
 	for f in _live:
 		(f as Callable).call()
 
@@ -57,6 +88,8 @@ func update_view() -> void:
 func rebuild() -> void:
 	if mgr == null:
 		return
+	_shape = _shape_sig()
+	_live_ms = 0
 	_live.clear()
 	_cards.clear()
 	_clear(body_box)

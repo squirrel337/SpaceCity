@@ -21,6 +21,8 @@ const REACTORS := ["fission_40kw", "fission_1mw"]             # 원자로 계열
 const REPOSE := 0.8                                  # 판 비탈·쌓은 비탈의 가장 가파른 기울기 (흙의 안식각 약 39°)
 ## 모듈 데이터의 clearance_m가 있으면 그 거리를 쓴다 (매립형 원자로 20 m, 방벽 착륙장 15 m …)
 const TILE_NAMES := {"A": "A 100%", "B": "B 85%", "C": "C 70%"}
+const IDX_CELL := 16.0                               # 자리 찾기 색인의 칸 (m) — check_spot은 둘레 칸의 건물·길만 본다
+const SYNC_FRAME_US := 3000                          # 보이는 도시의 배치를 시뮬레이션에 맞출 때 한 프레임에 쓰는 시간 (μs)
 
 var layout: BaseLayout
 var buildings: Array = []          # {uid, id, x, y, rot, variant, seq(대기열 번호, 지어졌으면 -1), tile}
@@ -48,6 +50,15 @@ var _adj: Array = []
 var _adj_rev := -1
 var _fixed := {}
 var _fixed_rev := -1
+var _bidx := {}                    # 색인 칸 → 건물 번호들 (자리 찾기)
+var _bidx_n := -1                  # 색인에 넣은 건물 수 (-1: 다시 만든다 — 건물을 뺐을 때)
+var _brect: Array = []             # 건물마다 바닥 사각형 · 계열 (색인과 함께)
+var _bfam: Array = []
+var _bspecial: Array = []          # 착륙장·원자로: [번호, 거리 규칙만큼 넓힌 사각형] (거리 규칙이 멀리까지 닿는다)
+var _eidx := {}                    # 색인 칸 → 길 번호들
+var _eidx_sig := ""
+var _sync_frame := -1              # 배치 따라잡기의 프레임 예산 (여러 곳에서 불러도 한 프레임에 한 몫)
+var _sync_spent := 0
 
 
 func _init(p_layout: BaseLayout = null) -> void:
@@ -80,13 +91,23 @@ func hub() -> Vector2:
 # ── 시뮬레이션과 맞추기 ─────────────────────────────────────────
 ## 시뮬레이션의 개수·대기열이 바뀌었으면 계획을 맞춘다: 끝난 공사는 지어진 건물로,
 ## 취소된 공사는 지우고, 자리 없는 공사·건물(자동 운영, 처음 기지)은 빈자리에 놓는다
-func sync(sim: CitySim) -> void:
+## budget_us > 0: 이 프레임에 그만큼만 쓰고 (모든 부르는 곳이 함께 나눈다) 남은 자리 찾기는 다음 프레임에 잇는다 —
+## 오래 안 본 도시를 고르거나 불러왔을 때 수십 채를 한 프레임에 놓지 않게. 다 맞췄을 때만 한 번 바뀌었다고 알린다
+func sync(sim: CitySim, budget_us: int = 0) -> void:
 	if sim == null:
 		return
 	var sig := _signature(sim)
 	if sig == _sig:
 		return
-	_sig = sig
+	var deadline := 0
+	if budget_us > 0:
+		var f := Engine.get_process_frames()
+		if f != _sync_frame:
+			_sync_frame = f
+			_sync_spent = 0
+		if _sync_spent >= budget_us:
+			return
+		deadline = Time.get_ticks_usec() + budget_us - _sync_spent
 	var live := {}
 	for item in sim.queue:
 		if String(item["id"]) in SPECIAL:
@@ -121,13 +142,18 @@ func sync(sim: CitySim) -> void:
 			have += 1
 		for e in fin:
 			buildings.erase(e)
+			_bidx_n = -1
 		while have < want:
 			_auto_place(kind, -1, _tile_for_built(sim, kind), sim)
 			have += 1
+			if deadline > 0 and Time.get_ticks_usec() > deadline:
+				_sync_spent = budget_us
+				return
 		while have > want:
 			for i in range(buildings.size() - 1, -1, -1):
 				if buildings[i]["id"] == kind and int(buildings[i]["seq"]) < 0:
 					buildings.remove_at(i)
+					_bidx_n = -1
 					break
 			have -= 1
 	var planned := {}
@@ -138,6 +164,12 @@ func sync(sim: CitySim) -> void:
 		var seq := int(item["seq"])
 		if live.has(seq) and not planned.has(seq):
 			_auto_place(String(item["id"]), seq, String(item.get("tile", "")), sim)
+			if deadline > 0 and Time.get_ticks_usec() > deadline:
+				_sync_spent = budget_us
+				return
+	if deadline > 0:
+		_sync_spent = budget_us - maxi(0, deadline - Time.get_ticks_usec())
+	_sig = sig
 	_touch()
 
 
@@ -346,29 +378,105 @@ func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1) -> St
 	elif _rect_point_dist(r, ice) < BaseLayout.ICE_CRATER_R:
 		return "%s 안에는 지을 수 없다" % layout.ice_text().split("(")[0]
 	var inner := r.grow(-0.05)
-	for e in buildings:
+	var k_pad := kfam == "landing_pad"
+	var k_reactor := kfam in REACTORS
+	var k_clear := clearance(kind) if k_pad or k_reactor else 0.0
+	var k_people := _people(kind)
+	for bi in _near_buildings(r, k_clear):
+		var e: Dictionary = buildings[bi]
 		if int(e["uid"]) == ignore_uid:
 			continue
-		var er := entry_rect(e)
+		var er: Rect2 = _brect[bi]
 		if inner.intersects(er):
 			return "다른 건물(%s)과 겹친다" % GameData.module_name(String(e["id"]))
 		var other: String = e["id"]
-		var ofam := fam(other)
-		if kfam == "landing_pad" and ofam != "landing_pad" and _rect_dist(r, er) < clearance(kind):
-			return "착륙장 둘레 %d m 안에 건물이 있다 (착륙 분사)" % int(clearance(kind))
-		if ofam == "landing_pad" and kfam != "landing_pad" and _rect_dist(r, er) < clearance(other):
+		var ofam: String = _bfam[bi]
+		if k_pad and ofam != "landing_pad" and _rect_dist(r, er) < k_clear:
+			return "착륙장 둘레 %d m 안에 건물이 있다 (착륙 분사)" % int(k_clear)
+		if ofam == "landing_pad" and not k_pad and _rect_dist(r, er) < clearance(other):
 			return "착륙장에서 %d m 넘게 떨어져야 한다 (착륙 분사)" % int(clearance(other))
-		if kfam in REACTORS and _people(other) and _rect_dist(r, er) < clearance(kind):
-			return "이 원자로는 사람이 머무는 건물에서 %d m 넘게 떨어져야 한다" % int(clearance(kind))
-		if ofam in REACTORS and _people(kind) and _rect_dist(r, er) < clearance(other):
+		if k_reactor and _people(other) and _rect_dist(r, er) < k_clear:
+			return "이 원자로는 사람이 머무는 건물에서 %d m 넘게 떨어져야 한다" % int(k_clear)
+		if ofam in REACTORS and k_people and _rect_dist(r, er) < clearance(other):
 			return "원자로(%s)에서 %d m 넘게 떨어져야 한다" % [GameData.module_name(other), int(clearance(other))]
-	for k in edges.size():
+	for k in _near_edges(r):
 		var ed: Vector2i = edges[k]
 		if _seg_rect_dist(nodes[ed.x], nodes[ed.y], r) < edge_half(k) - 0.05:
 			return "길 위에는 지을 수 없다"
 	if flooded_in(r) > 0:
 		return "물에 잠긴 땅이다 — 먼저 메운다"
 	return _ground_reason(r)
+
+
+# ── 자리 찾기 색인 ──────────────────────────────────────────────
+## 건물·길을 16 m 칸에 나눠 두고 check_spot은 둘레 칸의 것만 본다 (결과는 다 훑을 때와 같다 — 건물은 배열 순서대로).
+## 건물은 늘기만 하면 새 것만 넣고, 빼면 다시 만든다. 길은 road_rev·개수가 바뀌면 다시 만든다
+static func _cells_of(r: Rect2) -> Array:
+	var out: Array = []
+	var x1 := int(floor(r.end.x / IDX_CELL))
+	var y1 := int(floor(r.end.y / IDX_CELL))
+	for x in range(int(floor(r.position.x / IDX_CELL)), x1 + 1):
+		for y in range(int(floor(r.position.y / IDX_CELL)), y1 + 1):
+			out.append(Vector2i(x, y))
+	return out
+
+
+func _bindex() -> void:
+	if _bidx_n < 0 or _bidx_n > buildings.size():
+		_bidx = {}
+		_brect = []
+		_bfam = []
+		_bspecial = []
+		_bidx_n = 0
+	while _bidx_n < buildings.size():
+		var e: Dictionary = buildings[_bidx_n]
+		var f := fam(String(e["id"]))
+		var er := entry_rect(e)
+		_brect.append(er)
+		_bfam.append(f)
+		if f == "landing_pad" or f in REACTORS:
+			_bspecial.append([_bidx_n, er.grow(clearance(String(e["id"])))])
+		for c in _cells_of(er):
+			if _bidx.has(c):
+				(_bidx[c] as Array).append(_bidx_n)
+			else:
+				_bidx[c] = [_bidx_n]
+		_bidx_n += 1
+
+
+## r(과 reach m 둘레)에 닿을 수 있는 건물의 번호 (배열 순서) — 착륙장·원자로는 그 거리 규칙만큼 넓혀 본다
+func _near_buildings(r: Rect2, reach: float = 0.0) -> PackedInt32Array:
+	_bindex()
+	var seen := {}
+	for sp in _bspecial:
+		if (sp[1] as Rect2).intersects(r):
+			seen[sp[0]] = true
+	for c in _cells_of(r.grow(reach)):
+		for i in _bidx.get(c, []):
+			seen[i] = true
+	var out := PackedInt32Array(seen.keys())
+	out.sort()
+	return out
+
+
+## r에 반폭만큼 닿을 수 있는 길의 번호
+func _near_edges(r: Rect2) -> Array:
+	var sig := "%d|%d|%d" % [road_rev, edges.size(), nodes.size()]
+	if sig != _eidx_sig:
+		_eidx_sig = sig
+		_eidx = {}
+		for k in edges.size():
+			var ed: Vector2i = edges[k]
+			for c in _cells_of(Rect2(nodes[ed.x], Vector2.ZERO).expand(nodes[ed.y]).grow(edge_half(k))):
+				if _eidx.has(c):
+					(_eidx[c] as Array).append(k)
+				else:
+					_eidx[c] = [k]
+	var seen := {}
+	for c in _cells_of(r):
+		for k in _eidx.get(c, []):
+			seen[k] = true
+	return seen.keys()
 
 
 ## 새 땅(처음 기지 밖)의 땅 모양: 물 위, 또는 너무 가파른 곳 (그보다 덜 가파르면 기초를 쌓아 앉힌다)
@@ -1505,7 +1613,8 @@ func to_save() -> Dictionary:
 
 
 ## 저장한 계획을 되살리고 시뮬레이션과 맞춘다. 없거나 읽을 수 없으면 새 계획
-static func from_save(data: Variant, sim: CitySim, p_layout: BaseLayout = null) -> CityPlan:
+## sync_now = false: 시뮬레이션에 맞추는 자리 찾기를 미룬다 (불러오기 — 그 도시를 볼 때 프레임마다 조금씩 맞춘다)
+static func from_save(data: Variant, sim: CitySim, p_layout: BaseLayout = null, sync_now: bool = true) -> CityPlan:
 	if not data is Dictionary or not int(data.get("version", 0)) in [1, VERSION]:
 		return create(sim, p_layout)
 	var plan := CityPlan.new(p_layout)
@@ -1550,6 +1659,6 @@ static func from_save(data: Variant, sim: CitySim, p_layout: BaseLayout = null) 
 	for e in plan.buildings:
 		plan._next_uid = maxi(plan._next_uid, int(e["uid"]) + 1)
 	plan.road_rev += 1
-	if sim != null:
+	if sim != null and sync_now:
 		plan.sync(sim)
 	return plan

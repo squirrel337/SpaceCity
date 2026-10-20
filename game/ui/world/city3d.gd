@@ -130,7 +130,7 @@ func update(delta: float, speed_level: int) -> void:
 	if sim == null or plan == null:
 		return
 	_t += delta
-	plan.sync(sim)
+	plan.sync(sim, CityPlan.SYNC_FRAME_US)          # 오래 안 본 도시는 프레임마다 조금씩 맞춘다
 	ground.apply_terrain(plan)
 	if plan.road_rev != _road_rev:
 		_road_rev = plan.road_rev

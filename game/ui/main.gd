@@ -24,6 +24,8 @@ var _jumping := false
 var _auto_jump := false             # 다음 사건을 계속 넘긴다 (사건마다 잠깐 멈췄다 다음으로)
 var _auto_wait := 0.0
 var _panel_dirty := false           # 날이 바뀌어 탭을 다시 그릴 것 (빠를 때는 0.5초마다 한 번만)
+var _saved_ms := -100000              # 마지막으로 저장한 때 (창을 오갈 때마다 저장하지 않게)
+var _tab_sim := {}                   # 탭 → 묶인 식민지 (보이지 않는 탭은 고를 때 묶는다 — 식민지를 바꿀 때 7개를 다 만들지 않게)
 var _panel_clock := 0.0
 var auto_jump_button: Button
 var _jump_start := 0
@@ -166,8 +168,8 @@ func _build() -> void:
 	tool.placed.connect(_on_placed)
 	tool.bought.connect(func(ok: bool, text: String):
 		_toast(text, "good" if ok else "warn")
-		if ok and tabs[current_tab].has_method("rebuild"):
-			tabs[current_tab].rebuild()
+		if ok:
+			_refresh_tab()
 		_dirty = true)
 	forecast = ForecastBar.new()
 	forecast.custom_minimum_size.y = 46
@@ -488,8 +490,7 @@ func _on_placed(kind: String, ok: bool, text: String) -> void:
 		msg = "%s — 지을 수 없다 (%s)" % [GameData.module_name(kind), text]
 		_toast(msg, "warn")
 	tabs["build"].message.text = msg
-	if tabs[current_tab].has_method("rebuild"):
-		tabs[current_tab].rebuild()
+	_refresh_tab()
 	_dirty = true
 
 
@@ -703,8 +704,8 @@ func _activate(index: int, fly: bool = true) -> void:
 	plan = c["plan"]
 	sim.interactive = true
 	tool.bind(sim, plan)
-	for key in tabs:
-		tabs[key].bind(sim)
+	_tab_sim.clear()
+	_bind_tab(current_tab)
 	city_view.sim = sim
 	city_view.title = String(c["name"])
 	city_view.ridge = plan.layout.kind == "ridge"
@@ -771,6 +772,7 @@ func _update_markers() -> void:
 func _save() -> void:
 	if sim == null or _game_over:
 		return
+	_saved_ms = Time.get_ticks_msec()
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f != null:
 		var data := colonies.to_save()
@@ -795,8 +797,11 @@ func _notification(what: int) -> void:
 		NOTIFICATION_WM_CLOSE_REQUEST:
 			_save()
 			get_tree().quit()
-		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT:
+		NOTIFICATION_APPLICATION_PAUSED:
 			_save()
+		NOTIFICATION_APPLICATION_FOCUS_OUT:
+			if Time.get_ticks_msec() - _saved_ms > 30000:     # 창을 오갈 때마다 멈추지 않게 (30초에 한 번)
+				_save()
 		NOTIFICATION_WM_GO_BACK_REQUEST:
 			if modal.visible and modal.context == "menu":
 				modal.visible = false
@@ -1014,7 +1019,7 @@ func _process(delta: float) -> void:
 		_panel_dirty = false
 		_panel_clock = 0.0
 		if tabs[current_tab] is BuildPanel or tabs[current_tab] is ResearchPanel or tabs[current_tab] is ColonyPanel:
-			tabs[current_tab].rebuild()
+			tabs[current_tab].refresh()
 
 
 ## 대도시 카드·지역 카드: 카메라가 대도시(또는 반도체·AI 데이터센터 지역) 위에 있으면 (닫지 않았으면) 그곳의 카드를 보인다.
@@ -1302,10 +1307,32 @@ func _select_tab(key: String) -> void:
 		tabs[k].visible = k == key
 		tab_buttons[k].set_pressed_no_signal(k == key)
 	if sim != null:
-		if tabs[key].has_method("rebuild"):
-			tabs[key].rebuild()
+		_bind_tab(key)
 		tabs[key].update_view()
 	panel_scroll.scroll_vertical = 0
+
+
+## 탭을 고른 식민지에 묶는다: 처음이면 bind (다시 만들기), 이미 묶였으면 바뀐 것만 (refresh — 없으면 rebuild)
+func _bind_tab(key: String) -> void:
+	var t: Control = tabs[key]
+	if _tab_sim.get(key) != sim:
+		_tab_sim[key] = sim
+		t.bind(sim)
+	elif t.has_method("refresh"):
+		t.refresh()
+	elif t.has_method("rebuild"):
+		t.rebuild()
+
+
+## 지금 보이는 탭을 새로 그린다 (모양이 그대로면 글·단추만)
+func _refresh_tab() -> void:
+	if sim == null:
+		return
+	var t: Control = tabs[current_tab]
+	if t.has_method("refresh"):
+		t.refresh()
+	elif t.has_method("rebuild"):
+		t.rebuild()
 
 
 func _on_player_change() -> void:
@@ -1524,8 +1551,8 @@ func _on_auto(on: bool) -> void:
 	if on:
 		sim.autopilot = AutoPolicy.new("good")
 		sim.autopilot.configure(sim)
-		for key in tabs:
-			tabs[key].bind(sim)
+		_tab_sim.clear()
+		_bind_tab(current_tab)
 		_toast("자동 운영 — 시드가 추천 운영 방침으로 짓고 연구한다", "good")
 	else:
 		sim.autopilot = null

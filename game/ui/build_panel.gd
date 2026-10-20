@@ -1,6 +1,7 @@
 class_name BuildPanel
 extends VBoxContainer
-## 건설 탭 — 대기열과 짓기 목록. '짓기'를 누르면 3D 세계나 지도에서 자리를 고른다
+## 건설 탭 — 대기열과 짓기 목록. '짓기'를 누르면 3D 세계나 지도에서 자리를 고른다.
+## 목록은 모양(식민지·펼친 계열·로봇 제작)이 바뀔 때만 다시 만들고, 날마다는 글·단추만 고친다 (refresh).
 
 signal changed
 signal place_requested(mid: String)
@@ -14,6 +15,12 @@ var queue_box := VBoxContainer.new()
 var catalog := VBoxContainer.new()
 var message := ThemeFactory.muted("")
 var _open := {}          # 계열 → 같은 계열의 다른 종류를 펼쳐 보이나
+var _entries := {}       # 모듈 id → {title, detail, base(고정 설명), button}
+var _toggles := {}       # 계열 → [단추, 분류 색] (같은 계열 몇 종 · 지음·대기)
+var _specials := {}      # 피복·로봇 → {title, button}
+var _qrows: Array = []   # 대기열 줄마다 {title, bar}
+var _queue_sig := ""
+var _shape := ""         # 목록의 모양 — 바뀌면 다시 만든다
 
 
 func _init() -> void:
@@ -46,7 +53,32 @@ func _on_sort(on: bool) -> void:
 	sim.queue_by_priority = on
 	if on:
 		sim.queue.sort_custom(sim._queue_order)
-	rebuild()
+	refresh()
+
+
+func _shape_sig() -> String:
+	var open := PackedStringArray()
+	for f in _open:
+		if _open[f]:
+			open.append(String(f))
+	return "%d|%s|%s" % [sim.get_instance_id(), str(sim.techs.has("robot_fabrication")), ",".join(open)]
+
+
+## 날마다·탭을 고를 때: 목록의 모양이 그대로면 글과 단추만 고친다 (다시 만들면 100 ms 넘게 걸린다)
+func refresh() -> void:
+	if sim == null:
+		return
+	if _shape_sig() != _shape:
+		rebuild()
+		return
+	update_view()
+	_refresh_queue()
+	for kind in _specials:
+		_special_update(kind)
+	for mid in _entries:
+		_entry_update(mid)
+	for fam in _toggles:
+		_toggle_update(fam)
 
 
 static func _clear(box: Node) -> void:
@@ -68,13 +100,14 @@ func update_view() -> void:
 func rebuild() -> void:
 	if sim == null:
 		return
+	_shape = _shape_sig()
+	_entries = {}
+	_toggles = {}
+	_specials = {}
 	update_view()
-	_clear(queue_box)
+	_queue_sig = "-"
+	_refresh_queue()
 	_clear(catalog)
-	if sim.queue.is_empty():
-		queue_box.add_child(ThemeFactory.muted("비어 있다. 아래에서 지을 모듈을 고른다."))
-	for i in range(sim.queue.size()):
-		queue_box.add_child(_queue_row(i, sim.queue[i]))
 	catalog.add_child(_special_entry("regolith_cover"))
 	if sim.techs.has("robot_fabrication"):
 		catalog.add_child(_special_entry("robot"))
@@ -94,20 +127,14 @@ func rebuild() -> void:
 			var members: Array = GameData.FAMILY[fam].slice(1)
 			if members.is_empty():
 				continue
-			var built := 0
-			for m in members:
-				built += int(sim.counts.get(m, 0)) + sim.queued(m)
 			var toggle := Button.new()
 			toggle.flat = true
 			toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			toggle.custom_minimum_size.y = 34
 			toggle.add_theme_font_size_override("font_size", 13)
 			toggle.add_theme_color_override("font_color", Palette.CATEGORY[cat].lightened(0.2))
-			var names := []
-			for m in members:
-				names.append(sim.M[m]["name"])
-			toggle.text = ("▾ " if _open.get(fam, false) else "▸ ") + "같은 계열 %d종 — %s%s" % [members.size(),
-				", ".join(names), ("  (지음·대기 %d)" % built) if built else ""]
+			_toggles[fam] = toggle
+			_toggle_update(fam)
 			toggle.clip_text = true
 			toggle.tooltip_text = "같은 일을 하는 다른 설계 — 비용·전력·크기·고장 간격이 다르다"
 			toggle.pressed.connect(func():
@@ -122,29 +149,67 @@ func rebuild() -> void:
 					catalog.add_child(indent)
 
 
+## 같은 계열 단추의 글 (펼침 · 지음·대기 수)
+func _toggle_update(fam: String) -> void:
+	var toggle: Button = _toggles[fam]
+	var members: Array = GameData.FAMILY[fam].slice(1)
+	var built := 0
+	var names := []
+	for m in members:
+		built += int(sim.counts.get(m, 0)) + sim.queued(m)
+		names.append(sim.M[m]["name"])
+	toggle.text = ("▾ " if _open.get(fam, false) else "▸ ") + "같은 계열 %d종 — %s%s" % [members.size(),
+		", ".join(names), ("  (지음·대기 %d)" % built) if built else ""]
+
+
+## 대기열: 같은 공사들이면 줄의 글·진척만 고치고, 바뀌었으면 줄을 다시 만든다
+func _refresh_queue() -> void:
+	var seqs := PackedStringArray()
+	for item in sim.queue:
+		seqs.append(str(int(item["seq"])))
+	var qsig := ",".join(seqs)
+	if qsig != _queue_sig:
+		_queue_sig = qsig
+		_clear(queue_box)
+		_qrows = []
+		if sim.queue.is_empty():
+			queue_box.add_child(ThemeFactory.muted("비어 있다. 아래에서 지을 모듈을 고른다."))
+		for i in range(sim.queue.size()):
+			queue_box.add_child(_queue_row(i, sim.queue[i]))
+		return
+	for i in range(mini(_qrows.size(), sim.queue.size())):
+		_queue_update(_qrows[i], sim.queue[i])
+
+
+func _queue_update(r: Dictionary, item: Dictionary) -> void:
+	var done: float = 1.0 - item["rd"] / maxf(item["rd_total"], 0.001)
+	var text := "%s · %d%%" % [GameData.module_name(item["id"]), int(round(done * 100))]
+	if item["print_total"] > 0:
+		text += " · 인쇄 %s / %s t" % [Fmt.n(item["print_total"] - item["print_t"]), Fmt.n(item["print_total"])]
+	(r["title"] as Label).text = text
+	(r["bar"] as ProgressBar).value = done
+
+
 func _queue_row(i: int, item: Dictionary) -> Control:
 	var row := HBoxContainer.new()
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_constant_override("separation", 2)
 	var title := Label.new()
-	var done: float = 1.0 - item["rd"] / maxf(item["rd_total"], 0.001)
-	var text := "%s · %d%%" % [GameData.module_name(item["id"]), int(round(done * 100))]
-	if item["print_total"] > 0:
-		text += " · 인쇄 %s / %s t" % [Fmt.n(item["print_total"] - item["print_t"]), Fmt.n(item["print_total"])]
-	title.text = text
 	title.add_theme_font_size_override("font_size", 14)
 	info.add_child(title)
 	var bar := ProgressBar.new()
 	bar.show_percentage = false
 	bar.max_value = 1.0
 	bar.step = 0.0
-	bar.value = done
 	bar.custom_minimum_size.y = 6
 	bar.add_theme_stylebox_override("background", Palette.box(Palette.PANEL_2, Color.TRANSPARENT, 3, 0))
 	bar.add_theme_stylebox_override("fill", Palette.box(Palette.AMBER, Color.TRANSPARENT, 3, 0))
 	info.add_child(bar)
 	row.add_child(info)
+	var r := {"title": title, "bar": bar}
+	_qrows.append(r)
+	_queue_update(r, item)
 	var cancel := Button.new()
 	cancel.text = "취소"
 	cancel.tooltip_text = "손대지 않았으면 자재를 모두, 시작했으면 절반을 돌려받는다"
@@ -155,7 +220,7 @@ func _queue_row(i: int, item: Dictionary) -> Control:
 
 func _on_cancel(i: int) -> void:
 	sim.cancel_queued(i)
-	rebuild()
+	refresh()
 	changed.emit()
 
 
@@ -166,28 +231,36 @@ func _entry(mid: String) -> Control:
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_constant_override("separation", 1)
 	var title := Label.new()
-	var count := int(sim.counts.get(mid, 0))
-	var waiting := sim.queued(mid)
-	title.text = m["name"] + ("  ×%d" % count if count else "") + ("  (+%d 대기)" % waiting if waiting else "")
 	info.add_child(title)
 	var cost := _cost_text(m["cost"])
 	var power := float(m["power_kw"])
 	var line := "%s · %s 로봇·일%s" % [cost, Fmt.n(float(m["build_rd"])), (" · %s kW" % Fmt.n(power)) if power > 0 else ""]
-	var detail := ThemeFactory.muted(line + "\n" + describe(m), 12)
+	var base := line + "\n" + describe(m)
+	var detail := ThemeFactory.muted(base, 12)
 	info.add_child(detail)
 	row.add_child(info)
 	var button := Button.new()
 	button.text = "짓기"
-	button.tooltip_text = "지을 자리를 고른다"
 	button.custom_minimum_size = Vector2(72, 44)
-	var reason := sim.build_block_reason(mid, 0.0)
-	if reason != "":
-		button.disabled = true
-		button.tooltip_text = reason
-		detail.text += "\n" + reason
 	button.pressed.connect(_on_build.bind(mid))
 	row.add_child(button)
+	_entries[mid] = {"title": title, "detail": detail, "base": base, "button": button}
+	_entry_update(mid)
 	return row
+
+
+## 한 모듈의 바뀌는 것: 지은·대기 수, 지을 수 없는 까닭 (글이 같으면 Label이 다시 모양을 잡지 않는다)
+func _entry_update(mid: String) -> void:
+	var r: Dictionary = _entries[mid]
+	var m: Dictionary = sim.M[mid]
+	var count := int(sim.counts.get(mid, 0))
+	var waiting := sim.queued(mid)
+	(r["title"] as Label).text = m["name"] + ("  ×%d" % count if count else "") + ("  (+%d 대기)" % waiting if waiting else "")
+	var reason := sim.build_block_reason(mid, 0.0)
+	var button: Button = r["button"]
+	button.disabled = reason != ""
+	button.tooltip_text = reason if reason != "" else "지을 자리를 고른다"
+	(r["detail"] as Label).text = String(r["base"]) + ("\n" + reason if reason != "" else "")
 
 
 func _special_entry(kind: String) -> Control:
@@ -200,21 +273,30 @@ func _special_entry(kind: String) -> Control:
 	button.text = "짓기"
 	button.custom_minimum_size = Vector2(72, 44)
 	if kind == "regolith_cover":
-		var habs := int(sim.counts.get("hab_module", 0))
-		title.text = "레골리스 피복  %d / %d기" % [sim.covered_habs + sim.queued("regolith_cover"), habs]
 		detail = ThemeFactory.muted("레골리스 50 t · 5 로봇·일\n거주 모듈 1기를 덮어 만성 선량을 하루 1.0 → 0.45 mSv로 줄인다", 12)
-		button.disabled = sim.stock["regolith_t"] < sim.C["regolith_cover"]["regolith_t"] \
-			or sim.covered_habs + sim.queued("regolith_cover") >= habs
 	else:
-		title.text = "건설 로봇 제작  (지금 %d대)" % sim.robots
 		detail = ThemeFactory.muted("부품 5 · 4 로봇·일 — 로봇 자가 제작 기술", 12)
-		button.disabled = sim.stock["parts"] < sim.C["robots"]["local_parts"]
 	info.add_child(title)
 	info.add_child(detail)
 	row.add_child(info)
 	button.pressed.connect(_on_special.bind(kind))
 	row.add_child(button)
+	_specials[kind] = {"title": title, "button": button}
+	_special_update(kind)
 	return row
+
+
+func _special_update(kind: String) -> void:
+	var title: Label = _specials[kind]["title"]
+	var button: Button = _specials[kind]["button"]
+	if kind == "regolith_cover":
+		var habs := int(sim.counts.get("hab_module", 0))
+		title.text = "레골리스 피복  %d / %d기" % [sim.covered_habs + sim.queued("regolith_cover"), habs]
+		button.disabled = sim.stock["regolith_t"] < sim.C["regolith_cover"]["regolith_t"] \
+			or sim.covered_habs + sim.queued("regolith_cover") >= habs
+	else:
+		title.text = "건설 로봇 제작  (지금 %d대)" % sim.robots
+		button.disabled = sim.stock["parts"] < sim.C["robots"]["local_parts"]
 
 
 func _on_build(mid: String) -> void:
@@ -225,7 +307,7 @@ func _on_build(mid: String) -> void:
 func _on_special(kind: String) -> void:
 	if sim.enqueue_special(kind, 0.0):
 		message.text = "%s — 대기열에 넣었다" % GameData.module_name(kind)
-	rebuild()
+	refresh()
 	changed.emit()
 
 

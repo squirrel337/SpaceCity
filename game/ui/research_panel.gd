@@ -10,6 +10,7 @@ var sim: CitySim
 var status := Label.new()
 var progress := Meter.new("진행")
 var list := VBoxContainer.new()
+var _shape := ""         # 완료·대기 순서·지금 과제 — 바뀔 때만 목록을 다시 만든다
 
 
 func _init() -> void:
@@ -27,6 +28,21 @@ func _init() -> void:
 func bind(p_sim: CitySim) -> void:
 	sim = p_sim
 	rebuild()
+
+
+func _shape_sig() -> String:
+	return "%d|%d|%s|%s" % [sim.get_instance_id(), sim.techs.size(), ",".join(PackedStringArray(sim.research_queue)),
+		current_target()]
+
+
+## 날마다·탭을 고를 때: 기술의 상태가 그대로면 진행만 고친다
+func refresh() -> void:
+	if sim == null:
+		return
+	if _shape_sig() != _shape:
+		rebuild()
+	else:
+		update_view()
 
 
 func current_target() -> String:
@@ -59,6 +75,7 @@ func update_view() -> void:
 func rebuild() -> void:
 	if sim == null:
 		return
+	_shape = _shape_sig()
 	update_view()
 	for c in list.get_children():
 		list.remove_child(c)

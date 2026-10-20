@@ -17,6 +17,7 @@ var master := CheckButton.new()
 var box := VBoxContainer.new()
 var _live: Array = []
 var _open := {"space": true, "local": true, "feeder": false, "air": false}
+var _shape := ""         # 노선·켜짐·펼침·운영 중인 대도시 — 바뀔 때만 다시 만든다 (나머지는 _live가 고친다)
 
 
 func _init() -> void:
@@ -74,9 +75,26 @@ func update_view() -> void:
 		(f as Callable).call()
 
 
+func _shape_sig() -> String:
+	var fn := mgr.metro_fn
+	return "%d|%d|%s|%s|%d|%d" % [mgr.transport.lines.size(), mgr.transport.rev, str(_open),
+		",".join(PackedStringArray(fn.keys_with_ops())), fn.active_keys().size(), fn.modes.metros.size()]
+
+
+## 탭을 고를 때·날마다: 모양이 그대로면 글만 고친다 (다시 만들면 노선이 많을 때 수십 ms)
+func refresh() -> void:
+	if mgr == null:
+		return
+	if _shape_sig() != _shape:
+		rebuild()
+	else:
+		update_view()
+
+
 func rebuild() -> void:
 	if mgr == null:
 		return
+	_shape = _shape_sig()
 	_live.clear()
 	_clear(box)
 	var tr := mgr.transport

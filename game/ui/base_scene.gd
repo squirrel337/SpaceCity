@@ -6,7 +6,7 @@ extends RefCounted
 
 ## 건물과 공사 현장: {id, sprite, pos, rot, variant, uid, broken, building, progress}
 static func collect(sim: CitySim, plan: CityPlan) -> Array:
-	plan.sync(sim)
+	plan.sync(sim, CityPlan.SYNC_FRAME_US)
 	var items := []
 	var progress := {}
 	for item in sim.queue:
@@ -61,7 +61,7 @@ static func sites(sim: CitySim, plan: CityPlan) -> Array:
 	var out := []
 	if sim == null:
 		return out
-	plan.sync(sim)
+	plan.sync(sim, CityPlan.SYNC_FRAME_US)
 	for item in sim.queue:
 		var e := plan.entry_of_seq(int(item["seq"]))
 		if e.is_empty():

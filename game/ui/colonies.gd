@@ -457,7 +457,7 @@ func load_save(data: Dictionary) -> bool:
 	for cd in data["colonies"]:
 		var sd: Dictionary = cd["sim"]
 		var s2 := CitySim.from_save(sd)
-		var plan2 := CityPlan.from_save(cd.get("plan"), s2, BaseLayout.new(_layout_of(s2.site_id)))
+		var plan2 := CityPlan.from_save(cd.get("plan"), s2, BaseLayout.new(_layout_of(s2.site_id)), false)
 		var entry := _entry(s2, plan2, int(cd.get("founded", 0)))
 		if cd.has("name"):
 			entry["name"] = String(cd["name"])

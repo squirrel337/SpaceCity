@@ -86,6 +86,9 @@ var max_co2 := 0.0
 var min_reserve_days := 1e9
 var notes: Array = []            # [시각(시간), 문장, 종류]
 var daily: Array = []
+var _daily_cols: Array = []       # 저장용 일별 기록 (열 이름 · 배수 · 줄) — 늘어난 날만 더 싼다
+var _daily_k: Array = []
+var _daily_rows: Array = []
 
 # 파생값 — refresh()가 하루에 한 번 갱신한다
 var wk := {}
@@ -1336,7 +1339,42 @@ func to_save() -> Dictionary:
 		"autopilot": autopilot.name if autopilot != null else "", "site_id": site_id, "start_unix": start_unix}
 	for f in SAVE_FIELDS:
 		data[f] = get(f)
+	data["daily"] = _pack_daily()
 	return data
+
+
+## 일별 기록을 저장에 작게: 열 이름 한 번과 줄마다 숫자 (실수는 1/1000 단위 정수 — 보고서의 평균에만 쓰는 기록이다).
+## 저장 파일의 대부분이 이것이었다 (3년이면 식민지마다 1,100줄). 지난번에 싼 줄은 다시 싸지 않는다
+func _pack_daily() -> Dictionary:
+	if daily.is_empty():
+		return {"cols": [], "k": [], "rows": []}
+	if _daily_cols.is_empty() or _daily_rows.size() > daily.size():
+		_daily_cols = (daily[0] as Dictionary).keys()
+		_daily_k = []
+		for c in _daily_cols:
+			_daily_k.append(1 if typeof(daily[0][c]) == TYPE_INT else 1000)
+		_daily_rows = []
+	for i in range(_daily_rows.size(), daily.size()):
+		var rec: Dictionary = daily[i]
+		var row: Array = []
+		for j in _daily_cols.size():
+			var v: Variant = rec.get(_daily_cols[j], 0)
+			row.append(int(v) if int(_daily_k[j]) == 1 else int(round(float(v) * 1000.0)))
+		_daily_rows.append(row)
+	return {"cols": _daily_cols, "k": _daily_k, "rows": _daily_rows}
+
+
+static func _unpack_daily(d: Dictionary) -> Array:
+	var cols: Array = d.get("cols", [])
+	var ks: Array = d.get("k", [])
+	var out: Array = []
+	for row in d.get("rows", []):
+		var rec := {}
+		for j in mini(cols.size(), (row as Array).size()):
+			var k := int(ks[j]) if j < ks.size() else 1000
+			rec[String(cols[j])] = int(row[j]) if k == 1 else float(row[j]) / k
+		out.append(rec)
+	return out
 
 
 static func from_save(data: Dictionary) -> CitySim:
@@ -1344,8 +1382,10 @@ static func from_save(data: Dictionary) -> CitySim:
 	var sim := CitySim.new(int(data["seed_value"]), years, "", String(data.get("site_id", GameData.HOME_SITE)),
 		int(data.get("start_unix", -1)))
 	for f in SAVE_FIELDS:
-		if data.has(f):
+		if data.has(f) and not (f == "daily" and data[f] is Dictionary):
 			sim.set(f, data[f])
+	if data.get("daily") is Dictionary:
+		sim.daily = _unpack_daily(data["daily"])
 	sim._restore_types()
 	sim.rng.set_state(data["rng"])
 	if String(data.get("autopilot", "")) != "":
