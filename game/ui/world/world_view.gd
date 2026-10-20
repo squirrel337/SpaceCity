@@ -107,6 +107,7 @@ var _ov_ms := 0
 
 
 func _init() -> void:
+	ModelLib.preload_data()              # 장면을 짓는 동안 다른 스레드에서
 	clip_contents = true
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_CLICK
@@ -143,6 +144,7 @@ func _init() -> void:
 func _exit_tree() -> void:
 	PlanetLook.coast_release()
 	SiteSurface.claim_patch(true)
+	ModelLib.release()
 
 
 func _ready() -> void:

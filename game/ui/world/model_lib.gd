@@ -15,14 +15,27 @@ const LAMP_COLOR := Color(1.0, 0.95, 0.82)
 
 static var path := PATH              # 모형 파일 (미리보기 도구가 바꿀 수 있다)
 static var _data: Dictionary = {}
+static var _data_task := -1
+static var _parsed: Variant = null
 static var _pal: Array = []          # [Color(선형), gloss, alpha]
 static var _cache: Dictionary = {}
 static var _mats: Array = []
 
 
+## 시작할 때: 모형 자료(JSON, 수 MB)를 다른 스레드에서 풀기 시작한다 (data()가 처음 불릴 때 받는다)
+static func preload_data() -> void:
+	if _data.is_empty() and _data_task < 0:
+		_data_task = WorkerThreadPool.add_task(func() -> void:
+			_parsed = JSON.parse_string(FileAccess.get_file_as_string(path)), false, "models.json")
+
+
 static func data() -> Dictionary:
+	if _data_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_data_task)
+		_data_task = -1
 	if _data.is_empty():
-		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+		var parsed: Variant = _parsed if _parsed is Dictionary else JSON.parse_string(FileAccess.get_file_as_string(path))
+		_parsed = null
 		_data = parsed if parsed is Dictionary else {"palette": [], "buildings": {}, "vehicles": {}}
 		_pal.clear()
 		for p in _data.get("palette", []):
@@ -105,6 +118,18 @@ static func ready(group: String, id: String, v: int = 0) -> bool:
 	if not _jobs.has(key):
 		_jobs[key] = WorkerThreadPool.add_task(_make.bind(key, _prims(group, id, v), materials()), false, "model " + key)
 	return false
+
+
+## 끝낼 때: 다른 스레드의 일을 모두 거둔다 (일이 쥔 재질이 렌더링 서버보다 오래 남지 않게)
+static func release() -> void:
+	for key in _jobs:
+		WorkerThreadPool.wait_for_task_completion(_jobs[key])
+	_jobs.clear()
+	_made.clear()
+	if _data_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_data_task)
+		_data_task = -1
+		_parsed = null
 
 
 ## 다른 스레드에서 만드는 모형 수 (다 만든 것은 거둔다)

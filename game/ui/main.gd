@@ -657,6 +657,7 @@ func _build_side() -> Control:
 
 # ── 새 게임·저장 ─────────────────────────────────────────────────
 func _new_game(seed_value: int, autopilot: bool) -> void:
+	_boot_save()                                     # 미리 풀어 둔 저장은 쓰지 않으니 놓는다
 	var s := CitySim.new(seed_value, 40.0, "good" if autopilot else "")
 	colonies.start(s, CityPlan.create(s, world.ground_for(s.site_id).layout))
 	_begin_session(0)
@@ -784,12 +785,24 @@ func _save() -> void:
 func _load_save() -> bool:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return false
-	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	var data: Variant = _boot_save()
+	if data == null:
+		data = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 	if not data is Dictionary or not colonies.load_save(data):
 		return false
 	_begin_session(int(data.get("active", 0)))
 	sim.note("관리 기록 — 저장한 지점에서 다시 가동했다", "info")
 	return true
+
+
+## 시작 화면(boot.gd)이 다른 스레드에서 미리 풀어 둔 저장 — 그 뒤로 파일이 그대로일 때만. 한 번 꺼내면 놓는다
+func _boot_save() -> Variant:
+	var root := get_tree().root
+	if not root.has_meta("boot_save"):
+		return null
+	var pre: Array = root.get_meta("boot_save")
+	root.remove_meta("boot_save")
+	return pre[1] if pre.size() == 2 and int(pre[0]) == FileAccess.get_modified_time(SAVE_PATH) else null
 
 
 func _notification(what: int) -> void:

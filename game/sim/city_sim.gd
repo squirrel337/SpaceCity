@@ -222,13 +222,38 @@ static func illumination_schedule(r: PyRandom, hours: int, il: Dictionary) -> Pa
 	return d
 
 
-## 자전하는 천체의 낮과 밤 (1 = 어두움): 하루(day_h)의 앞 light_frac이 낮이고, 아침에 시작한다 — 파이썬과 같다
+## 자전하는 천체의 낮과 밤 (1 = 어두움): 하루(day_h)의 앞 light_frac이 낮이고, 아침에 시작한다 — 파이썬과 같다.
+## 40년치를 한 시간씩 세면 25 ms쯤 (새 게임에 도시마다) — 정수 p시간이 하루의 정수배에 맞으면(지구 24, 화성 1233 = 50일)
+## 한 주기만 세고 이어 붙인다. 어느 시각도 낮밤 경계에 (40년 동안 어긋나는 만큼보다) 가깝지 않을 때만 — 그래서 한 시간씩 센 것과
+## 한 칸도 다르지 않다. 아니면 끝까지 한 시간씩
 static func rotation_schedule(hours: int, il: Dictionary) -> PackedByteArray:
-	var d := PackedByteArray()
-	d.resize(hours)
 	var day_h := float(il["day_h"])
 	var light := float(il["light_frac"])
-	for hh in hours:
+	var p := 0
+	var drift := 0.0
+	for k in range(1, 200):
+		var c := roundi(k * day_h)
+		if c >= hours or c > 20000:
+			break
+		var e := absf(c / day_h - k) * (float(hours) / c + 1.0)
+		if c > 0 and e < 1e-7:
+			p = c
+			drift = e
+			break
+	var n := p if p > 0 else hours
+	var d := PackedByteArray()
+	d.resize(n)
+	var margin := 1.0
+	for hh in n:
+		var f := fposmod((hh + 0.5) / day_h + 0.02, 1.0)
+		d[hh] = 1 if f >= light else 0
+		margin = minf(margin, minf(absf(f - light), minf(f, 1.0 - f)))
+	if p > 0 and margin > drift + 1e-9:
+		while d.size() < hours:
+			d.append_array(d.slice(0, mini(d.size(), hours - d.size())))
+		return d
+	d.resize(hours)
+	for hh in range(n, hours):
 		d[hh] = 1 if fposmod((hh + 0.5) / day_h + 0.02, 1.0) >= light else 0
 	return d
 
@@ -1364,19 +1389,6 @@ func _pack_daily() -> Dictionary:
 	return {"cols": _daily_cols, "k": _daily_k, "rows": _daily_rows}
 
 
-static func _unpack_daily(d: Dictionary) -> Array:
-	var cols: Array = d.get("cols", [])
-	var ks: Array = d.get("k", [])
-	var out: Array = []
-	for row in d.get("rows", []):
-		var rec := {}
-		for j in mini(cols.size(), (row as Array).size()):
-			var k := int(ks[j]) if j < ks.size() else 1000
-			rec[String(cols[j])] = int(row[j]) if k == 1 else float(row[j]) / k
-		out.append(rec)
-	return out
-
-
 static func from_save(data: Dictionary) -> CitySim:
 	var years: float = float(data["days"]) / 365.25
 	var sim := CitySim.new(int(data["seed_value"]), years, "", String(data.get("site_id", GameData.HOME_SITE)),
@@ -1384,8 +1396,8 @@ static func from_save(data: Dictionary) -> CitySim:
 	for f in SAVE_FIELDS:
 		if data.has(f) and not (f == "daily" and data[f] is Dictionary):
 			sim.set(f, data[f])
-	if data.get("daily") is Dictionary:
-		sim.daily = _unpack_daily(data["daily"])
+	if data.get("daily") is Dictionary:          # 시작 화면이 미리 풀었으면 이미 줄의 목록이다
+		sim.daily = DailyPack.unpack(data["daily"])
 	sim._restore_types()
 	sim.rng.set_state(data["rng"])
 	if String(data.get("autopilot", "")) != "":

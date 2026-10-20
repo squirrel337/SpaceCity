@@ -15,6 +15,8 @@ const ARMS := [["방패-센타우루스", 0.0, 1.0, 0.3], ["페르세우스", PI
 	["궁수-용골", PI * 1.5, 0.6, 0.2]]
 
 var _mat: ShaderMaterial
+var _task := -1                                 # 점 구름을 짓는 다른 스레드의 일 (끝나면 _built)
+var _built: ArrayMesh
 var center := PackedFloat64Array([0, 0, 0])    # 은하 중심 (km, 해 중심 황도)
 var axes := []                                  # [해→중심 c, 은하 동쪽 e, 은하 북극 n] (황도 단위 벡터)
 
@@ -32,7 +34,8 @@ func _init() -> void:
 	axes = [c, e, n]
 	center = Astro.dvec(c * R0_LY * Astro.LY)
 	var count := int({"low": 24000, "medium": 42000, "high": 70000, "ultra": 120000}.get(Settings.level(), 42000))
-	mesh = _build(count)
+	# 별 수만 개를 다른 스레드에서 (시작이 그만큼 빨라진다 — 은하는 수백 광년 밖으로 나가야 보인다)
+	_task = WorkerThreadPool.add_task(func() -> void: _built = _build(count), false, "galaxy")
 	_mat = ShaderMaterial.new()
 	_mat.shader = load("res://ui/world/shaders/galaxy_points.gdshader")
 	material_override = _mat
@@ -44,6 +47,7 @@ func _init() -> void:
 func place(view: WorldView) -> float:
 	var d_sun := Astro.len3(view.cam.pos) / Astro.LY
 	var k := smoothstep(400.0, 6000.0, d_sun)
+	_claim(k > 0.01)
 	visible = k > 0.01
 	if not visible:
 		return 0.0
@@ -55,6 +59,21 @@ func place(view: WorldView) -> float:
 	_mat.set_shader_parameter("gain", k)
 	_mat.set_shader_parameter("px_scale", view.px_scale())
 	return k
+
+
+## 다른 스레드가 지은 점 구름을 받는다 (wait이면 끝날 때까지 기다린다)
+func _claim(wait: bool) -> void:
+	if _task < 0 or not (wait or WorkerThreadPool.is_task_completed(_task)):
+		return
+	WorkerThreadPool.wait_for_task_completion(_task)
+	_task = -1
+	mesh = _built
+	_built = null
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and _task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_task)
 
 
 ## 은하 중심 기준 (x: 해→중심, y: 은하 동쪽, z: 북극; 광년) → 황도 축 (광년)
