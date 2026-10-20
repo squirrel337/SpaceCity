@@ -59,6 +59,8 @@ var _eidx := {}                    # 색인 칸 → 길 번호들
 var _eidx_sig := ""
 var _sync_frame := -1              # 배치 따라잡기의 프레임 예산 (여러 곳에서 불러도 한 프레임에 한 몫)
 var _sync_spent := 0
+var _fam_built := {}             # 계열 → 지어진 자리들 (built_of_family — 배치가 바뀌면 비운다)
+var _fam_rev := -1
 
 
 func _init(p_layout: BaseLayout = null) -> void:
@@ -1558,11 +1560,18 @@ func random_node(rng: RandomNumberGenerator) -> Vector2:
 # ── 찾기 ────────────────────────────────────────────────────────
 ## 지어진 건물 중 이 계열(종류 모두)의 자리들 (지은 순서)
 func built_of_family(f: String) -> Array:
-	var out := []
-	for e in buildings:
-		if fam(String(e["id"])) == f and int(e["seq"]) < 0:
-			out.append(Vector3(e["x"], e["y"], 0))
-	return out
+	# 기지의 탈것이 프레임마다 묻는다 (굴착기·로봇 정비소·착륙장…) — 배치가 바뀔 때까지 같은 답 (받는 쪽은 고치지 않는다)
+	var rev := revision * 100000 + buildings.size()
+	if rev != _fam_rev:
+		_fam_rev = rev
+		_fam_built.clear()
+	if not _fam_built.has(f):
+		var out := []
+		for e in buildings:
+			if fam(String(e["id"])) == f and int(e["seq"]) < 0:
+				out.append(Vector3(e["x"], e["y"], 0))
+		_fam_built[f] = out
+	return _fam_built[f]
 
 
 ## 지어진 건물 중 이 종류의 자리들 (지은 순서)

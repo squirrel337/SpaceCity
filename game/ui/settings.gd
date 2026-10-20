@@ -11,7 +11,7 @@ const LEVEL_NAMES := {"auto": "자동", "low": "낮음", "medium": "보통", "hi
 ## 단계마다: render_px(3D 화면의 픽셀 상한), msaa(0·2·4), shadow_splits(0이면 끔), shadow_size, metro_budget(대도시
 ## 건물 수), metro_keep(동시에 지어 두는 대도시), patch_segs(지형 조각 둘레 칸), bake(천체 겉모습 굽기), stars, aniso
 const PRESETS := {
-	"low": {"render_px": 0.9e6, "msaa": 0, "shadow_splits": 2, "shadow_size": 2048, "metro_budget": 6000, "metro_keep": 1,
+	"low": {"render_px": 0.9e6, "msaa": 0, "shadow_splits": 0, "shadow_size": 2048, "metro_budget": 6000, "metro_keep": 1,
 		"patch_segs": 128, "bake": 512, "stars": 3000, "aniso": 2},
 	"medium": {"render_px": 1.4e6, "msaa": 0, "shadow_splits": 2, "shadow_size": 2048, "metro_budget": 12000,
 		"metro_keep": 1, "patch_segs": 160, "bake": 512, "stars": 4200, "aniso": 4},

@@ -95,6 +95,15 @@ var _fq_fast := 0
 var metro_grounds := {}              # 대도시 key → {ground: SiteSurface, city: MetroCity, used} (가까이 갈 때 만든다, 둘까지)
 var _metro_near: SiteSurface         # 카메라가 내려다보는 대도시의 땅 (없으면 null)
 var _ahead_sig := ""                 # 해안 지도를 미리 읽는 대도시·지역 (바뀔 때만 다시 부른다)
+var _ahead_col := PackedStringArray()  # 땅이 아직 없는 지구의 식민지 (식민지·땅 수가 바뀔 때만 다시 센다)
+var _ahead_csig := ""
+var _chains := {}                    # 천체 → 카메라 축척 사슬 (자료로 정해진다 — 한 번만 만든다)
+var _sky_pos := PackedFloat64Array()  # 이웃 별의 자리를 마지막으로 셈한 카메라 위치·렌더 단위
+var _sky_unit := 1.0
+var _ov_view: Array = []             # 화면 위 그림을 마지막으로 그린 때의 카메라(조작 상태)·입력 수·크기, 시각
+var _input_n := 0
+var _ov_jd := 0.0
+var _ov_ms := 0
 
 
 func _init() -> void:
@@ -430,6 +439,12 @@ func _cam_alt(id: String) -> float:
 
 
 func _chain(id: String) -> Array:
+	if not _chains.has(id):
+		_chains[id] = _chain_of(id)
+	return _chains[id]
+
+
+func _chain_of(id: String) -> Array:
 	var b: Dictionary = Astro.bodies[id]
 	match id:
 		"sun":
@@ -499,11 +514,26 @@ func _process(delta: float) -> void:
 	var t1 := Time.get_ticks_usec()
 	if city and sim:
 		city.update(delta, speed_level)
-	_overlay.queue_redraw()
+	_queue_overlay()
 	_auto_quality(delta)
 	var t2 := Time.get_ticks_usec()
 	perf["place_us"] = t1 - t0
 	perf["city_us"] = t2 - t1
+
+
+## 화면 위 이름표·노선: 카메라를 움직이지 않고(천체에 붙은 카메라의 거리·기울기·방향·목표) 입력이 없고 크기가 그대로이며
+## 시간이 조금만 흘렀으면 1초에 열 번만 다시 그린다 (이름표는 글자마다 그리기 명령이라 수백 글자를 매 프레임 다시
+## 만들면 1~2 ms). 날아가는 중·도구를 쓰는 동안은 매 프레임
+func _queue_overlay() -> void:
+	var now := Time.get_ticks_msec()
+	var view := [cam.focus, cam.mode, cam.t_dir, cam.fwd, cam.tilt, cam.dist, cam.yaw, cam.pitch, _input_n, size]
+	if view == _ov_view and absf(jd - _ov_jd) * 24.0 < 0.25 and now - _ov_ms < 100 and not cam.flying() \
+			and not cam.track.is_valid() and not _tool_on():
+		return
+	_ov_view = view
+	_ov_jd = jd
+	_ov_ms = now
+	_overlay.queue_redraw()
 
 
 func _on_resized() -> void:
@@ -603,7 +633,8 @@ func _place_all() -> void:
 		var rad: float = info["radius"]
 		node.global_transform = Transform3D(g_basis(info["frame"]).scaled(Vector3.ONE * rad * s), to_render(c))
 		var mat: ShaderMaterial = e["mat"]
-		if mat:
+		if mat and (id == "sun" or id == near_id or _apparent_px(c, rad) >= 0.75):
+			# (화면에서 1화소도 안 되는 천체는 빛 방향·자전을 고치지 않는다 — 점은 이름표가 그린다)
 			var sun_dir := g_vec(Astro.vec(Astro.norm3(Astro.sub3(sun_c, c)))) if id != "sun" else Vector3.UP
 			mat.set_shader_parameter("sun_dir", sun_dir)
 			mat.set_shader_parameter("spin_h", vis_hours)
@@ -722,49 +753,58 @@ func _place_light(near_id: String, sun_c: PackedFloat64Array) -> void:
 func _update_metros() -> void:
 	var near_key := ""
 	# 해안 지도를 다른 스레드에서 미리 읽는다: 땅이 아직 없는 지구의 식민지 (고를 때 기다리지 않게), 다가가는 대도시·지역
-	var ahead := PackedStringArray()
 	if mgr != null:
-		for c in mgr.list:
-			var sid := String(c["site"])
-			if not grounds.has(sid) and String(GameData.site(sid).get("body", "")) == "earth":
-				ahead.append(sid)
+		var csig := "%d|%d" % [mgr.list.size(), grounds.size()]
+		if csig != _ahead_csig:
+			_ahead_csig = csig
+			_ahead_col = PackedStringArray()
+			for c in mgr.list:
+				var sid := String(c["site"])
+				if not grounds.has(sid) and String(GameData.site(sid).get("body", "")) == "earth":
+					_ahead_col.append(sid)
+	var ahead := _ahead_col.duplicate()
 	var on_earth := cam.mode == "body" and cam.focus == "earth" and _bodies.has("earth")
 	var alt := Astro.len3(Astro.sub3(cam.pos, _info("earth")["center"])) - 6371.0 if on_earth else INF
 	var t := Astro.vec(cam.t_dir)
+	var m := {}
+	var r := {}
 	if alt < 4000.0:
-		var pm := Metros.nearest(t, 700.0)
-		var pr := Metros.nearest_region(t, 450.0)
-		if not pm.is_empty():
-			ahead.append(String(pm["key"]))
-		if not pr.is_empty():
-			ahead.append(String(pr["key"]))
+		m = Metros.nearest(t, 700.0)
+		r = Metros.nearest_region(t, 450.0)
+		if not m.is_empty():
+			ahead.append(String(m["key"]))
+		if not r.is_empty():
+			ahead.append(String(r["key"]))
 	var sig := ",".join(ahead)
 	if sig != _ahead_sig:
 		_ahead_sig = sig
 		PlanetLook.coast_prefetch(ahead)
-	if on_earth:
-			var m := Metros.nearest(t, 250.0)
-			var r := Metros.nearest_region(t, 150.0)
-			var dm := INF
-			var dr := INF
-			if not m.is_empty():
-				dm = Metros.km_between(t, m["dir"]) / maxf(float(m["radius_km"]), 1.0)
-			if not r.is_empty():
-				dr = Metros.km_between(t, r["dir"]) / (float(r["radius_km"]) + 8.0)
-			if _metro_near != null:
-				var cur := String(_metro_near.site_data.get("id", ""))
-				if not m.is_empty() and cur == String(m["key"]):
-					dm /= 1.15
-				elif not r.is_empty() and cur == String(r["key"]):
-					dr /= 1.15
-			if dr < dm:
-				near_key = String(r["key"])
-				if not metro_grounds.has(near_key) and PlanetLook.coast_ready(near_key):
-					_make_region(r)
-			elif not m.is_empty():
-				near_key = String(m["key"])
-				if not metro_grounds.has(near_key) and PlanetLook.coast_ready(near_key):
-					_make_metro(m)
+	# 고도 1,500 km 아래: 가장 가까운 대도시(250 km 안)나 지역(150 km 안)의 땅을 만든다
+	if alt < 1500.0:
+		var dm := INF
+		var dr := INF
+		if not m.is_empty():
+			var km := Metros.km_between(t, m["dir"])
+			if km < 250.0:
+				dm = km / maxf(float(m["radius_km"]), 1.0)
+		if not r.is_empty():
+			var kr := Metros.km_between(t, r["dir"])
+			if kr < 150.0:
+				dr = kr / (float(r["radius_km"]) + 8.0)
+		if _metro_near != null:
+			var cur := String(_metro_near.site_data.get("id", ""))
+			if not m.is_empty() and cur == String(m["key"]):
+				dm /= 1.15
+			elif not r.is_empty() and cur == String(r["key"]):
+				dr /= 1.15
+		if dr < dm:
+			near_key = String(r["key"])
+			if not metro_grounds.has(near_key) and PlanetLook.coast_ready(near_key):
+				_make_region(r)
+		elif dm < INF:
+			near_key = String(m["key"])
+			if not metro_grounds.has(near_key) and PlanetLook.coast_ready(near_key):
+				_make_metro(m)
 	_metro_near = null
 	for k in metro_grounds:
 		var me: Dictionary = metro_grounds[k]
@@ -890,7 +930,12 @@ func _place_sky() -> void:
 	var r := _camera.far * 0.9
 	_milky.global_transform = Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * r), Vector3.ZERO)
 	_sky_stars.global_transform = Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * r * 0.97), Vector3.ZERO)
-	# 이웃 별: 실제 3차원 위치, 밝기는 지금 카메라에서의 겉보기 등급
+	# 이웃 별: 실제 3차원 위치, 밝기는 지금 카메라에서의 겉보기 등급 — 카메라가 10만 km 넘게 움직였거나
+	# 렌더 단위가 1% 넘게 바뀌었을 때만 다시 셈한다 (광년 밖의 별이라 그 사이에는 그대로다)
+	if _sky_pos.size() == 3 and Astro.len3(Astro.sub3(cam.pos, _sky_pos)) < 1.0e5 and absf(_unit / _sky_unit - 1.0) < 0.01:
+		return
+	_sky_pos = cam.pos
+	_sky_unit = _unit
 	var pos4 := PackedVector4Array()
 	var col4 := PackedVector4Array()
 	for s in Astro.systems:
@@ -1102,6 +1147,7 @@ func zoom_by(k: float) -> void:
 
 # ── 입력 ────────────────────────────────────────────────────────
 func _gui_input(event: InputEvent) -> void:
+	_input_n += 1                        # 화면 위 그림을 다음 프레임에 다시 그린다 (마우스 자리를 묻는 것은 비싸다)
 	if event is InputEventScreenTouch:
 		_touch(event)
 		accept_event()
@@ -1550,6 +1596,13 @@ func _label_colony(i: int, font: Font, placed: Array) -> void:
 	var info := _info(body)
 	var c: PackedFloat64Array = info["center"]
 	var r: float = info["radius"]
+	var rad_px := _apparent_px(c, r)
+	var alpha := smoothstep(3.0, 9.0, rad_px)           # 천체가 점만 할 때는 천체 이름표에 맡긴다
+	var active: bool = col_d.get("active", false)
+	if active and ground != null and ground.body == body:
+		alpha *= smoothstep(20.0, 60.0, ground.cam_alt_km())
+	if alpha < 0.05:
+		return                                         # (땅 높이·가림을 셈하기 전에)
 	var dir: Vector3 = col_d.get("dir", Vector3(0, 0, -1))
 	var h := _terrain_km(body, dir)
 	var p := Astro.add3(c, Astro.bmul(info["frame"], Astro.scale3(Astro.dvec(dir), r + h)))
@@ -1559,13 +1612,6 @@ func _label_colony(i: int, font: Font, placed: Array) -> void:
 	if Astro.dot3(out, to_cam) < -0.02 * Astro.len3(to_cam):
 		return
 	if body != cam.focus and _occluded(p):
-		return
-	var rad_px := _apparent_px(c, r)
-	var alpha := smoothstep(3.0, 9.0, rad_px)           # 천체가 점만 할 때는 천체 이름표에 맡긴다
-	var active: bool = col_d.get("active", false)
-	if active and ground != null and ground.body == body:
-		alpha *= smoothstep(20.0, 60.0, ground.cam_alt_km())
-	if alpha < 0.05:
 		return
 	var sp: Variant = screen_of(to_render(p))
 	if sp == null:

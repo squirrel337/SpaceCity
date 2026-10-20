@@ -9,6 +9,9 @@ var _row: HBoxContainer
 var _popup: PopupMenu
 var _popup_items: Array = []
 var _sig := ""
+var _head := ""
+var _kids_n := 0
+var _kids_ms := 0
 
 
 func _init() -> void:
@@ -30,8 +33,14 @@ func refresh() -> void:
 	var parts := PackedStringArray()
 	for a in path:
 		parts.append(String(a["name"]))
-	var last_children := world.anchors.children(path[-1]).size()
-	parts.append(str(last_children))
+	# 마지막 단계 아래의 수 ('▾'를 보일지): 목록을 만들어야 알 수 있다 (지구는 대도시·지역 50여 곳) — 경로가 같으면 0.5초에 한 번
+	var head := "|".join(parts)
+	var now := Time.get_ticks_msec()
+	if head != _head or now - _kids_ms > 500:
+		_head = head
+		_kids_ms = now
+		_kids_n = world.anchors.children(path[-1]).size()
+	parts.append(str(_kids_n))
 	var sig := "|".join(parts)
 	if sig == _sig:
 		return

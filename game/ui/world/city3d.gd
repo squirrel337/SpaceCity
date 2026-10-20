@@ -99,6 +99,8 @@ func setup(p_ground: SiteGround) -> void:
 
 ## 지형 높이를 구운 뒤: 건물·길을 새 높이에 다시 놓는다
 func _on_terrain_ready() -> void:
+	for e in _agent_nodes.values():
+		(e as Dictionary).erase("at")          # 서 있는 탈것도 새 땅 높이에 다시 놓는다
 	_sig = ""
 	_road_rev = -1
 	_ways_sig = "-"
@@ -162,6 +164,11 @@ func update(delta: float, speed_level: int) -> void:
 		_sig = sig
 		_rebuild()
 	_update_tool()
+	if not visible_now():
+		# 카메라가 멀어 도시가 보이지 않으면 (고도 400 km 위·다른 천체) 탈것·불빛은 두고, 그동안의 도시 사이
+		# 사건은 다시 보일 때 한꺼번에 띄우지 않는다
+		traffic.forget_events()
+		return
 	if heights_ok:
 		_update_ways()
 	var sites := BaseScene.sites(sim, plan)
@@ -332,8 +339,6 @@ func _sync_agents(delta: float) -> void:
 				"last": a["pos"]}
 			_agent_nodes[uid] = e
 		var p: Vector3 = a["pos"]
-		var ground := _local(Vector2(p.x, p.y))
-		var pos := ground + Vector3(0, p.z, 0)
 		var last: Vector3 = e["last"]
 		var mv := Vector2(p.x - last.x, p.y - last.y)
 		var want: float = e["yaw"]
@@ -341,13 +346,18 @@ func _sync_agents(delta: float) -> void:
 			want = atan2(mv.y, mv.x)
 		elif not a.get("flying", false):
 			want = deg_to_rad(HEADING_DEG.get(a["heading"], rad_to_deg(want)))
+		var thrust: bool = a.get("thrust", false)
+		if p == last and not thrust and e.has("at") and absf(angle_difference(float(e["yaw"]), want)) < 0.0005:
+			continue                             # 서서 다 돈 탈것: 그대로 둔다 (땅 높이를 다시 재지 않는다)
+		var ground := _local(Vector2(p.x, p.y))
+		var pos := ground + Vector3(0, p.z, 0)
 		var yaw := lerp_angle(float(e["yaw"]), want, clampf(delta * 6.0, 0.0, 1.0))
 		e["yaw"] = yaw
 		e["last"] = p
+		e["at"] = true
 		var node: MeshInstance3D = e["node"]
 		node.transform = Transform3D(Basis(Vector3.UP, yaw), pos)
 		var plume: MeshInstance3D = e["plume"]
-		var thrust: bool = a.get("thrust", false)
 		plume.visible = thrust
 		if thrust:
 			var flick := 0.85 + 0.15 * sin(_t * 40.0 + float(uid))
@@ -775,6 +785,8 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 	if dist_ok:
 		for b in _boxes:
 			var it: Dictionary = b[2]
+			if not (it["broken"] or it["building"]):
+				continue                         # 표시가 없는 건물은 화면 자리를 셈하지 않는다
 			var box: AABB = b[0]
 			var top := global_transform * Vector3(box.get_center().x, box.end.y + 1.5, box.get_center().z)
 			var sp: Variant = view.screen_of(top)

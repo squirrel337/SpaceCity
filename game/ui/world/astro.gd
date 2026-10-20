@@ -142,7 +142,25 @@ static func centuries(jd: float) -> float:
 
 # ── 위치 ────────────────────────────────────────────────────────
 ## 천체의 태양 중심 위치 (km)
+## 같은 시각이면 한 번만 셈한다 (위성은 모행성 자리를, 지구와 달은 서로의 자리를 다시 쓴다 — 프레임마다 천체 스물 몇 개)
+static var _memo_jd := NAN
+static var _memo := {}
+
+
 static func position(id: String, jd: float) -> PackedFloat64Array:
+	if jd == _memo_jd:
+		var hit: Variant = _memo.get(id)
+		if hit != null:
+			return hit
+	else:
+		_memo_jd = jd
+		_memo.clear()
+	var p := _position(id, jd)
+	_memo[id] = p
+	return p
+
+
+static func _position(id: String, jd: float) -> PackedFloat64Array:
 	load_data()
 	if id == "sun" or not bodies.has(id):
 		return v3(0, 0, 0)

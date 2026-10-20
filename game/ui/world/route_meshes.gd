@@ -13,6 +13,10 @@ var view: WorldView
 var _per := {}                 # 천체 → {lines: MeshInstance3D, lmat, mm: MultiMeshInstance3D, mmat, sig}
 var _line_shader: Shader
 var _marker_shader: Shader
+var _geo := {}                  # 노선 id → [a 방향, b 방향, 사이각, 가운데 높이] (교통이 바뀌면 비운다)
+var _geo_rev := -1
+var _by_body := {}              # 천체 → [[편, 노선], …] (가는 중인 편 — trip_rev가 바뀔 때 다시 묶는다)
+var _trips_rev := -1
 
 
 func _init(p_view: WorldView) -> void:
@@ -164,43 +168,103 @@ static func point(l: Dictionary, r: float, t: float) -> Vector3:
 	return Vector3(v.x, v.z, -v.y)
 
 
-## 가는 중인 편의 표: 천체마다 멀티메시에 자리(원점)·조금 뒤의 자리(쪽)·모양·색을 넣는다
+## 가는 중인 편의 표: 천체마다 멀티메시에 자리(원점)·조금 뒤의 자리(쪽)·모양·색을 넣는다 — 버퍼 하나로 한 번에
+## (편이 수백이면 칸마다 넣는 호출이 프레임을 먹는다). 노선 양 끝의 방향은 노선마다 한 번 셈해 둔다
 func _place_vehicles(tr: Transport, ov: RouteOverlay, alphas: Dictionary) -> void:
 	var hour_f := float(view.mgr.hour) + view.hour_frac
-	var counts := {}
-	for t_rec in tr.trips:
-		var l := tr.line_by_id(String(t_rec["line"]))
-		if l.is_empty() or String(l["kind"]) in ["ferry", "ship"]:
-			continue
-		var body := String(l["body"])
+	if tr.rev != _geo_rev:
+		_geo_rev = tr.rev
+		_geo.clear()
+		_trips_rev = -1
+	if tr.trip_rev != _trips_rev:
+		# 천체마다 그 위를 가는 편 (편이 떠나고 닿을 때만 다시 묶는다 — 프레임마다는 보이는 천체의 편만 본다)
+		_trips_rev = tr.trip_rev
+		_by_body.clear()
+		for t_rec in tr.trips:
+			var l := tr.line_by_id(String(t_rec["line"]))
+			if l.is_empty() or String(l["kind"]) in ["ferry", "ship"]:
+				continue
+			var body := String(l["body"])
+			var list: Array = _by_body.get(body, [])
+			list.append([t_rec, l])
+			_by_body[body] = list
+	var items := {}                  # 천체 → [[자리, 쪽, 색, 모양], …]
+	for body in _by_body:
 		if float(alphas.get(body, 0.0)) <= 0.02:
 			continue
-		var hot: bool = ov._hi(l["id"])
-		if not ov.show and not hot:
-			continue
-		var n := int(counts.get(body, 0))
-		if n >= MARKER_CAP:
-			continue
-		var e: Dictionary = _per[body]
-		var mm: MultiMesh = (e["mm"] as MultiMeshInstance3D).multimesh
 		var r := float(Astro.bodies[body]["radius_km"])
-		var k := RouteOverlay.progress(l, t_rec, hour_f)
-		if k <= 0.0005 or k >= 0.9995:
-			continue            # 싣고 내리는 중 (도시에 서 있다 — 도시 점과 겹치지 않게)
-		var fwd := String(t_rec["from"]) == String(l["a"])
-		var kk := k if fwd else 1.0 - k
-		var step := 0.01 if fwd else -0.01
-		var p := point(l, r, kk)
-		var p2 := point(l, r, clampf(kk + step, 0.0, 1.0))
-		if p2.distance_squared_to(p) < 1e-14:
-			p2 = p + (p - point(l, r, clampf(kk - step, 0.0, 1.0)))
-		var kind := String(l["kind"])
-		var col: Color = RouteOverlay.COLORS.get(kind, Color.WHITE)
-		mm.set_instance_transform(n, Transform3D(Basis(), p))
-		var dlt := p2 - p
-		mm.set_instance_custom_data(n, Color(dlt.x, dlt.y, dlt.z, float(KIND_SHAPE.get(kind, 0.0))))
-		mm.set_instance_color(n, Color(col, 1.0 if l["role"] == "local" else 0.75))
-		counts[body] = n + 1
+		var list: Array = []
+		for tl in _by_body[body]:
+			var t_rec: Dictionary = tl[0]
+			var l: Dictionary = tl[1]
+			if not ov.show and not ov._hi(l["id"]):
+				continue
+			if list.size() >= MARKER_CAP:
+				break
+			var k := RouteOverlay.progress(l, t_rec, hour_f)
+			if k <= 0.0005 or k >= 0.9995:
+				continue            # 싣고 내리는 중 (도시에 서 있다 — 도시 점과 겹치지 않게)
+			var g := _line_geo(l, r)
+			var fwd := String(t_rec["from"]) == String(l["a"])
+			var kk := k if fwd else 1.0 - k
+			var step := 0.01 if fwd else -0.01
+			var p := _at(g, r, kk)
+			var p2 := _at(g, r, clampf(kk + step, 0.0, 1.0))
+			if p2.distance_squared_to(p) < 1e-14:
+				p2 = p + (p - _at(g, r, clampf(kk - step, 0.0, 1.0)))
+			var kind := String(l["kind"])
+			var col: Color = RouteOverlay.COLORS.get(kind, Color.WHITE)
+			list.append([p, p2 - p, Color(col, 1.0 if l["role"] == "local" else 0.75), float(KIND_SHAPE.get(kind, 0.0))])
+		items[body] = list
 	for body in _per:
-		var mm2: MultiMesh = (_per[body]["mm"] as MultiMeshInstance3D).multimesh
-		mm2.visible_instance_count = int(counts.get(body, 0))
+		var mm: MultiMesh = (_per[body]["mm"] as MultiMeshInstance3D).multimesh
+		var list: Array = items.get(body, [])
+		if not list.is_empty():
+			# 칸마다 20개: 변환(행마다 기저 셋 + 원점) 12 · 색 4 · 덧붙임(쪽 xyz, 모양) 4
+			var buf := PackedFloat32Array()
+			buf.resize(mm.instance_count * 20)
+			for i in list.size():
+				var it: Array = list[i]
+				var p: Vector3 = it[0]
+				var dl: Vector3 = it[1]
+				var c: Color = it[2]
+				var o := i * 20
+				buf[o] = 1.0
+				buf[o + 3] = p.x
+				buf[o + 5] = 1.0
+				buf[o + 7] = p.y
+				buf[o + 10] = 1.0
+				buf[o + 11] = p.z
+				buf[o + 12] = c.r
+				buf[o + 13] = c.g
+				buf[o + 14] = c.b
+				buf[o + 15] = c.a
+				buf[o + 16] = dl.x
+				buf[o + 17] = dl.y
+				buf[o + 18] = dl.z
+				buf[o + 19] = float(it[3])
+			mm.buffer = buf
+		mm.visible_instance_count = list.size()
+
+
+## 노선 하나의 양 끝 방향·사이각·가운데 높이 (point와 같은 셈을 편마다 다시 하지 않게)
+func _line_geo(l: Dictionary, r: float) -> Array:
+	var id := String(l["id"])
+	var g: Array = _geo.get(id, [])
+	if g.is_empty():
+		var a := Transport.node_dir(l["a"])
+		var b := Transport.node_dir(l["b"])
+		g = [a, b, acos(clampf(a.dot(b), -1.0, 1.0)), RouteOverlay.arc_height(l, r)]
+		_geo[id] = g
+	return g
+
+
+## point()와 같은 점 (미리 셈한 노선 모양으로)
+static func _at(g: Array, r: float, t: float) -> Vector3:
+	var a: Vector3 = g[0]
+	var b: Vector3 = g[1]
+	var om: float = g[2]
+	var d := a if om < 1e-6 else ((a * sin((1.0 - t) * om) + b * sin(t * om)) / sin(om)).normalized()
+	var h := float(g[3]) * 4.0 * t * (1.0 - t) + r * 0.0006
+	var v := d * (1.0 + h / r)
+	return Vector3(v.x, v.z, -v.y)

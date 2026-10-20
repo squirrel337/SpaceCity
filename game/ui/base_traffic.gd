@@ -117,32 +117,45 @@ func _spawn(role: String, id: String, pos: Vector3, speed: float, extra: Diction
 
 
 func _ensure(sim: CitySim) -> void:
-	if _count("rover") < 2:
-		_spawn("rover", "ltv", _hub() + Vector3(_count("rover") * 6.0, 0, 0), 7.0)
-	if _count("cruiser") < 1:
+	var n := {}                          # 갈래마다 몇 대 (프레임마다 한 번만 센다)
+	for a in agents:
+		n[a["role"]] = int(n.get(a["role"], 0)) + 1
+	var rovers := int(n.get("rover", 0))
+	if rovers < 2:
+		_spawn("rover", "ltv", _hub() + Vector3(rovers * 6.0, 0, 0), 7.0)
+	if int(n.get("cruiser", 0)) < 1:
 		_spawn("cruiser", "pressurized_rover", _hub() + Vector3(-8, 0, 0), 4.5)
-	if _count("hauler") < 1:
+	if int(n.get("hauler", 0)) < 1:
 		_spawn("hauler", "cargo_hauler", _road_point(_pad_spot()), 5.0, {"state": "parked"})
-	if _count("hopper") < 1:
+	if int(n.get("hopper", 0)) < 1:
 		var home: Vector3 = plan.layout.gates.get("life", _hub()) + Vector3(-6, 6, 0)
 		_spawn("hopper", "hopper", home, 0.0, {"state": "parked", "wait": 12.0})
 	var digs_at := plan.built_of_family("excavator")
 	var digs := mini(digs_at.size(), 2)
-	while _count("digger") < digs:
-		var site: Vector3 = digs_at[_count("digger")]
+	var dn := int(n.get("digger", 0))
+	while dn < digs:
+		var site: Vector3 = digs_at[dn]
 		_spawn("digger", "excavator_robot", site + Vector3(-7, -3, 0), 1.6, {"site": site})
-	while _count("digger") > digs:
+		dn += 1
+	while dn > digs:
 		_remove_one("digger")
+		dn -= 1
 	var working := clampi(sim.robots - sim.robots_broken, 0, MAX_ROBOTS)
-	var bay := _robot_home(sim)
-	while _count("robot") < working:
-		var k := _count("robot")
-		_spawn("robot", "builder_robot", bay + Vector3((k % 4) * 3.0 - 4.5, 7.0 + floorf(k / 4.0) * 3.0, 0), 3.5,
-			{"index": k, "state": "home"})
-	while _count("robot") > working:
-		_remove_one("robot")
-	while _count("walker") < WALKERS:
+	var rn := int(n.get("robot", 0))
+	if rn != working:
+		var bay := _robot_home(sim)
+		while rn < working:
+			var k := rn
+			_spawn("robot", "builder_robot", bay + Vector3((k % 4) * 3.0 - 4.5, 7.0 + floorf(k / 4.0) * 3.0, 0), 3.5,
+				{"index": k, "state": "home"})
+			rn += 1
+		while rn > working:
+			_remove_one("robot")
+			rn -= 1
+	var wn := int(n.get("walker", 0))
+	while wn < WALKERS:
 		_spawn("walker", "astronaut", _random_core_spot(), 1.4)
+		wn += 1
 
 
 func _remove_one(role: String) -> void:
@@ -355,6 +368,11 @@ func _start_hop(a: Dictionary, to: Vector3, state: String) -> void:
 
 # ── 도시 사이 교통 ─────────────────────────────────────────────
 ## 교통의 새 사건(이 도시의 출발·도착)을 탈것으로 띄운다. ways: City3D의 고속도로·활주로·방향
+## 도시가 보이지 않는 동안: 그동안의 도시 사이 사건은 탈것으로 띄우지 않는다 (다시 보일 때 지난 일이 한꺼번에 뜨지 않게)
+func forget_events() -> void:
+	_ev_n = -1
+
+
 func intercity(tr: Transport, site: String, ways: Dictionary) -> void:
 	if plan == null:
 		return

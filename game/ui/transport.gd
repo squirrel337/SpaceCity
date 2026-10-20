@@ -22,6 +22,7 @@ static var D: Dictionary = {}
 var enabled := true
 var lines: Array = []      # [{id, a, b, mode, kind, role, body, km, trip_h, every_h, next: [a→b, b→a], on, stats, last}]
 var trips: Array = []      # [{line, from, to, depart, arrive, cargo: {열쇠: 양}, people: [[명, 선량]], pax, mode, kind}]
+var trip_rev := 0          # 편이 떠나고 닿을 때마다 (지도의 탈것 표가 천체마다의 편 목록을 다시 묶는다)
 var flow := {}             # 노드 → {in_t, out_t, in_p, out_p} — 이번 기록 기간 (note_days)
 var totals := {"trips": 0, "t": 0.0, "settlers": 0, "pax": 0}
 var events: Array = []     # 최근 출발·도착 [{n, hour, type: dep|arr, site, other, mode, kind, line}] — 3D 기지가 탈것을 띄운다
@@ -60,6 +61,7 @@ func reset() -> void:
 	enabled = true
 	lines = []
 	trips = []
+	trip_rev += 1
 	flow = {}
 	totals = {"trips": 0, "t": 0.0, "settlers": 0, "pax": 0}
 	_off = {}
@@ -357,6 +359,7 @@ func dispatch(col: Colonies, line_id: String, dir: int, cargo: Dictionary, tag: 
 		"arrive": col.hour + (trip_h if trip_h > 0 else int(l["trip_h"])), "cargo": cargo, "people": [], "pax": 0,
 		"mode": l["mode"], "kind": l["kind"], "tag": tag}
 	trips.append(t)
+	trip_rev += 1
 	if _sim(col, src) != null:
 		_flow(src, "out_t", cargo_t(cargo))
 		_event("dep", src, dst, l)
@@ -376,6 +379,7 @@ func step(col: Colonies) -> void:
 	for t in trips.duplicate():
 		if col.hour >= int(t["arrive"]):
 			trips.erase(t)
+			trip_rev += 1
 			_arrive(col, t)
 	if enabled:
 		for l in lines:
@@ -472,6 +476,7 @@ func _depart(col: Colonies, l: Dictionary, dir: int) -> void:
 	var t := {"line": l["id"], "from": src, "to": dst, "depart": col.hour, "arrive": col.hour + int(l["trip_h"]),
 		"cargo": cargo, "people": people, "pax": maxi(pax, settlers), "mode": l["mode"], "kind": l["kind"]}
 	trips.append(t)
+	trip_rev += 1
 	var tons := cargo_t(cargo)
 	if s_sim != null and (tons > 0.0 or settlers > 0):
 		_flow(src, "out_t", tons)
@@ -846,6 +851,7 @@ func load_save(data_in: Dictionary, col: Colonies) -> void:
 			if String(t.get("tag", "")) != "":
 				tr["tag"] = String(t["tag"])
 			trips.append(tr)
+			trip_rev += 1
 		var fl: Dictionary = data_in.get("flow", {})
 		for k in fl:
 			var f: Dictionary = fl[k]
