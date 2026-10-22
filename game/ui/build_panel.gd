@@ -6,7 +6,8 @@ extends VBoxContainer
 signal changed
 signal place_requested(mid: String)
 
-const ORDER := ["habitat", "life_support", "food", "power", "thermal", "safety", "industry", "logistics", "research", "social"]
+const ORDER := ["habitat", "life_support", "food", "power", "thermal", "safety", "industry", "logistics", "research", "social",
+	"commerce"]
 
 var sim: CitySim
 var res_label := Label.new()
@@ -332,7 +333,8 @@ static func describe(m: Dictionary) -> String:
 	var labels := {"housing": "거주 %s명", "shelter": "대피 %s명", "generation_kw": "발전 %s kW", "landing_slots": "착륙 슬롯 %s",
 		"storage_kwh": "축전 %s kWh", "heat_kw": "방열 %s kW", "co2_kg_day": "CO₂ 제거 %s kg/일",
 		"wastewater_kg_day": "폐수 처리 %s kg/일", "rp_day": "연구 %s RP/일", "morale": "사기 +%s",
-		"care": "진료 %s명", "robot_slots": "로봇 %s대 정비", "print_t_day": "인쇄 %s t/일"}
+		"care": "진료 %s명", "robot_slots": "로봇 %s대 정비", "print_t_day": "인쇄 %s t/일",
+		"support_day": "지원 +%s/일"}
 	for key in labels:
 		if pv.has(key):
 			out.append(labels[key] % Fmt.n(pv[key]))
@@ -349,11 +351,18 @@ static func describe(m: Dictionary) -> String:
 		out.append("거리 규칙 %d m" % int(m["clearance_m"]))
 	if pv.has("recovery"):
 		out.append("회수 %s" % Fmt.pct(pv["recovery"]))
+	if pv.has("build_boost"):
+		out.append("건설 +%s" % Fmt.pct(pv["build_boost"]))
 	if pv.has("storage"):
 		var st := []
 		for k in pv["storage"]:
 			st.append(_amount(k, pv["storage"][k]))
 		out.append("저장: " + ", ".join(st))
+	if pv.has("make"):
+		var mk := []
+		for k in pv["make"]:
+			mk.append(_amount(k, pv["make"][k]))
+		out.append("생산: " + ", ".join(mk) + " (하루)")
 	if m.has("recipe"):
 		var ins := []
 		for k in m["recipe"]["in"]:

@@ -28,11 +28,13 @@ const CATEGORY := {
 	"safety": Color("f28482"),
 	"research": Color("c86bfa"),
 	"social": Color("f4a6c6"),
+	"commerce": Color("e9c46a"),
 }
 
 const CATEGORY_KO := {
 	"habitat": "거주", "life_support": "생명유지", "food": "식량", "power": "전력", "thermal": "열",
 	"industry": "산업", "logistics": "물류", "safety": "안전", "research": "연구", "social": "사회",
+	"commerce": "상업",
 }
 
 

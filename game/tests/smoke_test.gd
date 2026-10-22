@@ -45,6 +45,9 @@ func _process(_delta: float) -> bool:
 		_world_check()
 		_plan_check()
 		_types_check()
+		_devmodes_check()
+		_runway_check()
+		_raised_check()
 		_speed_check()
 		main._on_module_tapped("hab_module")
 		main._show_help()
@@ -185,7 +188,7 @@ func _map_check() -> void:
 	var layout: BaseLayout = main.plan.layout
 	_check(layout.capacity("hab_module") >= 30, "거주 모듈 자리가 모자란다")
 	_check(layout.capacity("solar_tower") == 38, "태양광 타워 자리가 능선 칸(8+10+20)과 다르다")
-	_check(main.sim.M.size() == 145 and GameData.FAMILY.size() == 29, "건물이 29계열 145종이 아니다")
+	_check(main.sim.M.size() == 170 and GameData.FAMILY.size() == 34, "건물이 34계열 170종이 아니다")
 	for kind in main.sim.M:
 		if GameData.family(kind) == kind:
 			_check(layout.capacity(kind) > 0, "기본 자리가 없는 계열: " + kind)
@@ -490,7 +493,7 @@ func _plan_check() -> void:
 
 
 func _types_check() -> void:
-	## 건물 145종: 계열 규칙으로 도는 시뮬레이션, 자리 찾기, 거리 규칙
+	## 건물 170종: 계열 규칙으로 도는 시뮬레이션, 자리 찾기, 거리 규칙
 	var v := CitySim.new(2061, 1.0, "variety")
 	for d in range(120):
 		for _i in range(24):
@@ -510,7 +513,7 @@ func _types_check() -> void:
 		var spot := plan.suggest(mid)
 		if not spot.is_empty():
 			placed += 1
-	_check(placed >= 110, "빈자리를 찾은 새 종류가 모자란다: %d / 116" % placed)
+	_check(placed >= 125, "빈자리를 찾은 새 종류가 모자란다: %d / 136" % placed)
 	# 거리 규칙: 매립형 원자로는 거주 건물에 20 m까지, 100 kW 원자로는 60 m — 둘이 갈리는 자리가 있어야 한다
 	var core: Rect2 = plan.layout.rects["core"]
 	var split := false
@@ -521,7 +524,148 @@ func _types_check() -> void:
 			split = true
 			break
 	_check(split, "매립형 원자로를 거주구 가까이 놓을 자리를 찾지 못했다")
-	print("smoke: types %d mixed built, %d/116 placeable" % [mixed, placed])
+	print("smoke: types %d mixed built, %d/136 placeable" % [mixed, placed])
+
+
+## 새 건물의 효과(지원 점수·들여오는 부품·건설 속도)와 도시 발전 모드: 방향 건물 착공, 땅 구역 사기·돌려주기, 저장 왕복
+func _devmodes_check() -> void:
+	var a := CitySim.new(2061, 1.0, "")
+	a.counts["space_bank"] = 2
+	a.counts["trade_exchange"] = 1
+	a.refresh()
+	var sup := a.support
+	var parts := float(a.stock["parts"])
+	a.commerce()
+	_check(is_equal_approx(a.support - sup, 2.0 * 1.5 + 0.4), "금융·교역 시설의 지원 점수가 들어오지 않았다")
+	_check(is_equal_approx(float(a.stock["parts"]) - parts, 0.6), "교역소의 부품이 들어오지 않았다")
+	var b0 := CitySim.new(2061, 1.0, "")
+	var b1 := CitySim.new(2061, 1.0, "")
+	b1.counts["rover_depot"] = 1
+	b1.refresh()
+	for b in [b0, b1]:
+		(b as CitySim).queue = [{"id": "hab_module", "seq": 999, "rd": 1000.0, "print_t": 0.0}]
+		(b as CitySim).work_robots()
+	var done0 := 1000.0 - float(b0.queue[0]["rd"])
+	var done1 := 1000.0 - float(b1.queue[0]["rd"])
+	_check(done0 > 0.0 and is_equal_approx(done1, done0 * 1.08), "로버 차고지가 건설을 8% 빠르게 하지 않는다 (%.2f → %.2f)" % [done0, done1])
+	# 발전 모드: 교통 중심 — 방향 건물을 대기열에 넣고, 교통 지구 땅을 사서 블록을 정하고, 빈 구역을 돌려준다
+	var home := CitySim.new(7, 40.0, "good")
+	var col := Colonies.new()
+	col.start(home, CityPlan.create(home, BaseLayout.new("ridge")))
+	var c: Dictionary = col.list[0]
+	c["mode"] = "transport"
+	home.stock["parts"] = 3000.0
+	home.support = 4000.0
+	for d in 6:
+		CityDev.step_day(c, d)
+	_check(home.planned("transit_center") + home.planned("rover_depot") > 0, "교통 중심이 환승 센터·차고지를 짓지 않는다")
+	var plan: CityPlan = c["plan"]
+	var land0 := plan.land.size()
+	_check(plan.expand_zone("transit", home, {}, "시험"), "교통 지구 땅 구역을 사지 못했다")
+	var bought: Vector2i = plan.land.keys()[0]
+	var zoned := 0
+	for bl in plan.blocks():
+		if String(bl["district"]) == "transit" and plan.parcel_rect(bought).has_point(bl["center"]):
+			zoned += 1
+	_check(plan.land.size() == land0 + 1 and zoned > 0, "산 땅 구역의 블록이 교통 지구가 되지 않았다")
+	var p0 := float(home.stock["parts"])
+	var e0 := plan.edges.size()
+	_check(plan.release_parcel(bought, home, "시험"), "빈 땅 구역을 돌려주지 못했다")
+	_check(plan.land.size() == land0 and float(home.stock["parts"]) > p0 and plan.edges.size() < e0,
+		"돌려준 땅 구역의 길·값이 정리되지 않았다")
+	var col2 := Colonies.new()
+	col2.load_save(JSON.parse_string(JSON.stringify(col.to_save())))
+	_check(String(col2.list[0].get("mode", "")) == "transport", "발전 모드가 저장되지 않았다")
+	_check(LayoutData.dev_modes().size() == 11, "발전 모드가 균형 + 열 가지가 아니다")
+	# 목표를 다 채운 작은 도시: 부품이 넉넉하면 그 모드 구획의 건물을 하나 더 (20일에 하나)
+	var xs := CitySim.new(7, 40.0, "good")
+	var xc := {"sim": xs, "plan": CityPlan.create(xs, BaseLayout.new("ridge")), "mode": "transport"}
+	var xm := LayoutData.dev_mode("transport")
+	for w in xm["wants"]:
+		xs.counts[String(w[0])] = CityDev.target(w, xs.population())
+	xs.refresh()
+	xs.stock["parts"] = 3000.0
+	xs.queue = []
+	CityDev._build(xc, xs, xm, "transport")
+	CityDev._build(xc, xs, xm, "transport")
+	_check(xs.queue.size() == 1 and String(xs.queue[0]["id"]) in ["transit_center", "rover_depot", "maglev_terminal"],
+		"목표를 채운 교통 중심 도시가 남는 자재로 교통 지구 건물을 (20일에 하나) 더 짓지 않는다")
+	print("smoke: dev modes — bank/trade/boost ok, transport queued %d, parcel bought+released" % (home.planned("transit_center")
+		+ home.planned("rover_depot")))
+
+
+## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.
+## 우주항 땅은 블록 칸에 맞는다
+func _runway_check() -> void:
+	var ns := CitySim.new(2061, 1.0, "good", "earth_naro")
+	var np := CityPlan.create(ns, BaseLayout.new("open"))
+	var rw := np.runway()
+	_check(not rw.is_empty(), "지구 도시에 활주로가 없다")
+	var d: Vector2 = (rw["b"] as Vector2) - (rw["a"] as Vector2)
+	_check(absf(d.x) < 0.01 or absf(d.y) < 0.01, "활주로가 길 격자와 나란하지 않다")
+	var t: Array = rw["taxi"]
+	_check(np.nearest_edge(((t[0] as Vector2) + (t[1] as Vector2)) * 0.5, 2.0) >= 0, "유도로가 길 그물에 없다")
+	var refused := false
+	for cell in np._strip_cells(String(np.runway_at[0]), int(np.runway_at[1])):
+		if String(np.parcel_status(cell)["reason"]) == "활주로 자리다":
+			refused = true
+	_check(refused, "활주로 줄의 땅 구역을 살 수 있다")
+	var pa := np.layout.pad_area
+	var pt := np.layout.pitch
+	var g := np.layout.grid_o
+	_check(absf(fposmod(pa.position.x - g.x + pt * 0.5, pt) - pt * 0.5) < 0.01
+		and absf(fposmod(pa.position.y - g.y + pt * 0.5, pt) - pt * 0.5) < 0.01, "우주항 땅이 블록 칸에 맞지 않는다")
+	var moon := CityPlan.create(CitySim.new(2061, 1.0, "good"), BaseLayout.new("ridge"))
+	_check(moon.runway().is_empty(), "달 도시에 활주로가 있다")
+	print("smoke: runway %s along the grid, pad area on blocks" % [np.runway_at])
+
+
+## 높은 길: 고가는 지나는 길과 만나지 않고(교차로·블록이 그대로), 엇갈리는 곳은 4.5 m 넘게 뜬다. 높은 길끼리 겹치면 막는다.
+## 높은 길만으로 이어진 곳을 지나는 탈것은 떠서 간다. 저장 왕복, 받침 24가지가 다 지어진다
+func _raised_check() -> void:
+	var rp := CityPlan.create(null, BaseLayout.new("ridge"))
+	var hub := rp.hub()
+	var pt := rp.layout.pitch
+	var a := hub + Vector2(-pt * 2.0, pt * 0.5)
+	var b := hub + Vector2(pt * 2.0, pt * 0.5)
+	_check(rp.road_check(a, b, "elevated_street") == "", "고가 도로를 놓지 못한다: " + rp.road_check(a, b, "elevated_street"))
+	var n0 := rp.nodes.size()
+	var bl0 := rp.blocks().size()
+	rp.add_road(a, b, CityPlan.SNAP_M, "elevated_street")
+	_check(rp.nodes.size() == n0 + 2 and rp.blocks().size() == bl0, "고가가 지나는 길과 이어졌다 (꼭짓점 %d → %d)" % [n0, rp.nodes.size()])
+	var k := rp.etypes.find("elevated_street")
+	_check(k >= 0 and is_equal_approx(rp.lift(k, 0.5), 7.0), "고가 가운데가 덱 높이에 닿지 않는다")
+	var m0 := hub + Vector2(pt * 0.5, -pt)
+	var m1 := hub + Vector2(pt * 0.5, pt * 2.0)
+	_check(rp.road_check(m0, m1, "monorail").begins_with("다른 높은 길"), "높은 길끼리 겹치는데 막지 않는다")
+	_check(rp.road_check(hub + Vector2(-pt, -10), hub + Vector2(-pt, pt + 10), "street") == "",
+		"고가 밑으로 지나는 땅 위의 길을 막는다")
+	_check(rp.road_check(hub + Vector2(-pt * 1.5, -10), hub + Vector2(-pt * 1.5, pt + 10), "street").begins_with("고가 밑을"),
+		"오르는 비탈(2.8 m)과 엇갈리는 길을 막지 않는다")
+	var back := CityPlan.from_save(rp.to_save(), null, BaseLayout.new("ridge"))
+	_check(back.etypes == rp.etypes and back.levels().size() == rp.edges.size(), "높은 길이 저장 왕복에서 달라졌다")
+	# 높은 길만으로 이어진 두 길: 경로가 덱 위로 간다
+	var iso := CityPlan.new(BaseLayout.new("ridge"))
+	iso.add_road(Vector2(1000, 1000), Vector2(1060, 1000), 0.6, "street")
+	iso.add_road(Vector2(1260, 1000), Vector2(1320, 1000), 0.6, "street")
+	iso.add_road(Vector2(1060, 1000), Vector2(1260, 1000), 0.6, "girder_bridge")
+	var high := 0.0
+	for q in iso.route(Vector3(1010, 1004, 0), Vector3(1310, 1004, 0)):
+		high = maxf(high, (q as Vector3).z)
+	_check(high > 5.0, "다리를 지나는 경로가 뜨지 않는다 (%.1f m)" % high)
+	var raised := 0
+	for t in LayoutData.data["roads"]:
+		if not LayoutData.raised(t):
+			continue
+		raised += 1
+		var pl := CityPlan.new(BaseLayout.new("ridge"))
+		pl.add_road(Vector2(0, 0), Vector2(240, 0), 0.6, t)
+		var rm := RoadMesh.start(pl, func(p: Vector2, above: float) -> Vector3: return Vector3(p.x, above, -p.y))
+		rm.step(0)
+		_check(not rm.v.is_empty(), "덱을 짓지 못한 높은 길: " + t)
+		_check(rm.sx.size() > 0 or t == "pontoon_bridge", "받침이 없는 높은 길: " + t)
+	_check(raised >= 20 and LayoutData.data["roads"].size() >= 26, "높은 길 종류가 20가지가 안 된다 (%d)" % raised)
+	print("smoke: raised roads %d kinds, viaduct over streets, bridge route %.1f m up" % [raised, high])
 
 
 ## 여러 천체의 도시: 천체마다 기본 도시, 같은 천체 원정(로버 행렬)·도착·함께 흐르는 시간·기술 나누기,

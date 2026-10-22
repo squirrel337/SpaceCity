@@ -1,6 +1,7 @@
 // 기지의 길: 종류마다 겉모습이 다르다 — 흙길(다진 흙·바퀴 자국), 도로(가운데 노란 점선·흰 가장자리선),
-// 대로(차로 넷·가운데 분리대), 고속도로(넓은 갓길), 철도(자갈·침목·레일), 가압 통로(굽은 판·창의 불빛).
-// UV.x = 가로(0~1), UV.y = 길이(m). UV2.x = 종류 + 10 × 부분 (0 길 띠, 1 교차로 판, 2 옆면, 3 통로 껍질),
+// 대로(차로 넷·가운데 분리대), 고속도로(넓은 갓길), 철도(자갈·침목·레일), 가압 통로(굽은 판·창의 불빛),
+// 높은 길의 덱 — 보행로(타일), 모노레일 빔, 자기부상 궤도(코일 줄), 컨베이어(고무 띠·롤러), 덱 판(콘크리트)·난간.
+// UV.x = 가로(0~1), UV.y = 길이(m). UV2.x = 무늬 + 100 × 부분 (0 길 띠, 1 교차로 판, 2 옆면, 3 통로 껍질, 4 덱 판, 5 난간),
 // UV2.y = 그 띠의 길이 (끝에서 3 m 안은 건널목). 밤에는 가로등.
 // 꼭짓점을 카메라 쪽으로 조금 당겨(화면 위치는 그대로) 깊이에서 땅보다 앞서게 한다 — 길이 지형에 묻히지 않게.
 shader_type spatial;
@@ -16,8 +17,8 @@ varying float v_len;
 
 void vertex() {
 	float code = UV2.x + 0.5;
-	v_part = floor(code / 10.0);
-	v_type = floor(code - v_part * 10.0);
+	v_part = floor(code / 100.0);
+	v_type = floor(code - v_part * 100.0);
 	v_len = UV2.y;
 	VERTEX = (MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	VERTEX *= 1.0 - pull;
@@ -38,7 +39,14 @@ void fragment() {
 	float lamp = 0.0;
 	float glow = 0.0;
 	int t = int(v_type);
-	if (v_part > 1.5 && v_part < 2.5) {
+	if (v_part > 3.5 && v_part < 4.5) {
+		// 높은 길의 덱 판 (옆면·밑면): 콘크리트, 4 m마다 이음
+		col = vec3(0.6, 0.6, 0.58) * (0.82 + 0.18 * n) * (1.0 - 0.18 * line(fract(y / 4.0), 0.5, 0.03));
+	} else if (v_part > 4.5) {
+		// 난간: 밝은 콘크리트 벽, 위 가장자리에 금속 띠
+		col = mix(vec3(0.72, 0.72, 0.7) * (0.9 + 0.1 * n), vec3(0.55, 0.58, 0.62), step(0.82, x));
+		lamp = (1.0 - smoothstep(0.0, 0.05, abs(fract(y / 15.0) - 0.5))) * step(0.85, x);
+	} else if (v_part > 1.5 && v_part < 2.5) {
 		// 옆면 (길의 두께, 둔덕)
 		col = (t == 0 ? vec3(0.27, 0.24, 0.2) : vec3(0.3, 0.3, 0.31)) * (0.8 + 0.2 * n);
 	} else if (t == 0) {
@@ -56,6 +64,27 @@ void fragment() {
 	} else if (t == 4) {
 		// 가압 통로의 바닥 (껍질 안쪽이라 거의 보이지 않는다)
 		col = vec3(0.5, 0.52, 0.55);
+	} else if (t == 7) {
+		// 고가 보행로: 밝은 타일 (1 m 줄눈), 가운데 띠
+		col = vec3(0.7, 0.68, 0.64) * (0.9 + 0.1 * n);
+		col *= 1.0 - 0.15 * (line(fract(y), 0.5, 0.02) + line(fract(x * 4.0), 0.5, 0.03));
+		col = mix(col, vec3(0.45, 0.62, 0.7), line(x, 0.5, 0.05) * 0.6);
+		lamp = (1.0 - smoothstep(0.0, 0.06, abs(fract(y / 8.0) - 0.5))) * line(x, 0.5, 0.08);
+	} else if (t == 8) {
+		// 모노레일 빔: 매끈한 콘크리트, 가운데 주행면
+		col = vec3(0.74, 0.74, 0.72) * (0.92 + 0.08 * n);
+		col = mix(col, vec3(0.5, 0.5, 0.5), line(x, 0.5, 0.18) * 0.5);
+	} else if (t == 9) {
+		// 자기부상 궤도: 짙은 판, 양쪽 코일 줄 (밤에 푸르게)
+		col = vec3(0.24, 0.26, 0.29) * (0.9 + 0.2 * n);
+		float coil = (line(x, 0.18, 0.03) + line(x, 0.82, 0.03)) * step(0.4, fract(y / 1.2));
+		col = mix(col, vec3(0.3, 0.55, 0.75), clamp(coil, 0.0, 1.0));
+		glow = clamp(coil, 0.0, 1.0) * 0.5;
+	} else if (t == 10) {
+		// 컨베이어: 검은 고무 띠, 롤러 줄, 가장자리 금속
+		col = vec3(0.12, 0.12, 0.13) * (0.9 + 0.2 * n2);
+		col = mix(col, vec3(0.5, 0.52, 0.55), step(0.86, abs(x - 0.5) * 2.0));
+		col *= 1.0 - 0.3 * line(fract(y / 1.5), 0.5, 0.05);
 	} else if (t == 6) {
 		// 활주로: 밝은 포장, 가장자리 실선, 가운데 긴 점선, 양 끝 문턱 줄무늬
 		vec3 conc = vec3(0.34, 0.34, 0.35) * (0.9 + 0.2 * n) + vec3(0.03) * n2;
@@ -101,7 +130,8 @@ void fragment() {
 		// 가로등: 가장자리에 15 m마다
 		lamp = (1.0 - smoothstep(0.0, 0.07, abs(fract(y / 15.0) - 0.5))) * (1.0 - smoothstep(0.04, 0.09, min(x, 1.0 - x)));
 	}
-	if (v_part > 2.5) {
+	bool shell = v_part > 2.5 && v_part < 3.5;
+	if (shell) {
 		// 가압 통로 껍질: 흰 판, 4 m마다 이음 고리, 옆구리 창 띠 (밤에 켜진다)
 		float ring = line(fract(y / 4.0), 0.5, 0.04);
 		float win = line(x, 0.3, 0.035) + line(x, 0.7, 0.035);
@@ -111,8 +141,8 @@ void fragment() {
 		glow = clamp(win, 0.0, 1.0) * pane;
 	}
 	ALBEDO = col;
-	ROUGHNESS = v_part > 2.5 ? 0.45 : 1.0;
-	SPECULAR = v_part > 2.5 ? 0.35 : 0.1;
+	ROUGHNESS = shell ? 0.45 : 1.0;
+	SPECULAR = shell ? 0.35 : 0.1;
 	EMISSION = vec3(1.0, 0.68, 0.32) * night * lamp * 3.0 + vec3(0.9, 0.85, 0.7) * night * glow * 1.4;
 }
 

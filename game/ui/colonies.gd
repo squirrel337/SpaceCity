@@ -146,8 +146,11 @@ func date_text(game_hour: float) -> String:
 ## 교통은 도시가 흐른 뒤에 떠나고 닿는다
 func step() -> Array:
 	hour += 1
-	for c in list:
-		(c["sim"] as CitySim).advance_hour()
+	for i in list.size():
+		var s: CitySim = list[i]["sim"]
+		s.advance_hour()
+		if s.hour % 24 == 0:
+			CityDev.step_day(list[i], i)          # 그 도시의 하루가 끝났다 — 발전 모드 (도시마다 다른 시간에)
 	var arrived := []
 	for e in expeditions.duplicate():
 		if hour >= int(e["arrive"]):
@@ -433,7 +436,9 @@ func to_save() -> Dictionary:
 	var cols := []
 	for c in list:
 		cols.append({"name": c["name"], "site": c["site"], "founded": c["founded"],
-			"sim": (c["sim"] as CitySim).to_save(), "plan": (c["plan"] as CityPlan).to_save()})
+			"sim": (c["sim"] as CitySim).to_save(), "plan": (c["plan"] as CityPlan).to_save(),
+			"mode": String(c.get("mode", "")), "idle": c.get("idle", {}), "bought": int(c.get("bought", -100000)),
+			"extra": int(c.get("extra", -100000))})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
 		"metro_fn": metro_fn.to_save()}
@@ -467,6 +472,12 @@ func load_save(data: Dictionary) -> bool:
 		var entry := _entry(s2, plan2, int(cd.get("founded", 0)))
 		if cd.has("name"):
 			entry["name"] = String(cd["name"])
+		if LayoutData.dev_modes().has(String(cd.get("mode", ""))):
+			entry["mode"] = String(cd.get("mode", ""))
+		if cd.get("idle") is Dictionary:
+			entry["idle"] = cd["idle"]
+		entry["bought"] = int(cd.get("bought", -100000))
+		entry["extra"] = int(cd.get("extra", -100000))
 		list.append(entry)
 	expeditions = []
 	for e in data.get("expeditions", []):

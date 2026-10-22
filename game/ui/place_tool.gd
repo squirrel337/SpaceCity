@@ -417,15 +417,19 @@ func _recheck_road() -> void:
 		reason = "너무 급히 굽는다 — %s은 반지름 %d m 이상 (지금 %d m)" % [LayoutData.road_name(road_type), int(rmin), int(r)]
 		return
 	for i in range(preview.size() - 1):
-		var why := plan.road_check(preview[i], preview[i + 1], road_type)
+		var why := plan.road_check(preview[i], preview[i + 1], road_type, false)
 		if why != "":
 			reason = why
 			return
+	var cross := plan.cross_check_path(preview, road_type)
+	if cross != "":
+		reason = cross
+		return
 	if sim != null and not road_cost.is_empty() and not sim.can_afford(road_cost, 0.0):
 		reason = "자재 부족 — %s" % _cost_text(road_cost)
 		return
 	var slope := _max_slope()
-	if slope > float(LayoutData.road(road_type)["grade"]) * 1.05:
+	if not LayoutData.raised(road_type) and slope > float(LayoutData.road(road_type)["grade"]) * 1.05:
 		note = "비탈 %d%% — 땅을 깎고 메워 %d%%로 고른다" % [int(slope * 100.0), int(float(LayoutData.road(road_type)["grade"]) * 100.0)]
 
 

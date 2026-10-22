@@ -1,7 +1,7 @@
 extends SceneTree
 ## 식민지 스크린숏 — 천체마다 기본 도시가 있는 세계에서: 화성 헬라스에서 예제로로 로버 행렬을 보내고(시험이라 하루 만에
 ## 도착), 타이탄 아디리에서 크라켄 해로 가는 행렬은 이동 중으로 둔다. 행성 단위의 도시 점, 화성 도시로 날아가 내려앉기,
-## 화성 도시, 개척 탭, 세레스·지구 도시, 고향으로 돌아오기를 찍는다 (디스플레이가 필요하다).
+## 화성 도시, 개척 탭(화성 도시를 무역 중심 발전 모드로), 세레스·지구 도시, 고향으로 돌아오기를 찍는다 (디스플레이가 필요하다).
 ##   xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 \
 ##     --script res://tests/colony_shots.gd -- --out /tmp/shots [--days 120]
 
@@ -103,7 +103,9 @@ func _process(_delta: float) -> bool:
 			["fly_mid", func(): main._on_colony_view(mars_i), func(): return w.cam._fly.get("t", 1.0) > 0.55],
 			["landing", func(): pass, func(): return not w.cam.flying() and float(w._descent.get("t", 0.0)) > 0.5],
 			["mars_city", func(): pass, func(): return not w.cam.flying() and w._descent.is_empty()],
-			["colony_tab", func(): main._select_tab("colony")],
+			["colony_tab", func():
+				main._on_dev_mode(mars_i, "trade")      # 개척 탭 맨 위: 고른 도시의 발전 모드 (무역 중심)
+				main._select_tab("colony")],
 			["ceres_city", func(): main._on_colony_view(ceres_i), func(): return not w.cam.flying() and w._descent.is_empty()],
 			["earth_city", func(): main._on_colony_view(earth_i), func(): return not w.cam.flying() and w._descent.is_empty()],
 			["back_home", func(): main._on_colony_view(0), func(): return not w.cam.flying() and w._descent.is_empty()],

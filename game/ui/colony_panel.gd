@@ -5,6 +5,7 @@ extends VBoxContainer
 
 signal view_requested(index: int)
 signal changed
+signal mode_requested(index: int, mode: String)     # 도시 발전 모드를 골랐다 (자동 운영이 꺼져 있으면 켠다)
 
 const ENV_ROWS := [["sun", "햇빛"], ["day", "하루"], ["dose", "방사선"], ["resources", "자원"], ["rule", "규칙"]]
 
@@ -93,6 +94,9 @@ func rebuild() -> void:
 	_live.clear()
 	_cards.clear()
 	_clear(body_box)
+	var here := mgr.index_of_sim(sim) if sim != null else -1
+	if here >= 0:
+		body_box.add_child(_dev_section(here))
 	var cands := mgr.candidates()
 	for body in Colonies.BODY_ORDER:
 		var cities := []
@@ -121,6 +125,60 @@ func rebuild() -> void:
 			_cards[id] = card
 			body_box.add_child(card)
 	update_view()
+
+
+## 고른 도시의 발전 모드: 열 가지 방향(과 균형) 단추, 목표 건물, 땅 (자동 운영일 때 그 방향으로 짓고 땅을 넓히거나 줄인다)
+func _dev_section(i: int) -> Control:
+	var c: Dictionary = mgr.list[i]
+	var s: CitySim = c["sim"]
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 10))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	card.add_child(v)
+	v.add_child(ThemeFactory.heading("도시 발전 모드 · %s" % c["name"], 16))
+	var now := Label.new()
+	now.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	now.add_theme_font_size_override("font_size", 13)
+	v.add_child(now)
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	v.add_child(grid)
+	var cur := String(c.get("mode", ""))
+	for id in LayoutData.dev_modes():
+		var m: Dictionary = LayoutData.dev_mode(id)
+		var b := Button.new()
+		b.text = String(m.get("name", id))
+		b.toggle_mode = true
+		b.button_pressed = id == cur
+		b.custom_minimum_size = Vector2(0, 36)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.add_theme_font_size_override("font_size", 13)
+		b.add_theme_color_override("font_pressed_color", Color(String(m.get("color", "aab3c8"))).lightened(0.3))
+		b.tooltip_text = String(m.get("text", ""))
+		var mode_id := String(id)
+		b.pressed.connect(func(): mode_requested.emit(i, mode_id))
+		grid.add_child(b)
+	var text := ThemeFactory.muted(String(LayoutData.dev_mode(cur).get("text", "")), 12)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(text)
+	var goal := ThemeFactory.muted("", 12)
+	goal.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	goal.add_theme_color_override("font_color", Palette.TEXT.darkened(0.1))
+	v.add_child(goal)
+	_live.append(func():
+		var st := CityDev.status(c)
+		var auto := "자동 운영 — 이 방향으로 짓는다" if s.autopilot != null else "직접 운영 — 방향을 고르면 자동 운영을 켠다"
+		now.text = "지금: %s · %s · 산 땅 구역 %d/%d · 구획이 찬 정도 %s" % [CityDev.mode_name(cur), auto, int(st["land"]),
+			int(st["max"]), Fmt.pct(float(st["fill"]))]
+		var parts := PackedStringArray()
+		for r in st["rows"]:
+			var q := " (+%d 짓는 중)" % int(r[2]) if int(r[2]) > 0 else ""
+			parts.append("%s %d/%d%s" % [GameData.module_name(r[0]), int(r[1]), int(r[3]), q])
+		goal.text = ("목표: " + " · ".join(parts)) if not parts.is_empty() else "목표 건물 없음 — 살림에 필요한 것만 짓는다")
+	return card
 
 
 ## 3D 지도의 후보지 점을 눌렀을 때: 그 카드를 펼친다

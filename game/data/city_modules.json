@@ -3991,6 +3991,656 @@
         "rp_day": 1.5
       },
       "note": "모든 관측과 기록을 두 벌로 보관한다"
+    },
+    {
+      "id": "space_bank",
+      "name": "우주 은행",
+      "category": "commerce",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 40
+      },
+      "build_rd": 15,
+      "power_kw": 12,
+      "crew": 4,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "support_day": 1.5
+      },
+      "note": "식민지 채권과 지구의 투자자를 잇는다 — 지구 지원 점수가 날마다 들어온다"
+    },
+    {
+      "id": "stock_exchange",
+      "name": "우주 증권거래소",
+      "family": "space_bank",
+      "category": "commerce",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 90,
+        "metal_t": 1
+      },
+      "build_rd": 30,
+      "power_kw": 30,
+      "crew": 10,
+      "mtbf_days": 2500,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "support_day": 4
+      },
+      "note": "달 기업의 주식과 행성 사이 화물 선물이 거래되는 곳. 지구 시장이 열리는 시간에 바쁘다"
+    },
+    {
+      "id": "insurance_hall",
+      "name": "우주 보험회관",
+      "family": "space_bank",
+      "category": "commerce",
+      "priority": 4,
+      "tech": "space_weather_forecast",
+      "start": 0,
+      "cost": {
+        "parts": 50
+      },
+      "build_rd": 20,
+      "power_kw": 10,
+      "crew": 5,
+      "mtbf_days": 3500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "support_day": 2,
+        "morale": 1
+      },
+      "note": "태양 폭풍·화물선 사고를 보장한다 — 예보가 있어야 값을 매길 수 있다"
+    },
+    {
+      "id": "trade_exchange",
+      "name": "교역소",
+      "category": "commerce",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 35
+      },
+      "build_rd": 14,
+      "power_kw": 8,
+      "crew": 3,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "support_day": 0.4,
+        "make": {
+          "parts": 0.6
+        }
+      },
+      "note": "지구·다른 식민지와 물자를 바꾼다 — 날마다 부품이 조금씩 들어온다"
+    },
+    {
+      "id": "bonded_warehouse",
+      "name": "보세 창고",
+      "family": "trade_exchange",
+      "category": "commerce",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 25
+      },
+      "build_rd": 10,
+      "power_kw": 3,
+      "crew": 1,
+      "mtbf_days": 6000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "storage": {
+          "water_kg": 10000,
+          "food_kg": 6000
+        },
+        "make": {
+          "parts": 0.3
+        }
+      },
+      "note": "통관을 기다리는 화물과 비축품을 쌓아 둔다"
+    },
+    {
+      "id": "market_hall",
+      "name": "우주 시장",
+      "family": "trade_exchange",
+      "category": "commerce",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 30
+      },
+      "build_rd": 12,
+      "power_kw": 10,
+      "crew": 2,
+      "mtbf_days": 4000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 3,
+        "support_day": 0.6
+      },
+      "note": "여압 둥근 지붕 아래의 가게들 — 지구에서 온 물건과 달에서 만든 물건"
+    },
+    {
+      "id": "space_hotel",
+      "name": "우주 호텔",
+      "category": "commerce",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 60
+      },
+      "build_rd": 25,
+      "power_kw": 25,
+      "crew": 6,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "support_day": 1.2,
+        "morale": 2
+      },
+      "note": "달을 보러 온 손님이 묵는다 — 관광 수입이 지원 점수로 들어온다"
+    },
+    {
+      "id": "space_museum",
+      "name": "우주 박물관",
+      "family": "space_hotel",
+      "category": "commerce",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 45
+      },
+      "build_rd": 18,
+      "power_kw": 12,
+      "crew": 3,
+      "mtbf_days": 5000,
+      "repair": {
+        "parts": 1,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 4,
+        "rp_day": 1,
+        "support_day": 0.5
+      },
+      "note": "아폴로부터 첫 기지까지 — 손님과 정착민 모두를 위한 전시"
+    },
+    {
+      "id": "view_tower",
+      "name": "전망 타워",
+      "family": "space_hotel",
+      "category": "commerce",
+      "priority": 4,
+      "tech": "sintered_construction",
+      "start": 0,
+      "cost": {
+        "parts": 50,
+        "regolith_t": 120
+      },
+      "build_rd": 26,
+      "power_kw": 10,
+      "crew": 2,
+      "mtbf_days": 6000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 3,
+        "support_day": 0.8
+      },
+      "note": "소결 벽돌로 쌓은 탑 꼭대기의 둥근 전망실 — 지평선 위의 지구"
+    },
+    {
+      "id": "transit_center",
+      "name": "환승 센터",
+      "category": "logistics",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 35
+      },
+      "build_rd": 14,
+      "power_kw": 10,
+      "crew": 3,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "build_boost": 0.05,
+        "morale": 1
+      },
+      "note": "로버 노선과 통로가 모인다 — 자재와 사람이 빨리 돌아 건설이 빨라진다"
+    },
+    {
+      "id": "rover_depot",
+      "name": "로버 차고지",
+      "family": "transit_center",
+      "category": "logistics",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 30
+      },
+      "build_rd": 12,
+      "power_kw": 8,
+      "crew": 2,
+      "mtbf_days": 2500,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "build_boost": 0.08
+      },
+      "note": "화물 로버를 충전하고 정비해 공사장으로 보낸다"
+    },
+    {
+      "id": "maglev_terminal",
+      "name": "자기부상 터미널",
+      "family": "transit_center",
+      "category": "logistics",
+      "priority": 3,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 70,
+        "metal_t": 1.5
+      },
+      "build_rd": 30,
+      "power_kw": 40,
+      "crew": 4,
+      "mtbf_days": 2500,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "build_boost": 0.1,
+        "make": {
+          "parts": 0.3
+        }
+      },
+      "note": "기지와 채굴장·우주항을 잇는 자기부상 화물 열차의 종점"
+    },
+    {
+      "id": "tech_fab",
+      "name": "첨단 제조동",
+      "category": "industry",
+      "priority": 3,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 70,
+        "metal_t": 1
+      },
+      "build_rd": 28,
+      "power_kw": 80,
+      "crew": 6,
+      "mtbf_days": 1500,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "make": {
+          "parts": 0.8
+        }
+      },
+      "note": "무균실에서 전자 부품과 정밀 부품을 만든다 — 지구에서 들여오던 부품을 대신한다"
+    },
+    {
+      "id": "data_center",
+      "name": "데이터센터",
+      "family": "tech_fab",
+      "category": "industry",
+      "priority": 3,
+      "tech": "seed_distributed",
+      "start": 0,
+      "cost": {
+        "parts": 60
+      },
+      "build_rd": 20,
+      "power_kw": 120,
+      "crew": 2,
+      "mtbf_days": 1500,
+      "repair": {
+        "parts": 3,
+        "rd": 1
+      },
+      "provides": {
+        "rp_day": 5
+      },
+      "note": "시드의 분산 연산과 연구 시뮬레이션 — 전기를 많이 먹는다"
+    },
+    {
+      "id": "robotics_lab",
+      "name": "로봇공학 연구소",
+      "family": "tech_fab",
+      "category": "industry",
+      "priority": 3,
+      "tech": "autonomous_robots_2",
+      "start": 0,
+      "cost": {
+        "parts": 45
+      },
+      "build_rd": 18,
+      "power_kw": 20,
+      "crew": 4,
+      "mtbf_days": 2000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "build_boost": 0.06,
+        "rp_day": 1.5
+      },
+      "note": "건설 로봇의 손과 소프트웨어를 고친다 — 로봇이 더 빨리 일한다"
+    },
+    {
+      "id": "apartment_block",
+      "name": "공동 주택 블록",
+      "family": "hab_module",
+      "category": "habitat",
+      "priority": 1,
+      "tech": "sintered_construction",
+      "start": 0,
+      "cost": {
+        "parts": 70,
+        "regolith_t": 400
+      },
+      "build_rd": 50,
+      "power_kw": 10,
+      "crew": 0,
+      "mtbf_days": 5000,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "housing": 36,
+        "dose": "covered"
+      },
+      "note": "소결 벽 속에 거주 모듈을 여러 층으로 넣은 집합 주택 — 벽이 곧 피복이다"
+    },
+    {
+      "id": "terrace_housing",
+      "name": "계단식 주거동",
+      "family": "hab_module",
+      "category": "habitat",
+      "priority": 1,
+      "tech": "sunlight_piping",
+      "start": 0,
+      "cost": {
+        "parts": 90
+      },
+      "build_rd": 30,
+      "power_kw": 8,
+      "crew": 0,
+      "mtbf_days": 4000,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "housing": 16,
+        "morale": 1
+      },
+      "note": "층마다 햇빛 정원이 있는 계단식 주거동 — 자연광 도입이 있어야 한다"
+    },
+    {
+      "id": "research_institute",
+      "name": "종합 연구원",
+      "family": "research_lab",
+      "category": "research",
+      "priority": 4,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 80
+      },
+      "build_rd": 32,
+      "power_kw": 40,
+      "crew": 14,
+      "mtbf_days": 1800,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "rp_day": 14
+      },
+      "note": "여러 분야의 연구실과 강의실을 한 지붕 아래에 모았다"
+    },
+    {
+      "id": "deep_space_array",
+      "name": "전파 망원경 배열",
+      "family": "research_lab",
+      "category": "research",
+      "priority": 4,
+      "tech": "space_weather_forecast",
+      "start": 0,
+      "cost": {
+        "parts": 55
+      },
+      "build_rd": 22,
+      "power_kw": 18,
+      "crew": 4,
+      "mtbf_days": 2000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "rp_day": 4,
+        "morale": 1
+      },
+      "note": "달 뒷면처럼 조용한 하늘을 듣는 접시 안테나 넷 — 태양 활동도 지켜본다"
+    },
+    {
+      "id": "grid_storage_hall",
+      "name": "대용량 축전소",
+      "family": "battery_bank",
+      "category": "power",
+      "priority": null,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 90
+      },
+      "build_rd": 16,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 3,
+        "rd": 1
+      },
+      "provides": {
+        "storage_kwh": 2000
+      },
+      "note": "배터리 선반을 큰 창고 하나에 모았다 — 많이 담을수록 값이 싸다"
+    },
+    {
+      "id": "solar_field",
+      "name": "태양광 패널 밭",
+      "family": "solar_tower",
+      "category": "power",
+      "priority": null,
+      "tech": "tall_towers",
+      "start": 0,
+      "cost": {
+        "parts": 40
+      },
+      "build_rd": 14,
+      "power_kw": 0,
+      "crew": 0,
+      "mtbf_days": 2000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "generation_kw": 140
+      },
+      "note": "낮게 기울인 패널 줄이 해를 따라 돈다 — 타워 II 기술의 넓은 판"
+    },
+    {
+      "id": "regolith_quarry",
+      "name": "레골리스 채석장",
+      "family": "excavator",
+      "category": "industry",
+      "priority": 3,
+      "tech": null,
+      "start": 0,
+      "cost": {
+        "parts": 70
+      },
+      "build_rd": 22,
+      "power_kw": 50,
+      "crew": 2,
+      "mtbf_days": 400,
+      "repair": {
+        "parts": 3,
+        "rd": 1
+      },
+      "recipe": {
+        "in": {},
+        "out": {
+          "regolith_t": 150
+        }
+      },
+      "note": "계단처럼 깎아 내려가는 노천 채석장과 운반대"
+    },
+    {
+      "id": "ore_refinery",
+      "name": "광석 정련소",
+      "family": "mre_plant",
+      "category": "industry",
+      "priority": 3,
+      "tech": "molten_regolith_electrolysis",
+      "start": 0,
+      "cost": {
+        "parts": 150,
+        "metal_t": 1
+      },
+      "build_rd": 60,
+      "power_kw": 330,
+      "crew": 5,
+      "mtbf_days": 350,
+      "repair": {
+        "parts": 5,
+        "rd": 3
+      },
+      "recipe": {
+        "in": {
+          "regolith_t": 3.5
+        },
+        "out": {
+          "metal_t": 1.1,
+          "o2_kg": 850
+        }
+      },
+      "note": "레골리스를 골라 녹이고 금속 덩이로 뽑는 큰 정련소"
+    },
+    {
+      "id": "assembly_plant",
+      "name": "조립 공장",
+      "family": "parts_fab",
+      "category": "industry",
+      "priority": 3,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 140,
+        "metal_t": 4
+      },
+      "build_rd": 55,
+      "power_kw": 90,
+      "crew": 8,
+      "mtbf_days": 450,
+      "repair": {
+        "parts": 5,
+        "rd": 3
+      },
+      "recipe": {
+        "in": {
+          "metal_t": 0.7
+        },
+        "out": {
+          "parts": 5
+        }
+      },
+      "note": "문형 기중기가 달린 높은 조립동 — 큰 부품을 통째로 짠다"
+    },
+    {
+      "id": "botanical_dome",
+      "name": "식물원 돔",
+      "family": "green_commons",
+      "category": "social",
+      "priority": 4,
+      "tech": "algae_bioreactor",
+      "start": 0,
+      "cost": {
+        "parts": 45,
+        "regolith_t": 60
+      },
+      "build_rd": 24,
+      "power_kw": 35,
+      "crew": 2,
+      "mtbf_days": 4000,
+      "repair": {
+        "parts": 2,
+        "rd": 1
+      },
+      "provides": {
+        "morale": 6
+      },
+      "recipe": {
+        "in": {
+          "co2_kg": 6
+        },
+        "out": {
+          "o2_kg": 6
+        }
+      },
+      "note": "유리 돔 속의 숲 — 정착민이 가장 좋아하는 산책길"
     }
   ]
 }

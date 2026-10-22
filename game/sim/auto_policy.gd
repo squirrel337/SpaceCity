@@ -171,6 +171,13 @@ func decide(sim: CitySim, day: int) -> void:
 		build(sim, "parts_fab")
 	if sim.robots + sim.queued("robot") < 8 + pop / 40:
 		sim.enqueue_special("robot", sim.auto_reserve)
+	# 상업·교통·첨단 산업 (시험용 'variety' 정책만): 120일부터 해마다 계열마다 하나씩 — 지원 점수·부품 생산·건설 가속 규칙을 맞춰 본다
+	if variety and day >= 120:
+		for fam: String in ["space_bank", "trade_exchange", "space_hotel", "transit_center", "tech_fab"]:
+			@warning_ignore("integer_division")
+			if fam_planned(sim, fam) < 1 + day / 365:
+				build(sim, fam)
+				break
 
 
 ## 계열의 계획 수량 (완공 + 대기)

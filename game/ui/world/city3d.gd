@@ -38,6 +38,8 @@ var _boxes: Array = []            # [AABB(로컬), id, item]
 var _models_wait := false         # 다른 스레드가 아직 만드는 모형이 있다 (다 되면 다시 그린다)
 var _wait_h := 0.0                # 땅의 높이 격자를 기다린 시간 (s) — 굽기가 안 되면 2초 뒤 그냥 깐다
 var _road_job: RoadMesh           # 짓는 중인 길 그물 메시
+var _structs: MultiMeshInstance3D  # 높은 길의 받침
+var _struct_mat: ShaderMaterial
 var _district_job: _Job           # 짓는 중인 구획 판 메시
 var _road_rev := -1
 var _ghost: MeshInstance3D
@@ -155,6 +157,7 @@ func update(delta: float, speed_level: int) -> void:
 		if _road_job != null:
 			if _road_job.step(MESH_US):
 				_set_roads(_road_job.mesh())
+				_set_structs(_road_job)
 				_road_job = null
 		elif _district_job != null and _district_job.run(MESH_US):
 			_districts.mesh = _district_job.geo.mesh()
@@ -179,6 +182,8 @@ func update(delta: float, speed_level: int) -> void:
 	_night = move_toward(_night, 1.0 if sim.is_dark() else 0.0, delta / 0.8)
 	if _road_mat:
 		_road_mat.set_shader_parameter("night", _night)
+	if _struct_mat:
+		_struct_mat.set_shader_parameter("night", _night)
 	if _district_mat:
 		_district_mat.set_shader_parameter("night", _night)
 	var sc := global_transform.basis.get_scale().x
@@ -384,6 +389,31 @@ func _set_roads(mesh: ArrayMesh) -> void:
 	_roads.mesh = mesh
 
 
+## 높은 길의 받침 (교각·주탑·케이블·아치·트러스 — RoadStructs): 단위 상자 MultiMesh 하나
+func _set_structs(rm: RoadMesh) -> void:
+	if rm.sx.is_empty():
+		if _structs != null:
+			_structs.visible = false
+		return
+	if _structs == null:
+		_structs = MultiMeshInstance3D.new()
+		_struct_mat = ShaderMaterial.new()
+		_struct_mat.shader = load("res://ui/world/shaders/bridge.gdshader")
+		_structs.material_override = _struct_mat
+		add_child(_structs)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.use_custom_data = true
+	mm.mesh = BoxMesh.new()
+	mm.instance_count = rm.sx.size()
+	mm.buffer = rm.struct_buffer()
+	_structs.multimesh = mm
+	_structs.visible = true
+	_structs.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if int(Settings.q("shadow_splits")) > 0 \
+		else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
 # ── 자리 고르기 ─────────────────────────────────────────────────
 func _make_tool_nodes() -> void:
 	_ghost = MeshInstance3D.new()
@@ -502,9 +532,13 @@ func _update_tool() -> void:
 		"road":
 			# 놓을 길: 종류의 폭으로, 곡선이면 원호를 따라. 꺾이는 점은 둥글게
 			var hw := LayoutData.road_half(tool.road_type)
+			var rd := LayoutData.road(tool.road_type)
 			_pen_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
 			_pen_mesh.surface_set_color(Color(good if ok else bad, 0.6))
-			_ribbon(tool.preview, hw)
+			if LayoutData.raised(tool.road_type):
+				_ribbon(tool.preview, hw, float(rd.get("deck_m", 6.0)), float(rd.get("grade", 0.06)))      # 덱 높이로 (끝에서 오른다)
+			else:
+				_ribbon(tool.preview, hw)
 			_pen_mesh.surface_set_color(Color(good if ok else bad, 0.95))
 			if tool.road_from != null:
 				_disc(tool.road_from, 2.2)
@@ -583,10 +617,15 @@ func _rect_outline(r: Rect2, w: float) -> void:
 
 
 ## 길 미리보기: 점들을 잇는 띠 하나 — 꺾이는 점은 두 방향의 평균 법선으로 (토막이 겹쳐 진해지지 않게), 6 m마다 땅을 따라간다
-func _ribbon(pts: PackedVector2Array, w: float) -> void:
+func _ribbon(pts: PackedVector2Array, w: float, deck := 0.0, grade := 1.0) -> void:
 	var n := pts.size()
 	if n < 2:
 		return
+	var total := 0.0
+	var acc := PackedFloat32Array([0.0])
+	for i in range(1, n):
+		total += pts[i].distance_to(pts[i - 1])
+		acc.append(total)
 	var side: Array = []
 	for i in n:
 		var d := Vector2.ZERO
@@ -614,7 +653,11 @@ func _ribbon(pts: PackedVector2Array, w: float) -> void:
 			var c1 := a.lerp(b, t1)
 			var n0 := na.lerp(nb, t0)
 			var n1 := na.lerp(nb, t1)
-			var q := [_local(c0 - n0, 0.3), _local(c0 + n0, 0.3), _local(c1 + n1, 0.3), _local(c1 - n1, 0.3)]
+			var s0 := lerpf(acc[i], acc[i + 1], t0)
+			var s1 := lerpf(acc[i], acc[i + 1], t1)
+			var u0 := 0.3 + minf(deck, grade * minf(s0, total - s0))
+			var u1 := 0.3 + minf(deck, grade * minf(s1, total - s1))
+			var q := [_local(c0 - n0, u0), _local(c0 + n0, u0), _local(c1 + n1, u1), _local(c1 - n1, u1)]
 			for j in [0, 1, 2, 0, 2, 3]:
 				_pen_mesh.surface_add_vertex(q[j])
 
@@ -1171,19 +1214,11 @@ func _update_ways() -> void:
 			var end_p := start + dir * 3200.0
 			highways[l["id"]] = {"a": start, "b": end_p, "dir": dir, "other": other, "km": float(l["km"]), "mode": l["mode"]}
 			g.ribbon(start, end_p, LayoutData.road_half("highway"), "highway")
-	if ground.body in ["earth", "mars"]:
-		# 활주로: 기지 남쪽 바깥, 화면의 가로(u) 방향 — 우주항 구역에서 유도로가 닿는다
-		var length := 2400.0 if ground.body == "earth" else 700.0
-		var v_c := BaseLayout.BOUNDS_UV.end.y + 90.0
-		var a := BaseLayout.uv_to_xy(Vector2(-length * 0.5, v_c))
-		var b := BaseLayout.uv_to_xy(Vector2(length * 0.5, v_c))
-		var w := 45.0 if ground.body == "earth" else 24.0
-		runway = {"a": a, "b": b, "w": w}
-		g.ribbon(a, b, w * 0.5, "runway")
-		var gate: Vector3 = layout.gates.get("pad", layout.hub)
-		var from := Vector2(gate.x, gate.y)
-		var to := BaseLayout.uv_to_xy(Vector2(BaseLayout.xy_to_uv(from).x, v_c))
-		g.ribbon(from, to + (to - from).normalized() * w * 0.5, LayoutData.road_half("avenue"), "avenue")
+	var rw := plan.runway()
+	if not rw.is_empty():
+		# 활주로: 기지 밖 격자의 땅 구역 한 줄에 블록과 나란히 (유도로는 길 그물의 대로 — 우주항 땅에서 곧게 온다)
+		runway = {"a": rw["a"], "b": rw["b"], "w": rw["w"]}
+		g.ribbon(rw["a"], rw["b"], float(rw["w"]) * 0.5, "runway")
 	if _ways == null:
 		_ways = MeshInstance3D.new()
 		_ways.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

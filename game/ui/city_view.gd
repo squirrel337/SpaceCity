@@ -4,7 +4,8 @@ extends Control
 
 signal module_tapped(mid: String)
 
-const ORDER := ["habitat", "life_support", "food", "power", "thermal", "safety", "industry", "logistics", "research", "social"]
+const ORDER := ["habitat", "life_support", "food", "power", "thermal", "safety", "industry", "logistics", "research", "social",
+	"commerce"]
 const HEADER := 92.0
 const PAD := 12.0
 const GAP := 8.0

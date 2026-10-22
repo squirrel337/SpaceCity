@@ -294,6 +294,8 @@ func _grade_roads(plan: CityPlan, hh: PackedFloat32Array, kmax: int, shoulder: f
 		if length < 0.5:
 			continue
 		var type := plan.edge_type(k)
+		if LayoutData.raised(type):
+			continue                # 높은 길(고가·다리) 밑의 땅은 그대로 둔다 — 받침이 땅에 선다
 		var hw := LayoutData.road_half(type)
 		var grade := float(LayoutData.road(type)["grade"])
 		var steps := maxi(1, int(ceil(length / 2.0)))

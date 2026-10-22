@@ -1,7 +1,10 @@
 extends SceneTree
-## 건물 145종 스크린숏 — 새 종류를 한 기씩 세운 기지를 3D로 찍는다 (디스플레이가 필요하다).
+## 건물 170종 스크린숏 — 새 종류를 한 기씩 세운 기지를 3D로 찍는다 (디스플레이가 필요하다).
 ##   xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 \
 ##     --script res://tests/types_shots.gd -- --out /tmp/shots
+
+## 도시 발전 모드와 함께 들어온 계열 (맏이도 새 종류다)
+const NEW_FAMILIES := ["space_bank", "trade_exchange", "space_hotel", "transit_center", "tech_fab"]
 
 var main: Control
 var frame := 0
@@ -59,7 +62,7 @@ func _process(_delta: float) -> bool:
 			sim.advance_hour()
 			guard += 1
 		for mid in sim.M:
-			if GameData.family(mid) != mid:
+			if GameData.family(mid) != mid or mid in NEW_FAMILIES:
 				sim.counts[mid] = 1
 				if GameData.family(mid) == "solar_tower":
 					var t := sim.free_tile()
@@ -77,6 +80,9 @@ func _process(_delta: float) -> bool:
 			["types_industry", func(): _look_at_xy(w, _center_of(["excavator", "regolith_printer", "mre_plant", "parts_fab", "robot_bay", "propellant_plant"]), 0.16, 55.0)],
 			["types_civic", func(): _look_at_xy(w, _center_of(["research_lab", "green_commons", "comms_center", "medical_bay"]), 0.15, 55.0)],
 			["types_ridge", func(): _look_at_xy(w, _center_of(["solar_tower"]) + Vector2(70, 70), 0.3, 60.0, Vector3(-1.0, -1.0, 0.0))],
+			["types_commerce", func(): _look_at_xy(w, _center_of(["space_bank", "trade_exchange", "space_hotel"]), 0.16, 55.0)],
+			["types_tech", func(): _look_at_xy(w, _center_of(["tech_fab"]), 0.14, 55.0)],
+			["types_transit", func(): _look_at_xy(w, _center_of(["transit_center"]), 0.14, 55.0)],
 		]
 		_wait = 40
 		return false

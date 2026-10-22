@@ -9,7 +9,7 @@
     python3 city_balance.py --policy naive       # 준비 없이 성장만 좇는 정책
     python3 city_balance.py --monte-carlo 200    # 두 정책을 각각 200회 돌려 비교
     python3 city_balance.py --module-table       # 문서용 모듈 표 (Markdown, 기본 29종)
-    python3 city_balance.py --module-catalog     # 전체 모듈 표 (29계열 145종)
+    python3 city_balance.py --module-catalog     # 전체 모듈 표 (34계열 170종)
     python3 city_balance.py --policy variety     # 계열의 여러 종류를 섞어 짓는 시험 정책
     python3 city_balance.py --csv daily.csv      # 일별 기록 (차트용)
     python3 city_balance.py --site mars_hellas   # 다른 부지 (../data/city_sites.json)
@@ -617,6 +617,7 @@ class City:
         self.work_robots()
         self.decide(day)
         self.research()
+        self.commerce()
         self.earth(day)
         self.space_weather(day)
         self.dose_and_departures()
@@ -642,6 +643,11 @@ class City:
         s = self.stock
         speed = 1.5 if "autonomous_robots_2" in self.techs else 1.0
         rd = (self.robots - self.robots_broken) * speed * self.build_k
+        boost = 0.0               # 교통·로봇 시설: 자재와 로봇이 빨리 돌아 작업량이 는다 (합은 50%까지)
+        for m in WITH.get("build_boost", []):
+            boost += self.wk[m] * provided(m, "build_boost")
+        if boost:
+            rd *= 1.0 + min(boost, 0.5)
         while self.robots_broken and s["parts"] >= self.C["robots"]["repair_parts"] and rd >= 0.5:
             self.robots_broken -= 1
             s["parts"] -= self.C["robots"]["repair_parts"]
@@ -828,6 +834,12 @@ class City:
             build("parts_fab")
         if self.robots + self.queued("robot") < 8 + pop / 40:
             self.enqueue_special("robot")
+        # 상업·교통·첨단 산업 (시험용 'variety' 정책만): 120일부터 해마다 계열마다 하나씩 — 지원 점수·부품 생산·건설 가속 규칙을 맞춰 본다
+        if self.policy.variety and day >= 120:
+            for fam in ("space_bank", "trade_exchange", "space_hotel", "transit_center", "tech_fab"):
+                if p(fam) < 1 + day // 365:
+                    build(fam)
+                    break
 
     def fam_planned(self, fam):
         """계열의 계획 수량 (완공 + 대기)."""
@@ -888,6 +900,22 @@ class City:
             self.research_queue.pop(0)
             self.note(f"연구 완료 — {tech['name']}")
             break
+
+    def commerce(self):
+        """상업·교통 시설: 날마다 지구 지원 점수(금융·관광·교역)와 들여오는 자재(교역·첨단 제조).
+        4순위 시설은 절전으로 꺼진 시간만큼 덜 낸다."""
+        share = 1.0 - self.day["p4_off_h"] / 24.0
+        made = 0.0
+        for m in WITH.get("support_day", []):
+            made += self.wk[m] * provided(m, "support_day")
+        if made:
+            self.support += made * share
+        for m in WITH.get("make", []):
+            n = self.wk[m]
+            if n:
+                k4 = share if spec(m, "priority") == 4 else 1.0
+                for k, v in provided(m, "make").items():
+                    self.stock[k] = self.stock.get(k, 0.0) + n * v * k4
 
     def earth(self, day):
         earth = self.C["earth"]
@@ -1229,11 +1257,11 @@ def monte_carlo(runs, years):
 
 CATEGORY_KO = {"habitat": "거주", "life_support": "생명유지", "food": "식량", "power": "전력",
                "thermal": "열", "industry": "산업", "logistics": "물류", "safety": "안전",
-               "research": "연구", "social": "사회"}
+               "research": "연구", "social": "사회", "commerce": "상업"}
 
 
 def module_table(families=False):
-    """문서용 모듈 표. families=True면 계열마다 기본 모듈 아래에 같은 계열의 다른 종류를 둔다 (145종)."""
+    """문서용 모듈 표. families=True면 계열마다 기본 모듈 아래에 같은 계열의 다른 종류를 둔다 (170종)."""
     names = CATEGORY_KO
     print("| 모듈 | 분류 | 절전 순위 | 필요 기술 | 시작 | 비용 | 건설 (로봇·일) | 전력 (kW) | 인원 | 고장 간격 (일) "
           "| 수리 (부품 · 로봇·일) | 기능 |")
@@ -1269,7 +1297,8 @@ def describe(m):
     labels = {"housing": "거주 {}명", "shelter": "대피 {}명", "generation_kw": "발전 {:,} kW", "landing_slots": "착륙 슬롯 {}",
               "storage_kwh": "축전 {:,} kWh", "heat_kw": "방열 {} kW", "co2_kg_day": "CO₂ 제거 {} kg/일",
               "wastewater_kg_day": "폐수 처리 {:,} kg/일", "rp_day": "연구 {} RP/일", "morale": "사기 +{}",
-              "care": "진료 {}명", "robot_slots": "로봇 {}대 정비", "print_t_day": "인쇄 {} t/일"}
+              "care": "진료 {}명", "robot_slots": "로봇 {}대 정비", "print_t_day": "인쇄 {} t/일",
+              "support_day": "지원 +{:g}/일", "build_boost": "건설 +{:.0%}"}
     for key, fmt in labels.items():
         if key in pv:
             out.append(fmt.format(pv[key]))
@@ -1287,6 +1316,8 @@ def describe(m):
         out.append(f"회수 {pv['recovery']:.0%}")
     if "storage" in pv:
         out.append("저장: " + ", ".join(amount(k, v) for k, v in pv["storage"].items()))
+    if "make" in pv:
+        out.append("생산: " + ", ".join(amount(k, v) for k, v in pv["make"].items()) + " (하루)")
     if "recipe" in m:
         ins = ", ".join(amount(k, v) for k, v in m["recipe"]["in"].items())
         outs = ", ".join(amount(k, v) for k, v in m["recipe"]["out"].items())
@@ -1311,7 +1342,7 @@ def main():
     parser.add_argument("--site", choices=list(SITES), default=HOME_SITE, help="부지 (../data/city_sites.json)")
     parser.add_argument("--monte-carlo", type=int, metavar="N", help="두 정책을 N회씩 돌려 비교")
     parser.add_argument("--module-table", action="store_true", help="문서용 모듈 표 출력 (기본 모듈 29종)")
-    parser.add_argument("--module-catalog", action="store_true", help="문서용 전체 모듈 표 (29계열 145종)")
+    parser.add_argument("--module-catalog", action="store_true", help="문서용 전체 모듈 표 (34계열 170종)")
     parser.add_argument("--tech-table", action="store_true", help="문서용 기술 표 출력")
     parser.add_argument("--csv", metavar="PATH", help="일별 기록을 CSV로 저장")
     args = parser.parse_args()

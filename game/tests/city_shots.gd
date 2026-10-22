@@ -164,6 +164,24 @@ func _metro_setup() -> void:
 	main._set_speed(0)
 
 
+## 높은 길 종류를 나란히 깐다 (기지 동쪽 바깥, 40 m 간격 · 220 m 길이 — 검사 없이): 고가 또는 다리
+func _raised_row(w: WorldView, level: String, x0: float) -> void:
+	var plan: CityPlan = main.plan
+	var i := 0
+	for t in LayoutData.road_types(w.ground.body):
+		if LayoutData.level(t) != level:
+			continue
+		var y := -150.0 + 40.0 * i
+		plan.add_road(Vector2(x0, y), Vector2(x0 + 220.0, y), 0.6, t)
+		i += 1
+	_until_lit()
+	_aim(w, Vector2(x0 + 110.0, -150.0 + 20.0 * i), 0.62, 52.0, Vector2(-1, 0.15))
+
+
+func _roads_done(w: WorldView) -> bool:
+	return w.city._road_job == null and w.city._road_rev == main.plan.road_rev
+
+
 func _metro_done(w: WorldView, key: String) -> bool:
 	if not _settled(w) or not w.metro_grounds.has(key):
 		return false
@@ -298,6 +316,12 @@ func _process(_delta: float) -> bool:
 				main._on_colony_view(main.colonies.index_of_site("earth_naro"))
 				_until_lit(), func(): return _settled(w)],
 			["flood_dug", func(): _flood_setup(w), func(): return _settled(w)],
+			["viaducts", func(): _raised_row(w, "viaduct", 700.0), func(): return _settled(w) and _roads_done(w)],
+			["viaducts_low", func(): _aim(w, Vector2(810.0, 60.0), 0.16, 66.0, Vector2(-1, 0.3)),
+				func(): return _settled(w) and _roads_done(w)],
+			["bridges", func(): _raised_row(w, "bridge", 420.0), func(): return _settled(w) and _roads_done(w)],
+			["bridges_low", func(): _aim(w, Vector2(530.0, 120.0), 0.2, 68.0, Vector2(-1, 0.25)),
+				func(): return _settled(w) and _roads_done(w)],
 		]
 		if not only.is_empty():
 			_steps = _steps.filter(func(st: Array) -> bool: return String(st[0]) in only)

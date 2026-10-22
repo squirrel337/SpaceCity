@@ -24,7 +24,7 @@ static func plan(host: MetroCity, r: Dictionary, center: Vector2) -> Array:
 		rad = maxf(rad, maxf(1400.0, 1400.0 / (2.0 * sin(PI / maxf(n - 1.0, 2.0)))))
 	var h := absi(String(r.get("id", "")).hash())
 	var a0 := float(h % 360) * PI / 180.0
-	var rot := float(posmod(int(h / 360.0), 90)) * PI / 180.0
+	var rot := atan2(host._vv.y, host._vv.x)          # 대도시의 길 격자와 나란히 (지역만 있는 땅은 정북 격자)
 	var plots: Array = []
 	for i in n:
 		var a := a0 + TAU * (i - 1) / maxf(n - 1.0, 1.0)
@@ -43,7 +43,7 @@ static func plan(host: MetroCity, r: Dictionary, center: Vector2) -> Array:
 		if not ok:
 			continue
 		var kind := String(kinds[i % kinds.size()])
-		plots.append({"en": en, "kind": kind, "group": _group_of(kind), "rot": rot + 0.2 * (i % 3)})
+		plots.append({"en": en, "kind": kind, "group": _group_of(kind), "rot": rot})
 	return plots
 
 

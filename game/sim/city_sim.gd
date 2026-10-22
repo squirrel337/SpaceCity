@@ -730,6 +730,7 @@ func step_day(d: int) -> void:
 	if autopilot != null:
 		autopilot.decide(self, d)
 	research()
+	commerce()
 	earth(d)
 	space_weather(d)
 	dose_and_departures()
@@ -779,6 +780,11 @@ func work_robots() -> void:
 	var s := stock
 	var speed := 1.5 if techs.has("autonomous_robots_2") else 1.0
 	var rd: float = (robots - robots_broken) * speed * build_k
+	var boost := 0.0           # 교통·로봇 시설: 자재와 로봇이 빨리 돌아 작업량이 는다 (합은 50%까지)
+	for m in with_prov("build_boost"):
+		boost += wk[m] * float(prov(m, "build_boost"))
+	if boost:
+		rd *= 1.0 + minf(boost, 0.5)
 	var repair_parts := float(C["robots"]["repair_parts"])
 	while robots_broken and s["parts"] >= repair_parts and rd >= 0.5:
 		robots_broken -= 1
@@ -947,6 +953,24 @@ func research() -> void:
 
 
 var last_rp := 0.0
+
+
+## 상업·교통 시설: 날마다 지구 지원 점수(금융·관광·교역)와 들여오는 자재(교역·첨단 제조).
+## 4순위 시설은 절전으로 꺼진 시간만큼 덜 낸다 — 파이썬 commerce와 같다
+func commerce() -> void:
+	var share := 1.0 - float(today.get("p4_off_h", 0)) / 24.0
+	var made := 0.0
+	for m in with_prov("support_day"):
+		made += wk[m] * float(prov(m, "support_day"))
+	if made:
+		support += made * share
+	for m in with_prov("make"):
+		var n: int = wk[m]
+		if n:
+			var k4 := share if priority_of(m) == 4 else 1.0
+			var mk: Dictionary = prov(m, "make", {})
+			for k in mk:
+				stock[k] = float(stock.get(k, 0.0)) + n * float(mk[k]) * k4
 
 
 func earth(d: int) -> void:

@@ -16,6 +16,7 @@ const BOUNDS_UV := Rect2(-235, -262, 470, 530)      # 지도 끝 (u, v)
 const CREST_V := -214.0                               # 능선 마루 (그 위는 하늘)
 const ICE_CRATER_R := 34.0
 const SPECIAL := ["ice", "pad"]                       # 블록이 아니라 따로 두는 구획
+const PAD_CLEAR := 30.0                               # 착륙장 둘레 (착륙 분사) — 우주항 땅이 이만큼 넉넉하다
 ## 능선의 일조 구역 (u, v 사각형). 태양광 타워는 여기에만 서고, 구역이 곧 시뮬레이션의 일조 칸이다:
 ## A 마루 한가운데(일조 100%), B 양옆(85%), C 낮은 비탈(70%). 왼쪽 C는 얼음 분화구를 비켜 바깥에 있다
 const ZONES := {
@@ -24,7 +25,7 @@ const ZONES := {
 	"C": [Rect2(-234, CREST_V + 18, 62, 22), Rect2(112, CREST_V + 18, 62, 22)],
 }
 ## 구획을 채우는 차례 (가운데에 가까워야 하는 것부터)
-const ORDER := ["core", "civic", "life", "domes", "farm", "power", "industry", "reactor"]
+const ORDER := ["core", "civic", "life", "domes", "farm", "power", "industry", "reactor", "commerce", "tech", "transit"]
 
 var slots := {}            # 계열 → Array[Vector3] (자리 중심, 채우는 순서)
 var district_of := {}      # 계열 → 구획 이름
@@ -44,6 +45,7 @@ var every := 2
 var open_cells := {}
 var ice_center := Vector3.ZERO
 var pad_rect := Rect2()    # 우주항 (착륙장 줄)
+var pad_area := Rect2()    # 우주항 땅 — 길 격자의 블록 칸에 맞춘 사각형 (착륙장 줄과 둘레 30 m가 들고, 둘레로 격자 길이 지난다)
 ## 부지 종류: "ridge" — 능선의 일조 구역 A·B·C와 얼음 분화구 (달 남극·수성 극지),
 ## "open" — 능선이 없는 평지: 일조 구역이 한 덩어리의 태양광 단지(A)이고 얼음 분화구 자리는 얼음 매장지다
 var kind := "ridge"
@@ -78,8 +80,9 @@ func _init(p_kind: String = "ridge") -> void:
 	var zd := LayoutData.zones()
 	var ic := uv_to_xy(Vector2(zd["ice"]["center_uv"][0], zd["ice"]["center_uv"][1]))
 	ice_center = Vector3(ic.x, ic.y, 0)
-	_place_specials(zd)
 	var core_c := uv_to_xy(Vector2(zd["core"]["center_uv"][0], zd["core"]["center_uv"][1]))
+	_grid_setup(core_c)
+	_place_specials(zd)
 	_grid(core_c)
 	_assign(zd)
 	_connect_specials()
@@ -118,7 +121,7 @@ func special_at(p: Vector2, pad: float = 8.0) -> bool:
 				return true
 	if p.distance_to(Vector2(ice_center.x, ice_center.y)) < ICE_CRATER_R + pad + 6.0:
 		return true
-	return pad_rect.grow(30.0).has_point(p)
+	return pad_rect.grow(PAD_CLEAR).has_point(p)
 
 
 ## 이 점에 블록·길을 둘 수 있나 (지도 안, 능선 아래, 일조 구역·얼음 분화구·우주항 밖)
@@ -132,7 +135,7 @@ func _open_at(p: Vector2, margin: float) -> bool:
 				return false
 	if p.distance_to(Vector2(ice_center.x, ice_center.y)) < ICE_CRATER_R + 14.0:
 		return false
-	if pad_rect.grow(30.0).has_point(p):
+	if pad_rect.grow(PAD_CLEAR).has_point(p):
 		return false
 	return true
 
@@ -145,19 +148,21 @@ func _cell_open(r: Rect2, margin: float) -> bool:
 	return true
 
 
-## 거주 구역 가운데(대로 둘이 만나는 곳)를 원점으로 길 격자: 두 줄마다 대로, 그 사이 도로
-func _grid(core_c: Vector2) -> void:
+## 길 격자의 원점(거주 구역 가운데 — 대로 둘이 만나는 곳)과 간격 (우주항 땅도 이 격자에 맞춘다)
+func _grid_setup(core_c: Vector2) -> void:
 	var g := LayoutData.grid()
-	var block := float(g["block_m"])
-	every = int(g["avenue_every"])
-	var margin := float(g["margin_m"])
+	every = maxi(1, int(g["avenue_every"]))
+	pitch = float(g["block_m"]) + (float(LayoutData.road("avenue")["width_m"]) + float(LayoutData.road("street")["width_m"])) * 0.5
+	grid_o = core_c
+	hub = Vector3(core_c.x, core_c.y, 0)
+
+
+## 거주 구역 가운데를 원점으로 길 격자: 두 줄마다 대로, 그 사이 도로
+func _grid(core_c: Vector2) -> void:
+	var margin := float(LayoutData.grid()["margin_m"])
 	var w_av := float(LayoutData.road("avenue")["width_m"])
 	var w_st := float(LayoutData.road("street")["width_m"])
-	pitch = block + (w_av + w_st) * 0.5
-	every = maxi(1, every)
-	grid_o = core_c
 	var n := 9
-	hub = Vector3(core_c.x, core_c.y, 0)
 	var xs: Array = []
 	var ys: Array = []
 	for k in range(-n, n + 1):
@@ -196,7 +201,9 @@ func _grid(core_c: Vector2) -> void:
 			segments.append([Vector2(xs[a.x], ys[a.y]), Vector2(xs[b.x], ys[b.y]), t])
 
 
-## 우주항과 얼음 분화구: 블록이 아니라 따로 (착륙장 둘레 30 m, 얼음 채굴기는 분화구 안)
+## 우주항과 얼음 분화구: 블록이 아니라 따로 (착륙장 둘레 30 m, 얼음 채굴기는 분화구 안).
+## 우주항 땅은 길 격자의 블록 칸에 맞춘다 — 착륙장 줄과 둘레 30 m가 드는 가장 작은 칸 묶음(3×2)을 바라는 자리에서 가장
+## 가까운 격자에 놓고, 착륙장 줄은 그 가운데에. 둘레의 블록과 길이 격자 그대로 이어진다 (비스듬히 비켜 앉지 않는다)
 func _place_specials(zd: Dictionary) -> void:
 	for name in SPECIAL:
 		var d: Dictionary = zd[name]
@@ -217,6 +224,11 @@ func _place_specials(zd: Dictionary) -> void:
 				items.append([k, Vector2(x0 + (c + 0.5) * cell.x, y + (r + 0.5) * cell.y), cell])
 			y += ceili(float(cap) / per_row) * cell.y
 		var origin := center - Vector2(row_w, y) * 0.5
+		if name == "pad":
+			var need := Vector2(row_w, y) + Vector2(PAD_CLEAR, PAD_CLEAR) * 2.0
+			var size := Vector2(ceilf(need.x / pitch), ceilf(need.y / pitch)) * pitch
+			pad_area = Rect2(grid_o + ((center - size * 0.5 - grid_o) / pitch).round() * pitch, size)
+			origin = pad_area.get_center() - Vector2(row_w, y) * 0.5
 		var rect := Rect2(origin, Vector2(row_w, y))
 		rects[name] = rect
 		lots[name] = []
@@ -326,7 +338,7 @@ func _connect_specials() -> void:
 	# 우주항: 가장 가까운 길 꼭짓점에서 착륙장 줄 가장자리까지 (직각으로 꺾어) 대로
 	var pc := pad_rect.get_center()
 	var s1: Vector2 = near.call(pc)
-	var r := pad_rect.grow(4.0)
+	var r := pad_rect.grow(LayoutData.road_half("avenue") + 2.5)      # 길 끝이 착륙장 자리에 걸리지 않게
 	var to_pad := Vector2(clampf(s1.x, r.position.x, r.end.x), clampf(s1.y, r.position.y, r.end.y))
 	_route_l(s1, to_pad, "avenue")
 	gates["pad"] = Vector3(to_pad.x, to_pad.y, 0)

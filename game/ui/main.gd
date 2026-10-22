@@ -48,6 +48,7 @@ var place_note: Label
 var place_opts: HFlowContainer         # 도구의 고를 것: 길 종류·곡선, 구획, 땅 고치기의 방법·붓
 var _opts_mode := ""
 var _opt_buttons := {}
+var _road_group := "ground"        # 길 도구의 단추 묶음: ground 땅 위 · viaduct 고가 · bridge 다리
 var road_button: Button
 var plan_buttons := {}                 # 도시 계획 도구: 도로 · 구획 · 땅
 var city_area: Control
@@ -351,7 +352,9 @@ func _update_place_opts() -> void:
 		group = "road"
 	if group in ["build", "land"]:
 		group = ""
-	var key := group + "|" + tool.body()
+	if group == "road":
+		_road_group = LayoutData.road_group(tool.road_type)
+	var key := group + "|" + tool.body() + ("|" + _road_group if group == "road" else "")
 	if key != _opts_mode:
 		_opts_mode = key
 		for c in place_opts.get_children():
@@ -360,13 +363,33 @@ func _update_place_opts() -> void:
 		_opt_buttons.clear()
 		match group:
 			"road":
+				# 묶음: 땅 위의 길 · 고가 (땅을 따라 높이 — 밑의 길과 만나지 않는다) · 다리 (물·분화구 위로 곧게)
+				var gg := ButtonGroup.new()
+				for grp in [["ground", "땅 위", "땅을 따라가는 길 — 만나는 길과 교차로가 된다"],
+						["viaduct", "고가", "땅을 따라 높이 뜬 길 — 밑으로 지나는 길과 만나지 않고 끝에서 비탈로 내려앉는다"],
+						["bridge", "다리", "두 끝 사이를 곧게 건너는 길 — 물·분화구·골짜기 위로. 땅 위의 길은 물을 건너지 못한다"]]:
+					var gk: String = grp[0]
+					_opt("g:" + gk, grp[1], grp[2], gg, func():
+						for t2 in LayoutData.road_types(tool.body()):
+							if LayoutData.road_group(t2) == gk:
+								if tool.mode == "erase":
+									tool.start_road(t2)
+								else:
+									tool.set_road_type(t2)
+								break)
+				_opt_gap()
 				var g := ButtonGroup.new()
 				for t in LayoutData.road_types(tool.body()):
+					if LayoutData.road_group(t) != _road_group:
+						continue
 					var rd := LayoutData.road(t)
 					var type: String = t
-					_opt(type, String(rd["name"]), "폭 %s m · 차로 %d · 속력 ×%s · 100 m마다 %s · 가장 가파른 기울기 %d%%" % [
+					var tip := "폭 %s m · 차로 %d · 속력 ×%s · 100 m마다 %s · 가장 가파른 기울기 %d%%" % [
 						Fmt.n(float(rd["width_m"]), 0), int(rd["lanes"]), str(rd["speed"]),
-						PlaceTool._cost_text(LayoutData.road_cost(type, 100.0)), int(float(rd["grade"]) * 100.0)], g,
+						PlaceTool._cost_text(LayoutData.road_cost(type, 100.0)), int(float(rd["grade"]) * 100.0)]
+					if LayoutData.raised(type):
+						tip += " · 덱 높이 %s m · 받침 %s m마다" % [Fmt.n(float(rd.get("deck_m", 6.0)), 1), Fmt.n(float(rd.get("span_m", 24.0)), 0)]
+					_opt(type, String(rd["name"]), tip, g,
 						func():
 							if tool.mode == "erase":
 								tool.start_road(type)
@@ -404,7 +427,8 @@ func _update_place_opts() -> void:
 		var b: Button = _opt_buttons[k]
 		var on := false
 		if group == "road":
-			on = k == tool.road_type or (k == "curve" and tool.curve) or (k == "snap" and tool.angle_snap)
+			on = k == tool.road_type or (k == "curve" and tool.curve) or (k == "snap" and tool.angle_snap) \
+				or k == "g:" + _road_group
 		elif group == "zone":
 			on = k == "z:" + tool.zone_kind
 		elif group == "terrain":
@@ -637,6 +661,7 @@ func _build_side() -> Control:
 	tabs["research"].changed.connect(_on_player_change)
 	tabs["colony"].mgr = colonies
 	tabs["colony"].view_requested.connect(_on_colony_view)
+	tabs["colony"].mode_requested.connect(_on_dev_mode)
 	tabs["colony"].changed.connect(func():
 		_update_colony_ui()
 		_on_player_change())
@@ -1556,6 +1581,26 @@ func _on_modal_choice(context: String, choice: String) -> void:
 				_begin_place(choice.trim_prefix("build:"))
 	_dirty = true
 	_refresh_live()
+
+
+## 도시 발전 모드를 골랐다: 그 도시에 적고, 자동 운영이 꺼져 있으면 켠다
+func _on_dev_mode(index: int, mode: String) -> void:
+	if index < 0 or index >= colonies.list.size():
+		return
+	var c: Dictionary = colonies.list[index]
+	var s: CitySim = c["sim"]
+	c["mode"] = mode
+	if s.autopilot == null:
+		s.autopilot = AutoPolicy.new("good")
+		s.autopilot.configure(s)
+		if s == sim:
+			auto_button.set_pressed_no_signal(true)
+			_tab_sim.clear()
+			_bind_tab(current_tab)
+	s.note("발전 모드 — %s: %s" % [CityDev.mode_name(mode), String(LayoutData.dev_mode(mode).get("text", ""))], "info")
+	_toast("%s — 발전 모드 %s" % [c["name"], CityDev.mode_name(mode)], "good")
+	tabs["colony"].rebuild()
+	_dirty = true
 
 
 func _on_auto(on: bool) -> void:

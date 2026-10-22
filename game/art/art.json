@@ -125,6 +125,56 @@
     }
    ]
   },
+  "apartment_block": {
+   "foot": [
+    12,
+    9
+   ],
+   "height": 18.2,
+   "title": "공동 주택 블록",
+   "variants": [
+    {
+     "height": 18.2
+    },
+    {
+     "height": 19.4
+    },
+    {
+     "height": 16.8
+    },
+    {
+     "height": 18.2
+    },
+    {
+     "height": 18.2
+    }
+   ]
+  },
+  "assembly_plant": {
+   "foot": [
+    16,
+    12
+   ],
+   "height": 8.6,
+   "title": "조립 공장",
+   "variants": [
+    {
+     "height": 8.6
+    },
+    {
+     "height": 8.6
+    },
+    {
+     "height": 8.8
+    },
+    {
+     "height": 8.6
+    },
+    {
+     "height": 8.6
+    }
+   ]
+  },
   "battery_bank": {
    "foot": [
     7,
@@ -300,6 +350,31 @@
     }
    ]
   },
+  "bonded_warehouse": {
+   "foot": [
+    16,
+    10
+   ],
+   "height": 6.0,
+   "title": "보세 창고",
+   "variants": [
+    {
+     "height": 6.0
+    },
+    {
+     "height": 6.0
+    },
+    {
+     "height": 6.0
+    },
+    {
+     "height": 5.6
+    },
+    {
+     "height": 6.4
+    }
+   ]
+  },
   "bosch_reactor": {
    "foot": [
     6,
@@ -322,6 +397,31 @@
     },
     {
      "height": 3.4
+    }
+   ]
+  },
+  "botanical_dome": {
+   "foot": [
+    16,
+    14
+   ],
+   "height": 8.8,
+   "title": "식물원 돔",
+   "variants": [
+    {
+     "height": 8.8
+    },
+    {
+     "height": 8.0
+    },
+    {
+     "height": 7.0
+    },
+    {
+     "height": 8.8
+    },
+    {
+     "height": 8.6
     }
    ]
   },
@@ -775,6 +875,31 @@
     }
    ]
   },
+  "data_center": {
+   "foot": [
+    14,
+    10
+   ],
+   "height": 5.8,
+   "title": "데이터센터",
+   "variants": [
+    {
+     "height": 5.8
+    },
+    {
+     "height": 5.8
+    },
+    {
+     "height": 6.0
+    },
+    {
+     "height": 6.4
+    },
+    {
+     "height": 5.6
+    }
+   ]
+  },
   "deep_shelter": {
    "foot": [
     12,
@@ -797,6 +922,31 @@
     },
     {
      "height": 3.0
+    }
+   ]
+  },
+  "deep_space_array": {
+   "foot": [
+    16,
+    16
+   ],
+   "height": 9.4,
+   "title": "전파 망원경 배열",
+   "variants": [
+    {
+     "height": 9.4
+    },
+    {
+     "height": 9.8
+    },
+    {
+     "height": 9.8
+    },
+    {
+     "height": 8.2
+    },
+    {
+     "height": 11.8
     }
    ]
   },
@@ -1375,6 +1525,31 @@
     }
    ]
   },
+  "grid_storage_hall": {
+   "foot": [
+    12,
+    8
+   ],
+   "height": 4.4,
+   "title": "대용량 축전소",
+   "variants": [
+    {
+     "height": 4.4
+    },
+    {
+     "height": 4.4
+    },
+    {
+     "height": 4.4
+    },
+    {
+     "height": 4.8
+    },
+    {
+     "height": 5.0
+    }
+   ]
+  },
   "gym": {
    "foot": [
     10,
@@ -1725,6 +1900,31 @@
     }
    ]
   },
+  "insurance_hall": {
+   "foot": [
+    11,
+    9
+   ],
+   "height": 11.0,
+   "title": "우주 보험회관",
+   "variants": [
+    {
+     "height": 11.0
+    },
+    {
+     "height": 11.0
+    },
+    {
+     "height": 11.3
+    },
+    {
+     "height": 11.2
+    },
+    {
+     "height": 11.0
+    }
+   ]
+  },
   "ionic_scrubber": {
    "foot": [
     7,
@@ -2025,6 +2225,31 @@
     }
    ]
   },
+  "maglev_terminal": {
+   "foot": [
+    18,
+    8
+   ],
+   "height": 9.0,
+   "title": "자기부상 터미널",
+   "variants": [
+    {
+     "height": 9.0
+    },
+    {
+     "height": 9.0
+    },
+    {
+     "height": 9.0
+    },
+    {
+     "height": 9.4
+    },
+    {
+     "height": 9.0
+    }
+   ]
+  },
   "magnetic_shelter": {
    "foot": [
     10,
@@ -2047,6 +2272,31 @@
     },
     {
      "height": 5.2
+    }
+   ]
+  },
+  "market_hall": {
+   "foot": [
+    14,
+    12
+   ],
+   "height": 6.0,
+   "title": "우주 시장",
+   "variants": [
+    {
+     "height": 6.0
+    },
+    {
+     "height": 5.5
+    },
+    {
+     "height": 6.0
+    },
+    {
+     "height": 6.0
+    },
+    {
+     "height": 6.0
     }
    ]
   },
@@ -2375,6 +2625,31 @@
     }
    ]
   },
+  "ore_refinery": {
+   "foot": [
+    14,
+    10
+   ],
+   "height": 10.0,
+   "title": "광석 정련소",
+   "variants": [
+    {
+     "height": 10.0
+    },
+    {
+     "height": 10.6
+    },
+    {
+     "height": 9.6
+    },
+    {
+     "height": 10.0
+    },
+    {
+     "height": 10.2
+    }
+   ]
+  },
   "parts_fab": {
    "foot": [
     10,
@@ -2625,6 +2900,31 @@
     }
    ]
   },
+  "regolith_quarry": {
+   "foot": [
+    14,
+    10
+   ],
+   "height": 3.6,
+   "title": "레골리스 채석장",
+   "variants": [
+    {
+     "height": 3.6
+    },
+    {
+     "height": 3.8
+    },
+    {
+     "height": 3.6
+    },
+    {
+     "height": 3.4
+    },
+    {
+     "height": 3.8
+    }
+   ]
+  },
   "regolith_sink": {
    "foot": [
     8,
@@ -2697,6 +2997,31 @@
     },
     {
      "height": 4.2
+    }
+   ]
+  },
+  "research_institute": {
+   "foot": [
+    16,
+    12
+   ],
+   "height": 11.2,
+   "title": "종합 연구원",
+   "variants": [
+    {
+     "height": 11.2
+    },
+    {
+     "height": 11.6
+    },
+    {
+     "height": 11.4
+    },
+    {
+     "height": 11.0
+    },
+    {
+     "height": 11.4
     }
    ]
   },
@@ -2847,6 +3172,56 @@
     },
     {
      "height": 3.0
+    }
+   ]
+  },
+  "robotics_lab": {
+   "foot": [
+    12,
+    9
+   ],
+   "height": 7.0,
+   "title": "로봇공학 연구소",
+   "variants": [
+    {
+     "height": 7.0
+    },
+    {
+     "height": 7.0
+    },
+    {
+     "height": 7.0
+    },
+    {
+     "height": 7.0
+    },
+    {
+     "height": 7.0
+    }
+   ]
+  },
+  "rover_depot": {
+   "foot": [
+    14,
+    10
+   ],
+   "height": 4.9,
+   "title": "로버 차고지",
+   "variants": [
+    {
+     "height": 4.9
+    },
+    {
+     "height": 4.9
+    },
+    {
+     "height": 4.9
+    },
+    {
+     "height": 4.6
+    },
+    {
+     "height": 4.9
     }
    ]
   },
@@ -3099,6 +3474,31 @@
     }
    ]
   },
+  "solar_field": {
+   "foot": [
+    9,
+    6
+   ],
+   "height": 2.8,
+   "title": "태양광 패널 밭",
+   "variants": [
+    {
+     "height": 2.8
+    },
+    {
+     "height": 2.8
+    },
+    {
+     "height": 2.8
+    },
+    {
+     "height": 2.8
+    },
+    {
+     "height": 2.8
+    }
+   ]
+  },
   "solar_sinterer": {
    "foot": [
     9,
@@ -3174,6 +3574,81 @@
     }
    ]
   },
+  "space_bank": {
+   "foot": [
+    12,
+    10
+   ],
+   "height": 9.0,
+   "title": "우주 은행",
+   "variants": [
+    {
+     "height": 9.0
+    },
+    {
+     "height": 8.6
+    },
+    {
+     "height": 9.0
+    },
+    {
+     "height": 8.4
+    },
+    {
+     "height": 9.0
+    }
+   ]
+  },
+  "space_hotel": {
+   "foot": [
+    12,
+    10
+   ],
+   "height": 16.0,
+   "title": "우주 호텔",
+   "variants": [
+    {
+     "height": 16.0
+    },
+    {
+     "height": 16.0
+    },
+    {
+     "height": 16.0
+    },
+    {
+     "height": 15.4
+    },
+    {
+     "height": 16.2
+    }
+   ]
+  },
+  "space_museum": {
+   "foot": [
+    16,
+    12
+   ],
+   "height": 8.0,
+   "title": "우주 박물관",
+   "variants": [
+    {
+     "height": 8.0
+    },
+    {
+     "height": 7.0
+    },
+    {
+     "height": 8.2
+    },
+    {
+     "height": 7.8
+    },
+    {
+     "height": 6.8
+    }
+   ]
+  },
   "spirulina_tank": {
    "foot": [
     6,
@@ -3221,6 +3696,31 @@
     },
     {
      "height": 7.0
+    }
+   ]
+  },
+  "stock_exchange": {
+   "foot": [
+    16,
+    12
+   ],
+   "height": 14.0,
+   "title": "우주 증권거래소",
+   "variants": [
+    {
+     "height": 14.0
+    },
+    {
+     "height": 13.4
+    },
+    {
+     "height": 14.4
+    },
+    {
+     "height": 13.7
+    },
+    {
+     "height": 13.4
     }
    ]
   },
@@ -3399,6 +3899,31 @@
     }
    ]
   },
+  "tech_fab": {
+   "foot": [
+    16,
+    12
+   ],
+   "height": 8.0,
+   "title": "첨단 제조동",
+   "variants": [
+    {
+     "height": 8.0
+    },
+    {
+     "height": 8.0
+    },
+    {
+     "height": 8.4
+    },
+    {
+     "height": 8.0
+    },
+    {
+     "height": 7.6
+    }
+   ]
+  },
   "telemedicine": {
    "foot": [
     6,
@@ -3446,6 +3971,31 @@
     },
     {
      "height": 4.6
+    }
+   ]
+  },
+  "terrace_housing": {
+   "foot": [
+    12,
+    9
+   ],
+   "height": 10.2,
+   "title": "계단식 주거동",
+   "variants": [
+    {
+     "height": 10.2
+    },
+    {
+     "height": 10.6
+    },
+    {
+     "height": 10.2
+    },
+    {
+     "height": 10.4
+    },
+    {
+     "height": 10.6
     }
    ]
   },
@@ -3524,6 +4074,31 @@
     }
    ]
   },
+  "trade_exchange": {
+   "foot": [
+    14,
+    10
+   ],
+   "height": 7.0,
+   "title": "교역소",
+   "variants": [
+    {
+     "height": 7.0
+    },
+    {
+     "height": 6.6
+    },
+    {
+     "height": 7.0
+    },
+    {
+     "height": 6.8
+    },
+    {
+     "height": 7.0
+    }
+   ]
+  },
   "transhab": {
    "foot": [
     12,
@@ -3546,6 +4121,31 @@
     },
     {
      "height": 6.1
+    }
+   ]
+  },
+  "transit_center": {
+   "foot": [
+    16,
+    10
+   ],
+   "height": 7.9,
+   "title": "환승 센터",
+   "variants": [
+    {
+     "height": 7.9
+    },
+    {
+     "height": 7.9
+    },
+    {
+     "height": 8.1
+    },
+    {
+     "height": 7.5
+    },
+    {
+     "height": 8.1
     }
    ]
   },
@@ -3596,6 +4196,31 @@
     },
     {
      "height": 12.4
+    }
+   ]
+  },
+  "view_tower": {
+   "foot": [
+    8,
+    8
+   ],
+   "height": 28.0,
+   "title": "전망 타워",
+   "variants": [
+    {
+     "height": 28.0
+    },
+    {
+     "height": 27.4
+    },
+    {
+     "height": 28.0
+    },
+    {
+     "height": 27.6
+    },
+    {
+     "height": 27.0
     }
    ]
   },
