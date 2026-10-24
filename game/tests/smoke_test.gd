@@ -97,7 +97,8 @@ func _save_roundtrip() -> void:
 	_check(restored.rng.random() == twin.rng.random(), "난수 상태가 이어지지 않았다")
 
 
-## 멈춤 없애기 (1단계): 자리 찾기 색인은 다 훑을 때와 같은 답, 프레임 예산으로 나눠 맞춘 배치는 한 번에 맞춘 것과 같다,
+## 멈춤 없애기 (1단계): 자리 찾기 색인은 다 훑을 때와 같은 답, 프레임 예산으로 나눠 맞춘 배치는 한 번에 맞춘 것과 같다
+## (따라잡는 동안 이따금 놓은 데까지 알린다),
 ## 일별 기록을 작게 싼 저장이 되돌아온다, 날마다의 탭 새로 고침은 목록을 다시 만들지 않는다
 func _stall_check() -> void:
 	var sim: CitySim = main.sim
@@ -117,6 +118,7 @@ func _stall_check() -> void:
 		if (conflict and got != want) or (got == "" and want != ""):
 			diff += 1
 	_check(diff == 0, "자리 찾기 색인이 다 훑을 때와 다른 답을 냈다 (%d곳)" % diff)
+	_index_check(plan, rng)
 	# 배치 따라잡기: 저장에서 맞추지 않고 읽은 뒤 프레임 예산으로 나눠 맞춘다 — 한 번에 맞춘 것과 같은 자리
 	var data: Dictionary = JSON.parse_string(JSON.stringify(plan.to_save()))
 	for i in range(data["buildings"].size() - 1, -1, -1):
@@ -136,7 +138,7 @@ func _stall_check() -> void:
 		var b: Dictionary = full.buildings[i]
 		same = same and a["id"] == b["id"] and is_equal_approx(float(a["x"]), float(b["x"])) \
 			and is_equal_approx(float(a["y"]), float(b["y"])) and int(a["rot"]) == int(b["rot"])
-	_check(same and lazy.revision == rev0 + 1, "나눠 맞춘 배치가 한 번에 맞춘 것과 다르다 (%d프레임, 건물 %d/%d)" % [frames,
+	_check(same and lazy.revision > rev0, "나눠 맞춘 배치가 한 번에 맞춘 것과 다르다 (%d프레임, 건물 %d/%d)" % [frames,
 		lazy.buildings.size(), full.buildings.size()])
 	# 저장: 일별 기록을 열과 정수로
 	var back := CitySim.from_save(JSON.parse_string(JSON.stringify(sim.to_save(), "", false, true)))
@@ -155,6 +157,56 @@ func _stall_check() -> void:
 	_check(bp.catalog.get_child(0) == first, "건설 탭이 날마다 목록을 다시 만든다")
 	main._select_tab("life")
 	print("smoke: stalls — 색인 600곳 같은 답, 배치 따라잡기 %d프레임, 일별 기록 %d줄 되돌림" % [frames, back.daily.size()])
+
+
+## 건물이 많을 때의 지름길 (불러오기·도시 바꾸기): 자리 찾기 커서는 처음부터 찾은 것과 같은 자리, 가까운 길·깔릴 길의
+## 건물 검사·구역의 빈 땅은 색인 없이 다 훑은 것과 같은 답
+func _index_check(plan: CityPlan, rng: RandomNumberGenerator) -> void:
+	var same_seek := true
+	for kind in ["hab_module", "research_lab", "battery_bank", "parts_fab", "hydroponics", "radiator"]:
+		var warm := plan.suggest(kind)
+		plan._seek.clear()
+		same_seek = same_seek and str(warm) == str(plan.suggest(kind))
+	_check(same_seek, "자리 찾기 커서가 처음부터 찾은 것과 다른 자리를 냈다")
+	var e_diff := 0
+	var r_diff := 0
+	var hw := LayoutData.road_half("street")
+	plan._near_edges(Rect2())
+	for _i in 300:
+		var q := Vector2(rng.randf_range(-260, 260), rng.randf_range(-260, 260))
+		var md := rng.randf_range(0.5, 12.0)
+		var want_k := -1
+		var best := md
+		for k in plan.edges.size():
+			var dd := CityPlan._seg_point(plan.nodes[plan.edges[k].x], plan.nodes[plan.edges[k].y], q).distance_to(q)
+			if dd < best:
+				best = dd
+				want_k = k
+		if plan.nearest_edge(q, md) != want_k:
+			e_diff += 1
+		var b := q + Vector2(rng.randf_range(-60, 60), rng.randf_range(-60, 60))
+		var want_r := ""
+		for e in plan.buildings:
+			if CityPlan._seg_rect_dist(q, b, plan.entry_rect(e).grow(-0.3)) < hw:
+				want_r = "건물"
+				break
+		if want_r == "" and plan.flooded_along(q, b, hw):
+			want_r = "물"
+		if plan.road_check_shape(q, b, "street") != want_r:
+			r_diff += 1
+	var p_diff := 0
+	for k in plan.land:
+		var r := plan.parcel_rect(k).grow(-0.5)
+		var want_e := true
+		for e in plan.buildings:
+			var er := plan.entry_rect(e)
+			if er.intersects(r):
+				for c in [er.position, Vector2(er.end.x, er.position.y), er.end, Vector2(er.position.x, er.end.y)]:
+					want_e = want_e and plan.layout.base_has(c)
+		if plan.parcel_empty(k) != want_e:
+			p_diff += 1
+	_check(e_diff == 0 and r_diff == 0 and p_diff == 0, "색인이 다 훑을 때와 다른 답을 냈다 (가까운 길 %d, 깔릴 길 %d, 빈 구역 %d)" % [
+		e_diff, r_diff, p_diff])
 
 
 ## 옛 check_spot의 건물·길 부분 (다 훑는다) — 색인과 견준다

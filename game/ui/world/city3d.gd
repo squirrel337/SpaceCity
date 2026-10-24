@@ -23,6 +23,9 @@ var title := "섀클턴 시드 시티"     # 왼쪽 위 이름 (식민지 이름
 
 var _items: Array = []
 var _sig := ""
+var _bsig := ""                   # 고장 수 (바뀌면 표시만 고친다 — 자리·모형은 그대로)
+var _seats := {}                  # 건물 uid → [앉는 자리, 기초(없으면 null)] — 땅이 그대로인 동안 (땅 높이를 다섯 곳 읽는 셈을 한 번만)
+var _seats_sig := ""
 var _groups := {}                 # "sprite/변형" → MultiMeshInstance3D
 var _sites_root: Node3D
 var _agents_root: Node3D
@@ -104,6 +107,7 @@ func _on_terrain_ready() -> void:
 	for e in _agent_nodes.values():
 		(e as Dictionary).erase("at")          # 서 있는 탈것도 새 땅 높이에 다시 놓는다
 	_sig = ""
+	_seats.clear()
 	_road_rev = -1
 	_ways_sig = "-"
 	_district_sig = ""
@@ -121,6 +125,7 @@ func set_sim(new_sim: CitySim, p_plan: CityPlan, p_tool: PlaceTool) -> void:
 	traffic.plan = plan
 	traffic.reset(sim)
 	_sig = ""
+	_seats.clear()
 	_road_rev = -1
 
 
@@ -163,9 +168,14 @@ func update(delta: float, speed_level: int) -> void:
 			_districts.mesh = _district_job.geo.mesh()
 			_district_job = null
 	var sig := _signature()
+	var bsig := _broken_sig()
 	if sig != _sig or (_models_wait and ModelLib.pending() == 0):
 		_sig = sig
+		_bsig = bsig
 		_rebuild()
+	elif bsig != _bsig:
+		_bsig = bsig
+		_restatus()
 	_update_tool()
 	if not visible_now():
 		# 카메라가 멀어 도시가 보이지 않으면 (고도 400 km 위·다른 천체) 탈것·불빛은 두고, 그동안의 도시 사이
@@ -197,22 +207,55 @@ func update(delta: float, speed_level: int) -> void:
 		_ring.visible = false
 
 
+## 배치가 바뀌었나 (계획의 판, 덮은 거주 모듈 수 — 모형이 바뀐다). 고장 수는 따로 (_broken_sig)
 func _signature() -> String:
-	var parts := PackedStringArray([str(plan.revision), str(sim.covered_habs)])
+	return "%d,%d" % [plan.revision, sim.covered_habs]
+
+
+func _broken_sig() -> String:
+	var parts := PackedStringArray()
 	for k in sim.broken:
 		parts.append("%s:%d" % [k, int(sim.broken[k])])
 	return ",".join(parts)
+
+
+## 건물마다 앉는 자리 (uid로 기억해 둔다 — 건물은 옮겨지지 않는다. 땅을 고치거나 높이를 다시 구우면 버린다)
+func _seats_of(items: Array, plinths: Array) -> Array:
+	var tsig := "%d|%s" % [plan.terrain_rev, str(ground.baked_heights())]
+	if tsig != _seats_sig:
+		_seats_sig = tsig
+		_seats.clear()
+	var keep := {}
+	var out: Array = []
+	for it in items:
+		var uid := int(it["uid"])
+		var s: Array = _seats.get(uid, [])
+		if s.is_empty():
+			var pl: Array = []
+			s = [_seat(it, pl), pl[0] if not pl.is_empty() else null]
+		keep[uid] = s
+		out.append(s[0])
+		if s[1] != null:
+			plinths.append(s[1])
+	_seats = keep
+	return out
+
+
+## 고장 수만 바뀌었다: 표시(이름표·고장 표지)와 누를 상자만 새로 — 멀티메시·공사 현장은 그대로
+func _restatus() -> void:
+	_items = BaseScene.collect(sim, plan)
+	var seats := _seats_of(_items, [])
+	_set_boxes(seats)
 
 
 func _rebuild() -> void:
 	_items = BaseScene.collect(sim, plan)
 	_models_wait = false
 	var plinths: Array = []
-	var seats: Array = []             # 건물마다 앉는 자리 (한 번만 셈한다 — 땅 높이를 다섯 곳 읽는다)
+	var seats := _seats_of(_items, plinths)
 	var by_key := {}
 	for i in _items.size():
 		var it: Dictionary = _items[i]
-		seats.append(_seat(it, plinths))
 		if it["building"]:
 			continue
 		var key := "%s/%d" % [it["sprite"], it["variant"]]
@@ -257,7 +300,12 @@ func _rebuild() -> void:
 		mi.mesh = ModelLib.mesh("buildings", it["sprite"], 0)
 		mi.transform = seats[i]
 		_sites_root.add_child(mi)
-	# 누를 상자 (모형이 아직이면 바닥 크기의 낮은 상자)
+	_set_boxes(seats)
+	_set_plinths(plinths)
+
+
+## 누를 상자 (모형이 아직이면 바닥 크기의 낮은 상자)
+func _set_boxes(seats: Array) -> void:
 	_boxes.clear()
 	for i in _items.size():
 		var it: Dictionary = _items[i]
@@ -268,7 +316,6 @@ func _rebuild() -> void:
 			var f := CityPlan.foot_of(String(it["id"]), 0) * 0.5
 			aabb = AABB(Vector3(-f.x, 0.0, -f.y), Vector3(f.x * 2.0, 4.0, f.y * 2.0))
 		_boxes.append([(seats[i] as Transform3D) * aabb, it["id"], it])
-	_set_plinths(plinths)
 
 
 ## 건물이 앉는 자리: 바닥 네 귀와 가운데의 땅 높이 가운데 가장 높은 곳 (처음 기지는 평평해 가운데 높이와 같다).

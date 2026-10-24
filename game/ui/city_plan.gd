@@ -23,6 +23,8 @@ const REPOSE := 0.8                                  # 판 비탈·쌓은 비탈
 const TILE_NAMES := {"A": "A 100%", "B": "B 85%", "C": "C 70%"}
 const IDX_CELL := 16.0                               # 자리 찾기 색인의 칸 (m) — check_spot은 둘레 칸의 건물·길만 본다
 const SYNC_FRAME_US := 3000                          # 보이는 도시의 배치를 시뮬레이션에 맞출 때 한 프레임에 쓰는 시간 (μs)
+const SYNC_CATCHUP_US := 9000                        # 세 프레임 넘게 밀려 있으면 (불러오기·오래 안 본 도시) 한 프레임 몫을 늘린다
+const SYNC_SHOW_MS := 250                            # 따라잡는 동안 이만큼마다 놓은 데까지 보여 준다
 const RUNWAY := {"earth": [2400.0, 45.0], "mars": [700.0, 24.0]}   # 활주로 길이·폭 (m) — 대기가 있는 천체의 비행기 기지
 
 var layout: BaseLayout
@@ -49,6 +51,8 @@ var _cands: Array = []
 var _cands_sig := ""
 var _blocks: Array = []
 var _blocks_sig := ""
+var _dblocks := {}                 # 구획 → 그 구획의 블록들 (기지 가운데에서 가까운 것부터 — 블록이 바뀔 때만 다시 고른다)
+var _dblocks_sig := ""
 var _next_uid := 1
 var _sig := ""
 var _adj: Array = []
@@ -66,6 +70,15 @@ var _lv_rev := -1
 var _eidx_sig := ""
 var _sync_frame := -1              # 배치 따라잡기의 프레임 예산 (여러 곳에서 불러도 한 프레임에 한 몫)
 var _sync_spent := 0
+var _sync_late_f := -1             # 몫을 다 쓰고도 못 맞춘 마지막 프레임
+var _sync_behind := 0              # 그렇게 이어진 프레임 수
+var _sync_shown := 0               # 따라잡는 동안 마지막으로 보여 준 때 (ms)
+var _sync_new := 0                 # 그 뒤로 놓은 건물 수
+## 자리 찾기 커서: "종류|목록" → 앞에서부터 막힌 후보 수 (-1: 다 막혔다). 건물은 늘기만 하므로 한 번 막힌 후보는
+## 길·구획·땅·지형·물·땅 높이가 그대로이고 건물이 빠지지 않는 한 계속 막혀 있다 — 그동안은 다시 따지지 않는다 (결과는 같다)
+var _seek := {}
+var _seek_sig := ""
+var _bgen := 0                     # 건물이 빠질 때마다 +1 (빈자리가 생길 수 있다 — 커서를 버린다)
 var _fam_built := {}             # 계열 → 지어진 자리들 (built_of_family — 배치가 바뀌면 비운다)
 var _fam_rev := -1
 
@@ -107,7 +120,8 @@ func hub() -> Vector2:
 ## 시뮬레이션의 개수·대기열이 바뀌었으면 계획을 맞춘다: 끝난 공사는 지어진 건물로,
 ## 취소된 공사는 지우고, 자리 없는 공사·건물(자동 운영, 처음 기지)은 빈자리에 놓는다
 ## budget_us > 0: 이 프레임에 그만큼만 쓰고 (모든 부르는 곳이 함께 나눈다) 남은 자리 찾기는 다음 프레임에 잇는다 —
-## 오래 안 본 도시를 고르거나 불러왔을 때 수십 채를 한 프레임에 놓지 않게. 다 맞췄을 때만 한 번 바뀌었다고 알린다
+## 오래 안 본 도시를 고르거나 불러왔을 때 수십 채를 한 프레임에 놓지 않게. 세 프레임 넘게 밀려 있으면 몫을
+## SYNC_CATCHUP_US로 늘리고, 따라잡는 동안 SYNC_SHOW_MS마다 놓은 데까지 바뀌었다고 알린다 (도시가 차례로 채워진다)
 func sync(sim: CitySim, budget_us: int = 0) -> void:
 	if sim == null:
 		return
@@ -120,6 +134,8 @@ func sync(sim: CitySim, budget_us: int = 0) -> void:
 		if f != _sync_frame:
 			_sync_frame = f
 			_sync_spent = 0
+		if _sync_behind >= 3 and budget_us >= SYNC_FRAME_US:
+			budget_us = SYNC_CATCHUP_US       # 보이는 도시만 (보이지 않는 도시의 작은 몫은 그대로)
 		if _sync_spent >= budget_us:
 			return
 		deadline = Time.get_ticks_usec() + budget_us - _sync_spent
@@ -158,17 +174,20 @@ func sync(sim: CitySim, budget_us: int = 0) -> void:
 		for e in fin:
 			buildings.erase(e)
 			_bidx_n = -1
+			_bgen += 1
 		while have < want:
 			_auto_place(kind, -1, _tile_for_built(sim, kind), sim)
 			have += 1
+			_sync_new += 1
 			if deadline > 0 and Time.get_ticks_usec() > deadline:
-				_sync_spent = budget_us
+				_sync_pause(budget_us)
 				return
 		while have > want:
 			for i in range(buildings.size() - 1, -1, -1):
 				if buildings[i]["id"] == kind and int(buildings[i]["seq"]) < 0:
 					buildings.remove_at(i)
 					_bidx_n = -1
+					_bgen += 1
 					break
 			have -= 1
 	var planned := {}
@@ -179,13 +198,34 @@ func sync(sim: CitySim, budget_us: int = 0) -> void:
 		var seq := int(item["seq"])
 		if live.has(seq) and not planned.has(seq):
 			_auto_place(String(item["id"]), seq, String(item.get("tile", "")), sim)
+			_sync_new += 1
 			if deadline > 0 and Time.get_ticks_usec() > deadline:
-				_sync_spent = budget_us
+				_sync_pause(budget_us)
 				return
 	if deadline > 0:
 		_sync_spent = budget_us - maxi(0, deadline - Time.get_ticks_usec())
 	_sig = sig
+	_sync_behind = 0
+	_sync_new = 0
 	_touch()
+
+
+## 이 프레임의 몫을 다 썼다: 밀린 프레임을 세고, 따라잡는 동안 이따금 놓은 데까지 보여 준다
+func _sync_pause(budget_us: int) -> void:
+	_sync_spent = budget_us
+	var f := Engine.get_process_frames()
+	var now := Time.get_ticks_msec()
+	if _sync_late_f != f:
+		if _sync_late_f == f - 1:
+			_sync_behind += 1
+		else:
+			_sync_behind = 1
+			_sync_shown = now         # 새로 밀리기 시작했다 — 보여 주기는 SYNC_SHOW_MS 뒤부터
+		_sync_late_f = f
+	if _sync_new > 0 and now - _sync_shown >= SYNC_SHOW_MS:
+		_sync_shown = now
+		_sync_new = 0
+		_touch()
 
 
 func _signature(sim: CitySim) -> String:
@@ -308,12 +348,18 @@ func suggest(kind: String, tile: String = "", spiral: bool = true) -> Dictionary
 			if check_spot(kind, at, 0).is_empty():
 				return {"at": at, "rot": 0, "variant": BaseScene.variant_of(kind, i), "tile": zone_of(at)}
 		return {}
+	_seek_valid()
 	var slots: Array = layout.slots.get(fam(kind), [])
-	for i in slots.size():
-		var p: Vector3 = slots[i]
-		var at := Vector2(p.x, p.y)
-		if check_spot(kind, at, 0).is_empty():
-			return {"at": at, "rot": 0, "variant": BaseScene.variant_of(kind, i), "tile": ""}
+	var sk := kind + "|slots"
+	var from := int(_seek.get(sk, 0))
+	if from >= 0:
+		for i in range(from, slots.size()):
+			var p: Vector3 = slots[i]
+			var at := Vector2(p.x, p.y)
+			if not _overlaps(rect_of(kind, at, 0)) and check_spot(kind, at, 0).is_empty():
+				_seek[sk] = i
+				return {"at": at, "rot": 0, "variant": BaseScene.variant_of(kind, i), "tile": ""}
+		_seek[sk] = -1
 	# 기본 자리가 다 찼으면: 그 구획으로 정한 블록 안 (플레이어가 새로 정한 블록도), 그다음 빈 블록
 	var district: String = layout.district_of.get(fam(kind), "")
 	if district != "" and not (district in BaseLayout.SPECIAL):
@@ -322,22 +368,68 @@ func suggest(kind: String, tile: String = "", spiral: bool = true) -> Dictionary
 			return bs
 	if not spiral:
 		return {}
+	var spk := kind + "|spiral"
+	var skip := int(_seek.get(spk, 0))
+	if skip < 0:
+		return {}
 	var c := _anchor(kind)
 	var f := ArtLib.footprint(kind)
 	var step := clampf(minf(f.x, f.y) * 0.5, 2.0, 6.0)
 	var variant := BaseScene.variant_of(kind, count_of(kind))
+	var idx := 0                      # 나선의 후보 번호 (고리·방향·회전 순)
 	var ring := 1
 	while ring * step < 320.0:
 		var r := ring * step
 		var n := maxi(8, int(TAU * r / step))
+		if idx + n * 2 <= skip:
+			idx += n * 2              # 이 고리는 다 막혔다
+			ring += 1
+			continue
 		for k in n:
 			var a := TAU * k / n
 			var at := (c + Vector2(cos(a), sin(a)) * r).snapped(Vector2.ONE)
 			for rot in [0, 1]:
-				if check_spot(kind, at, rot).is_empty():
+				if idx >= skip and not _overlaps(rect_of(kind, at, rot)) and check_spot(kind, at, rot).is_empty():
+					_seek[spk] = idx
 					return {"at": at, "rot": rot, "variant": variant, "tile": ""}
+				idx += 1
 		ring += 1
+	_seek[spk] = -1
 	return {}
+
+
+## 그 구획의 블록들 — 기지 가운데에서 가까운 것부터 (블록이 바뀔 때만 다시 고른다)
+func _district_blocks(district: String) -> Array:
+	var all := blocks()
+	if _dblocks_sig != _blocks_sig:
+		_dblocks_sig = _blocks_sig
+		_dblocks.clear()
+	if not _dblocks.has(district):
+		var hubp := hub()
+		var list := all.filter(func(b): return String(b["district"]) == district)
+		list.sort_custom(func(x, y): return (x["center"] as Vector2).distance_to(hubp) < (y["center"] as Vector2).distance_to(hubp))
+		_dblocks[district] = list
+	return _dblocks[district]
+
+
+## 자리 찾기 커서를 쓸 수 있나: 길·구획·땅·지형·물·땅 높이 중 하나라도 바뀌었거나 건물이 빠졌으면 버린다
+func _seek_valid() -> void:
+	var sig := "%d|%d|%d|%d|%d|%d|%s" % [road_rev, zone_rev, land_rev, terrain_rev, flood_rev, _bgen,
+		str(ground != null and ground.baked_heights()) if ground != null else "-"]
+	if sig != _seek_sig:
+		_seek_sig = sig
+		_seek.clear()
+
+
+## 다른 건물과 바닥이 겹치나 — 자리 찾기가 찬 자리를 check_spot 없이 넘긴다 (겹치면 check_spot도 막는다)
+func _overlaps(r: Rect2) -> bool:
+	_bindex()
+	var inner := r.grow(-0.05)
+	for c in _cells_of(r):
+		for i in _bidx.get(c, []):
+			if inner.intersects(_brect[i]):
+				return true
+	return false
 
 
 func _anchor(kind: String) -> Vector2:
@@ -857,6 +949,7 @@ func land_candidates() -> Array:
 	if sig == _cands_sig:
 		return _cands
 	_cands_sig = sig
+	_near_edges(Rect2())              # 길 색인을 지금 것으로 (구역마다 깔릴 길의 끝이 가까운 길에 닿는지 볼 때 쓴다)
 	var owned := {}
 	var s := parcel_size()
 	# 처음 기지를 덮는 구역들
@@ -1041,9 +1134,11 @@ func _node_near(p: Vector2) -> int:
 ## 땅 구역에 깔 길이 건물·물에 막히나 (기지 경계는 따지지 않는다)
 func road_check_shape(a: Vector2, b: Vector2, type: String) -> String:
 	var hw := LayoutData.road_half(type)
-	for e in buildings:
-		if _seg_rect_dist(a, b, entry_rect(e).grow(-0.3)) < hw:
-			return "건물"
+	_bindex()
+	for c in _cells_of(Rect2(a, Vector2.ZERO).expand(b).grow(hw)):        # 길에서 반폭 안에 닿을 수 있는 건물만
+		for i in _bidx.get(c, []):
+			if _seg_rect_dist(a, b, (_brect[i] as Rect2).grow(-0.3)) < hw:
+				return "건물"
 	if flooded_along(a, b, hw):
 		return "물"
 	return ""
@@ -1204,13 +1299,15 @@ func _zone_anchor(district: String) -> Vector2:
 ## 산 땅 구역이 비었나 (처음 기지 밖 몫에 건물이 하나도 없다 — 길만 있다)
 func parcel_empty(c: Vector2i) -> bool:
 	var r := parcel_rect(c).grow(-0.5)
-	for e in buildings:
-		var er := entry_rect(e)
-		if not er.intersects(r):
-			continue
-		for q in [er.position, Vector2(er.end.x, er.position.y), er.end, Vector2(er.position.x, er.end.y)]:
-			if not layout.base_has(q):
-				return false
+	_bindex()
+	for cell in _cells_of(r):                 # 그 구역에 걸친 건물만 (건물 색인)
+		for i in _bidx.get(cell, []):
+			var er: Rect2 = _brect[i]
+			if not er.intersects(r):
+				continue
+			for q in [er.position, Vector2(er.end.x, er.position.y), er.end, Vector2(er.position.x, er.end.y)]:
+				if not layout.base_has(q):
+					return false
 	return true
 
 
@@ -1300,30 +1397,49 @@ func blocks() -> Array:
 	for k in edges.size():
 		if not LayoutData.raised(edge_type(k)):
 			flat.append(edges[k])
+	var at := {}                    # 꼭짓점 자리 → 번호, 꼭짓점 둘 → 그 사이의 첫 길 (면의 변이 어느 길인지 바로 찾는다)
+	for i in nodes.size():
+		if not at.has(nodes[i]):
+			at[nodes[i]] = i
+	var pair := {}
+	for k in edges.size():
+		var e: Vector2i = edges[k]
+		var key := Vector2i(mini(e.x, e.y), maxi(e.x, e.y))
+		if not pair.has(key):
+			pair[key] = k
 	for face in RoadNet.faces(nodes, flat):
 		var f: PackedVector2Array = face
 		if RoadNet.area(f) > 120000.0:
 			continue                # 기지를 다 감싸는 큰 면 (바깥 길로 둘러싸인 빈 땅) — 블록으로 보지 않는다
-		var d := _face_inset(f)
+		var d := _face_inset(f, at, pair)
 		for poly in RoadNet.inset(f, d):
 			var c := RoadNet.centroid(poly)
 			_blocks.append({"poly": poly, "face": f, "center": c, "area": RoadNet.area(poly), "district": _seed_in(poly)})
 	return _blocks
 
 
-## 면을 줄일 거리: 그 면을 이루는 길 가운데 가장 넓은 것의 반폭 + 보도
-func _face_inset(f: PackedVector2Array) -> float:
+## 면을 줄일 거리: 그 면을 이루는 길 가운데 가장 넓은 것의 반폭 + 보도.
+## 변의 길은 꼭짓점 둘로 찾는다 (at·pair — 꼭짓점은 0.5 m 안에 둘이 없다). 못 찾으면 다 훑는다
+func _face_inset(f: PackedVector2Array, at: Dictionary, pair: Dictionary) -> float:
 	var d := ROAD_HALF
 	for i in f.size():
 		var a := f[i]
 		var b := f[(i + 1) % f.size()]
-		for k in edges.size():
-			var e: Vector2i = edges[k]
-			var p: Vector2 = nodes[e.x]
-			var q: Vector2 = nodes[e.y]
-			if (p.distance_to(a) < 0.01 and q.distance_to(b) < 0.01) or (p.distance_to(b) < 0.01 and q.distance_to(a) < 0.01):
-				d = maxf(d, edge_half(k))
-				break
+		var k := -1
+		if at.has(a) and at.has(b):
+			var ia: int = at[a]
+			var ib: int = at[b]
+			k = int(pair.get(Vector2i(mini(ia, ib), maxi(ia, ib)), -1))
+		if k < 0:
+			for j in edges.size():
+				var e: Vector2i = edges[j]
+				var p: Vector2 = nodes[e.x]
+				var q: Vector2 = nodes[e.y]
+				if (p.distance_to(a) < 0.01 and q.distance_to(b) < 0.01) or (p.distance_to(b) < 0.01 and q.distance_to(a) < 0.01):
+					k = j
+					break
+		if k >= 0:
+			d = maxf(d, edge_half(k))
 	return d + SIDEWALK
 
 
@@ -1372,24 +1488,33 @@ func set_district(p: Vector2, district: String) -> bool:
 
 ## 구획 블록 안에서 이 종류를 놓을 빈자리: 블록 가장자리(길 쪽)부터 줄지어 찾는다
 func _block_spot(kind: String, district: String) -> Dictionary:
+	_seek_valid()
 	var f := ArtLib.footprint(kind) + Vector2(BaseLayout.GAP, BaseLayout.GAP)
-	var hubp := hub()
-	var list := blocks().filter(func(b): return String(b["district"]) == district)
-	list.sort_custom(func(x, y): return (x["center"] as Vector2).distance_to(hubp) < (y["center"] as Vector2).distance_to(hubp))
-	for b in list:
+	for b in _district_blocks(district):
+		var bc: Vector2 = b["center"]
+		var key := "%s|%d,%d" % [kind, roundi(bc.x * 10.0), roundi(bc.y * 10.0)]
+		var skip := int(_seek.get(key, 0))
+		if skip < 0:
+			continue                  # 이 종류로는 꽉 찬 블록
 		var poly: PackedVector2Array = b["poly"]
 		var bb := Rect2(poly[0], Vector2.ZERO)
 		for q in poly:
 			bb = bb.expand(q)
+		var idx := 0
 		var y := bb.position.y + f.y * 0.5
 		while y <= bb.end.y - f.y * 0.5 + 0.01:
 			var x := bb.position.x + f.x * 0.5
 			while x <= bb.end.x - f.x * 0.5 + 0.01:
-				var at := snap_center(kind, Vector2(x, y), 0)
-				if RoadNet.rect_inside(rect_of(kind, at, 0), poly) and check_spot(kind, at, 0).is_empty():
-					return {"at": at, "rot": 0, "variant": BaseScene.variant_of(kind, count_of(kind)), "tile": ""}
+				if idx >= skip:
+					var at := snap_center(kind, Vector2(x, y), 0)
+					var rr := rect_of(kind, at, 0)
+					if RoadNet.rect_inside(rr, poly) and not _overlaps(rr) and check_spot(kind, at, 0).is_empty():
+						_seek[key] = idx
+						return {"at": at, "rot": 0, "variant": BaseScene.variant_of(kind, count_of(kind)), "tile": ""}
+				idx += 1
 				x += f.x
 			y += f.y
+		_seek[key] = -1
 	return {}
 
 
@@ -1637,7 +1762,13 @@ func snap(p: Vector2, radius: float = SNAP_M) -> Vector2:
 func nearest_edge(p: Vector2, max_d: float = INF, ground_only: bool = false) -> int:
 	var best := -1
 	var best_d := max_d
-	for k in edges.size():
+	var ks: Variant = edges.size()
+	if max_d < 64.0 and _eidx_sig == "%d|%d|%d" % [road_rev, edges.size(), nodes.size()]:
+		# 가까운 길만: 길 색인이 지금 길 그물의 것이면 그 칸들의 길만 본다 (번호 순 — 다 훑을 때와 같은 답)
+		var near := _near_edges(Rect2(p, Vector2.ZERO).grow(max_d))
+		near.sort()
+		ks = near
+	for k: int in ks:
 		if ground_only and LayoutData.raised(edge_type(k)):
 			continue
 		var q := _seg_point(nodes[edges[k].x], nodes[edges[k].y], p)

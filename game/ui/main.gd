@@ -8,6 +8,7 @@ const HOURS_PER_SECOND := [0.0, 3.0, 9.0, 30.0, 0.0]   # 정지 · 1×(하루 8�
 const SPEED_LABELS := ["정지", "1×", "3×", "10×", "최고"]
 const MAX_SPEED := 4
 const MAX_FRAME_US := 12000                         # 최고 속도: 한 프레임에 시뮬레이션에 쓰는 시간 (PC에서 하루 30일쯤)
+const HIDDEN_SYNC_US := 1500                         # 보이지 않는 도시 하나의 배치를 한 프레임에 맞추는 몫
 const AUTO_JUMP_PAUSE := 1.2                        # 다음 사건 계속 넘기기: 사건마다 알림을 보여 주는 틈 (초)
 const REPORT_DAY := 1096                            # 3년 보고서
 const JUMP_LIMIT_H := 24 * 30
@@ -30,6 +31,7 @@ var _panel_clock := 0.0
 var auto_jump_button: Button
 var _jump_start := 0
 var _last_day := -1
+var _hidden_i := 0                     # 배치를 맞출 다음 보이지 않는 도시
 var _ui_clock := 0.0
 var _report_shown := false
 var _game_over := false
@@ -1046,6 +1048,7 @@ func _process(delta: float) -> void:
 				_acc = 0.0
 				break
 	world.hour_frac = clampf(_acc, 0.0, 1.0) if speed > 0 else 0.0
+	_sync_hidden()
 	_ui_clock += delta
 	if stepped:
 		_dirty = true
@@ -1210,6 +1213,21 @@ func _step() -> void:
 	if day != _last_day:
 		_last_day = day
 		_on_new_day(day)
+
+
+## 보이지 않는 도시도 배치를 조금씩 맞춰 둔다 (프레임마다 한 도시씩 돌아가며) — 그 도시를 고르거나 불러올 때
+## 수백 채가 밀려 있지 않게. 한 번 본 도시만 (땅의 높이·물을 알아야 새 땅에 제대로 놓는다)
+func _sync_hidden() -> void:
+	var n := colonies.list.size()
+	for _k in n:
+		_hidden_i = (_hidden_i + 1) % n
+		if _hidden_i == active:
+			continue
+		var c: Dictionary = colonies.list[_hidden_i]
+		var p: CityPlan = c["plan"]
+		if p.ground != null:
+			p.sync(c["sim"], HIDDEN_SYNC_US)
+			return
 
 
 func _on_new_day(day: int) -> void:
