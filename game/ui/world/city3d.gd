@@ -29,6 +29,8 @@ var _seats_sig := ""
 var _groups := {}                 # "sprite/변형" → MultiMeshInstance3D
 var _sites_root: Node3D
 var _growing: Array = []          # 공정에 따라 바뀌는 공사 현장: [MeshInstance3D, _items의 번호, 앉는 자리] (_grow_sites)
+var _works: WorksView             # 길 공사 (차단막·기둥·덱·크레인)
+var _trains: LineTrains           # 모노레일·자기부상 궤도의 열차
 var _grow_t := 0.0
 var _agents_root: Node3D
 var _agent_nodes := {}            # uid → {node, plume, yaw}
@@ -78,6 +80,10 @@ func setup(p_ground: SiteGround) -> void:
 	traffic = BaseTraffic.new()
 	_sites_root = Node3D.new()
 	add_child(_sites_root)
+	_works = WorksView.new()
+	add_child(_works)
+	_trains = LineTrains.new()
+	add_child(_trains)
 	_agents_root = Node3D.new()
 	add_child(_agents_root)
 	ground.terrain_ready.connect(_on_terrain_ready)
@@ -190,6 +196,11 @@ func update(delta: float, speed_level: int) -> void:
 	if _grow_t >= 0.25:
 		_grow_t = 0.0
 		_grow_sites()
+		if heights_ok:
+			_works.refresh(plan, _local)
+	if heights_ok:
+		_trains.refresh(plan)
+		_trains.step(plan, _local, delta * VIS_SPEED[clampi(speed_level, 0, 3)])
 	var sites := BaseScene.sites(sim, plan)
 	if transport != null:
 		traffic.intercity(transport, site_key, {"highways": highways, "runway": runway, "bearings": bearings})

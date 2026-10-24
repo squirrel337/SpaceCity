@@ -83,6 +83,11 @@ static func sites(sim: CitySim, plan: CityPlan) -> Array:
 			continue
 		out.append({"pos": Vector3(e["x"], e["y"], 0), "foot": CityPlan.foot_of(String(e["id"]), int(e["rot"])),
 			"key": "q%d" % int(e["uid"])})
+	for i in plan.works.size():                # 길 공사: 앞머리 (넓히기는 가운데)
+		var w: Dictionary = plan.works[i]
+		var f := float(w["p"]) if String(w["kind"]) == "line" else 0.5
+		var at: Vector2 = (w["a"] as Vector2).lerp(w["b"], clampf(f, 0.05, 0.95))
+		out.append({"pos": Vector3(at.x, at.y, 0), "foot": Vector2(12, 12), "key": "w%d" % i})
 		if out.size() >= 6:
 			break
 	for kind in sim.broken:

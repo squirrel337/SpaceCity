@@ -42,6 +42,8 @@ var terrain_rev := 0               # 땅을 고칠 때마다 +1
 var flood_rev := 0                 # 물에 잠긴 칸이 바뀔 때마다 +1
 var land := {}                     # 사들인 땅 구역: Vector2i(구역 번호) → true (구역 = 길 격자의 블록 cells×cells)
 var land_rev := 0                  # 땅을 살 때마다 +1
+var works: Array = []              # 길 공사 (RoadWorks — 넓히기·노선): {kind, a, b, type, p 공정, days, len, cost …}
+var works_rev := 0                 # 길 공사가 늘거나 끝날 때마다 +1
 var ground: SiteGround             # 이 도시의 땅 (높이·물 — 땅 구역의 비탈, 새 땅의 건물 비탈). 없으면 따지지 않는다
 var body := ""                     # 이 도시가 선 천체 (활주로가 있나)
 var runway_at: Array = []          # 활주로 자리 [쪽("+x"·"-x"·"+y"·"-y"), 땅 구역 줄 번호] — 처음 정하면 저장한다 (땅을 사도 옮겨 가지 않게)
@@ -422,7 +424,7 @@ func _district_blocks(district: String) -> Array:
 
 ## 자리 찾기 커서를 쓸 수 있나: 길·구획·땅·지형·물·땅 높이 중 하나라도 바뀌었거나 건물이 빠졌으면 버린다
 func _seek_valid() -> void:
-	var sig := "%d|%d|%d|%d|%d|%d|%s" % [road_rev, zone_rev, land_rev, terrain_rev, flood_rev, _bgen,
+	var sig := "%d|%d|%d|%d|%d|%d|%d|%s" % [road_rev, zone_rev, land_rev, terrain_rev, flood_rev, _bgen, works_rev,
 		str(ground != null and ground.baked_heights()) if ground != null else "-"]
 	if sig != _seek_sig:
 		_seek_sig = sig
@@ -524,6 +526,9 @@ func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1, ignor
 		var ed: Vector2i = edges[k]
 		if _seg_rect_dist(nodes[ed.x], nodes[ed.y], r) < edge_half(k) - 0.05:
 			return "길 위에는 지을 수 없다"
+	for w in works:
+		if _seg_rect_dist(w["a"], w["b"], r) < LayoutData.road_half(String(w["type"])) + 0.5:
+			return "길 공사 자리다 (%s)" % RoadWorks.title(w)
 	if flooded_in(r) > 0:
 		return "물에 잠긴 땅이다 — 먼저 메운다"
 	return _ground_reason(r)
@@ -693,9 +698,16 @@ func road_check(a: Vector2, b: Vector2, type: String = "street", cross := true) 
 		if not in_land(p, 1.0, -2.0):
 			return "기지 밖이다 — '확장'으로 땅 구역을 산다"
 	var hw := LayoutData.road_half(type)
-	for e in buildings:
-		if _seg_rect_dist(a, b, entry_rect(e).grow(-0.3)) < hw:
-			return "건물(%s)을 지나간다" % GameData.module_name(String(e["id"]))
+	_bindex()
+	var near := {}
+	for c in _cells_of(Rect2(a, Vector2.ZERO).expand(b).grow(hw)):        # 길에서 반폭 안에 닿을 수 있는 건물만 (배열 순서로 — 다 훑을 때와 같은 답)
+		for i in _bidx.get(c, []):
+			near[i] = true
+	var idx := PackedInt32Array(near.keys())
+	idx.sort()
+	for i in idx:
+		if _seg_rect_dist(a, b, (_brect[i] as Rect2).grow(-0.3)) < hw:
+			return "건물(%s)을 지나간다" % GameData.module_name(String(buildings[i]["id"]))
 	var up := LayoutData.raised(type)
 	if up:
 		if ground != null and (ground.water_at(a) or ground.water_at(b)):
@@ -2377,6 +2389,8 @@ func to_save() -> Dictionary:
 		"districts": zs, "terrain": ts, "flood": fs, "land": ls}
 	if runway_at.size() == 2:
 		out["runway"] = runway_at.duplicate()
+	if not works.is_empty():
+		out["works"] = RoadWorks.to_save(works)
 	return out
 
 
@@ -2437,6 +2451,7 @@ static func from_save(data: Variant, sim: CitySim, p_layout: BaseLayout = null, 
 	var rs: Variant = data.get("runway")
 	if rs is Array and rs.size() == 2 and String(rs[0]) in ["+x", "-x", "+y", "-y"]:
 		plan.runway_at = [String(rs[0]), int(rs[1])]
+	plan.works = RoadWorks.from_save(data.get("works"))
 	plan.road_rev += 1
 	plan._ensure_taxiway()
 	if sim != null and sync_now:

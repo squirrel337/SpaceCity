@@ -47,6 +47,7 @@ func _process(_delta: float) -> bool:
 		_types_check()
 		_devmodes_check()
 		_redevelop_check()
+		_roadworks_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -706,6 +707,64 @@ func _zoned(plan: CityPlan, district: String) -> int:
 		if String(bl["district"]) == district:
 			n += 1
 	return n
+
+
+## 길 재건축: 통행량이 많은 길을 넓히고(차단막), 정착민이 늘면 고가 대로 노선을 놓는다(기둥 → 덱). 공사 자리에는 건물을 놓지 않고,
+## 다 되면 길 그물에 들어간다. 저장 왕복
+func _roadworks_check() -> void:
+	var ws := CitySim.new(7, 40.0, "good")
+	var wp := CityPlan.create(ws, BaseLayout.new("ridge"))
+	ws.stock["parts"] = 5000.0
+	ws.stock["metal_t"] = 100.0
+	var ld := RoadWorks.loads(wp)
+	var top := 0.0
+	for x in ld:
+		top = maxf(top, x)
+	_check(top > 0.0, "길의 통행량을 셈하지 못했다")
+	var c := {"sim": ws, "plan": wp, "mode": ""}
+	var rw := RoadWorks.data()
+	var lines: Array = rw["lines"]
+	var p0: float = lines[0]["min_pop"]
+	lines[0]["min_pop"] = 0.0
+	var started := RoadWorks.start_next(c)
+	lines[0]["min_pop"] = p0
+	_check(started and wp.works.size() == 1 and String(wp.works[0]["kind"]) == "line", "고가 대로 노선 공사를 시작하지 않았다")
+	var w: Dictionary = wp.works[0]
+	var side := ((w["b"] as Vector2) - (w["a"] as Vector2)).normalized().orthogonal()
+	var reserved := false
+	for i in range(1, 20):
+		for sg: float in [1.0, -1.0]:
+			var at: Vector2 = (w["a"] as Vector2).lerp(w["b"], i / 20.0) + side * sg * 9.4
+			if wp.check_spot("crew_capsule", at, 0).begins_with("길 공사"):
+				reserved = true
+	_check(reserved, "노선 공사 자리(넓어질 폭)에 건물을 놓을 수 있다")
+	var back := CityPlan.from_save(JSON.parse_string(JSON.stringify(wp.to_save())), ws, BaseLayout.new("ridge"))
+	_check(back.works.size() == 1 and (back.works[0]["b"] as Vector2).distance_to(w["b"]) < 0.05, "길 공사가 저장 왕복에서 달라졌다")
+	var view := WorksView.new()
+	w["p"] = 0.5
+	view.refresh(wp, func(p: Vector2, above: float) -> Vector3: return Vector3(p.x, above, -p.y))
+	_check(view.multimesh.instance_count > 3, "노선 공사의 기둥·크레인이 보이지 않는다")
+	view.free()
+	var e0 := wp.edges.size()
+	for d in 200:
+		RoadWorks.advance(wp, ws)
+		if wp.works.is_empty():
+			break
+	_check(wp.works.is_empty() and wp.edges.size() > e0 and wp.etypes.has(String(w["type"])), "노선 공사가 끝났는데 길 그물에 없다")
+	# 궤도 노선의 열차: 모노레일 한 줄에 한 편 (3량 × 상자 3)
+	var mono := RoadWorks.plan_line(wp, "monorail")
+	_check(not mono.is_empty() and wp.add_road(mono[0], mono[1], CityPlan.SNAP_M, "monorail"), "모노레일 노선을 놓지 못했다")
+	var trains := LineTrains.new()
+	trains.refresh(wp)
+	trains.step(wp, func(p: Vector2, above: float) -> Vector3: return Vector3(p.x, above, -p.y), 1.0)
+	_check(trains.multimesh.instance_count == 9, "모노레일에 열차가 다니지 않는다 (%d)" % trains.multimesh.instance_count)
+	trains.free()
+	# 넓히기: 가장 붐비는 도로를 대로로
+	var wd: Dictionary = rw["widen"]
+	var run := RoadWorks.widen_run(wp, {"steps": wd["steps"], "load": {"path": 0.0, "street": 0.0}})
+	_check(not run.is_empty() and String(run["type"]) == "avenue", "넓힐 길을 고르지 못했다")
+	print("smoke: road works line %s %d m, widen %s → %s (load %d)" % [String(w["type"]), int(w["len"]), String(run.get("from", "")),
+		String(run.get("type", "")), int(run.get("load", 0))])
 
 
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.

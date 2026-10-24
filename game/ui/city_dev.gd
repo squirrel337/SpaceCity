@@ -51,6 +51,7 @@ static func step_day(c: Dictionary, index: int) -> void:
 	var every := int(LayoutData.redevelop().get("every_days", 0))
 	if every > 0 and posmod(day + index, every) == 1:
 		redevelop(c)
+	RoadWorks.step(c, day, index)
 
 
 static func _research(sim: CitySim, m: Dictionary) -> void:
@@ -240,6 +241,7 @@ static func redevelop(c: Dictionary) -> bool:
 		c["redev"] = -1
 	var m := LayoutData.dev_mode(String(c.get("mode", "")))
 	var reserve := float(m.get("reserve", {}).get("parts", 60.0))
+	var keep := float(m.get("reserve", {}).get("support", 250.0))
 	var zones: Array = m.get("zones", [])
 	var use := plan.zone_use(sim)
 	var fams: Dictionary = rd.get("families", {})
@@ -257,7 +259,7 @@ static func redevelop(c: Dictionary) -> bool:
 		var to_d := 0.0
 		for mid in GameData.FAMILY[fam]:
 			var dd := density(mid, metric)
-			if dd > to_d and sim.build_block_reason(mid, reserve) == "":
+			if dd > to_d and buildable(sim, mid, reserve, keep):
 				to_d = dd
 				to = mid
 		if to == "":
@@ -302,7 +304,7 @@ static func redevelop(c: Dictionary) -> bool:
 				lost += float(sim.prov(String(g), "housing"))
 			if lost > 0.0 and sim.housing_cap - lost < pop:
 				continue                  # 헐면 정착민이 다 살 수 없다
-			if not sim.enqueue(to, "", reserve):
+			if not import_metal(sim, float(GameData.MODULES[to]["cost"].get("metal_t", 0.0)), keep) or not sim.enqueue(to, "", reserve):
 				return false
 			for g in gone:
 				sim.demolish(String(g), refund)
@@ -313,6 +315,40 @@ static func redevelop(c: Dictionary) -> bool:
 			sim.note("재건축 — %s을(를) 헐고 그 자리에 %s을(를) 짓는다" % [names, GameData.module_name(to)], "build")
 			return true
 	return false
+
+
+## 지을 수 있나 (재건축): 연구가 됐고 부품이 reserve만큼 남고, 금속은 모자라면 지구에서 들여올 수 있을 만큼 (import_metal)
+static func buildable(sim: CitySim, mid: String, reserve: float, support_keep: float) -> bool:
+	var m: Dictionary = GameData.MODULES[mid]
+	if m["tech"] != null and not sim.techs.has(m["tech"]):
+		return false
+	var cost: Dictionary = (m["cost"] as Dictionary).duplicate()
+	var short := float(cost.get("metal_t", 0.0)) - float(sim.stock["metal_t"])
+	if short > 0.0:
+		if sim.support - short * metal_price() < support_keep:
+			return false
+		cost.erase("metal_t")
+	return sim.can_afford(cost, reserve)
+
+
+## 금속이 need t만큼 있게 한다 — 모자라는 만큼 지구에서 들여온다 (1 t마다 지원 점수 earth_import.metal_t, 지원 점수가
+## support_keep만큼은 남을 때만). 있으면(들여왔으면) true
+static func import_metal(sim: CitySim, need: float, support_keep: float) -> bool:
+	var short := need - float(sim.stock["metal_t"])
+	if short <= 0.0:
+		return true
+	var price := short * metal_price()
+	if sim.support - price < support_keep:
+		return false
+	sim.support -= price
+	sim.stock["metal_t"] = float(sim.stock["metal_t"]) + short
+	sim.note("지구에서 금속 %.1f t를 들여왔다 (지원 점수 %d)" % [short, int(round(price))], "info")
+	return true
+
+
+static func metal_price() -> float:
+	LayoutData.load_all()
+	return float(LayoutData.data.get("earth_import", {}).get("metal_t", 25.0))
 
 
 ## 건물 하나의 값: metric이 crew면 인원, 아니면 provides의 그 값
@@ -355,5 +391,8 @@ static func status(c: Dictionary) -> Dictionary:
 		if busy >= 0 and int(item["seq"]) == busy:
 			var p := clampf(1.0 - float(item["rd"]) / maxf(1e-6, float(item["rd_total"])), 0.0, 1.0)
 			redev = "%s (%s)" % [String(c.get("redev_txt", "")), "철거 중" if p < BaseScene.DEMOLISH else "공정 " + Fmt.pct(p)]
+	var works := PackedStringArray()
+	for w in plan.works:
+		works.append("%s %d m (공정 %s)" % [RoadWorks.title(w), int(round(float(w["len"]))), Fmt.pct(float(w["p"]))])
 	return {"rows": rows, "land": plan.land.size(), "max": int(m.get("land", {}).get("max", 8)), "fill": _fill(use), "use": use,
-		"redev": redev}
+		"redev": redev, "works": works}
