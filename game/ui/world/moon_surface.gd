@@ -80,25 +80,33 @@ func patch_radius_m() -> float:
 
 
 # ── 지형 모형 ───────────────────────────────────────────────────
+## 기지 평지의 모형 축 (열 = 모형 x·y, 위 — 위가 기지 평지 가운데의 방향): 섀클턴 중심에서 (테두리 반지름 + 능선 마루까지)
+## 떨어진 점, 모형 방향 (−1, −1)/√2 (2D 지도의 '위' = 능선 쪽)이 섀클턴 중심을 보도록. 배치 계획의 방위(CityPlan.north_dir)도 쓴다
+static func home_frame() -> Basis:
+	Astro.load_data()
+	var m: Dictionary = Astro.sky.get("moon", {})
+	var sh: Dictionary = m.get("shackleton", {"lat": -89.67, "lon": 129.78, "diameter_km": 21.0})
+	var sc := Astro.latlon(float(sh["lat"]), float(sh["lon"]))
+	var site_cfg: Dictionary = m.get("site", {"lat": -89.9, "lon": 34.5})
+	var nominal := Astro.latlon(float(site_cfg["lat"]), float(site_cfg["lon"]))
+	# 마루가 2D 지도의 v = −214 m
+	var gap_km := float(sh["diameter_km"]) * 0.5 + absf(BaseLayout.CREST_V) / 1000.0
+	var axis := sc.cross(nominal).normalized()
+	var up := sc.rotated(axis, gap_km / R_KM).normalized()
+	var to_sc := (sc - up * sc.dot(up)).normalized()
+	var q := up.cross(to_sc)
+	var ax := (to_sc * -0.7071067811865476 + q * 0.7071067811865476).normalized()
+	return Basis(ax, up.cross(ax), up)
+
+
 func _build_terrain_model() -> void:
 	var m: Dictionary = Astro.sky.get("moon", {})
 	var sh: Dictionary = m.get("shackleton", {"lat": -89.67, "lon": 129.78, "diameter_km": 21.0, "depth_km": 4.2,
 		"floor_km": 6.6, "rim_m": 280})
 	var sc := Astro.latlon(float(sh["lat"]), float(sh["lon"]))
 	var rim_r := float(sh["diameter_km"]) * 0.5
-	var site_cfg: Dictionary = m.get("site", {"lat": -89.9, "lon": 34.5})
-	var nominal := Astro.latlon(float(site_cfg["lat"]), float(site_cfg["lon"]))
-	# 기지 평지 중심: 섀클턴 중심에서 (테두리 반지름 + 능선 마루까지) 떨어진 점 — 마루가 2D 지도의 v = −214 m
-	var gap_km := rim_r + absf(BaseLayout.CREST_V) / 1000.0
-	var axis := sc.cross(nominal).normalized()
-	_site = sc.rotated(axis, gap_km / R_KM).normalized()
-	var up := _site
-	var to_sc := (sc - up * sc.dot(up)).normalized()
-	var q := up.cross(to_sc)
-	# 모형 방향 (−1, −1)/√2 (2D 지도의 '위' = 능선 쪽)이 섀클턴 중심을 보도록
-	var ax := (to_sc * -0.7071067811865476 + q * 0.7071067811865476).normalized()
-	var ay := up.cross(ax)
-	_site_basis = Basis(ax, ay, up)
+	_site_basis = home_frame()
+	_site = _site_basis.z
 	# 남극 크레이터·산 (섀클턴 포함)
 	_pol_c.clear()
 	_pol_p.clear()

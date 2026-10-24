@@ -1,0 +1,31 @@
+{
+  "_meta": {
+    "about": "위치가 있는 재난과 둘레 탐사 (CityHazards·CityExplore — 시뮬레이션 밖의 규칙, 모든 도시). 난수는 도시·날로 정해진다 (다시 해도 같다)",
+    "hazards": "id, name, text, bodies(이 천체에서만 — *는 어디서나), per_year(한 해에 몇 번), shape(point 점 — radius_m [작게, 크게] / line 줄 — length_m, width_m), break_p(그 안의 건물마다 고장 날 확률), people(사람이 머무는 건물만), crater(땅에 구덩이 — 반지름의 0.6배, 깊이 crater_m). 고장 난 건물은 로봇이 고친다",
+    "explore": "도시 둘레 min_m~max_m에 탐사지 sites곳 (도시마다 정해진 자리와 숨은 발견). 로버 탐사대가 cost를 내고 speed_m_day로 가서 survey_days 동안 조사하고 돌아온다. 발견(finds: weight 비율로, bodies에서만)의 reward — water_kg·metal_t 비축, rp 연구 점수, support 지원 점수, housing_add·morale 그 도시에 남는 보정. 자동 운영은 every_days마다 가장 가까운 곳에 보낸다"
+  },
+  "hazards": [
+    {"id": "meteor", "name": "운석 충돌", "text": "작은 운석이 도시에 떨어졌다", "bodies": ["moon", "mercury", "ceres", "callisto", "mars"],
+      "per_year": 0.8, "shape": "point", "radius_m": [12, 30], "break_p": 1.0, "crater": true, "crater_m": 2.5},
+    {"id": "quake", "name": "월진", "text": "얕은 월진이 단층을 따라 지나갔다", "bodies": ["moon"],
+      "per_year": 0.5, "shape": "line", "length_m": 220, "width_m": 18, "break_p": 0.5},
+    {"id": "dust_devil", "name": "먼지 회오리", "text": "먼지 회오리가 도시를 가로질렀다", "bodies": ["mars"],
+      "per_year": 1.5, "shape": "line", "length_m": 260, "width_m": 14, "break_p": 0.35},
+    {"id": "fire", "name": "화재", "text": "건물에 불이 났다", "bodies": ["earth", "titan"],
+      "per_year": 0.8, "shape": "point", "radius_m": [10, 16], "break_p": 0.6},
+    {"id": "blowout", "name": "압력 누출", "text": "여압 건물의 벽이 새었다", "bodies": ["*"],
+      "per_year": 0.4, "shape": "point", "radius_m": [5, 8], "break_p": 1.0, "people": true}
+  ],
+  "explore": {
+    "sites": 6, "min_m": 700, "max_m": 2600, "cost": {"parts": 20}, "speed_m_day": 1200, "survey_days": 4, "every_days": 15,
+    "finds": [
+      {"id": "ice", "name": "얼음 광맥", "text": "영구 그늘 속 얼음", "weight": 3, "bodies": ["moon", "mercury", "ceres", "callisto", "mars"], "reward": {"water_kg": 20000}},
+      {"id": "metal", "name": "금속 광맥", "text": "철·티타늄이 많은 현무암", "weight": 3, "bodies": ["*"], "reward": {"metal_t": 30}},
+      {"id": "lava_tube", "name": "용암 동굴", "text": "사람이 살 수 있는 큰 동굴 — 입구를 막아 거주구로", "weight": 1, "bodies": ["moon", "mars"], "reward": {"housing_add": 60, "morale": 1}},
+      {"id": "meteorite", "name": "운석 파편", "text": "오래된 운석 조각", "weight": 2, "bodies": ["*"], "reward": {"rp": 300}},
+      {"id": "old_probe", "name": "옛 탐사선", "text": "20세기의 탐사선이 그대로 서 있다", "weight": 1, "bodies": ["moon", "mars"], "reward": {"support": 200, "morale": 1}},
+      {"id": "anomaly", "name": "전파 이상", "text": "땅속에서 나오는 이상한 신호", "weight": 1, "bodies": ["*"], "reward": {"rp": 500}},
+      {"id": "nothing", "name": "빈 땅", "text": "볼 것이 없었다", "weight": 2, "bodies": ["*"], "reward": {}}
+    ]
+  }
+}

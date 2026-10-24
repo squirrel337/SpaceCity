@@ -51,6 +51,8 @@ func _process(_delta: float) -> bool:
 		_services_check()
 		_progress_check()
 		_research_paths_check()
+		_hazards_check()
+		_explore_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -900,6 +902,109 @@ func _research_paths_check() -> void:
 		(CityResearch.state(c)["cards"] as Array).size(), str((st["branches"] as Dictionary).values()), float(ra.ext.get("rp_k", 1.0))])
 
 
+## 위치가 있는 재난: 압력 누출은 사람이 머무는 건물 하나를 고장 내고 그 건물을 맨 뒤로 옮긴다, 운석은 흔적을 남기고 땅을 판다,
+## 같은 도시·같은 날이면 같은 재난, 흔적은 저장 왕복에서 그대로
+func _hazards_check() -> void:
+	var hs := CitySim.new(7, 40.0, "")
+	var hp := CityPlan.create(hs, BaseLayout.new("ridge"))
+	var c := {"sim": hs, "plan": hp, "mode": "", "site": hs.site_id}
+	var broken0 := 0
+	for k in hs.broken:
+		broken0 += int(hs.broken[k])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	_check(CityHazards.strike(c, "blowout", rng), "압력 누출이 일어나지 않았다")
+	var broken1 := 0
+	for k in hs.broken:
+		broken1 += int(hs.broken[k])
+	_check(broken1 == broken0 + 1, "압력 누출이 건물 하나를 고장 내지 않았다 (%d → %d)" % [broken0, broken1])
+	var leak := String(hp.buildings[-1]["id"])
+	_check(CityPlan._people(leak), "부서진 건물이 맨 뒤로 가지 않았다")
+	var trev := hp.terrain_rev
+	_check(CityHazards.strike(c, "meteor", rng) and hp.scars.size() == 2 and String(hp.scars[-1]["kind"]) == "meteor", "운석이 흔적을 남기지 않았다")
+	_check(hp.terrain_rev > trev, "운석이 구덩이를 남기지 않았다")
+	var last: Array = hs.notes[-1]
+	_check(String(last[1]).begins_with("재난 — 운석 충돌 (") and String(last[2]) == "warn", "재난 알림이 없다: %s" % str(last))
+	var back := CityPlan.from_save(JSON.parse_string(JSON.stringify(hp.to_save())), hs, BaseLayout.new("ridge"))
+	_check(back.scars.size() == 2 and String(back.scars[1]["kind"]) == "meteor"
+		and (back.scars[1]["a"] as Vector2).distance_to(hp.scars[1]["a"]) < 0.2, "재난 흔적이 저장 왕복에서 달라졌다")
+	# 두 해 동안: 같은 도시 둘은 같은 날 같은 재난을 겪는다 (달 — 운석·월진·압력 누출만)
+	var runs: Array = []
+	for n in 2:
+		var s := CitySim.new(7, 40.0, "")
+		var cc := {"sim": s, "plan": CityPlan.create(s, BaseLayout.new("ridge")), "mode": "", "site": s.site_id}
+		var got: Array = []
+		for day in 730:
+			for id in CityHazards.step(cc, day):
+				got.append("%d:%s" % [day, id])
+		runs.append(got)
+	_check(runs[0] == runs[1], "같은 도시인데 재난이 달랐다")
+	var kinds := {}
+	for e in runs[0]:
+		kinds[String(e).get_slice(":", 1)] = true
+	_check(not kinds.has("dust_devil") and not kinds.has("fire"), "달에 먼지 회오리나 화재가 났다: %s" % str(runs[0]))
+	print("smoke: hazards — blowout broke %s, meteor scar %.0f m, two years on the Moon: %s" % [leak,
+		float(hp.scars[-1]["r"]), str(runs[0])])
+
+
+## 둘레 탐사: 도시마다 정해진 탐사지 여섯, 보내면 값을 내고 탐사대가 가고 (가는 길의 가운데쯤), 조사가 끝나면 발견과 보상,
+## 돌아오면 비운다. 용암 동굴은 집을 늘리고 저장 왕복 뒤에도 남는다. 자동 운영은 스스로 보낸다
+func _explore_check() -> void:
+	var es := CitySim.new(7, 40.0, "")
+	var ep := CityPlan.create(es, BaseLayout.new("ridge"))
+	var c := {"sim": es, "plan": ep, "mode": "", "site": es.site_id}
+	var st := CityExplore.state(c)
+	var ex := CityExplore.data()
+	var sites: Array = st["sites"]
+	_check(sites.size() == int(ex["sites"]), "탐사지가 %d곳이다" % sites.size())
+	for s in sites:
+		var d := CityExplore.site_pos(s).distance_to(ep.hub())
+		_check(d >= float(ex["min_m"]) - 1.0 and d <= float(ex["max_m"]) + 1.0, "탐사지가 너무 가깝거나 멀다 (%.0f m)" % d)
+	var es2 := CitySim.new(7, 40.0, "")
+	var c2 := {"sim": es2, "plan": CityPlan.create(es2, BaseLayout.new("ridge")), "mode": "", "site": es2.site_id}
+	_check(JSON.stringify(CityExplore.state(c2)["sites"]) == JSON.stringify(sites), "같은 도시인데 탐사지가 달랐다")
+	for id in [GameData.HOME_SITE, "mars_jezero"]:
+		var n := CityPlan.north_dir(id)
+		_check(CityPlan.direction_name(n, n) == "북" and CityPlan.direction_name(Vector2(n.y, -n.x), n) == "동"
+			and CityPlan.direction_name(-n, n) == "남", "%s의 방위가 어긋났다" % id)
+	sites[0]["find"] = "lava_tube"
+	es.stock["parts"] = 500.0
+	var house0 := float(es.ext.get("housing_add", 0.0))
+	_check(CityExplore.send(c, 0), "탐사대를 보내지 못했다: " + CityExplore.can_send(c, 0))
+	_check(absf(float(es.stock["parts"]) - (500.0 - float(ex["cost"]["parts"]))) < 0.01, "탐사대 값을 내지 않았다")
+	_check(CityExplore.can_send(c, 1) == "탐사대가 나가 있다", "탐사대가 둘 나갈 수 있다")
+	var trip: Dictionary = st["trip"]
+	es.hour = int((int(trip["depart"]) + int(trip["arrive"])) / 2.0)
+	var mid := CityExplore.rover_at(c)
+	var half := CityExplore.site_pos(sites[0]).distance_to(ep.hub()) * 0.5
+	_check(not mid.is_empty() and absf((mid["at"] as Vector2).distance_to(ep.hub()) - half) < half * 0.1, "탐사대가 가는 길에 있지 않다")
+	es.hour = int(trip["done"])
+	CityExplore.step(c, es.current_day())
+	_check(String(sites[0]["state"]) == "found", "조사가 끝났는데 발견이 드러나지 않았다")
+	_check(float(es.ext.get("housing_add", 0.0)) >= house0 + 60.0, "용암 동굴이 집을 늘리지 않았다 (%s)" % str(es.ext))
+	_check(String((es.notes[-1] as Array)[1]).begins_with("탐사 — 용암 동굴"), "발견 알림이 없다")
+	es.hour = int(trip["back"])
+	CityExplore.step(c, es.current_day())
+	_check((st["trip"] as Dictionary).is_empty() and CityExplore.rover_at(c).is_empty(), "탐사대가 돌아오지 않았다")
+	# 저장 왕복 (Colonies.load_save처럼)
+	var saved: Variant = JSON.parse_string(JSON.stringify(st))
+	var es3 := CitySim.new(7, 40.0, "")
+	var c3 := {"sim": es3, "plan": CityPlan.create(es3, BaseLayout.new("ridge")), "mode": "", "site": es3.site_id}
+	c3["explore"] = {"sites": saved["sites"], "trip": saved.get("trip", {})}
+	CityExplore.apply(c3)
+	_check(float(es3.ext.get("housing_add", 0.0)) >= 60.0 and CityExplore.can_send(c3, 0) == "이미 조사한 곳이다", "탐사가 저장 왕복에서 달라졌다")
+	# 자동 운영: every_days마다 가장 가까운 곳으로
+	var ea := CitySim.new(7, 40.0, "good")
+	var ca := {"sim": ea, "plan": CityPlan.create(ea, BaseLayout.new("ridge")), "mode": "", "site": ea.site_id}
+	ea.stock["parts"] = 500.0
+	for day in 8:
+		CityExplore.step(ca, day)
+	_check(not (CityExplore.state(ca)["trip"] as Dictionary).is_empty(), "자동 운영이 탐사대를 보내지 않았다")
+	print("smoke: explore — %d sites %s, lava tube housing +%d, autopilot sent to site %d" % [sites.size(),
+		str(sites.map(func(s): return String(s["find"]))), int(es.ext.get("housing_add", 0.0)) - int(house0),
+		int(CityExplore.state(ca)["trip"]["site"])])
+
+
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.
 ## 우주항 땅은 블록 칸에 맞는다
 func _runway_check() -> void:
@@ -1100,6 +1205,7 @@ func _colony_check() -> void:
 	wv._descent.clear()
 	wv._enter_cool = 0.0
 	wv.cam.look_at_surface("mars", Astro.latlon(-42.4, 70.5), 5.0, 0.5, Vector3(0, 0, 1))
+	main.modal.visible = false            # 결정 카드가 떠 있으면 줌인으로 고르지 않는다 (재난·탐사로 그날 무슨 일이 있을지 달라진다)
 	wv._check_enter(0.0)
 	_check(main.sim == hellas and wv.ground.body == "mars" and wv.cam.focus == "mars", "헬라스로 줌인해도 그 도시를 고르지 않았다")
 	main._on_colony_view(0)

@@ -746,6 +746,7 @@ func _activate(index: int, fly: bool = true) -> void:
 	city_view.ridge = plan.layout.kind == "ridge"
 	world.set_sim(sim, plan, tool)
 	world.city.title = String(c["name"])
+	world.city.colony = c
 	tabs["research"].colony = c
 	forecast.sim = sim
 	auto_button.set_pressed_no_signal(sim.autopilot != null)

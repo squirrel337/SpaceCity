@@ -99,6 +99,7 @@ func rebuild() -> void:
 		body_box.add_child(_dev_section(here))
 		body_box.add_child(_services_section(here))
 		body_box.add_child(_progress_section(here))
+		body_box.add_child(_explore_section(here))
 	var cands := mgr.candidates()
 	for body in Colonies.BODY_ORDER:
 		var cities := []
@@ -290,6 +291,66 @@ func _progress_section(i: int) -> Control:
 			var why := CityProgress.can_start(c, String(r[0]))
 			b.visible = why == ""
 			label.text = desc + ("\n첫 단계 %s · %d단계" % [CityPlan.cost_text(stages[0]["cost"]), stages.size()] if why == "" else "\n" + why))
+	return card
+
+
+## 고른 도시의 둘레 탐사 (CityExplore): 탐사지마다 거리·방향과 발견, 탐사대 보내기 (한 번에 한 탐사대)
+func _explore_section(i: int) -> Control:
+	var c: Dictionary = mgr.list[i]
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 10))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	card.add_child(v)
+	v.add_child(ThemeFactory.heading("둘레 탐사", 16))
+	var status := ThemeFactory.muted("", 13)
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(status)
+	var rows: Array = []
+	var st := CityExplore.state(c)
+	for k in (st["sites"] as Array).size():
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var label := ThemeFactory.muted("", 12)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(label)
+		var b := Button.new()
+		b.text = "보내기"
+		b.custom_minimum_size = Vector2(70, 32)
+		var idx := k
+		b.pressed.connect(func():
+			if CityExplore.send(c, idx):
+				update_view())
+		row.add_child(b)
+		v.add_child(row)
+		rows.append([label, b])
+	_live.append(func():
+		var s2 := CityExplore.state(c)
+		var trip: Dictionary = s2["trip"]
+		var sim2: CitySim = c["sim"]
+		if trip.is_empty():
+			status.text = "탐사대가 기지에 있다 — 한 번에 %s (가서 %d일 조사하고 돌아온다)" % [CityPlan.cost_text(CityExplore.data().get("cost", {})),
+				int(CityExplore.data().get("survey_days", 4))]
+		else:
+			var left := ceili((float(trip["back"]) - sim2.hour) / 24.0)
+			var phase := "가는 중" if sim2.hour < int(trip["arrive"]) else ("조사 중" if sim2.hour < int(trip["done"]) else "돌아오는 중")
+			status.text = "탐사대 %s — 돌아오기까지 %d일" % [phase, maxi(left, 0)]
+		for k in rows.size():
+			var site: Dictionary = s2["sites"][k]
+			var where := (c["plan"] as CityPlan).where_text(CityExplore.site_pos(site))
+			var label: Label = rows[k][0]
+			var b: Button = rows[k][1]
+			match String(site["state"]):
+				"found":
+					var f := CityExplore.find(String(site["find"]))
+					label.text = "✓ %s — %s (%s)" % [where, String(f.get("name", "?")), CityExplore.reward_text(f.get("reward", {}))]
+				"going":
+					label.text = "… %s — 탐사대가 가 있다" % where
+				_:
+					label.text = "? %s — 아직 모른다" % where
+			b.visible = String(site["state"]) == "unknown"
+			b.disabled = CityExplore.can_send(c, k) != "")
 	return card
 
 

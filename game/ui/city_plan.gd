@@ -47,8 +47,10 @@ var works_rev := 0                 # 길 공사가 늘거나 끝날 때마다 +1
 var mega: Array = []               # 짓는 메가프로젝트 (CityProgress): {id, cell: 땅 구역, stage: 단계, p: 그 단계의 공정}
 var mega_done: Array = []          # 다 지은 메가프로젝트: {id, cell}
 var mega_rev := 0                  # 메가프로젝트가 늘거나 단계가 바뀌거나 끝날 때마다 +1
+var scars: Array = []              # 최근 재난 (CityHazards): {kind, a, b — 줄이면 끝, r, hour} — 열둘까지
 var ground: SiteGround             # 이 도시의 땅 (높이·물 — 땅 구역의 비탈, 새 땅의 건물 비탈). 없으면 따지지 않는다
 var body := ""                     # 이 도시가 선 천체 (활주로가 있나)
+var site_id := ""                  # 이 도시의 부지 (방위 — north_dir)
 var runway_at: Array = []          # 활주로 자리 [쪽("+x"·"-x"·"+y"·"-y"), 땅 구역 줄 번호] — 처음 정하면 저장한다 (땅을 사도 옮겨 가지 않게)
 var _runway := {}
 var _runway_key := ""
@@ -96,6 +98,7 @@ func _init(p_layout: BaseLayout = null) -> void:
 static func create(sim: CitySim, p_layout: BaseLayout = null) -> CityPlan:
 	var plan := CityPlan.new(p_layout)
 	plan.body = _body_of(sim)
+	plan.site_id = sim.site_id if sim != null else ""
 	plan.default_roads()
 	plan._ensure_taxiway()
 	if sim != null:
@@ -1273,6 +1276,83 @@ func zone_free_block(district: String) -> bool:
 	return not best.is_empty() and set_district(best["center"], district)
 
 
+# ── 재난의 흔적 ────────────────────────────────────────────────
+## 운석 구덩이: 반지름 r 안은 깊이 depth까지 오목하게, r~1.35r은 둘레 둔덕 (건물·길 밑 칸은 그대로). 고친 칸 수
+func crater(center: Vector2, r: float, depth: float) -> int:
+	var c := cell_m()
+	var keep := _fixed_cells()
+	var lo := -float(LayoutData.terrain()["max_depth_m"])
+	var n := 0
+	var reach := int(ceil(r * 1.35 / c)) + 1
+	var ci := Vector2i(int(round(center.x / c)), int(round(center.y / c)))
+	for dj in range(-reach, reach + 1):
+		for di in range(-reach, reach + 1):
+			var key := Vector2i(ci.x + di, ci.y + dj)
+			if keep.has(key):
+				continue
+			var d := (Vector2(key) * c).distance_to(center) / maxf(r, 0.1)
+			var dh := 0.0
+			if d < 1.0:
+				dh = -depth * (1.0 - d * d)
+			elif d < 1.35:
+				dh = depth * 0.22 * (1.0 - absf(d - 1.15) / 0.2)
+			if absf(dh) < 0.02:
+				continue
+			terrain[key] = snappedf(clampf(float(terrain.get(key, 0.0)) + dh, lo, 30.0), 0.01)
+			n += 1
+	if n > 0:
+		terrain_rev += 1
+		_touch()
+	return n
+
+
+static var _home_north := Vector2.ZERO
+
+
+## 배치 좌표에서 그 부지의 북쪽 (단위 벡터): 3D 땅의 모형 축대로 — 다른 부지(SiteSurface)는 (−1, −1) 쪽,
+## 시작 부지 섀클턴(MoonSurface)은 능선 쪽이 크레이터 가운데를 보도록 돌아가 있다 (남극 가까이라 북쪽은 극에서 멀어지는 쪽)
+static func north_dir(id: String) -> Vector2:
+	if id != GameData.HOME_SITE:
+		return Vector2(-1, -1).normalized()
+	if _home_north == Vector2.ZERO:
+		var b := MoonSurface.home_frame()
+		var nb := Vector3(0, 0, 1) - b.z * b.z.z
+		var v := Vector2(nb.dot(b.x), nb.dot(b.y))
+		_home_north = v.normalized() if v.length_squared() > 1e-12 else Vector2(-1, -1).normalized()
+	return _home_north
+
+
+## 배치 좌표의 방향 → 여덟 방위 이름 (north: 배치 좌표의 북쪽 — 동쪽은 그 시계 방향 90°)
+static func direction_name(rel: Vector2, north: Vector2) -> String:
+	var n := rel.dot(north)
+	var e := rel.dot(Vector2(north.y, -north.x))
+	return ["동", "북동", "북", "북서", "서", "남서", "남", "남동"][posmod(int(round(atan2(n, e) / (PI / 4.0))), 8)]
+
+
+## 기지 가운데에서 본 자리: "북동쪽 320 m" (가까우면 "기지 가운데")
+func where_text(p: Vector2) -> String:
+	var rel := p - hub()
+	if rel.length() < 40.0:
+		return "기지 가운데"
+	var dir := direction_name(rel, north_dir(site_id))
+	if rel.length() >= 1000.0:
+		return "%s쪽 %.1f km" % [dir, rel.length() / 1000.0]
+	return "%s쪽 %d m" % [dir, int(round(rel.length() / 10.0)) * 10]
+
+
+## 지어진 건물 uid를 그 종류의 맨 뒤로 (재난에 부서진 건물이 고장 표시를 받는다 — 고장은 그 종류의 뒤쪽 건물에 붙는다)
+func move_to_end(uid: int) -> void:
+	for i in buildings.size():
+		if int(buildings[i]["uid"]) == uid:
+			var e: Dictionary = buildings[i]
+			buildings.remove_at(i)
+			buildings.append(e)
+			_bidx_n = -1
+			_bgen += 1
+			_touch()
+			return
+
+
 # ── 메가프로젝트 자리 ──────────────────────────────────────────
 const MEGA_INSET := 6.0            # 메가프로젝트는 땅 구역의 둘레 길 안쪽에 선다
 
@@ -2431,6 +2511,9 @@ func to_save() -> Dictionary:
 		out["runway"] = runway_at.duplicate()
 	if not works.is_empty():
 		out["works"] = RoadWorks.to_save(works)
+	if not scars.is_empty():
+		out["scars"] = scars.map(func(w): return [w["kind"], snappedf(w["a"].x, 0.1), snappedf(w["a"].y, 0.1), snappedf(w["b"].x, 0.1),
+			snappedf(w["b"].y, 0.1), snappedf(float(w["r"]), 0.1), int(w["hour"])])
 	if not mega.is_empty() or not mega_done.is_empty():
 		out["mega"] = mega.map(func(w): return [w["id"], w["cell"].x, w["cell"].y, int(w["stage"]), snappedf(float(w["p"]), 0.0001)])
 		out["mega_done"] = mega_done.map(func(w): return [w["id"], w["cell"].x, w["cell"].y])
@@ -2444,6 +2527,7 @@ static func from_save(data: Variant, sim: CitySim, p_layout: BaseLayout = null, 
 		return create(sim, p_layout)
 	var plan := CityPlan.new(p_layout)
 	plan.body = _body_of(sim)
+	plan.site_id = sim.site_id if sim != null else ""
 	for b in data.get("buildings", []):
 		if not b is Array or b.size() < 8 or not ArtLib.has("buildings", String(b[1])):
 			continue
@@ -2498,6 +2582,10 @@ static func from_save(data: Variant, sim: CitySim, p_layout: BaseLayout = null, 
 	for w in data.get("mega", []):
 		if w is Array and w.size() >= 5 and not CityProgress.mega(String(w[0])).is_empty():
 			plan.mega.append({"id": String(w[0]), "cell": Vector2i(int(w[1]), int(w[2])), "stage": int(w[3]), "p": float(w[4])})
+	for w in data.get("scars", []):
+		if w is Array and w.size() >= 7:
+			plan.scars.append({"kind": String(w[0]), "a": Vector2(float(w[1]), float(w[2])), "b": Vector2(float(w[3]), float(w[4])),
+				"r": float(w[5]), "hour": int(w[6])})
 	for w in data.get("mega_done", []):
 		if w is Array and w.size() >= 3 and not CityProgress.mega(String(w[0])).is_empty():
 			plan.mega_done.append({"id": String(w[0]), "cell": Vector2i(int(w[1]), int(w[2]))})

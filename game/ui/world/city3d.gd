@@ -21,6 +21,7 @@ var hovered := ""
 var hovered_pos := Vector3.ZERO
 var title := "섀클턴 시드 시티"     # 왼쪽 위 이름 (식민지 이름)
 var era_text := ""                 # 이름 옆의 시대 (CityProgress)
+var colony: Dictionary = {}        # 이 도시의 식민지 항목 (Colonies.list — 둘레 탐사 상태). main이 정한다
 
 var _items: Array = []
 var _sig := ""
@@ -36,6 +37,7 @@ var _cover: MeshInstance3D
 var _cover_sig := ""
 var _trains: LineTrains           # 모노레일·자기부상 궤도의 열차
 var _mega: MegaView               # 메가프로젝트 (짓는 것·다 지은 것)
+var _events: EventsView           # 재난의 흔적·둘레 탐사 (탐사지 표지·탐사대)
 var _grow_t := 0.0
 var _agents_root: Node3D
 var _agent_nodes := {}            # uid → {node, plume, yaw}
@@ -91,6 +93,8 @@ func setup(p_ground: SiteGround) -> void:
 	add_child(_trains)
 	_mega = MegaView.new()
 	add_child(_mega)
+	_events = EventsView.new()
+	add_child(_events)
 	_agents_root = Node3D.new()
 	add_child(_agents_root)
 	ground.terrain_ready.connect(_on_terrain_ready)
@@ -126,6 +130,7 @@ func _on_terrain_ready() -> void:
 	_road_rev = -1
 	_ways_sig = "-"
 	_district_sig = ""
+	_events.reset()
 	if _zones:
 		_zones.mesh = _zone_mesh()
 	for i in _floods.size():
@@ -142,6 +147,8 @@ func set_sim(new_sim: CitySim, p_plan: CityPlan, p_tool: PlaceTool) -> void:
 	_sig = ""
 	_seats.clear()
 	_road_rev = -1
+	if _events:
+		_events.reset()
 
 
 func visible_now() -> bool:
@@ -211,6 +218,8 @@ func update(delta: float, speed_level: int) -> void:
 	if heights_ok:
 		_trains.refresh(plan)
 		_trains.step(plan, _local, delta * VIS_SPEED[clampi(speed_level, 0, 3)])
+		_events.night = _night
+		_events.refresh(plan, sim, colony, _local, delta)
 	var sites := BaseScene.sites(sim, plan)
 	if transport != null:
 		traffic.intercity(transport, site_key, {"highways": highways, "runway": runway, "bearings": bearings})
@@ -1035,6 +1044,7 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 				ov.draw_rect(r, Color(0, 0, 0, 0.6))
 				ov.draw_rect(Rect2(r.position, Vector2(44.0 * _progress_of(it), 5)), Palette.AMBER)
 	_draw_district_labels(view, ov, font, bold)
+	_events.draw_overlay(view, ov, font, plan, colony, _local)
 	if cover_on:
 		var cv: Dictionary = CityServices.data().get("cover", {})
 		var x := 16.0
