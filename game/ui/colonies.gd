@@ -167,6 +167,7 @@ func step() -> Array:
 			CityHazards.step(list[i], s.current_day())       # 위치가 있는 재난 (모든 도시)
 			CityExplore.step(list[i], s.current_day())       # 둘레 탐사 (모든 도시)
 			CityTrade.step(list[i], s.current_day(), self)   # 수출 계약 (모든 도시)
+			_record_hist(list[i])                            # 통계: 날마다 지원 점수
 	var arrived := []
 	for e in expeditions.duplicate():
 		if hour >= int(e["arrive"]):
@@ -183,6 +184,16 @@ func step() -> Array:
 		if r != "":
 			scenario_news = r
 	return arrived
+
+
+## 통계 (StatsView): 시뮬레이션의 날마다 기록에 없는 값을 도시마다 날마다 — 지원 점수 (게임의 날과 함께)
+func _record_hist(c: Dictionary) -> void:
+	var h: Dictionary = c.get("hist", {}) if c.get("hist") is Dictionary else {}
+	if not h.has("days"):
+		h = {"days": [], "support": []}
+	(h["days"] as Array).append(int(floor(float(hour) / 24.0)))
+	(h["support"] as Array).append(int(round((c["sim"] as CitySim).support)))
+	c["hist"] = h
 
 
 ## 기술 나누기: 어느 도시든 알아낸 기술은 모두가 안다
@@ -459,7 +470,7 @@ func to_save() -> Dictionary:
 			"mode": String(c.get("mode", "")), "idle": c.get("idle", {}), "bought": int(c.get("bought", -100000)),
 			"extra": int(c.get("extra", -100000)), "redev": int(c.get("redev", -1)), "redev_txt": String(c.get("redev_txt", "")),
 			"progress": c.get("progress", {}), "research": c.get("research", {}), "explore": c.get("explore", {}),
-			"trade": c.get("trade", {}), "delegate": c.get("delegate", {}),
+			"trade": c.get("trade", {}), "delegate": c.get("delegate", {}), "hist": c.get("hist", {}),
 			"oplog": (c.get("oplog", []) as Array).slice(-120)})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
@@ -520,6 +531,9 @@ func load_save(data: Dictionary) -> bool:
 		if cd.get("explore") is Dictionary and cd["explore"].get("sites") is Array:
 			entry["explore"] = {"sites": cd["explore"]["sites"], "trip": cd["explore"].get("trip", {}) if cd["explore"].get("trip") is Dictionary else {}}
 			CityExplore.apply(entry)
+		if cd.get("hist") is Dictionary and cd["hist"].get("days") is Array:
+			entry["hist"] = {"days": (cd["hist"]["days"] as Array).map(func(x): return int(x)),
+				"support": (cd["hist"].get("support", []) as Array).map(func(x): return int(x))}
 		if cd.get("delegate") is Dictionary:
 			entry["delegate"] = cd["delegate"]
 			CityAuto.sync_policy(entry)

@@ -1,8 +1,9 @@
 class_name LogPanel
 extends VBoxContainer
-## 기록 탭 — 둘 가운데 하나를 본다:
+## 기록 탭 — 셋 가운데 하나를 본다:
 ##   관리 기록: 도시의 모든 기록 (최근 것부터, 120개까지). 새 기록은 맨 위에 더하고 넘치는 것만 뺀다 (다 다시 만들지 않는다)
 ##   운영 기록: 시드가 한 일 (자동 운영이든 맡긴 분야든 — CityAuto) 과 그 까닭. 분야로 거른다
+##   통계: 날마다 기록의 그래프 (StatsView)
 
 const KIND_COLOR := {"info": Palette.MUTED, "build": Palette.MUTED, "good": Palette.GREEN, "warn": Palette.AMBER,
 	"critical": Palette.RED, "death": Palette.RED}
@@ -12,7 +13,9 @@ const DOMAIN_COLOR := {"build": Palette.AMBER, "research": Palette.BLUE, "land":
 const SHOW := 120
 
 var sim: CitySim
-var colony: Dictionary = {}        # 고른 식민지 (운영 기록 — c["oplog"])
+var colony: Dictionary = {}        # 고른 식민지 (운영 기록 — c["oplog"], 통계)
+var mgr: Colonies                  # 모든 도시 (통계의 '모든 도시의 정착민')
+var stats := StatsView.new()
 var list := VBoxContainer.new()
 var _shown := -1
 var _view := "notes"               # notes 관리 기록 · ops 운영 기록
@@ -31,7 +34,7 @@ func _init() -> void:
 	var views := HBoxContainer.new()
 	views.add_theme_constant_override("separation", 6)
 	var group := ButtonGroup.new()
-	for v in [["notes", "관리 기록"], ["ops", "운영 기록 — 시드가 한 일"]]:
+	for v in [["notes", "관리 기록"], ["ops", "운영 기록 — 시드가 한 일"], ["stats", "통계"]]:
 		var b := Button.new()
 		b.text = v[1]
 		b.toggle_mode = true
@@ -67,6 +70,8 @@ func _init() -> void:
 	add_child(_chips)
 	list.add_theme_constant_override("separation", 4)
 	add_child(list)
+	stats.visible = false
+	add_child(stats)
 
 
 func bind(p_sim: CitySim) -> void:
@@ -84,9 +89,11 @@ func _set_view(v: String) -> void:
 	_view = v
 	if _view_buttons.has(v):
 		(_view_buttons[v] as Button).set_pressed_no_signal(true)
-	_heading.text = "관리 기록" if v == "notes" else "운영 기록"
+	_heading.text = {"notes": "관리 기록", "ops": "운영 기록", "stats": "통계"}.get(v, "관리 기록")
 	_chips.visible = v == "ops"
 	_summary.visible = v == "ops"
+	list.visible = v != "stats"
+	stats.visible = v == "stats"
 	_shown = -1
 	_ops_sig = ""
 	rebuild()
@@ -94,6 +101,11 @@ func _set_view(v: String) -> void:
 
 func update_view() -> void:
 	if sim == null:
+		return
+	if _view == "stats":
+		stats.colony = colony if colony.get("sim") == sim else {}
+		stats.mgr = mgr
+		stats.refresh()
 		return
 	if _view == "ops":
 		_update_ops()
@@ -132,6 +144,9 @@ func _clear() -> void:
 
 func rebuild() -> void:
 	if sim == null:
+		return
+	if _view == "stats":
+		update_view()
 		return
 	if _view == "ops":
 		_ops_sig = ""

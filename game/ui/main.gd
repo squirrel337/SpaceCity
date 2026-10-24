@@ -770,6 +770,7 @@ func _activate(index: int, fly: bool = true) -> void:
 	world.city.colony = c
 	tabs["research"].colony = c
 	tabs["log"].colony = c
+	tabs["log"].mgr = colonies
 	forecast.sim = sim
 	auto_button.set_pressed_no_signal(CityAuto.full(sim))
 	_update_colony_ui()

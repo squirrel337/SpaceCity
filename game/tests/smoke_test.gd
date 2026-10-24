@@ -57,6 +57,7 @@ func _process(_delta: float) -> bool:
 		_delegate_check()
 		_scenario_check()
 		_demolish_move_check()
+		_stats_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -1251,6 +1252,40 @@ func _demolish_move_check() -> void:
 	print("smoke: demolish %s (+%d parts), cancelled a lab, moved %s %.0f m" % [GameData.module_name(kind),
 		int(float(ms.stock["parts"]) - parts0), GameData.module_name(mkind),
 		Vector2(float(mv["x"]), float(mv["y"])).distance_to(to["at"])])
+
+
+## 통계: 기록 탭의 그래프가 날마다 기록·지원 점수를 담고 (가로축은 게임의 날), 모든 도시 그래프는 도시마다 한 줄, 가리키면 모두 같은 날.
+## 눈금은 서너 칸, 그날의 값 읽기, 지원 점수 기록은 저장된다
+func _stats_check() -> void:
+	var lp: LogPanel = main.tabs["log"]
+	var c: Dictionary = main.colonies.list[main.active]
+	lp.colony = c
+	lp.mgr = main.colonies
+	lp.bind(main.sim)
+	lp._set_view("stats")
+	lp.update_view()
+	var charts: Array = lp.stats._charts
+	var pop_chart: StatsChart = charts[0][0]
+	_check((pop_chart.lines[0]["values"] as PackedFloat32Array).size() == main.sim.daily.size() and main.sim.daily.size() > 30,
+		"정착민 그래프가 날마다 기록을 담지 않았다")
+	var sup: StatsChart = charts[6][0]
+	_check(not sup.lines.is_empty() and (sup.lines[0]["values"] as PackedFloat32Array).size() >= main.sim.daily.size() - 2,
+		"지원 점수 그래프가 비었다")
+	var all: StatsChart = charts[-1][0]
+	_check(all.lines.size() == mini(main.colonies.list.size(), StatsChart.SERIES.size()), "모든 도시 그래프의 줄 수가 맞지 않다")
+	lp.stats._on_hover(20)
+	_check(charts.all(func(e): return (e[0] as StatsChart).hover_day == 20), "가리킨 날이 모든 그래프에 같지 않다")
+	var l0: Dictionary = pop_chart.lines[0]
+	var d5 := int((l0["days"] as PackedInt32Array)[5])
+	_check(is_equal_approx(float(StatsChart.value_at(l0, d5)), float((l0["values"] as PackedFloat32Array)[5])) and StatsChart.value_at(l0, -5) == null,
+		"그날의 값 읽기가 틀렸다")
+	var ticks := StatsChart._ticks(0.0, 237.0)
+	_check(ticks.size() >= 3 and ticks.size() <= 6, "눈금이 %d칸이다" % ticks.size())
+	var saved: Dictionary = main.colonies.to_save()
+	_check(((saved["colonies"][main.active]["hist"] as Dictionary)["days"] as Array).size() > 30, "지원 점수 기록이 저장되지 않았다")
+	lp._set_view("notes")
+	print("smoke: stats — %d charts, %d days, %d cities, support %d → %d" % [charts.size(), main.sim.daily.size(),
+		all.lines.size(), int((sup.lines[0]["values"] as PackedFloat32Array)[0]), int((sup.lines[0]["values"] as PackedFloat32Array)[-1])])
 
 
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.
