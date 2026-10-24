@@ -163,8 +163,9 @@ func _dev_section(i: int) -> Control:
 		b.text = String(m.get("name", id))
 		b.toggle_mode = true
 		b.button_pressed = id == cur
-		b.custom_minimum_size = Vector2(0, 36)
+		b.custom_minimum_size = Vector2(0, 44)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART      # 긴 이름("Tourism & culture focus")은 두 줄로
 		b.add_theme_font_size_override("font_size", 13)
 		b.add_theme_color_override("font_pressed_color", Color(String(m.get("color", "aab3c8"))).lightened(0.3))
 		b.tooltip_text = String(m.get("text", ""))
@@ -330,6 +331,7 @@ func _progress_section(i: int) -> Control:
 	v.add_theme_constant_override("separation", 6)
 	card.add_child(v)
 	var head := ThemeFactory.heading("", 16)
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART     # "시대 1 · 정착 도시 · 사람이 늘고 …" — 영어는 길다
 	v.add_child(head)
 	var lines := ThemeFactory.muted("", 13)
 	lines.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -741,6 +743,7 @@ func _site_card(id: String) -> Control:
 	title.add_theme_font_override("font", ThemeFactory.bold)
 	title.add_theme_font_size_override("font_size", 15)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	top.add_child(title)
 	var more := Button.new()
 	more.text = "접기" if _open.get(id, false) else "자세히"

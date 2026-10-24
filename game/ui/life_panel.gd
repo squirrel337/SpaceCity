@@ -29,6 +29,7 @@ func _init() -> void:
 	_slider_row(ration_slider, ration_label, 0, 30, 1)
 	_slider_row(express_slider, express_label, 0, 40, 1)
 	express_button.text = "지금 긴급 보급선 부르기 (지원 300, 7일)"
+	express_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	express_button.pressed.connect(_on_express)
 	add_child(express_button)
 	ration_slider.value_changed.connect(_on_ration_threshold)
@@ -47,11 +48,12 @@ func _on_express_threshold(v: float) -> void:
 
 func _slider_row(slider: HSlider, label: Label, lo: float, hi: float, step: float) -> void:
 	label.add_theme_font_size_override("font_size", 14)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART      # 영어가 길면 줄을 바꾼다 (옆 패널을 넓히지 않게)
 	add_child(label)
 	slider.min_value = lo
 	slider.max_value = hi
 	slider.step = step
-	slider.custom_minimum_size.y = 28
+	slider.custom_minimum_size.y = 44
 	add_child(slider)
 
 

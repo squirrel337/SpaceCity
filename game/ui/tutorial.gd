@@ -87,12 +87,12 @@ func _init() -> void:
 	row.alignment = BoxContainer.ALIGNMENT_END
 	var skip := Button.new()
 	skip.text = "건너뛰기"
-	skip.custom_minimum_size = Vector2(0, 44 if OS.has_feature("mobile") else 36)
+	skip.custom_minimum_size = Vector2(0, 44 if ThemeFactory.touch() else 36)
 	skip.pressed.connect(func(): stop(true))
 	row.add_child(skip)
 	_next = Button.new()
 	_next.text = "다음"
-	_next.custom_minimum_size = Vector2(110, 44 if OS.has_feature("mobile") else 36)
+	_next.custom_minimum_size = Vector2(110, 44 if ThemeFactory.touch() else 36)
 	_next.pressed.connect(_on_next)
 	row.add_child(_next)
 	v.add_child(row)

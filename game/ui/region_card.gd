@@ -138,7 +138,7 @@ func refresh() -> void:
 		row.add_child(lb)
 		var b := Button.new()
 		b.text = "협력 · 운영비 %s" % Fmt.n(cost)
-		b.custom_minimum_size = Vector2(120, 44 if OS.has_feature("mobile") else 30)
+		b.custom_minimum_size = Vector2(120, 44 if ThemeFactory.touch() else 30)
 		b.add_theme_font_size_override("font_size", 13)
 		b.disabled = fn.modes.budget(mk3) < cost or bt2 == ""
 		if bt2 == "":
@@ -154,7 +154,7 @@ func refresh() -> void:
 	if not near.is_empty():
 		var go := Button.new()
 		go.text = "%s(으)로 가기" % String(near.get("name", ""))
-		go.custom_minimum_size.y = 44 if OS.has_feature("mobile") else 30
+		go.custom_minimum_size.y = 44 if ThemeFactory.touch() else 30
 		go.add_theme_font_size_override("font_size", 13)
 		go.pressed.connect(func(): region_ops.emit(key, "go", String(near["key"])))
 		_rows.add_child(go)

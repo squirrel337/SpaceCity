@@ -97,7 +97,7 @@ func _init() -> void:
 		b.toggle_mode = true
 		b.button_group = grp
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.custom_minimum_size.y = 44 if OS.has_feature("mobile") else 32
+		b.custom_minimum_size.y = 44 if ThemeFactory.touch() else 32
 		b.add_theme_font_size_override("font_size", 14)
 		var id := String(t[0])
 		b.pressed.connect(func(): set_tab(id))
@@ -123,7 +123,7 @@ func _init() -> void:
 		var b2 := Button.new()
 		b2.text = String(mb[1])
 		b2.toggle_mode = true
-		b2.custom_minimum_size = Vector2(76, 44 if OS.has_feature("mobile") else 30)
+		b2.custom_minimum_size = Vector2(76, 44 if ThemeFactory.touch() else 30)
 		b2.add_theme_font_size_override("font_size", 13)
 		var mode := String(mb[0])
 		b2.tooltip_text = Metros.mode_name(mode) + (" — " + String(Metros.mode_def(mode).get("text", "")) if mode != "" else
@@ -141,7 +141,7 @@ func _init() -> void:
 	_pick_box.add_child(_partner_label)
 	_partner_pick = OptionButton.new()
 	_partner_pick.add_theme_font_size_override("font_size", 13)
-	_partner_pick.custom_minimum_size.y = 44 if OS.has_feature("mobile") else 30
+	_partner_pick.custom_minimum_size.y = 44 if ThemeFactory.touch() else 30
 	_partner_pick.fit_to_longest_item = false
 	_partner_pick.item_selected.connect(func(i: int):
 		if i >= 0 and i < _partner_ids.size():
@@ -151,7 +151,7 @@ func _init() -> void:
 	_pick_box.add_child(_project_label)
 	_project_pick = OptionButton.new()
 	_project_pick.add_theme_font_size_override("font_size", 13)
-	_project_pick.custom_minimum_size.y = 44 if OS.has_feature("mobile") else 30
+	_project_pick.custom_minimum_size.y = 44 if ThemeFactory.touch() else 30
 	_project_pick.fit_to_longest_item = false
 	_project_pick.item_selected.connect(func(i: int):
 		if i >= 0 and i < _project_ids.size():
@@ -341,7 +341,7 @@ func next_auto(fn: MetroFunctions) -> String:
 func _button(text: String, w: float) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size = Vector2(w, 44 if OS.has_feature("mobile") else 32)
+	b.custom_minimum_size = Vector2(w, 44 if ThemeFactory.touch() else 32)
 	b.add_theme_font_size_override("font_size", 13)
 	return b
 

@@ -34,13 +34,17 @@ func _init() -> void:
 	var views := HBoxContainer.new()
 	views.add_theme_constant_override("separation", 6)
 	var group := ButtonGroup.new()
-	for v in [["notes", "관리 기록"], ["ops", "운영 기록 — 시드가 한 일"], ["stats", "통계"]]:
+	for v in [["notes", "관리 기록", "관리 기록 — 알림과 사건"], ["ops", "운영 기록", "운영 기록 — 시드가 한 일"], ["stats", "통계", "통계 — 지난 날들의 그래프"]]:
 		var b := Button.new()
 		b.text = v[1]
+		b.tooltip_text = v[2]
 		b.toggle_mode = true
 		b.button_group = group
 		b.button_pressed = v[0] == _view
-		b.custom_minimum_size = Vector2(0, 36)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.clip_text = true
+		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		b.custom_minimum_size = Vector2(0, 44)
 		var id: String = v[0]
 		b.pressed.connect(func(): _set_view(id))
 		views.add_child(b)

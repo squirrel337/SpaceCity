@@ -38,7 +38,9 @@ func _init() -> void:
 		priority_rows[p] = state
 	add_child(heat)
 	add_child(HSeparator.new())
-	add_child(ThemeFactory.heading("절전 정책 — 어두울 때 축전량이 문턱 아래면 끈다", 16))
+	var policy := ThemeFactory.heading("절전 정책 — 어두울 때 축전량이 문턱 아래면 끈다", 16)
+	policy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	add_child(policy)
 	for p in [4, 3, 2]:
 		var label := Label.new()
 		label.add_theme_font_size_override("font_size", 14)
@@ -47,7 +49,7 @@ func _init() -> void:
 		slider.min_value = 0
 		slider.max_value = 90
 		slider.step = 5
-		slider.custom_minimum_size.y = 28
+		slider.custom_minimum_size.y = 44
 		slider.value_changed.connect(_on_threshold.bind(p))
 		add_child(slider)
 		sliders[p] = slider

@@ -3,6 +3,16 @@ class_name ThemeFactory
 
 static var regular: Font
 static var bold: Font
+static var _touch := -1
+const TOUCH_MIN := 44.0             # 터치에서 누르는 곳의 최소 폭·높이 (1280×720 기준 UI 좌표)
+
+
+## 터치 화면 (Android, 터치스크린이 있는 PC, 시험의 --touch): 누르는 곳을 최소 44 px로 — 마우스면 조금 촘촘하게
+static func touch() -> bool:
+	if _touch < 0:
+		_touch = 1 if OS.has_feature("mobile") or DisplayServer.is_touchscreen_available() \
+			or OS.get_cmdline_user_args().has("--touch") else 0
+	return _touch == 1
 
 
 static func build() -> Theme:
@@ -29,6 +39,9 @@ static func build() -> Theme:
 				sb = Palette.box(Color.TRANSPARENT, Palette.TEAL.darkened(0.2), 8, 8)
 		sb.content_margin_left = 12
 		sb.content_margin_right = 12
+		var pad_y := 12 if touch() else 8   # 글 한 줄(16 px)이면 터치 44 px (08 UX), 마우스 36 px
+		sb.content_margin_top = pad_y
+		sb.content_margin_bottom = pad_y
 		theme.set_stylebox(state, "Button", sb)
 	theme.set_color("font_color", "Button", Palette.TEXT)
 	theme.set_color("font_hover_color", "Button", Palette.TEXT)

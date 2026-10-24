@@ -32,6 +32,7 @@ func _init() -> void:
 	add_child(res_label)
 	add_child(ThemeFactory.heading("대기열", 16))
 	auto_sort.text = "생명유지 → 대피·주거 → 전력 → 식량 순으로 자동 정렬"
+	auto_sort.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	auto_sort.toggled.connect(_on_sort)
 	add_child(auto_sort)
 	queue_box.add_theme_constant_override("separation", 6)

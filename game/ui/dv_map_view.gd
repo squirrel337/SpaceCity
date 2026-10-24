@@ -476,8 +476,9 @@ func _route_card(r: String) -> void:
 		var why := Fleet.order_reason(mgr, String(c_id), r)
 		var btn := Button.new()
 		btn.text = "주문 — %s" % Fleet.cost_text(Fleet.order_cost(mgr, String(c_id), known))
-		btn.custom_minimum_size = Vector2(0, 40 if OS.has_feature("mobile") else 32)
+		btn.custom_minimum_size = Vector2(0, 40 if ThemeFactory.touch() else 32)
 		btn.add_theme_font_size_override("font_size", 12)
+		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART      # 값이 길면 (영어) 카드를 넓히지 않고 두 줄로
 		btn.disabled = why != ""
 		btn.tooltip_text = why if why != "" else String(c.get("text", ""))
 		var cid := String(c_id)
@@ -493,6 +494,7 @@ func _route_card(r: String) -> void:
 	_box.add_child(HSeparator.new())
 	var auto := CheckBox.new()
 	auto.text = "함대 자동 운영 — 항로마다 배 둘 (★ 등급으로 주문)"
+	auto.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	auto.button_pressed = bool(Fleet.state(mgr).get("auto", true))
 	auto.toggled.connect(func(on: bool):
 		Fleet.state(mgr)["auto"] = on
@@ -535,7 +537,7 @@ func _node_card(id: String) -> void:
 			row.add_child(lab)
 			var go := Button.new()
 			go.text = "그 도시로"
-			go.custom_minimum_size = Vector2(0, 40 if OS.has_feature("mobile") else 32)
+			go.custom_minimum_size = Vector2(0, 40 if ThemeFactory.touch() else 32)
 			var idx := i
 			go.pressed.connect(func(): colony_picked.emit(idx))
 			row.add_child(go)
@@ -545,7 +547,7 @@ func _node_card(id: String) -> void:
 		if Fleet.routes(mgr).has(body):
 			var rb := Button.new()
 			rb.text = "%s 항로 보기" % Fleet.body_name(body)
-			rb.custom_minimum_size = Vector2(0, 40 if OS.has_feature("mobile") else 32)
+			rb.custom_minimum_size = Vector2(0, 40 if ThemeFactory.touch() else 32)
 			rb.pressed.connect(func():
 				selected = body
 				_sig = ""

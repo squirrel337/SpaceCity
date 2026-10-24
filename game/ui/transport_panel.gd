@@ -183,11 +183,13 @@ func _fleet_section() -> void:
 	box.add_child(head)
 	box.add_child(ThemeFactory.muted("행성간 수송선은 떠나는 부두에 그 항로의 배가 있어야 발사 창에 떠나고, 실을 것이 없으면 쉰다. 떠날 때 " +
 		"보내는 도시가 추진제 값(지원 점수 — 로켓 방정식)을 낸다. 화학은 빠르지만 추진제를 많이 쓰고, 핵열은 메가와트급 원자로가 있어야 " +
-		"하며, 전기 추진은 싸지만 전이가 1.5배 걸리고 자리가 40이다. 극저온 추진제 생산을 알면 메탄·산소·수소를 만드는 도시는 현지 값으로 산다.", 12))
+		"하며, 전기 추진은 싸지만 전이가 1.5배 걸리고 자리가 40이다. 극저온 추진제 생산을 알면 메탄·산소·수소를 만드는 도시는 현지 값으로 산다. " +
+		"함대 자동 운영은 항로마다 배를 둘로 맞추고, 모자라면 가장 알맞은 등급을 주문한다.", 12))
 	var auto := CheckButton.new()
-	auto.text = "함대 자동 운영 — 항로마다 배 둘, 모자라면 가장 알맞은 등급을 주문"
+	auto.text = "함대 자동 운영"
+	auto.tooltip_text = "항로마다 배 둘, 모자라면 가장 알맞은 등급을 주문"
 	auto.button_pressed = bool(st.get("auto", true))
-	auto.custom_minimum_size.y = 36
+	auto.custom_minimum_size.y = 44
 	auto.toggled.connect(func(on: bool):
 		st["auto"] = on
 		changed.emit())
@@ -234,7 +236,7 @@ func _fleet_section() -> void:
 	var cls_ids: Array = Fleet.data().get("classes", {}).keys()
 	var cpick := OptionButton.new()
 	cpick.add_theme_font_size_override("font_size", 13)
-	cpick.custom_minimum_size = Vector2(0, 44 if OS.has_feature("mobile") else 32)
+	cpick.custom_minimum_size = Vector2(0, 44 if ThemeFactory.touch() else 32)
 	for i in cls_ids.size():
 		cpick.add_item(Fleet.cls_name(String(cls_ids[i])), i)
 		if String(cls_ids[i]) == String(_ship_form["cls"]):
@@ -246,7 +248,7 @@ func _fleet_section() -> void:
 	form.add_child(cpick)
 	var rpick := OptionButton.new()
 	rpick.add_theme_font_size_override("font_size", 13)
-	rpick.custom_minimum_size = Vector2(0, 44 if OS.has_feature("mobile") else 32)
+	rpick.custom_minimum_size = Vector2(0, 44 if ThemeFactory.touch() else 32)
 	var r_opts: Array = [""] + route_ids
 	if not String(_ship_form["route"]) in r_opts:
 		_ship_form["route"] = String(route_ids[0]) if not route_ids.is_empty() else ""
@@ -261,7 +263,7 @@ func _fleet_section() -> void:
 	form.add_child(rpick)
 	var order := Button.new()
 	order.text = "배 주문"
-	order.custom_minimum_size = Vector2(0, 44 if OS.has_feature("mobile") else 32)
+	order.custom_minimum_size = Vector2(0, 44 if ThemeFactory.touch() else 32)
 	order.pressed.connect(func():
 		var why := Fleet.order(mgr, String(_ship_form["cls"]), String(_ship_form["route"]))
 		_ship_note = why if why != "" else "주문했다"
@@ -298,7 +300,7 @@ func _ship_row(sh: Dictionary, route_ids: Array) -> Control:
 	var id := int(sh["id"])
 	var move := OptionButton.new()
 	move.add_theme_font_size_override("font_size", 12)
-	move.custom_minimum_size = Vector2(0, 40 if OS.has_feature("mobile") else 30)
+	move.custom_minimum_size = Vector2(0, 40 if ThemeFactory.touch() else 30)
 	move.tooltip_text = "이 배의 항로를 바꾼다 (고향 부두에 있을 때만)"
 	var opts: Array = [""] + route_ids
 	for i in opts.size():
@@ -313,7 +315,7 @@ func _ship_row(sh: Dictionary, route_ids: Array) -> Control:
 	var ret := Button.new()
 	ret.text = "퇴역"
 	ret.tooltip_text = "해체한다 — 주문 부품의 30%를 돌려받는다"
-	ret.custom_minimum_size = Vector2(52, 40 if OS.has_feature("mobile") else 30)
+	ret.custom_minimum_size = Vector2(52, 40 if ThemeFactory.touch() else 30)
 	ret.add_theme_font_size_override("font_size", 12)
 	ret.pressed.connect(func():
 		Fleet.retire(mgr, id)
@@ -352,7 +354,7 @@ func _routes_section() -> void:
 	var pick := func(ids: Array, names: Array, cur: String, field: String) -> OptionButton:
 		var ob := OptionButton.new()
 		ob.add_theme_font_size_override("font_size", 13)
-		ob.custom_minimum_size = Vector2(0, 44 if OS.has_feature("mobile") else 32)
+		ob.custom_minimum_size = Vector2(0, 44 if ThemeFactory.touch() else 32)
 		ob.fit_to_longest_item = false
 		for i in ids.size():
 			ob.add_item(String(names[i]), i)
@@ -378,7 +380,7 @@ func _routes_section() -> void:
 	amount.step = 0.5 if float(g[2]) > 1.0 else 1.0
 	amount.value = float(_form["amount"])
 	amount.suffix = I18n.t(String(g[3]))           # 고정 글자 칸이라 저절로 번역되지 않는다
-	amount.custom_minimum_size = Vector2(110, 32)
+	amount.custom_minimum_size = Vector2(110, 44 if ThemeFactory.touch() else 32)
 	amount.value_changed.connect(func(v: float): _form["amount"] = v)
 	form.add_child(amount)
 	var every := SpinBox.new()
@@ -387,12 +389,12 @@ func _routes_section() -> void:
 	every.step = 1
 	every.value = int(_form["every"])
 	every.suffix = I18n.t("일마다")
-	every.custom_minimum_size = Vector2(120, 32)
+	every.custom_minimum_size = Vector2(150, 44 if ThemeFactory.touch() else 32)
 	every.value_changed.connect(func(v: float): _form["every"] = int(v))
 	form.add_child(every)
 	var add := Button.new()
 	add.text = "정기 교역 추가"
-	add.custom_minimum_size = Vector2(0, 44 if OS.has_feature("mobile") else 32)
+	add.custom_minimum_size = Vector2(0, 44 if ThemeFactory.touch() else 32)
 	add.pressed.connect(func():
 		var why := CityRoutes.add(mgr, String(_form["from"]), String(_form["to"]), String(_form["key"]), float(_form["amount"]),
 			int(_form["every"]))

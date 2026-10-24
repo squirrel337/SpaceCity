@@ -60,6 +60,7 @@ var plan_buttons := {}                 # 도시 계획 도구: 도로 · 구획 
 var city_area: Control
 var view_buttons := {}
 var world_row: HBoxContainer       # 3D: 확대·축소, 기지 (다른 고정점은 위쪽의 경로 막대)
+var view_switch: HFlowContainer    # 왼쪽 아래 단추 줄 — 도시 화면이 좁으면 두 줄로 (영어 · 1280 폭)
 var anchor_bar: AnchorBar          # 3D: 카메라의 고정점 경로 (우주 › 태양계 › 지구 › 도시)
 var metro_card: MetroCard          # 3D: 지구의 대도시 위에서 — 그 도시의 우주 시설 (도시 기능)·운영 방식·경제
 var region_card: RegionCard        # 3D: 반도체·AI 데이터센터 지역 위에서 — 그 지역과 협력
@@ -73,6 +74,10 @@ var auto_button: Button
 var date_label: Label
 var colony_button: OptionButton
 var chips := {}
+var chip_row: HBoxContainer
+var chip_spacer: Control
+var top_row: HBoxContainer
+const CHIP_MIN := 44.0             # 지표 하나의 가장 좁은 폭 (값 "39일"·"88%"가 보인다)
 var tabs := {}
 var tab_buttons := {}
 var current_tab := "life"
@@ -82,11 +87,20 @@ var panel_scroll: ScrollContainer
 func _ready() -> void:
 	I18n.apply()                         # 설정의 언어 (한국어 · English) — 화면을 만들기 전에
 	theme = ThemeFactory.build()
+	if ThemeFactory.touch():
+		get_tree().node_added.connect(_touch_size)
 	get_tree().auto_accept_quit = false
 	get_tree().quit_on_go_back = false
 	_fit_window()
 	_build()
 	_show_start()
+
+
+## 터치 화면: 단추가 트리에 들어올 때 최소 44×44 px로 (글씨가 작은 단추·접기 단추까지 — 08 UX)
+func _touch_size(n: Node) -> void:
+	if n is BaseButton:
+		var c := n as Control
+		c.custom_minimum_size = c.custom_minimum_size.max(Vector2(ThemeFactory.TOUCH_MIN, ThemeFactory.TOUCH_MIN))
 
 
 func _fit_window() -> void:
@@ -213,7 +227,7 @@ func _build() -> void:
 	toasts.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	toasts.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	toasts.offset_right = -12
-	toasts.offset_bottom = -62          # 왼쪽 아래 단추 줄 위로
+	toasts.offset_bottom = -62          # 왼쪽 아래 단추 줄 위로 (_place_toasts)
 	tutorial = Tutorial.new()
 	tutorial.main = self
 	tutorial.finished.connect(func(skipped: bool):
@@ -229,16 +243,19 @@ func _build() -> void:
 
 
 func _build_view_switch() -> Control:
-	## 왼쪽 아래: 3D·목록 전환과 확대 단추
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
+	## 왼쪽 아래: 3D·목록 전환과 확대 단추 — 도시 화면 폭에 맞춰 넘치면 위로 한 줄 더
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 4)
+	row.add_theme_constant_override("v_separation", 4)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE     # 단추 사이 빈 곳은 3D 화면이 받는다
+	view_switch = row
 	var group := ButtonGroup.new()
 	for pair in [["world", "3D"], ["list", "목록"], ["map", "항로"]]:
 		var b := Button.new()
 		b.text = pair[1]
 		b.toggle_mode = true
 		b.button_group = group
-		b.custom_minimum_size = Vector2(58, 40)
+		b.custom_minimum_size = Vector2(58, 44)
 		b.pressed.connect(_set_view.bind(pair[0]))
 		row.add_child(b)
 		view_buttons[pair[0]] = b
@@ -252,7 +269,7 @@ func _build_view_switch() -> Control:
 		pb.text = spec[1]
 		pb.toggle_mode = true
 		pb.tooltip_text = spec[2]
-		pb.custom_minimum_size = Vector2(52, 40)
+		pb.custom_minimum_size = Vector2(52, 44)
 		var which: String = spec[0]
 		pb.toggled.connect(func(on: bool):
 			if on:
@@ -276,20 +293,22 @@ func _build_view_switch() -> Control:
 		var wb := Button.new()
 		wb.text = spec[0]
 		wb.tooltip_text = spec[1]
-		wb.custom_minimum_size = Vector2(42 if spec[0].length() == 1 else 54, 40)
+		wb.custom_minimum_size = Vector2(44 if spec[0].length() == 1 else 54, 44)
 		wb.pressed.connect(spec[2])
 		world_row.add_child(wb)
 	var cover := Button.new()
 	cover.text = "범위"
 	cover.toggle_mode = true
 	cover.tooltip_text = "영향 범위 — 의료·여가·대피 시설이 닿는 원. 집이 원 안에 있으면 사기가 오른다 ('개척' 탭의 도시 기능)"
-	cover.custom_minimum_size = Vector2(54, 40)
+	cover.custom_minimum_size = Vector2(54, 44)
 	cover.toggled.connect(func(on: bool): world.show_cover(on))
 	world_row.add_child(cover)
-	row.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	row.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	row.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	row.offset_left = 10
+	row.offset_right = -10
 	row.offset_bottom = -10
+	row.resized.connect(_place_toasts)
 	view_buttons["world"].set_pressed_no_signal(true)
 	return row
 
@@ -328,7 +347,7 @@ func _build_place_bar() -> Control:
 		var b := Button.new()
 		b.text = spec[1]
 		b.tooltip_text = spec[2]
-		b.custom_minimum_size = Vector2(0, 40)
+		b.custom_minimum_size = Vector2(0, 44)
 		b.pressed.connect(_on_place_button.bind(spec[0]))
 		row.add_child(b)
 		place_buttons[spec[0]] = b
@@ -593,21 +612,29 @@ func _set_view(mode: String) -> void:
 	if mode == "map":
 		dv_map.active = active
 		dv_map.open(String(colonies.list[active]["body"]) if active >= 0 and active < colonies.list.size() else "mars")
-	# 알림: 항로 지도에서는 오른쪽 아래 카드 위로
-	toasts.offset_bottom = -(dv_map.size.y - dv_map.card_top() + 8.0) if mode == "map" else -62.0
+	_place_toasts()
+
+
+## 알림 자리: 왼쪽 아래 단추 줄 위로 (두 줄이면 더 위로), 항로 지도에서는 오른쪽 아래 카드 위로
+func _place_toasts() -> void:
+	if toasts == null or view_switch == null:
+		return
+	toasts.offset_bottom = -(dv_map.size.y - dv_map.card_top() + 8.0) if view_mode == "map" else -(view_switch.size.y + 18.0)
+	if world != null:
+		world.hud_bottom = view_switch.size.y + 22.0
 
 
 func _build_top_bar() -> Control:
 	var bar := PanelContainer.new()
 	bar.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL, Palette.LINE, 10, 6))
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
+	row.add_theme_constant_override("separation", 4)
 	bar.add_child(row)
-	date_label = ThemeFactory.heading("", 18)
-	date_label.custom_minimum_size.x = 140
+	top_row = row
+	date_label = ThemeFactory.heading("", 16)
 	row.add_child(date_label)
 	colony_button = OptionButton.new()
-	colony_button.custom_minimum_size = Vector2(96, 42)
+	colony_button.custom_minimum_size = Vector2(88, 44)
 	colony_button.fit_to_longest_item = false
 	colony_button.clip_text = true
 	colony_button.tooltip_text = "식민지 고르기 — 그 도시로 날아간다"
@@ -617,7 +644,7 @@ func _build_top_bar() -> Control:
 		var b := Button.new()
 		b.text = SPEED_LABELS[i]
 		b.toggle_mode = true
-		b.custom_minimum_size = Vector2(44, 42)
+		b.custom_minimum_size = Vector2(44, 44)
 		b.pressed.connect(_on_speed_button.bind(i))
 		if i == MAX_SPEED:
 			b.tooltip_text = "최고 속도 (4) — 화면이 버티는 만큼 빨리 흐른다 (PC에서 하루에 한 달쯤). 결정할 일·위급하면 멈춘다"
@@ -626,7 +653,7 @@ func _build_top_bar() -> Control:
 	var jump := Button.new()
 	jump.text = "다음 사건"
 	jump.tooltip_text = "알릴 일이 생길 때까지 시간을 건너뛴다 (최대 30일, F)"
-	jump.custom_minimum_size.y = 42
+	jump.custom_minimum_size.y = 44
 	jump.pressed.connect(func():
 		_stop_auto_jump()
 		_start_jump())
@@ -636,7 +663,7 @@ func _build_top_bar() -> Control:
 	auto_jump_button.toggle_mode = true
 	auto_jump_button.tooltip_text = "다음 사건을 계속 넘긴다 (Shift+F) — 사건마다 알림을 잠깐 보여 주고 다음 사건으로. " + \
 		"결정할 일(대피소 추첨 — 자동 운영이면 추첨으로 정한다)·위급(산소·식량 3일 아래)·사망이면 멈춘다"
-	auto_jump_button.custom_minimum_size = Vector2(52, 42)
+	auto_jump_button.custom_minimum_size = Vector2(52, 44)
 	auto_jump_button.toggled.connect(func(on: bool):
 		if on:
 			_begin_auto_jump()
@@ -647,22 +674,26 @@ func _build_top_bar() -> Control:
 	auto_button.text = "자동 운영"
 	auto_button.tooltip_text = "시드가 문서의 추천 운영대로 짓고 연구한다"
 	auto_button.toggle_mode = true
-	auto_button.custom_minimum_size.y = 42
+	auto_button.custom_minimum_size.y = 44
 	auto_button.toggled.connect(_on_auto)
 	row.add_child(auto_button)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(spacer)
-	var chip_row := HBoxContainer.new()
-	chip_row.add_theme_constant_override("separation", 8)
+	# 지표: 남는 폭에 오른쪽으로 붙이고, 모자라면 글 폭에 비례해 줄인다 (설명 줄은 …) — _fit_chips
+	chip_row = HBoxContainer.new()
+	chip_row.add_theme_constant_override("separation", 6)
+	chip_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	chip_row.clip_contents = true
+	chip_row.resized.connect(_fit_chips)
 	row.add_child(chip_row)
+	chip_spacer = Control.new()
+	chip_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	chip_row.add_child(chip_spacer)
 	for key in ["o2", "co2", "soc", "food", "pop", "morale", "trust"]:
 		var chip := _chip()
 		chip_row.add_child(chip["box"])
 		chips[key] = chip
 	var menu := Button.new()
 	menu.text = "메뉴"
-	menu.custom_minimum_size = Vector2(58, 42)
+	menu.custom_minimum_size = Vector2(58, 44)
 	menu.pressed.connect(_show_menu)
 	row.add_child(menu)
 	return bar
@@ -671,16 +702,65 @@ func _build_top_bar() -> Control:
 func _chip() -> Dictionary:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 0)
-	box.custom_minimum_size.x = 54
+	box.custom_minimum_size.x = CHIP_MIN
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.mouse_filter = Control.MOUSE_FILTER_STOP      # 도움말(줄이지 않은 설명)
 	var value := Label.new()
 	value.add_theme_font_override("font", ThemeFactory.bold)
 	value.add_theme_font_size_override("font_size", 16)
+	value.clip_text = true
 	var caption := Label.new()
 	caption.add_theme_font_size_override("font_size", 11)
 	caption.add_theme_color_override("font_color", Palette.MUTED)
+	caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	caption.clip_text = true
 	box.add_child(value)
 	box.add_child(caption)
 	return {"box": box, "value": value, "caption": caption}
+
+
+## 지표 폭: 늘이는 비율을 글 폭으로 — 자리가 넉넉하면 저마다 글 폭 그대로 (남는 폭은 앞의 빈칸이), 모자라면 글 폭에 비례해
+## 나눈다 (CHIP_MIN 아래로는 안 줄고, 설명 줄은 …). 최소 폭은 늘 CHIP_MIN이라 위 막대가 화면 밖으로 밀리지 않는다
+func _fit_chips() -> void:
+	if chip_row == null or chips.is_empty():
+		return
+	var want := {}
+	var total := 0.0
+	for k in chips:
+		var c: Dictionary = chips[k]
+		want[k] = maxf(CHIP_MIN, ceilf(maxf(_text_w(c["value"]), _text_w(c["caption"]))))
+		total += want[k]
+	var room := chip_row.size.x - float(chip_row.get_theme_constant("separation")) * chips.size()
+	chip_spacer.size_flags_stretch_ratio = maxf(0.001, room - total)
+	for k in chips:
+		(chips[k]["box"] as Control).size_flags_stretch_ratio = want[k]
+
+
+func _text_w(l: Label) -> float:
+	var t := I18n.t(l.text)
+	if t == "":
+		return 0.0
+	return l.get_theme_font("font").get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, l.get_theme_font_size("font_size")).x
+
+
+## 탭 이름이 단추에 들어가게 글자 크기를 13 → 11까지 줄이고, 그래도 넘치면 두 줄로 ("Life support")
+func _fit_tab_fonts() -> void:
+	for k in tab_buttons:
+		var b: Button = tab_buttons[k]
+		var room := b.size.x - 4.0
+		var t := I18n.t(b.text)
+		var font := b.get_theme_font("font")
+		var fs := 13
+		while fs > 11 and font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room:
+			fs -= 1
+		var wrap := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room and t.contains(" ")
+		if wrap:
+			fs = 12
+		if b.get_theme_font_size("font_size") != fs:
+			b.add_theme_font_size_override("font_size", fs)
+		var mode := TextServer.AUTOWRAP_WORD if wrap else TextServer.AUTOWRAP_OFF
+		if b.autowrap_mode != mode:
+			b.autowrap_mode = mode
 
 
 func _build_side() -> Control:
@@ -691,19 +771,22 @@ func _build_side() -> Control:
 	side.add_child(v)
 	var tab_row := HBoxContainer.new()
 	tab_row.add_theme_constant_override("separation", 4)
+	tab_row.resized.connect(_fit_tab_fonts)
 	v.add_child(tab_row)
 	for t in TABS:
 		var b := Button.new()
 		b.text = t[1]
 		b.toggle_mode = true
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.custom_minimum_size = Vector2(0, 42)
+		b.custom_minimum_size = Vector2(0, 44)
 		b.clip_text = true
 		b.add_theme_font_size_override("font_size", 13)
 		for state in ["normal", "hover", "pressed", "disabled", "focus"]:
 			var sb := (theme.get_stylebox(state, "Button") as StyleBoxFlat).duplicate() as StyleBoxFlat
 			sb.content_margin_left = 2
 			sb.content_margin_right = 2
+			sb.content_margin_top = 6            # 두 줄 이름도 44 px 안에
+			sb.content_margin_bottom = 6
 			b.add_theme_stylebox_override(state, sb)
 		b.pressed.connect(_select_tab.bind(t[0]))
 		tab_row.add_child(b)
@@ -1455,12 +1538,12 @@ func _refresh_live() -> void:
 	var soc := (sim.battery + sim.rfc) / cap if cap > 0 else 0.0
 	var ppm := sim.co2_ppm()
 	_set_chip("o2", Fmt.days(o2_days), "산소 비축", Palette.level_color(o2_days, 10, 5))
-	_set_chip("co2", "%s ppm" % Fmt.n(ppm), "CO₂", Palette.RED if ppm > 5000 else (Palette.AMBER if ppm > 2500 else Palette.TEXT))
+	_set_chip("co2", Fmt.n(ppm), "CO₂ ppm", Palette.RED if ppm > 5000 else (Palette.AMBER if ppm > 2500 else Palette.TEXT))
 	var shade := "그림자" if plan.layout.kind == "ridge" else "밤"
 	_set_chip("soc", Fmt.pct(soc), "축전" + (" · " + shade if sim.is_dark() else ""), Palette.level_color(soc, 0.4, 0.15))
 	_set_chip("food", Fmt.days(food_days), "식량 · 자급 %s" % Fmt.pct(made / food_need if food_need > 0 else 0.0),
 		Palette.level_color(food_days, 20, 7))
-	_set_chip("pop", "%d명" % int(pop), "인구 · 주거 %d" % int(sim.housing_cap), Palette.AMBER if pop > sim.housing_cap else Palette.TEXT)
+	_set_chip("pop", str(int(pop)), "인구 · 주거 %d" % int(sim.housing_cap), Palette.AMBER if pop > sim.housing_cap else Palette.TEXT)
 	_set_chip("morale", str(int(round(sim.morale))), "사기", Palette.level_color(sim.morale, 50, 35))
 	_set_chip("trust", str(int(round(sim.trust))), "신뢰", Palette.level_color(sim.trust, 40, 30))
 	if world.city != null and active >= 0 and active < colonies.list.size():
@@ -1476,9 +1559,14 @@ func _refresh_live() -> void:
 
 
 func _set_chip(key: String, value: String, caption: String, color: Color) -> void:
-	chips[key]["value"].text = value
-	chips[key]["value"].add_theme_color_override("font_color", color if color != Palette.TEAL else Palette.TEXT)
-	chips[key]["caption"].text = caption
+	var c: Dictionary = chips[key]
+	var changed: bool = c["caption"].text != caption or c["value"].text.length() != value.length()
+	c["value"].text = value
+	c["value"].add_theme_color_override("font_color", color if color != Palette.TEAL else Palette.TEXT)
+	c["caption"].text = caption
+	(c["box"] as Control).tooltip_text = "%s — %s" % [caption, value]
+	if changed:
+		_fit_chips.call_deferred()
 
 
 func _select_tab(key: String) -> void:
@@ -1547,6 +1635,8 @@ func _toast(text: String, kind: String, quiet := false) -> void:
 
 ## 언어를 바꿨다: 라벨·단추는 저절로 다시 번역된다 — 직접 그리는 화면과 숫자 글을 다시 그린다
 func _on_lang_changed() -> void:
+	_fit_tab_fonts()
+	_fit_chips.call_deferred()
 	_tab_sim.clear()
 	for k in tabs:
 		if tabs[k].has_method("rebuild"):

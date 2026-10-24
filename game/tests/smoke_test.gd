@@ -66,6 +66,7 @@ func _process(_delta: float) -> bool:
 		_sound_check()
 		_tutorial_check()
 		_i18n_check()
+		_layout_check()
 		main._on_module_tapped("hab_module")
 		main._show_help()
 		main._show_report()
@@ -89,6 +90,7 @@ func _process(_delta: float) -> bool:
 			print("smoke: 3y pop %d, trust %.1f, deaths %d, techs %d" % [int(s["population_end"]), s["trust_end"], int(s["deaths"]), s["techs"]])
 			main.modal.visible = false
 			_colony_check()
+			_layout_check()                   # 3년 뒤 (시대·메가프로젝트·도시 여덟) 화면 폭도
 			if failures.is_empty():
 				print("smoke: OK")
 				quit(0)
@@ -1998,6 +2000,55 @@ func _i18n_check() -> void:
 	main._on_lang_changed()
 	_check(not I18n.is_en() and TranslationServer.translate("생명유지") == "생명유지" and Fmt.days(30.0) == "30일", "한국어로 돌아오지 못했다")
 	print("smoke: i18n %.1f%% of %d strings, life tab \"%s\"" % [cover * 100.0, (cat as Dictionary).size(), life])
+
+
+## 화면 폭 (1280×720 기준 UI): 위 막대와 옆 패널(탭마다)이 한국어·영어 모두에서 넘치지 않는다 — 최소 폭으로 본다
+## (여러 해상도의 스크린숏과 터치 크기는 tests/device_shots.gd)
+func _layout_check() -> void:
+	var side: Control = (main.tab_buttons.values()[0] as Control).get_parent().get_parent().get_parent()
+	var bar: Control = main.top_row.get_parent()
+	var widths := PackedStringArray()
+	for lang in ["ko", "en"]:
+		I18n.apply(lang)
+		main._on_lang_changed()
+		main._refresh_live()
+		var bar_w := bar.get_combined_minimum_size().x
+		_check(bar_w <= 1260.0, "%s: 위 막대가 1280 폭에 들어가지 않는다 (%d)" % [lang, int(bar_w)])
+		var widest := 0.0
+		for tab in ["life", "power", "build", "research", "colony", "transport", "log"]:
+			main._select_tab(tab)
+			var w := side.get_combined_minimum_size().x
+			widest = maxf(widest, w)
+			_check(w <= 441.0, "%s: '%s' 탭의 글이 옆 패널을 넓힌다 (%d — %s)" % [lang, tab, int(w), _widest(side)])
+		widths.append("%s 막대 %d · 패널 %d" % [lang, int(bar_w), int(widest)])
+	I18n.apply("ko")
+	main._on_lang_changed()
+	main._select_tab("life")
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(20, 30)
+	main._touch_size(b)
+	_check(b.custom_minimum_size == Vector2(44, 44), "터치 크기가 44 px로 늘지 않았다 (%s)" % b.custom_minimum_size)
+	b.free()
+	print("smoke: layout %s" % ", ".join(widths))
+
+
+## 가장 넓은 자식을 끝까지 따라가 만난 마지막 글 (옆 패널을 넓힌 것)
+static func _widest(n: Node) -> String:
+	var at := n
+	var out := ""
+	for _d in 16:
+		var best: Control = null
+		for k in at.get_children():
+			if k is Control and (k as Control).is_visible_in_tree() and (best == null or
+					(k as Control).get_combined_minimum_size().x > best.get_combined_minimum_size().x):
+				best = k
+		if best == null:
+			break
+		at = best
+		if best is Label or best is Button:
+			out = "%s %d '%s'" % [best.get_class(), int(best.get_combined_minimum_size().x),
+				I18n.t((best as Label).text if best is Label else (best as Button).text).left(40)]
+	return out
 
 
 ## 그 노드 아래 글(라벨·단추)

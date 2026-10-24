@@ -163,6 +163,7 @@ func _entry(tid: String, target: String) -> Control:
 		state = "대기 %d번째" % (sim.research_queue.find(tid) + 1)
 		color = Palette.BLUE
 	title.text = t["name"] + ("  · " + state if state != "" else "")
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.add_theme_color_override("font_color", color)
 	info.add_child(title)
 	var req := []

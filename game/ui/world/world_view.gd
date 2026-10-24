@@ -33,6 +33,7 @@ var vis_hours := 0.0                 # 행성 자전용 시각 (배속이 빨라
 var hour_frac := 0.0                 # 다음 시뮬레이션 시간까지 흐른 몫 (main이 넣는다 — 해가 매끄럽게 움직이게)
 var jd := Astro.J2000
 var quality_hi := true
+var hud_bottom := 66.0               # 고도 글의 자리 (아래에서) — main이 왼쪽 아래 단추 줄 높이에 맞춘다
 
 var _vp: SubViewport
 var _tex: TextureRect
@@ -1755,7 +1756,7 @@ func _draw_readout(font: Font) -> void:
 		if cam.track.is_valid():
 			name = "수송선"
 		text = "%s에서 %s" % [name, Fmt.distance_km(cam.dist)]
-	var pos2 := Vector2(14, size.y - 66)
+	var pos2 := Vector2(14, size.y - hud_bottom)
 	_overlay.draw_string(font, pos2 + Vector2(1, 1), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0, 0, 0, 0.7))
 	_overlay.draw_string(font, pos2, I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.85, 0.88, 0.92, 0.9))
 	var hd := cam.heading_deg()

@@ -53,7 +53,7 @@ func refresh() -> void:
 		var b := Button.new()
 		b.text = String(a["name"])
 		b.flat = true
-		b.custom_minimum_size.y = 36
+		b.custom_minimum_size = Vector2(44, 44)          # 누르는 곳은 최소 44 px ("달")
 		b.add_theme_font_size_override("font_size", 14)
 		var last := i == path.size() - 1
 		b.add_theme_color_override("font_color", Palette.AMBER if last else Color(0.86, 0.88, 0.92))
@@ -66,7 +66,7 @@ func refresh() -> void:
 		var ch := Button.new()
 		ch.text = "▾" if last else "›"
 		ch.flat = true
-		ch.custom_minimum_size = Vector2(26, 36)
+		ch.custom_minimum_size = Vector2(44, 44)
 		ch.add_theme_font_size_override("font_size", 15)
 		ch.add_theme_color_override("font_color", Color(0.7, 0.74, 0.8))
 		ch.tooltip_text = "%s 안에서 고르기" % a["name"]

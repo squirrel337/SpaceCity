@@ -106,7 +106,7 @@ func _init() -> void:
 		sl.max_value = 1.0
 		sl.step = 0.05
 		sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		sl.custom_minimum_size.y = 36
+		sl.custom_minimum_size.y = 44
 		var key: String = spec[0]
 		sl.value_changed.connect(func(x: float):
 			Settings.set_value(key, x)
