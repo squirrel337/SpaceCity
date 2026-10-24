@@ -42,6 +42,7 @@ var city_view: CityView
 var world: WorldView
 var dv_map: DvMapView                # 항로 지도 (왼쪽 큰 화면의 '항로')
 var sound: Sound                     # 효과음·환경음 (코드로 합성)
+var tutorial: Tutorial               # 첫 한 시간 안내 (새 게임 카드·메뉴의 '튜토리얼')
 var _amb_wait := 0.0
 var plan: CityPlan
 var tool := PlaceTool.new()
@@ -212,6 +213,11 @@ func _build() -> void:
 	toasts.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	toasts.offset_right = -12
 	toasts.offset_bottom = -62          # 왼쪽 아래 단추 줄 위로
+	tutorial = Tutorial.new()
+	tutorial.main = self
+	tutorial.finished.connect(func(skipped: bool):
+		_toast("튜토리얼을 %s — 메뉴의 '튜토리얼'에서 다시 본다" % ("건너뛰었다" if skipped else "마쳤다"), "info"))
+	add_child(tutorial)
 	modal = Modal.new()
 	modal.chosen.connect(_on_modal_choice)
 	add_child(modal)
@@ -741,6 +747,7 @@ func _build_side() -> Control:
 # ── 새 게임·저장 ─────────────────────────────────────────────────
 func _new_game(seed_value: int, autopilot: bool) -> void:
 	_boot_save()                                     # 미리 풀어 둔 저장은 쓰지 않으니 놓는다
+	tutorial.cancel()
 	var s := CitySim.new(seed_value, 40.0, "good" if autopilot else "")
 	colonies.start(s, CityPlan.create(s, world.ground_for(s.site_id).layout))
 	_begin_session(0)
@@ -872,6 +879,7 @@ func _save() -> void:
 func _load_save() -> bool:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return false
+	tutorial.cancel()
 	var data: Variant = _boot_save()
 	if data == null:
 		data = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
@@ -1584,7 +1592,13 @@ func _show_start() -> void:
 	var choices := []
 	if FileAccess.file_exists(SAVE_PATH):
 		choices.append(["continue", "이어하기", "저장한 지점에서 계속한다"])
+	var tut := ["tutorial", "튜토리얼과 함께 시작", "첫 한 시간을 열한 단계로 — 지표 읽기, 시간, 3D, 짓기, 연구, 개척, 항로 지도"]
+	if not bool(Settings.value("tutorial/done", false)):
+		tut[1] = "튜토리얼과 함께 시작 (처음이라면)"
+		choices.append(tut)
 	choices.append(["new", "새로 시작 — 시드 2061", "디자인 문서·밸런스 시뮬레이터와 같은 운으로 시작한다"])
+	if bool(Settings.value("tutorial/done", false)):
+		choices.append(tut)
 	choices.append(["random", "다른 운으로 시작", "그림자·고장·폭풍·화물선의 운이 달라진다"])
 	choices.append(["auto", "시드 자동 운영으로 보기", "추천 운영대로 3년을 돌려 본다. 언제든 '자동 운영'을 꺼서 넘겨받는다"])
 	choices.append(["scenario", "시나리오·도전", "목표와 기한이 있는 판 %d가지 — 도전은 규칙이 더 까다롭고 가장 좋은 기록이 남는다" %
@@ -1649,6 +1663,7 @@ func _show_menu() -> void:
 		["save", "지금 저장", ""],
 		["settings", "설정", "그래픽 품질 (GPU에 맞춰 자동) · 지도에 보일 것"],
 		["help", "도움말", ""],
+		["tutorial", "튜토리얼", "첫 한 시간을 열한 단계로 다시 짚는다 (지금 도시에서)"],
 		["restart", "처음부터 다시", "저장한 게임을 덮어쓴다"],
 		["quit", "저장하고 끝내기", ""],
 	])
@@ -1754,6 +1769,10 @@ func _on_modal_choice(context: String, choice: String) -> void:
 						_new_game(2061, false)
 				"new":
 					_new_game(2061, false)
+				"tutorial":
+					_new_game(2061, false)
+					_set_speed(0)
+					tutorial.start()
 				"random":
 					_new_game(randi_range(1, 999999), false)
 				"auto":
@@ -1796,6 +1815,8 @@ func _on_modal_choice(context: String, choice: String) -> void:
 					_toast("저장했다", "good")
 				"help":
 					_show_help()
+				"tutorial":
+					tutorial.start()
 				"settings":
 					settings_panel.open()
 				"restart":

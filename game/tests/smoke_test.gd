@@ -64,6 +64,7 @@ func _process(_delta: float) -> bool:
 		_raised_check()
 		_speed_check()
 		_sound_check()
+		_tutorial_check()
 		main._on_module_tapped("hab_module")
 		main._show_help()
 		main._show_report()
@@ -1889,6 +1890,75 @@ func _sound_check() -> void:
 	_check(snd._want_amb == "space" and snd._amb_name == "space", "항로 지도에서 우주의 울림이 아니다 (%s)" % snd._amb_name)
 	main._set_view("world")
 	print("smoke: sound %d streams, played %s" % [snd.ready_count(), str(snd.played)])
+
+
+## 튜토리얼: 열한 단계 — 읽기 단계는 '다음', 할 일 단계는 그 일을 하면 넘어간다 (반나절 흘리기·화면 돌리기·짓기·연구·개척 탭·
+## 항로 지도), 단계마다 가리키는 자리, 끝내면 설정에 남는다, 건너뛰기, 새 게임 카드의 선택지
+func _tutorial_check() -> void:
+	var tu: Tutorial = main.tutorial
+	var old: Variant = Settings.value("tutorial/done", false)
+	main._set_speed(0)
+	main.modal.visible = false
+	tu.start()
+	_check(tu.active() and tu.step == 0 and tu._next.visible, "튜토리얼이 첫 단계로 열리지 않았다")
+	tu._on_next()
+	_check(tu.step == 1 and tu.target_rect().size != Vector2.ZERO, "지표 단계가 지표를 가리키지 않는다")
+	tu._on_next()
+	_check(tu.step == 2 and not tu.done_now() and not tu._next.visible, "시간 단계가 시간을 흘리기 전에 끝났다")
+	main._set_speed(1)
+	for _i in 13:
+		main._step()
+	main._set_speed(0)
+	tu._clock = 0.0
+	tu._process(0.016)
+	_check(tu.step == 3, "반나절을 흘렸는데 시간 단계에서 넘어가지 않았다 (%d)" % tu.step)
+	main.world.cam.yaw += 0.4
+	tu._clock = 0.0
+	tu._process(0.016)
+	_check(tu.step == 4, "화면을 돌렸는데 넘어가지 않았다 (%d)" % tu.step)
+	tu._on_next()
+	_check(tu.step == 5 and tu.target_rect().size != Vector2.ZERO, "짓기 단계가 건설 탭을 가리키지 않는다")
+	var sim: CitySim = main.sim
+	var m: Dictionary = sim.M["hab_module"]
+	for key in m["cost"]:
+		sim.stock[key] = float(sim.stock.get(key, 0.0)) + float(m["cost"][key]) + 100.0
+	if m["tech"] != null:
+		sim.techs[String(m["tech"])] = true
+	_check(sim.enqueue("hab_module"), "시험 건물을 대기열에 넣지 못했다")
+	tu._clock = 0.0
+	tu._process(0.016)
+	_check(tu.step == 6, "지었는데 짓기 단계에서 넘어가지 않았다 (%d)" % tu.step)
+	for t in GameData.TECHS:
+		if not sim.techs.has(t) and not sim.research_queue.has(t):
+			sim.research_queue.append(t)
+			break
+	main._select_tab("research")                 # 자동 운영이 차례를 다 채웠으면 연구 탭을 열어 본 것으로
+	tu._clock = 0.0
+	tu._process(0.016)
+	_check(tu.step == 7, "연구를 골랐는데 넘어가지 않았다 (%d)" % tu.step)
+	tu._on_next()
+	main._select_tab("colony")
+	tu._clock = 0.0
+	tu._process(0.016)
+	_check(tu.step == 9, "개척 탭을 열었는데 넘어가지 않았다 (%d)" % tu.step)
+	main._set_view("map")
+	tu._clock = 0.0
+	tu._process(0.016)
+	_check(tu.step == 10 and tu._next.visible, "항로 지도를 열었는데 마지막 단계가 아니다 (%d)" % tu.step)
+	main._set_view("world")
+	Settings.set_value("tutorial/done", false)
+	tu._on_next()
+	_check(not tu.active() and bool(Settings.value("tutorial/done", false)), "튜토리얼을 끝냈는데 설정에 남지 않았다")
+	Settings.set_value("tutorial/done", false)
+	tu.start()
+	tu.stop(true)
+	_check(not tu.active() and bool(Settings.value("tutorial/done", false)), "튜토리얼을 건너뛰지 못했다")
+	Settings.set_value("tutorial/done", false)
+	main._show_start()
+	_check(_texts(main.modal).any(func(x): return x.begins_with("튜토리얼과 함께 시작")), "새 게임 카드에 튜토리얼이 없다")
+	main.modal.visible = false
+	Settings.set_value("tutorial/done", old)
+	main._select_tab("life")
 
 
 ## 그 노드 아래 글(라벨·단추)
