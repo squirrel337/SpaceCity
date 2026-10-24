@@ -61,6 +61,7 @@ var seq := 0
 var stock := {}
 var cohorts: Array = []          # [인원, 누적 선량 mSv, 귀환 대기]
 var morale := 0.0
+var ext := {"morale": 0.0, "work_k": 1.0, "make_k": 1.0}   # 시뮬레이션 밖의 보정 (CityServices — 자리로 셈한다). 기본값이면 파이썬과 같다
 var trust := 0.0
 var trust_memory := 0.0          # 사건이 남긴 신뢰의 흔적. 반감기 약 1년
 var support := 0.0
@@ -623,7 +624,7 @@ func step_hour(pop: float) -> void:
 
 	# 3순위 산업
 	if run3:
-		var k3 := h * run3
+		var k3 := h * run3 * float(ext.get("make_k", 1.0))     # 도시 안 물류 (기본 1)
 		for m in active["ice_miner"]:
 			s["water_kg"] += wk[m] * recipe(m, "out", "water_kg") * mining * k3
 		for m in active["excavator"]:
@@ -941,7 +942,7 @@ func research() -> void:
 	for m in with_prov("rp_day"):
 		if family(m) != "research_lab":
 			rp_direct += wk[m] * float(prov(m, "rp_day"))
-	var rp: float = (scientists * prod * p4_share
+	var rp: float = (scientists * prod * p4_share * float(ext.get("work_k", 1.0))
 		+ rp_direct * p4_share
 		+ C["earth"]["earth_rp_day"])
 	last_rp = rp
@@ -982,14 +983,14 @@ func commerce() -> void:
 	for m in with_prov("support_day"):
 		made += wk[m] * float(prov(m, "support_day"))
 	if made:
-		support += made * share
+		support += made * share * float(ext.get("work_k", 1.0))
 	for m in with_prov("make"):
 		var n: int = wk[m]
 		if n:
 			var k4 := share if priority_of(m) == 4 else 1.0
 			var mk: Dictionary = prov(m, "make", {})
 			for k in mk:
-				stock[k] = float(stock.get(k, 0.0)) + n * float(mk[k]) * k4
+				stock[k] = float(stock.get(k, 0.0)) + n * float(mk[k]) * k4 * float(ext.get("make_k", 1.0))
 
 
 func earth(d: int) -> void:
@@ -1272,6 +1273,7 @@ func update_morale() -> void:
 			break
 	recent_deaths *= 0.97
 	recent_exposure *= 0.97
+	target += float(ext.get("morale", 0.0))      # 시설 영향 범위 (기본 0)
 	morale += (target - morale) * 0.1
 	trust_memory *= 0.998
 	trust += ((morale - 5 + trust_memory) - trust) * 0.05

@@ -245,6 +245,13 @@ func _build_view_switch() -> Control:
 		wb.custom_minimum_size = Vector2(42 if spec[0].length() == 1 else 54, 40)
 		wb.pressed.connect(spec[2])
 		world_row.add_child(wb)
+	var cover := Button.new()
+	cover.text = "범위"
+	cover.toggle_mode = true
+	cover.tooltip_text = "영향 범위 — 의료·여가·대피 시설이 닿는 원. 집이 원 안에 있으면 사기가 오른다 ('개척' 탭의 도시 기능)"
+	cover.custom_minimum_size = Vector2(54, 40)
+	cover.toggled.connect(func(on: bool): world.show_cover(on))
+	world_row.add_child(cover)
 	row.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	row.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	row.offset_left = 10

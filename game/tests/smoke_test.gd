@@ -48,6 +48,7 @@ func _process(_delta: float) -> bool:
 		_devmodes_check()
 		_redevelop_check()
 		_roadworks_check()
+		_services_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -765,6 +766,50 @@ func _roadworks_check() -> void:
 	_check(not run.is_empty() and String(run["type"]) == "avenue", "넓힐 길을 고르지 못했다")
 	print("smoke: road works line %s %d m, widen %s → %s (load %d)" % [String(w["type"]), int(w["len"]), String(run.get("from", "")),
 		String(run.get("type", "")), int(run.get("load", 0))])
+
+
+## 도시 기능의 자리: 시설 영향 범위·통근·물류를 재서 시뮬레이션 보정(ext)으로 건넨다. 기본 보정이면 하루가 그대로이고, 사기 보정은
+## 사기를 움직인다. 의료가 닿지 않으면 사기 보정이 내려간다. 출근 시간에 통근·화물 탈것이 다닌다. '범위' 보기에 원이 그려진다
+func _services_check() -> void:
+	var ss := CitySim.new(7, 40.0, "good")
+	var sp := CityPlan.create(ss, BaseLayout.new("ridge"))
+	var c := {"sim": ss, "plan": sp, "mode": ""}
+	CityServices.apply(c)
+	var m: Dictionary = c["services"]
+	var cv: Dictionary = m["cover"]
+	_check(cv.has("care") and float(m["commute_min"]) > 0.0 and float(m["freight_km"]) > 0.0, "도시 기능(범위·통근·물류)을 재지 못했다")
+	_check(is_equal_approx(float(ss.ext["work_k"]), float(m["ext"]["work_k"])), "도시 기능의 보정이 시뮬레이션에 건너가지 않았다")
+	var a := CitySim.new(2061, 1.0, "")
+	var b := CitySim.new(2061, 1.0, "")
+	b.ext = CityExt.neutral()
+	var d := CitySim.new(2061, 1.0, "")
+	d.ext = CityExt.neutral()
+	d.ext["morale"] = 10.0
+	for _h in 72:
+		a.advance_hour()
+		b.advance_hour()
+		d.advance_hour()
+	_check(a.morale == b.morale and a.rp_bank == b.rp_bank and a.stock["parts"] == b.stock["parts"], "기본 보정이 시뮬레이션을 바꾼다")
+	_check(d.morale > a.morale, "사기 보정이 들어가지 않는다")
+	var sv := CityServices.data()
+	var r0: float = sv["cover"]["care"]["radius_m"]
+	sv["cover"]["care"]["radius_m"] = 1.0
+	var m2 := CityServices.measure(sp, ss)
+	sv["cover"]["care"]["radius_m"] = r0
+	_check(float(m2["cover"]["care"]) < float(cv["care"]) and float(m2["ext"]["morale"]) < float(m["ext"]["morale"]),
+		"의료가 닿지 않는데 사기 보정이 내려가지 않는다")
+	var tr := BaseTraffic.new(sp)
+	ss.hour = int(ss.hour / 24) * 24 + 8
+	tr.update(0.1, ss, [])
+	var commuters := tr.agents.filter(func(x): return x["role"] == "commuter").size()
+	var freight := tr.agents.filter(func(x): return x["role"] == "freight").size()
+	_check(commuters == BaseTraffic.COMMUTERS and freight == BaseTraffic.FREIGHT, "출근 시간에 통근·화물 탈것이 없다 (%d, %d)" % [commuters, freight])
+	main.world.show_cover(true)
+	main.world.city._update_cover()
+	_check(main.world.city._cover != null and main.world.city._cover.mesh != null, "'범위' 보기에 원이 없다")
+	main.world.show_cover(false)
+	print("smoke: services care %s leisure %s, commute %.1f min, freight %.2f km, ext %s" % [Fmt.pct(float(cv["care"])),
+		Fmt.pct(float(cv["leisure"])), float(m["commute_min"]), float(m["freight_km"]), CityExt.text(ss.ext)])
 
 
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.

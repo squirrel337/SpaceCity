@@ -12,6 +12,8 @@ const ASCEND_S := 3.5
 const MAX_ROBOTS := 10
 const WALKERS := 6
 const MAX_TRANSIT := 8            # 한꺼번에 보이는 교통 탈것 (빠르게 흐를 때 넘치지 않게)
+const COMMUTERS := 6              # 출퇴근 시간(7~9시 집 → 일터, 17~19시 일터 → 집)에 길을 다니는 통근 탈것
+const FREIGHT := 2                # 일하는 시간(8~18시)에 만드는 건물과 저장 시설 사이를 오가는 화물 탈것
 const TRANSIT_ROLES := ["convoy", "fly", "plane", "transit_lander"]
 const ROLE_CAP := {"convoy": 6, "fly": 2, "plane": 2, "transit_lander": 1}    # 갈래마다 (열차는 세 대가 한 편)
 
@@ -21,6 +23,7 @@ var _seen := {}
 var _landers_waiting: Array = []
 var _rng := RandomNumberGenerator.new()
 var _ev_n := -1                   # 본 교통 사건 번호 (-1 = 아직 맞추지 않았다)
+var _trips := {}                  # 통근·물류의 끝점: {rev, homes, works, makers, stores} (배치가 바뀔 때까지)
 var _site := ""
 
 
@@ -156,6 +159,51 @@ func _ensure(sim: CitySim) -> void:
 	while wn < WALKERS:
 		_spawn("walker", "astronaut", _random_core_spot(), 1.4)
 		wn += 1
+	# 통근 (CityServices의 통근 시간이 그 길을 따른다): 출근은 집 → 일터, 퇴근은 일터 → 집. 닿으면 사라진다
+	var hod := sim.hour % 24
+	var ends := _trip_ends()
+	var rush := 1 if hod >= 7 and hod < 10 else (-1 if hod >= 17 and hod < 20 else 0)
+	if rush != 0 and not ends["homes"].is_empty() and not ends["works"].is_empty():
+		var cn := int(n.get("commuter", 0))
+		while cn < COMMUTERS:
+			var h: Vector3 = ends["homes"][_rng.randi() % ends["homes"].size()]
+			var w: Vector3 = ends["works"][_rng.randi() % ends["works"].size()]
+			var from := h if rush > 0 else w
+			var to := w if rush > 0 else h
+			var c := _spawn("commuter", "ltv" if _rng.randf() < 0.7 else "pressurized_rover", _road_point(from), 7.0,
+				{"state": "go", "wait": _rng.randf_range(0.0, 3.0)})
+			c["path"] = plan.route(c["pos"], _road_point(to))
+			cn += 1
+	if hod >= 8 and hod < 18 and not ends["makers"].is_empty() and not ends["stores"].is_empty():
+		var fn := int(n.get("freight", 0))
+		while fn < FREIGHT:
+			var m: Vector3 = ends["makers"][_rng.randi() % ends["makers"].size()]
+			var s: Vector3 = ends["stores"][_rng.randi() % ends["stores"].size()]
+			var f := _spawn("freight", "cargo_hauler", _road_point(m), 5.0, {"state": "go"})
+			f["path"] = plan.route(f["pos"], _road_point(s))
+			fn += 1
+
+
+## 통근·물류의 끝점 (배치의 판이 바뀔 때까지 같은 답): 집(집이 있는 건물), 일터(일손이 있는 건물), 만드는 건물(산업), 저장 시설
+func _trip_ends() -> Dictionary:
+	if int(_trips.get("rev", -1)) == plan.revision:
+		return _trips
+	_trips = {"rev": plan.revision, "homes": [], "works": [], "makers": [], "stores": []}
+	for e in plan.buildings:
+		if int(e["seq"]) >= 0:
+			continue
+		var m: Dictionary = GameData.MODULES.get(String(e["id"]), {})
+		var pv: Dictionary = m.get("provides", {})
+		var p := Vector3(float(e["x"]), float(e["y"]), 0)
+		if float(pv.get("housing", 0.0)) > 0.0:
+			_trips["homes"].append(p)
+		if int(m.get("crew", 0)) > 0:
+			_trips["works"].append(p)
+		if String(m.get("category", "")) == "industry":
+			_trips["makers"].append(p)
+		if pv.has("storage"):
+			_trips["stores"].append(p)
+	return _trips
 
 
 func _remove_one(role: String) -> void:
@@ -231,6 +279,8 @@ func _step(a: Dictionary, dt: float, sim: CitySim, sites: Array) -> void:
 			var dest := _random_core_spot()
 			a["path"] = [Vector3(dest.x, a["pos"].y, 0), dest]
 			a["wait"] = _rng.randf_range(1.0, 5.0)
+		"commuter", "freight":
+			a["gone"] = true                # 닿았다
 
 
 func _move(a: Dictionary, dt: float) -> void:

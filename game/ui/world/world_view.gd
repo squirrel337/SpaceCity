@@ -51,6 +51,7 @@ var _rings: MeshInstance3D
 var moon: MoonSurface
 var body_baker: BodyBaker            # 암석·얼음 천체의 겉모습을 GPU로 굽는다 (가까이 가면 더 곱게)
 var city: City3D                     # 지금 고른 식민지의 자세한 도시 (하나뿐)
+var cover_on := false                # '범위' 보기
 var ground: SiteGround               # 그 도시가 앉은 땅
 var grounds := {}                    # 부지 id → SiteGround (달 섀클턴은 늘, 다른 부지는 처음 고를 때 만든다)
 var colonies: Array = []             # [{name, site, body, dir: 몸체 고정 Vector3, pop, active, candidate?, transit?}] — 점과 이름표
@@ -244,6 +245,14 @@ func _mount_city(g: SiteGround) -> void:
 	g.city_root.add_child(city)
 	city.setup(g)
 	city.module_tapped.connect(func(mid): module_tapped.emit(mid))
+	city.show_cover(cover_on)
+
+
+## '범위' 보기 (의료·여가·대피 시설이 닿는 원) — 다른 땅의 도시로 옮겨도 이어진다
+func show_cover(on: bool) -> void:
+	cover_on = on
+	if city != null:
+		city.show_cover(on)
 
 
 ## 행성 단위의 점과 이름표 (main이 식민지가 바뀔 때마다 넣는다)

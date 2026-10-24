@@ -30,6 +30,9 @@ var _groups := {}                 # "sprite/변형" → MultiMeshInstance3D
 var _sites_root: Node3D
 var _growing: Array = []          # 공정에 따라 바뀌는 공사 현장: [MeshInstance3D, _items의 번호, 앉는 자리] (_grow_sites)
 var _works: WorksView             # 길 공사 (차단막·기둥·덱·크레인)
+var cover_on := false             # '범위' 보기: 의료·여가·대피 시설이 닿는 원 (CityServices의 반지름)
+var _cover: MeshInstance3D
+var _cover_sig := ""
 var _trains: LineTrains           # 모노레일·자기부상 궤도의 열차
 var _grow_t := 0.0
 var _agents_root: Node3D
@@ -198,6 +201,8 @@ func update(delta: float, speed_level: int) -> void:
 		_grow_sites()
 		if heights_ok:
 			_works.refresh(plan, _local)
+	if cover_on and heights_ok:
+		_update_cover()
 	if heights_ok:
 		_trains.refresh(plan)
 		_trains.step(plan, _local, delta * VIS_SPEED[clampi(speed_level, 0, 3)])
@@ -422,6 +427,73 @@ func _set_plinths(list: Array) -> void:
 	_plinths.multimesh.instance_count = list.size()
 	for i in list.size():
 		_plinths.multimesh.set_instance_transform(i, list[i])
+
+
+# ── 영향 범위 보기 ──────────────────────────────────────────────
+const COVER_COLORS := {"care": Color(0.95, 0.38, 0.45), "leisure": Color(0.4, 0.86, 0.5), "shelter": Color(0.42, 0.62, 1.0)}
+const COVER_NAMES := {"care": "의료", "leisure": "여가", "shelter": "대피"}
+
+
+func show_cover(on: bool) -> void:
+	cover_on = on
+	_cover_sig = ""
+	if _cover:
+		_cover.visible = on
+
+
+## 시설마다 그 반지름의 원 (땅을 따라 0.6 m 위에 옅게 칠하고 가장자리 띠는 진하게). 배치·땅이 바뀌면 다시 그린다
+func _update_cover() -> void:
+	var sig := "%d|%d" % [plan.revision, plan.terrain_rev]
+	if sig == _cover_sig and _cover != null:
+		return
+	_cover_sig = sig
+	if _cover == null:
+		_cover = MeshInstance3D.new()
+		_cover.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.vertex_color_use_as_albedo = true
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		_cover.material_override = mat
+		add_child(_cover)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var cv: Dictionary = CityServices.data().get("cover", {})
+	var n := 0
+	for e in plan.buildings:
+		if int(e["seq"]) >= 0:
+			continue
+		var mid := String(e["id"])
+		var pv: Dictionary = GameData.MODULES.get(mid, {}).get("provides", {})
+		for key in COVER_COLORS:
+			var pk := String(CityServices.CARE_KEYS[key])
+			if float(pv.get(pk, 0.0)) <= 0.0 or (key == "leisure" and GameData.family(mid) == "comms_center"):
+				continue
+			_cover_disc(st, Vector2(float(e["x"]), float(e["y"])), float(cv.get(key, {}).get("radius_m", 150.0)), COVER_COLORS[key])
+			n += 1
+	_cover.mesh = st.commit() if n > 0 else null
+	_cover.visible = cover_on
+
+
+func _cover_disc(st: SurfaceTool, c: Vector2, r: float, col: Color) -> void:
+	var seg := 48
+	var fill := Color(col, 0.1)
+	var edge := Color(col, 0.75)
+	var mid := _local(c, 0.6)
+	for i in seg:
+		var a0 := TAU * i / seg
+		var a1 := TAU * (i + 1) / seg
+		var d0 := Vector2(cos(a0), sin(a0))
+		var d1 := Vector2(cos(a1), sin(a1))
+		var o0 := _local(c + d0 * r, 0.6)
+		var o1 := _local(c + d1 * r, 0.6)
+		var i0 := _local(c + d0 * (r - 2.5), 0.6)
+		var i1 := _local(c + d1 * (r - 2.5), 0.6)
+		for v in [[mid, fill], [i0, fill], [i1, fill], [i0, edge], [o0, edge], [o1, edge], [i0, edge], [o1, edge], [i1, edge]]:
+			st.set_color(v[1])
+			st.add_vertex(v[0])
 
 
 ## 90° 단위 방향 (위에서 보아 시계 반대 방향)
@@ -958,6 +1030,14 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 				ov.draw_rect(r, Color(0, 0, 0, 0.6))
 				ov.draw_rect(Rect2(r.position, Vector2(44.0 * _progress_of(it), 5)), Palette.AMBER)
 	_draw_district_labels(view, ov, font, bold)
+	if cover_on:
+		var cv: Dictionary = CityServices.data().get("cover", {})
+		var x := 16.0
+		for key in COVER_COLORS:
+			var text := "%s %d m" % [COVER_NAMES[key], int(cv.get(key, {}).get("radius_m", 0))]
+			ov.draw_rect(Rect2(Vector2(x, 140), Vector2(10, 10)), COVER_COLORS[key])
+			_shadow_text(ov, font, Vector2(x + 14, 150), text, 12, Palette.TEXT)
+			x += font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 30.0
 	_draw_way_signs(view, ov, font, bold)
 	_draw_tool_overlay(view, ov, font, bold)
 	# 상태 (왼쪽 위)

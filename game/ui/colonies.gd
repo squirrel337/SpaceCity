@@ -151,6 +151,7 @@ func step() -> Array:
 		s.advance_hour()
 		if s.hour % 24 == 0:
 			CityDev.step_day(list[i], i)          # 그 도시의 하루가 끝났다 — 발전 모드 (도시마다 다른 시간에)
+			CityServices.step(list[i], s.current_day(), i)   # 시설 영향 범위·통근·물류 (모든 도시)
 	var arrived := []
 	for e in expeditions.duplicate():
 		if hour >= int(e["arrive"]):

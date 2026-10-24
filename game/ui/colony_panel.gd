@@ -97,6 +97,7 @@ func rebuild() -> void:
 	var here := mgr.index_of_sim(sim) if sim != null else -1
 	if here >= 0:
 		body_box.add_child(_dev_section(here))
+		body_box.add_child(_services_section(here))
 	var cands := mgr.candidates()
 	for body in Colonies.BODY_ORDER:
 		var cities := []
@@ -182,6 +183,35 @@ func _dev_section(i: int) -> Control:
 			goal.text += "\n재건축 중: %s" % String(st["redev"])
 		if not (st["works"] as PackedStringArray).is_empty():
 			goal.text += "\n길 공사: " + " · ".join(st["works"]))
+	return card
+
+
+## 고른 도시의 기능 자리 (CityServices): 의료·여가·대피가 닿는 사람의 몫, 통근 시간, 물류 거리, 시뮬레이션에 건넨 보정
+func _services_section(i: int) -> Control:
+	var c: Dictionary = mgr.list[i]
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 10))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	card.add_child(v)
+	v.add_child(ThemeFactory.heading("도시 기능 · 자리", 16))
+	var lines := ThemeFactory.muted("", 13)
+	lines.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lines.add_theme_color_override("font_color", Palette.TEXT.darkened(0.05))
+	v.add_child(lines)
+	var hint := ThemeFactory.muted("집 둘레에 의료·여가·대피 시설이 닿으면 사기가 오르고, 일터·저장 시설이 가까우면(고가·궤도 노선, 환승 시설) 일과 생산이 빨라진다. "
+		+ "3D 지도의 '범위' 단추로 닿는 곳을 본다.", 12)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(hint)
+	_live.append(func():
+		var m: Dictionary = c.get("services", {})
+		if m.is_empty():
+			lines.text = "아직 재지 않았다 — 하루가 지나면 잰다"
+			return
+		var cv: Dictionary = m.get("cover", {})
+		lines.text = "닿는 사람: 의료 %s · 여가 %s · 대피 %s\n통근 평균 %.1f분 · 물류 평균 %s km\n보정: %s" % [
+			Fmt.pct(float(cv.get("care", 0.0))), Fmt.pct(float(cv.get("leisure", 0.0))), Fmt.pct(float(cv.get("shelter", 0.0))),
+			float(m.get("commute_min", 0.0)), Fmt.n(float(m.get("freight_km", 0.0)), 2), CityExt.text((c["sim"] as CitySim).ext)])
 	return card
 
 
