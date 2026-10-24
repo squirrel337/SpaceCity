@@ -53,6 +53,7 @@ func _process(_delta: float) -> bool:
 		_research_paths_check()
 		_hazards_check()
 		_explore_check()
+		_trade_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -1003,6 +1004,70 @@ func _explore_check() -> void:
 	print("smoke: explore — %d sites %s, lava tube housing +%d, autopilot sent to site %d" % [sites.size(),
 		str(sites.map(func(s): return String(s["find"]))), int(es.ext.get("housing_add", 0.0)) - int(house0),
 		int(CityExplore.state(ca)["trip"]["site"])])
+
+
+## 수출 계약: 제안 셋(같은 도시·같은 날이면 같다), 받기·보내기(지원 점수·신뢰·비축, 다른 도시가 샀으면 그 도시 비축에),
+## 기한을 넘기면 놓친다, 자동 운영은 남는 양으로 받고 보낸다, 저장 왕복
+func _trade_check() -> void:
+	var mk := func(policy: String, name: String) -> Dictionary:
+		var s := CitySim.new(7, 40.0, policy)
+		s.stock["parts"] = 3000.0
+		s.stock["metal_t"] = 300.0
+		return {"sim": s, "plan": CityPlan.create(s, BaseLayout.new("ridge")), "mode": "", "site": s.site_id, "name": name}
+	var tc: Dictionary = mk.call("", "시험 도시")
+	var other := {"sim": CitySim.new(9, 40.0, "", "mars_hellas"), "site": "mars_hellas", "name": "헬라스"}
+	var mgr := Colonies.new()
+	mgr.list = [tc, other]
+	var ts: CitySim = tc["sim"]
+	CityTrade.step(tc, 0, mgr)
+	var st := CityTrade.state(tc)
+	_check((st["offers"] as Array).size() == int(CityTrade.data()["offers"]), "계약 제안이 %d건이다" % (st["offers"] as Array).size())
+	var tc2: Dictionary = mk.call("", "시험 도시")
+	var mgr2 := Colonies.new()
+	mgr2.list = [tc2, other]
+	CityTrade.step(tc2, 0, mgr2)
+	_check(JSON.stringify(CityTrade.state(tc2)["offers"]) == JSON.stringify(st["offers"]), "같은 도시·같은 날인데 제안이 달랐다")
+	# 받고 보내기 — 다른 도시가 사는 계약으로
+	var o: Dictionary = st["offers"][0]
+	o["to"] = "mars_hellas"
+	o["buyer"] = "헬라스"
+	var g := CityTrade.good(String(o["good"]))
+	var key := String(g["stock"])
+	var raw := float(o["amount"]) * float(g["per_unit"])
+	ts.stock[key] = raw * 3.0
+	var os: CitySim = other["sim"]
+	var other0 := float(os.stock.get(key, 0.0))
+	_check(CityTrade.accept(tc, int(o["id"])) and (st["active"] as Array).size() == 1, "계약을 받지 못했다")
+	var sup0 := ts.support
+	var trust0 := ts.trust
+	_check(CityTrade.deliver(tc, int(o["id"]), mgr), "계약을 보내지 못했다: " + CityTrade.can_deliver(tc, int(o["id"])))
+	_check(absf(ts.support - sup0 - float(o["reward"])) < 0.01 and ts.trust > trust0 and absf(float(ts.stock[key]) - raw * 2.0) < 0.01
+		and int(ts.stats.get("exports", 0)) == 1 and int(st["done"]) == 1, "보낸 계약의 값이 맞지 않다")
+	_check(absf(float(os.stock.get(key, 0.0)) - other0 - raw) < 0.01, "산 도시의 비축에 더해지지 않았다")
+	# 기한을 넘기면 놓친다
+	var o2: Dictionary = st["offers"][0]
+	CityTrade.accept(tc, int(o2["id"]))
+	var trust1 := ts.trust
+	ts.hour = int((st["active"][0] as Dictionary)["due"])
+	CityTrade.step(tc, ts.current_day(), mgr)
+	_check(int(st["failed"]) == 1 and (st["active"] as Array).is_empty() and ts.trust < trust1, "기한을 넘긴 계약을 놓치지 않았다")
+	_check((st["offers"] as Array).all(func(x): return int(x["expires"]) > ts.hour), "지난 제안이 남아 있다")
+	# 저장 왕복
+	var back: Variant = JSON.parse_string(JSON.stringify(st))
+	_check(back is Dictionary and int(back["done"]) == 1 and int(back["failed"]) == 1 and (back["offers"] as Array).size() == (st["offers"] as Array).size(),
+		"수출 계약이 저장 왕복에서 달라졌다")
+	# 자동 운영: 남는 양으로 받고 보낸다
+	var ta: Dictionary = mk.call("good", "자동 도시")
+	var tsa: CitySim = ta["sim"]
+	for k in ["water_kg", "o2_kg", "food_kg", "regolith_t"]:
+		tsa.stock[k] = float(tsa.stock.get(k, 0.0)) * 4.0 + 50000.0
+	for day in 3:
+		tsa.hour = day * 24
+		CityTrade.step(ta, day, null)
+	var sa := CityTrade.state(ta)
+	_check(int(sa["done"]) >= 1, "자동 운영이 계약을 보내지 않았다: %s" % str(sa))
+	print("smoke: trade — offers %s, delivered %s to 헬라스, autopilot done %d earned %d" % [
+		str((st["offers"] as Array).map(func(x): return CityTrade.amount_text(x))), CityTrade.amount_text(o), int(sa["done"]), int(sa["earned"])])
 
 
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.

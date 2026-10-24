@@ -1,0 +1,28 @@
+{
+  "_meta": {
+    "about": "수출 계약 (CityTrade — 시뮬레이션 밖의 규칙, 모든 도시). 도시마다 every_days마다 계약 제안이 offers건까지 들어온다 (도시·날로 정해지는 난수 — 다시 해도 같다). 제안은 offer_days 뒤에 사라진다. 받으면 deadline_days 안에 보내야 한다 — 보내면 reward 지원 점수와 trust_win 신뢰를 얻고, 못 보내면 trust_loss 신뢰와 morale_loss 사기를 잃는다. 한 번에 max_active건까지",
+    "goods": "id, name, stock(비축 열쇠), unit(보이는 단위), per_unit(보이는 단위 하나의 비축 값 — 물 1 t = 1000 kg), lots [작게, 크게](보이는 단위 — 정착민이 많으면 √(정착민/120)배, 3배까지), step(반올림 단위), price(보이는 단위 하나에 지원 점수 — 제안마다 premium 배), makers(이 계열이 있거나 비축이 lots의 두 배를 넘으면 그 물건의 제안이 온다), skip_bodies(이 천체에서는 오지 않는다 — 지구는 공기·물·식량을 시장에서 산다), keep_days(사람이 쓰는 것 — 정착민이 이 날수만큼 쓸 양은 남긴다) 또는 keep(남기는 양)",
+    "buyers": "지구에서 사는 쪽의 이름. colony_share의 확률로 다른 도시가 산다 — 보낸 것이 그 도시 비축에 더해진다",
+    "auto": "자동 운영: 남는 양(비축 − 남길 양)이 계약 양의 accept_k배 넘으면 받고, 계약 양을 넘으면 보낸다. 무역 중심 도시는 trade_accept_k, 한 번에 trade_extra건 더"
+  },
+  "every_days": 25, "offers": 3, "max_active": 2, "offer_days": 12, "deadline_days": [25, 60],
+  "premium": [0.9, 1.35], "trust_win": 1.0, "trust_loss": 3.0, "morale_loss": 1.0, "colony_share": 0.35,
+  "auto": {"accept_k": 1.0, "trade_accept_k": 0.6, "trade_extra": 2},
+  "goods": [
+    {"id": "water", "name": "물", "stock": "water_kg", "unit": "t", "per_unit": 1000, "lots": [5, 20], "step": 0.5, "price": 6,
+      "makers": ["ice_miner"], "skip_bodies": ["earth"], "keep_days": 40},
+    {"id": "oxygen", "name": "산소", "stock": "o2_kg", "unit": "t", "per_unit": 1000, "lots": [1, 4], "step": 0.5, "price": 20,
+      "makers": ["electrolyzer"], "skip_bodies": ["earth"], "keep_days": 30},
+    {"id": "food", "name": "식량", "stock": "food_kg", "unit": "t", "per_unit": 1000, "lots": [1, 4], "step": 0.5, "price": 15,
+      "makers": ["hydroponics", "algae_reactor"], "skip_bodies": ["earth"], "keep_days": 60},
+    {"id": "methane", "name": "메탄 연료", "stock": "ch4_kg", "unit": "t", "per_unit": 1000, "lots": [0.5, 2], "step": 0.5, "price": 40,
+      "makers": ["sabatier"], "keep": 200},
+    {"id": "metal", "name": "금속", "stock": "metal_t", "unit": "t", "per_unit": 1, "lots": [5, 25], "step": 1, "price": 10,
+      "makers": ["mre_plant"], "keep": 20},
+    {"id": "parts", "name": "부품", "stock": "parts", "unit": "개", "per_unit": 1, "lots": [20, 80], "step": 5, "price": 1.5,
+      "makers": ["parts_fab"], "keep": 200},
+    {"id": "regolith", "name": "다진 레골리스", "stock": "regolith_t", "unit": "t", "per_unit": 1, "lots": [40, 150], "step": 5, "price": 0.25,
+      "makers": ["excavator"], "skip_bodies": ["earth"], "keep": 100}
+  ],
+  "buyers": ["지구 우주청", "국제 달 연구소", "민간 발사 회사", "궤도 정거장 운영사", "심우주 탐사 연합"]
+}

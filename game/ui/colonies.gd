@@ -156,6 +156,7 @@ func step() -> Array:
 			CityResearch.step(list[i])                       # 연구 갈림길·돌파 카드 (모든 도시)
 			CityHazards.step(list[i], s.current_day())       # 위치가 있는 재난 (모든 도시)
 			CityExplore.step(list[i], s.current_day())       # 둘레 탐사 (모든 도시)
+			CityTrade.step(list[i], s.current_day(), self)   # 수출 계약 (모든 도시)
 	var arrived := []
 	for e in expeditions.duplicate():
 		if hour >= int(e["arrive"]):
@@ -444,7 +445,8 @@ func to_save() -> Dictionary:
 			"sim": (c["sim"] as CitySim).to_save(), "plan": (c["plan"] as CityPlan).to_save(),
 			"mode": String(c.get("mode", "")), "idle": c.get("idle", {}), "bought": int(c.get("bought", -100000)),
 			"extra": int(c.get("extra", -100000)), "redev": int(c.get("redev", -1)), "redev_txt": String(c.get("redev_txt", "")),
-			"progress": c.get("progress", {}), "research": c.get("research", {}), "explore": c.get("explore", {})})
+			"progress": c.get("progress", {}), "research": c.get("research", {}), "explore": c.get("explore", {}),
+			"trade": c.get("trade", {})})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
 		"metro_fn": metro_fn.to_save()}
@@ -501,6 +503,11 @@ func load_save(data: Dictionary) -> bool:
 		if cd.get("explore") is Dictionary and cd["explore"].get("sites") is Array:
 			entry["explore"] = {"sites": cd["explore"]["sites"], "trip": cd["explore"].get("trip", {}) if cd["explore"].get("trip") is Dictionary else {}}
 			CityExplore.apply(entry)
+		if cd.get("trade") is Dictionary and cd["trade"].get("offers") is Array:
+			var td: Dictionary = cd["trade"]
+			entry["trade"] = {"offers": td["offers"], "active": td.get("active", []) if td.get("active") is Array else [],
+				"next": int(td.get("next", 0)), "serial": int(td.get("serial", 0)), "done": int(td.get("done", 0)),
+				"failed": int(td.get("failed", 0)), "earned": float(td.get("earned", 0.0))}
 		list.append(entry)
 	expeditions = []
 	for e in data.get("expeditions", []):

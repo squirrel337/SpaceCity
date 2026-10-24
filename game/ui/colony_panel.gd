@@ -100,6 +100,7 @@ func rebuild() -> void:
 		body_box.add_child(_services_section(here))
 		body_box.add_child(_progress_section(here))
 		body_box.add_child(_explore_section(here))
+		body_box.add_child(_trade_section(here))
 	var cands := mgr.candidates()
 	for body in Colonies.BODY_ORDER:
 		var cities := []
@@ -351,6 +352,87 @@ func _explore_section(i: int) -> Control:
 					label.text = "? %s — 아직 모른다" % where
 			b.visible = String(site["state"]) == "unknown"
 			b.disabled = CityExplore.can_send(c, k) != "")
+	return card
+
+
+## 수출 계약: 받은 계약(보내기)과 들어온 제안(받기). 목록이 바뀌면 그 칸만 다시 만들고, 날마다 바뀌는 글은 고친다
+func _trade_section(i: int) -> Control:
+	var c: Dictionary = mgr.list[i]
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 10))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	card.add_child(v)
+	v.add_child(ThemeFactory.heading("수출 계약", 16))
+	var status := ThemeFactory.muted("", 13)
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(status)
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 6)
+	v.add_child(rows)
+	var shape := [""]
+	var items: Array = []            # [Label, Button, 받은 계약인가, 계약 번호]
+	_live.append(func():
+		var st := CityTrade.state(c)
+		var sim2: CitySim = c["sim"]
+		status.text = "보낸 계약 %d건 · 지원 점수 +%d · 놓친 계약 %d건 · 한 번에 %d건까지%s" % [int(st["done"]), int(st["earned"]),
+			int(st["failed"]), CityTrade.max_active(c), " — 자동 운영이 남는 양으로 받고 보낸다" if sim2.autopilot != null else ""]
+		var parts := PackedStringArray()
+		for a in st["active"]:
+			parts.append("a%d" % int(a["id"]))
+		for o in st["offers"]:
+			parts.append("o%d" % int(o["id"]))
+		var sig := ",".join(parts)
+		if sig != shape[0]:
+			shape[0] = sig
+			_clear(rows)
+			items.clear()
+			for list_key in ["active", "offers"]:
+				for e in st[list_key]:
+					var row := HBoxContainer.new()
+					row.add_theme_constant_override("separation", 8)
+					var label := ThemeFactory.muted("", 12)
+					label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+					label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+					row.add_child(label)
+					var b := Button.new()
+					b.custom_minimum_size = Vector2(70, 32)
+					var id := int(e["id"])
+					var is_active: bool = list_key == "active"
+					b.text = "보내기" if is_active else "받기"
+					b.pressed.connect(func():
+						if CityTrade.deliver(c, id, mgr) if is_active else CityTrade.accept(c, id):
+							_live_ms = 0
+							update_view())
+					row.add_child(b)
+					rows.add_child(row)
+					items.append([label, b, is_active, id])
+			if items.is_empty():
+				rows.add_child(ThemeFactory.muted("들어온 제안이 없다 — %d일마다 그 도시가 만드는 것에 제안이 온다" % int(CityTrade.data().get("every_days", 20)), 12))
+		for it in items:
+			var label: Label = it[0]
+			var b: Button = it[1]
+			var e := {}
+			for x in st["active" if it[2] else "offers"]:
+				if int(x["id"]) == int(it[3]):
+					e = x
+			if e.is_empty():
+				continue
+			var g := CityTrade.good(String(e["good"]))
+			var have := "비축 %s %s" % [CityTrade._num(CityTrade.have(sim2, g), g), String(g.get("unit", ""))]
+			if it[2]:
+				var left := ceili((float(e["due"]) - sim2.hour) / 24.0)
+				label.text = "%s → %s · 지원 점수 +%d · 남은 날 %d일 (%s)" % [CityTrade.amount_text(e), String(e["buyer"]),
+					int(e["reward"]), maxi(left, 0), have]
+				var why := CityTrade.can_deliver(c, int(it[3]))
+				b.disabled = why != ""
+				b.tooltip_text = why
+			else:
+				var gone := ceili((float(e["expires"]) - sim2.hour) / 24.0)
+				label.text = "제안: %s → %s · 지원 점수 +%d · 받으면 %d일 안에 · %d일 뒤 사라진다 (%s)" % [CityTrade.amount_text(e),
+					String(e["buyer"]), int(e["reward"]), int(e["days"]), maxi(gone, 0), have]
+				b.disabled = (st["active"] as Array).size() >= CityTrade.max_active(c)
+				b.tooltip_text = "받은 계약이 가득 찼다" if b.disabled else "")
 	return card
 
 

@@ -55,7 +55,8 @@ func update(dt: float, sim: CitySim, sites: Array) -> void:
 
 # ── 사건 ────────────────────────────────────────────────────────
 func _events(sim: CitySim) -> void:
-	for pair in [["cargo_delivered", "cargo_lander"], ["express", "cargo_lander"], ["arrived", "crew_lander"]]:
+	for pair in [["cargo_delivered", "cargo_lander"], ["express", "cargo_lander"], ["arrived", "crew_lander"],
+			["exports", "cargo_lander"]]:                     # 수출 계약 (CityTrade): 화물을 싣고 간다
 		var key: String = pair[0]
 		var now := int(sim.stats.get(key, 0))
 		if now > int(_seen.get(key, 0)):
