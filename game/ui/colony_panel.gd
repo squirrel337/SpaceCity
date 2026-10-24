@@ -105,6 +105,7 @@ func rebuild() -> void:
 		body_box.add_child(_progress_section(here))
 		body_box.add_child(_explore_section(here))
 		body_box.add_child(_trade_section(here))
+		body_box.add_child(_people_section(here))
 	var cands := mgr.candidates()
 	for body in Colonies.BODY_ORDER:
 		var cities := []
@@ -452,6 +453,47 @@ func _explore_section(i: int) -> Control:
 					label.text = "? %s — 아직 모른다" % where
 			b.visible = String(site["state"]) == "unknown"
 			b.disabled = CityExplore.can_send(c, k) != "")
+	return card
+
+
+## 사람들 (CityPeople): 이름 있는 정착민과 그 역할의 보정, 지금 걸린 보정, 고르기를 기다리는 이야기, 지난 이야기
+func _people_section(i: int) -> Control:
+	var c: Dictionary = mgr.list[i]
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 10))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	card.add_child(v)
+	v.add_child(ThemeFactory.heading("사람들 — 이름 있는 정착민", 16))
+	var who := Label.new()
+	who.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	who.add_theme_font_size_override("font_size", 13)
+	v.add_child(who)
+	var more := ThemeFactory.muted("", 12)
+	more.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(more)
+	_live.append(func():
+		var st := CityPeople.state(c)
+		var sim2: CitySim = c["sim"]
+		var rows := PackedStringArray()
+		for p in st["people"]:
+			rows.append("%s · %s %s — %s" % [String(p["name"]), String(p["trait"]), CityPeople.role_name(p),
+				CityPeople.effect_text(CityPeople.role(String(p["role"])).get("effect", {}))])
+		who.text = "\n".join(rows) if not rows.is_empty() else "아직 없다"
+		var lines := PackedStringArray()
+		for b in st["boosts"]:
+			var left := "늘" if int(b["until"]) < 0 else "남은 %d일" % maxi(0, int(b["until"]) - sim2.current_day())
+			var ef := {String(b["key"]): float(b["k"]) if b.has("k") else float(b.get("add", 0.0))}
+			lines.append("보정 — %s: %s (%s)" % [String(b.get("why", "")), CityPeople.effect_text(ef), left])
+		var pend := CityPeople.pending(c)
+		if not pend.is_empty():
+			lines.append("결정을 기다리는 이야기 — %s (이 도시를 보면 묻는다)" % String(pend["title"]))
+		var story: Array = st["story"]
+		for k in range(story.size() - 1, maxi(-1, story.size() - 4), -1):
+			var e: Array = story[k]
+			lines.append("%s · %s — %s" % [sim2.date_text(int(e[0]), false), String(e[1]), String(e[2])])
+		more.text = "\n".join(lines) if not lines.is_empty() else "%d일쯤마다 이 사람들의 이야기가 생긴다 — 직접 운영이면 결정 카드로 묻는다" % \
+			int(CityPeople.data()["every_days"][0]))
 	return card
 
 

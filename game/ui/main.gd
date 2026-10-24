@@ -1247,6 +1247,12 @@ func _after_metro_ops() -> void:
 func _step() -> void:
 	for i in colonies.step():
 		_on_founded(i)
+	var here: Dictionary = colonies.list[active]
+	if not CityPeople.pending(here).is_empty() and not modal.visible and not CityAuto.full(sim):
+		_jumping = false
+		_set_speed(0)
+		_show_event(here)
+		return
 	if colonies.scenario_news != "":
 		var result := colonies.scenario_news
 		colonies.scenario_news = ""
@@ -1623,6 +1629,16 @@ func _show_storm() -> void:
 		Palette.RED)
 
 
+## 이야기 이벤트 (CityPeople): 주인공·사정과 고를 것 — 고를 때까지 시간이 멈춘다
+func _show_event(c: Dictionary) -> void:
+	var inst := CityPeople.pending(c)
+	var choices := []
+	for i in (inst["choices"] as Array).size():
+		var ch: Dictionary = inst["choices"][i]
+		choices.append([str(i), String(ch["label"]), String(ch["text"])])
+	modal.open("event", "이야기 · %s" % String(c["name"]), String(inst["title"]), String(inst["text"]), choices, Palette.AMBER)
+
+
 func _show_report() -> void:
 	var h := colonies.home()
 	var s: Dictionary = (h["sim"] if not h.is_empty() else sim).summary()
@@ -1694,6 +1710,10 @@ func _on_modal_choice(context: String, choice: String) -> void:
 					return
 		"storm":
 			sim.resolve_storm(choice)
+			_dirty = true
+		"event":
+			CityPeople.resolve(colonies.list[active], int(choice), colonies)
+			_refresh_tab()
 			_dirty = true
 		"menu":
 			match choice:

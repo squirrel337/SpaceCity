@@ -167,6 +167,7 @@ func step() -> Array:
 			CityHazards.step(list[i], s.current_day())       # 위치가 있는 재난 (모든 도시)
 			CityExplore.step(list[i], s.current_day())       # 둘레 탐사 (모든 도시)
 			CityTrade.step(list[i], s.current_day(), self)   # 수출 계약 (모든 도시)
+			CityPeople.step(list[i], s.current_day(), self)  # 이름 있는 정착민·이야기 (모든 도시)
 			_record_hist(list[i])                            # 통계: 날마다 지원 점수
 	var arrived := []
 	for e in expeditions.duplicate():
@@ -471,6 +472,7 @@ func to_save() -> Dictionary:
 			"extra": int(c.get("extra", -100000)), "redev": int(c.get("redev", -1)), "redev_txt": String(c.get("redev_txt", "")),
 			"progress": c.get("progress", {}), "research": c.get("research", {}), "explore": c.get("explore", {}),
 			"trade": c.get("trade", {}), "delegate": c.get("delegate", {}), "hist": c.get("hist", {}),
+			"people": c.get("people", {}),
 			"oplog": (c.get("oplog", []) as Array).slice(-120)})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
@@ -534,6 +536,12 @@ func load_save(data: Dictionary) -> bool:
 		if cd.get("hist") is Dictionary and cd["hist"].get("days") is Array:
 			entry["hist"] = {"days": (cd["hist"]["days"] as Array).map(func(x): return int(x)),
 				"support": (cd["hist"].get("support", []) as Array).map(func(x): return int(x))}
+		if cd.get("people") is Dictionary and cd["people"].get("people") is Array:
+			var pd: Dictionary = cd["people"]
+			entry["people"] = {"people": pd["people"], "serial": int(pd.get("serial", 0)), "next": int(pd.get("next", 0)),
+				"boosts": pd.get("boosts", []) if pd.get("boosts") is Array else [], "seen": pd.get("seen", {}) if pd.get("seen") is Dictionary else {},
+				"pending": pd.get("pending", {}) if pd.get("pending") is Dictionary else {}, "story": pd.get("story", []) if pd.get("story") is Array else []}
+			CityPeople.apply(entry)
 		if cd.get("delegate") is Dictionary:
 			entry["delegate"] = cd["delegate"]
 			CityAuto.sync_policy(entry)

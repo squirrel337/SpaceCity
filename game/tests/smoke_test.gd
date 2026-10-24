@@ -58,6 +58,7 @@ func _process(_delta: float) -> bool:
 		_scenario_check()
 		_demolish_move_check()
 		_stats_check()
+		_people_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -1286,6 +1287,64 @@ func _stats_check() -> void:
 	lp._set_view("notes")
 	print("smoke: stats — %d charts, %d days, %d cities, support %d → %d" % [charts.size(), main.sim.daily.size(),
 		all.lines.size(), int((sup.lines[0]["values"] as PackedFloat32Array)[0]), int((sup.lines[0]["values"] as PackedFloat32Array)[-1])])
+
+
+## 이름 있는 정착민과 이야기: 처음 세 명(같은 도시면 같은 사람), 정착민이 늘면 더, 역할의 보정이 시뮬레이션에. 이벤트 날에 직접 운영은
+## 고르기를 기다리고 (다음 이벤트는 오지 않는다), 고르면 효과 (사기·부품·기간 보정), 떠나기·옮기기. 자동 운영은 스스로 고른다. 저장 왕복
+func _people_check() -> void:
+	var mk := func(policy: String, seed: int) -> Dictionary:
+		var s := CitySim.new(seed, 40.0, policy)
+		return {"sim": s, "plan": CityPlan.create(s, BaseLayout.new("ridge")), "site": s.site_id, "name": "시험 도시", "short": "시험", "mode": ""}
+	var c: Dictionary = mk.call("", 7)
+	var st := CityPeople.state(c)
+	var c2: Dictionary = mk.call("", 7)
+	_check((st["people"] as Array).size() == int(CityPeople.data()["start"])
+		and JSON.stringify(CityPeople.state(c2)["people"]) == JSON.stringify(st["people"]), "처음 사람들이 셋이 아니거나 같은 도시인데 달랐다")
+	var ps: CitySim = c["sim"]
+	ps.cohorts = [[300.0, 0.0, false]]
+	CityPeople.step(c, ps.current_day())
+	_check((st["people"] as Array).size() == 3 + 2, "정착민이 늘었는데 사람이 늘지 않았다 (%d)" % (st["people"] as Array).size())
+	var roles := {}
+	var names := {}
+	for p in st["people"]:
+		roles[String(p["role"])] = true
+		names[String(p["name"])] = true
+	_check(roles.size() == (st["people"] as Array).size() and names.size() == roles.size(), "역할이나 이름이 겹친다")
+	_check((c["ext_parts"] as Dictionary).has("people"), "역할의 보정이 시뮬레이션에 없다")
+	# 이벤트: 직접 운영은 기다린다
+	st["next"] = 0
+	ps.stock["parts"] = 500.0
+	CityPeople.step(c, 30)
+	var pend := CityPeople.pending(c)
+	_check(not pend.is_empty() and (pend["choices"] as Array).size() >= 2 and not String(pend["text"]).contains("{"), "이야기가 오지 않았거나 글이 비었다")
+	var next0 := int(st["next"])
+	CityPeople.step(c, next0 + 1)
+	_check(CityPeople.pending(c) == pend, "고르기를 기다리는 동안 다른 이야기가 왔다")
+	var morale0 := ps.morale
+	var parts0 := float(ps.stock["parts"])
+	_check(CityPeople.resolve(c, 0, null) and CityPeople.pending(c).is_empty() and (st["story"] as Array).size() == 1, "고른 것을 내지 못했다")
+	var ef: Dictionary = pend["choices"][0]["effect"]
+	_check(absf(ps.morale - clampf(morale0 + float(ef.get("morale", 0.0)), 0.0, 100.0)) < 0.01
+		and absf(float(ps.stock["parts"]) - maxf(0.0, parts0 + float(ef.get("parts", 0.0)))) < 0.01, "고른 것의 효과가 맞지 않다: %s" % str(ef))
+	# 기간 보정·떠나기
+	var boost := {"id": "x", "title": "시험", "text": "", "person": int(st["people"][0]["id"]), "to": "",
+		"choices": [{"label": "a", "text": "", "effect": {"boost": {"key": "make_k", "k": 1.5, "days": 10}, "person": "leave"}}]}
+	var n0 := (st["people"] as Array).size()
+	CityPeople.resolve(c, 0, null, false, boost)
+	_check((st["people"] as Array).size() == n0 - 1 and float(ps.ext.get("make_k", 1.0)) > 1.4, "보정이 걸리지 않았거나 사람이 떠나지 않았다")
+	CityPeople.step(c, ps.current_day() + 11)
+	_check(float(ps.ext.get("make_k", 1.0)) < 1.4, "기간이 끝난 보정이 남았다")
+	# 자동 운영은 스스로 고른다
+	var ca: Dictionary = mk.call("good", 9)
+	var sa := CityPeople.state(ca)
+	sa["next"] = 0
+	CityPeople.step(ca, 40)
+	_check(CityPeople.pending(ca).is_empty() and (sa["story"] as Array).size() == 1, "자동 운영이 이야기를 고르지 않았다")
+	var back: Variant = JSON.parse_string(JSON.stringify(st))
+	_check(back is Dictionary and (back["people"] as Array).size() == (st["people"] as Array).size() and (back["story"] as Array).size() == 2,
+		"사람들이 저장 왕복에서 달라졌다")
+	print("smoke: people — %s, story %s" % [str((st["people"] as Array).map(func(p): return "%s(%s)" % [p["name"], p["role"]])),
+		String(pend["title"])])
 
 
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.

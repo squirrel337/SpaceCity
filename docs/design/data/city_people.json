@@ -1,0 +1,115 @@
+{
+  "_meta": {
+    "about": "이름 있는 정착민과 이야기 이벤트 (CityPeople — 시뮬레이션 밖의 규칙, 모든 도시). 도시마다 처음 start명, 정착민이 per_pop명 늘 때마다 한 명씩 더 (max까지) — 이름·역할·성격은 도시로 정해진다. 그 사람이 있는 동안 역할의 보정(roles.effect)이 CityExt의 people 몫으로 들어간다. 이벤트는 every_days [작게, 크게]마다 한 번 (도시·날로 정해지는 난수), 조건(when)이 맞는 것 가운데 weight로 하나 — 같은 이벤트는 cooldown_days 안에 다시 오지 않는다 (once는 한 번만). 직접 운영 도시는 결정 카드로 묻고, 자동 운영·보지 않는 도시는 시드가 고른다",
+    "roles": "id, name, effect (CityExt 열쇠: morale·support_day·rp_day는 더하고, work_k·make_k·build_k·rp_k는 곱한다)",
+    "events": "id, title, text({name}·{role}·{colony}), role(그 역할의 사람이 있어야), when(min_pop·max_morale·min_trust·max_support·min_robots·min_era·colonies — 도시가 둘 이상), weight, once, choices: [{label, text, effect: {morale, trust, support, parts, rp, boost: {key, k 또는 add, days(0 = 늘)}, person: leave·move}}]"
+  },
+  "start": 3, "per_pop": 80, "max": 8, "every_days": [24, 40], "cooldown_days": 150,
+  "family": ["김", "이", "박", "최", "정", "강", "조", "윤", "장", "임", "한", "오", "서", "신", "권", "황", "안", "송", "류", "홍"],
+  "given": ["하늘", "서준", "민서", "지호", "다은", "유나", "도윤", "서연", "하린", "지안", "수아", "예준", "시우", "주원", "하은", "윤서", "지우", "은우", "소율", "태오"],
+  "world": ["아마라 오코예", "라울 멘데스", "아이코 다나카", "닐스 베리", "프리야 샤르마", "레일라 하산", "토마스 뮐러", "소피 르블랑",
+    "카를로스 리베라", "잉그리드 할보르센", "미겔 산토스", "유키 사토", "아자 이브라힘", "올리버 존스", "나디아 페트로바", "첸 웨이"],
+  "traits": ["꼼꼼한", "대담한", "쾌활한", "고집 센", "다정한", "호기심 많은", "말수 적은", "부지런한"],
+  "roles": [
+    {"id": "engineer", "name": "기술자", "effect": {"build_k": 1.03}},
+    {"id": "scientist", "name": "과학자", "effect": {"rp_k": 1.04}},
+    {"id": "doctor", "name": "의사", "effect": {"morale": 1.0}},
+    {"id": "farmer", "name": "농부", "effect": {"make_k": 1.02}},
+    {"id": "pilot", "name": "조종사", "effect": {"support_day": 0.5}},
+    {"id": "teacher", "name": "교사", "effect": {"rp_day": 0.5, "morale": 0.5}},
+    {"id": "artist", "name": "예술가", "effect": {"morale": 1.5}},
+    {"id": "manager", "name": "관리자", "effect": {"work_k": 1.02}}
+  ],
+  "events": [
+    {"id": "engineer_idea", "title": "{name}의 개조안", "role": "engineer", "weight": 3,
+      "text": "기술자 {name}이(가) 전해조와 반응기의 배관을 바꾸면 효율이 오른다는 개조안을 들고 왔다.",
+      "choices": [
+        {"label": "시험해 본다", "text": "부품 30을 들여 개조한다 — 90일 동안 만드는 효율 ×1.04", "effect": {"parts": -30, "boost": {"key": "make_k", "k": 1.04, "days": 90}}},
+        {"label": "다음에 하자", "text": "지금은 살림이 먼저다 — 사기 −0.5", "effect": {"morale": -0.5}}]},
+    {"id": "homesick", "title": "{name}의 향수병", "weight": 2,
+      "text": "{role} {name}이(가) 지구의 가족이 그립다며 다음 유인선으로 돌아가고 싶다고 한다.",
+      "choices": [
+        {"label": "보내 준다", "text": "{name}이(가) 떠난다 — 사기 +1, 신뢰 +1", "effect": {"morale": 1, "trust": 1, "person": "leave"}},
+        {"label": "가족 통화를 잡아 준다", "text": "지원 점수 40으로 긴 통화를 — 남는다, 사기 +1", "effect": {"support": -40, "morale": 1}}]},
+    {"id": "wedding", "title": "{name}의 결혼식", "when": {"min_pop": 150}, "weight": 2,
+      "text": "{role} {name}이(가) 기지에서 결혼식을 올리고 싶어 한다. 모두가 기다리던 일이다.",
+      "choices": [
+        {"label": "크게 연다", "text": "부품 20으로 꾸민다 — 사기 +4", "effect": {"parts": -20, "morale": 4}},
+        {"label": "조촐하게", "text": "사기 +2", "effect": {"morale": 2}}]},
+    {"id": "first_child", "title": "첫 아이", "when": {"min_pop": 250}, "weight": 4, "once": true,
+      "text": "기지에서 첫 아이가 태어났다. {role} {name}이(가) 아이의 이름을 지어 달라고 부탁한다.",
+      "choices": [
+        {"label": "기지 전체가 축하한다", "text": "지원 점수 30 — 사기 +5, 신뢰 +3", "effect": {"support": -30, "morale": 5, "trust": 3}},
+        {"label": "가족끼리 조용히", "text": "사기 +3", "effect": {"morale": 3}}]},
+    {"id": "scientist_find", "title": "{name}의 발견", "role": "scientist", "weight": 3,
+      "text": "과학자 {name}이(가) 레골리스 시료에서 뜻밖의 광물 조합을 찾았다.",
+      "choices": [
+        {"label": "논문으로 낸다", "text": "지구가 주목한다 — 지원 점수 +80, 신뢰 +2", "effect": {"support": 80, "trust": 2}},
+        {"label": "더 파고든다", "text": "연구 300 RP", "effect": {"rp": 300}}]},
+    {"id": "accident", "title": "{name}이(가) 다쳤다", "role": "engineer", "weight": 2,
+      "text": "기술자 {name}이(가) 작업 중 장비에 깔려 다쳤다. 크게 다치지는 않았지만 모두가 놀랐다.",
+      "choices": [
+        {"label": "안전 점검을 한다", "text": "부품 15 — 사기 +1, 30일 동안 로봇 작업량 ×0.97", "effect": {"parts": -15, "morale": 1, "boost": {"key": "build_k", "k": 0.97, "days": 30}}},
+        {"label": "일정을 지킨다", "text": "사기 −2", "effect": {"morale": -2}}]},
+    {"id": "workload", "title": "근무 시간 다툼", "when": {"max_morale": 60}, "weight": 4,
+      "text": "{role} {name}이(가) 정착민을 대표해 근무 시간을 줄여 달라고 한다. 지쳐 있다는 말이 많다.",
+      "choices": [
+        {"label": "쉬는 날을 늘린다", "text": "30일 동안 일하는 효율 ×0.95 — 사기 +4", "effect": {"morale": 4, "boost": {"key": "work_k", "k": 0.95, "days": 30}}},
+        {"label": "지금은 버틴다", "text": "사기 −3, 신뢰 −2", "effect": {"morale": -3, "trust": -2}}]},
+    {"id": "press", "title": "지구 취재진", "when": {"min_trust": 70}, "weight": 2,
+      "text": "지구의 방송국이 기지 생활을 취재하고 싶어 한다. {role} {name}이(가) 안내를 맡겠다고 한다.",
+      "choices": [
+        {"label": "문을 연다", "text": "지원 점수 +60, 사기 −1 (일이 밀린다)", "effect": {"support": 60, "morale": -1}},
+        {"label": "사양한다", "text": "신뢰 −1", "effect": {"trust": -1}}]},
+    {"id": "new_crop", "title": "{name}의 새 품종", "role": "farmer", "weight": 3,
+      "text": "농부 {name}이(가) 낮은 빛에서도 잘 자라는 품종을 골라냈다.",
+      "choices": [
+        {"label": "심어 본다", "text": "부품 10 — 120일 동안 만드는 효율 ×1.03", "effect": {"parts": -10, "boost": {"key": "make_k", "k": 1.03, "days": 120}}},
+        {"label": "기존 품종을 지킨다", "text": "아무 일도 없다", "effect": {}}]},
+    {"id": "school", "title": "{name}의 학교", "role": "teacher", "when": {"min_pop": 120}, "weight": 3, "once": true,
+      "text": "교사 {name}이(가) 아이들과 젊은 정착민을 위한 교실을 열자고 한다.",
+      "choices": [
+        {"label": "교실을 연다", "text": "부품 25 — 연구 RP/일 +1 (늘), 사기 +1", "effect": {"parts": -25, "morale": 1, "boost": {"key": "rp_day", "add": 1, "days": 0}}},
+        {"label": "아직 이르다", "text": "사기 −1", "effect": {"morale": -1}}]},
+    {"id": "mural", "title": "{name}의 벽화", "role": "artist", "weight": 3,
+      "text": "예술가 {name}이(가) 거주구 복도에 지구의 바다를 그리고 싶어 한다.",
+      "choices": [
+        {"label": "복도를 내준다", "text": "사기 +3", "effect": {"morale": 3}},
+        {"label": "작업장이 먼저다", "text": "사기 −1", "effect": {"morale": -1}}]},
+    {"id": "dose_warning", "title": "{name}의 경고", "role": "doctor", "weight": 2,
+      "text": "의사 {name}이(가) 몇몇 정착민의 누적 선량이 걱정된다며 차폐를 보강하자고 한다.",
+      "choices": [
+        {"label": "차폐를 보강한다", "text": "부품 30 — 사기 +2, 신뢰 +1", "effect": {"parts": -30, "morale": 2, "trust": 1}},
+        {"label": "기준 안이다", "text": "신뢰 −2", "effect": {"trust": -2}}]},
+    {"id": "robot_names", "title": "로봇 이름 짓기", "when": {"min_robots": 10}, "weight": 2, "once": true,
+      "text": "{role} {name}이(가) 로봇마다 이름을 붙이자는 대회를 열자고 한다.",
+      "choices": [
+        {"label": "대회를 연다", "text": "사기 +2", "effect": {"morale": 2}},
+        {"label": "번호로 충분하다", "text": "아무 일도 없다", "effect": {}}]},
+    {"id": "care_package", "title": "지구의 응원 상자", "when": {"max_support": 250}, "weight": 2,
+      "text": "지구의 학생들이 보낸 응원 상자가 화물선에 실려 왔다. {role} {name}이(가) 어떻게 나눌지 묻는다.",
+      "choices": [
+        {"label": "다 같이 나눈다", "text": "사기 +3", "effect": {"morale": 3}},
+        {"label": "쓸 만한 것은 창고에", "text": "부품 +20", "effect": {"parts": 20}}]},
+    {"id": "old_friend", "title": "{name}의 옛 동료", "when": {"colonies": 2}, "weight": 2,
+      "text": "{role} {name}이(가) {colony}에 있는 옛 동료와 함께 일하고 싶어 한다.",
+      "choices": [
+        {"label": "보내 준다", "text": "{name}이(가) {colony}로 옮긴다 — 신뢰 +1", "effect": {"trust": 1, "person": "move"}},
+        {"label": "남아 달라고 한다", "text": "사기 −0.5", "effect": {"morale": -0.5}}]},
+    {"id": "festival", "title": "기지 축제", "when": {"min_era": 1}, "weight": 2,
+      "text": "{role} {name}이(가) 기지가 세워진 날을 기념하는 축제를 열자고 한다.",
+      "choices": [
+        {"label": "크게 연다", "text": "지원 점수 50 — 사기 +5", "effect": {"support": -50, "morale": 5}},
+        {"label": "작게 연다", "text": "사기 +2", "effect": {"morale": 2}}]},
+    {"id": "pilot_run", "title": "{name}의 비행", "role": "pilot", "weight": 2,
+      "text": "조종사 {name}이(가) 남는 연료로 주변 지형을 정밀 촬영하겠다고 한다.",
+      "choices": [
+        {"label": "다녀오라", "text": "부품 10 — 연구 200 RP", "effect": {"parts": -10, "rp": 200}},
+        {"label": "연료를 아낀다", "text": "아무 일도 없다", "effect": {}}]},
+    {"id": "manager_plan", "title": "{name}의 근무표", "role": "manager", "weight": 2,
+      "text": "관리자 {name}이(가) 교대 근무표를 다시 짜면 일이 덜 겹친다고 한다.",
+      "choices": [
+        {"label": "새 근무표로", "text": "60일 동안 일하는 효율 ×1.04, 사기 −1", "effect": {"morale": -1, "boost": {"key": "work_k", "k": 1.04, "days": 60}}},
+        {"label": "지금대로", "text": "아무 일도 없다", "effect": {}}]}
+  ]
+}
