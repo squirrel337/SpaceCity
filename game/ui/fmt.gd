@@ -1,5 +1,5 @@
 class_name Fmt
-## 숫자·단위 표기
+## 숫자·단위 표기 (영어로 놓으면 단위도 영어 — I18n)
 
 
 static func n(value: float, decimals: int = 0) -> String:
@@ -30,17 +30,19 @@ static func pct(value: float) -> String:
 
 
 static func days(value: float) -> String:
+	var en := I18n.is_en()
 	if value >= 999:
-		return "충분"
+		return "plenty" if en else "충분"
 	if value >= 10:
-		return "%d일" % int(round(value))
-	return "%s일" % n(value, 1)
+		return ("%d d" if en else "%d일") % int(round(value))
+	return ("%s d" if en else "%s일") % n(value, 1)
 
 
 static func hours(value: float) -> String:
+	var en := I18n.is_en()
 	if value >= 48:
-		return "%s일" % n(value / 24.0, 1)
-	return "%d시간" % int(round(value))
+		return ("%s d" if en else "%s일") % n(value / 24.0, 1)
+	return ("%d h" if en else "%d시간") % int(round(value))
 
 
 static func distance_km(km: float) -> String:
@@ -53,15 +55,16 @@ static func distance_km(km: float) -> String:
 	if a < 1.0e6:
 		return "%s km" % n(km, 0)
 	if a < 0.05 * Astro.AU:
-		return "%s만 km" % n(km / 1.0e4, 0)
+		return ("%s k km" % n(km / 1.0e3, 0)) if I18n.is_en() else ("%s만 km" % n(km / 1.0e4, 0))
 	if a < 0.02 * Astro.LY:
 		return "%s AU" % n(km / Astro.AU, 2 if a < 10.0 * Astro.AU else 1)
 	return light_years(km / Astro.LY)
 
 
 static func light_years(ly: float) -> String:
+	var unit := " ly" if I18n.is_en() else "광년"
 	if ly < 10.0:
-		return "%s광년" % n(ly, 2)
+		return n(ly, 2) + unit
 	if ly < 1000.0:
-		return "%s광년" % n(ly, 1)
-	return "%s광년" % n(ly, 0)
+		return n(ly, 1) + unit
+	return n(ly, 0) + unit

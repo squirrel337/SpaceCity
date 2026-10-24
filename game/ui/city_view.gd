@@ -89,8 +89,8 @@ func _draw_header() -> void:
 		state = "그림자" if ridge else "밤"
 		if sim.bat_cap + sim.rfc_cap > 0.0:
 			state += " — 태양광 0 kW, 축전 %s" % Fmt.pct((sim.battery + sim.rfc) / maxf(1.0, sim.bat_cap + sim.rfc_cap))
-	draw_string(font, Vector2(16, 26), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Palette.TEXT)
-	draw_string(font, Vector2(16, 46), state, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Palette.AMBER if lit else Palette.BLUE)
+	draw_string(font, Vector2(16, 26), I18n.t(title), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Palette.TEXT)
+	draw_string(font, Vector2(16, 46), I18n.t(state), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Palette.AMBER if lit else Palette.BLUE)
 	if not sim.pending_storm.is_empty():
 		_draw_right(font, w - 16, 26, "태양 양성자 폭풍 경보", 15, Palette.RED)
 	elif sim.rationing:
@@ -103,7 +103,7 @@ func _draw_header() -> void:
 
 func _draw_right(font: Font, right_x: float, y: float, text: String, font_size: int, color: Color) -> void:
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-	draw_string(font, Vector2(right_x - width, y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+	draw_string(font, Vector2(right_x - width, y), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
 
 func _items() -> Array:
@@ -131,7 +131,7 @@ func _draw_card(r: Rect2, item: Dictionary) -> void:
 	draw_rect(Rect2(r.position + Vector2(0, 6), Vector2(4, r.size.y - 12)), color)
 	var x := r.position.x + 12
 	var name_size := 14 if r.size.x > 165 else 13
-	draw_string(font, Vector2(x, r.position.y + 21), m["name"], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 64, name_size, Palette.TEXT)
+	draw_string(font, Vector2(x, r.position.y + 21), I18n.t(m["name"]), HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 64, name_size, Palette.TEXT)
 	if item["count"]:
 		_draw_right(ThemeFactory.bold, r.end.x - 10, r.position.y + 23, "×%d" % item["count"], 18, color.lightened(0.15))
 	var parts := []
@@ -151,7 +151,7 @@ func _draw_card(r: Rect2, item: Dictionary) -> void:
 	if parts.is_empty():
 		parts.append(_function_line(mid, item["count"]))
 	if r.size.y >= 52:
-		draw_string(font, Vector2(x, r.position.y + r.size.y - 12), " · ".join(parts), HORIZONTAL_ALIGNMENT_LEFT,
+		draw_string(font, Vector2(x, r.position.y + r.size.y - 12), I18n.t(" · ".join(parts)), HORIZONTAL_ALIGNMENT_LEFT,
 			r.size.x - 20, 12, line_color)
 
 

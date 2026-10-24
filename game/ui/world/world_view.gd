@@ -1504,9 +1504,9 @@ func _label_metro_facilities(font: Font, placed: Array) -> void:
 			placed.append(rect)
 			_overlay.draw_rect(rect, Color(0.04, 0.05, 0.08, 0.6 * a))
 			_overlay.draw_rect(Rect2(rect.position, Vector2(3.0, rect.size.y)), Color(col, 0.95 * a))
-			_overlay.draw_string(bold, rect.position + Vector2(10, 15), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
+			_overlay.draw_string(bold, rect.position + Vector2(10, 15), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
 				Color(col.lightened(0.4), a))
-			_overlay.draw_string(font, rect.position + Vector2(10, 29), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+			_overlay.draw_string(font, rect.position + Vector2(10, 29), I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
 				Color(0.85, 0.87, 0.9, 0.9 * a))
 			_overlay.draw_line(Vector2(s2.x, rect.end.y), s2 + Vector2(0, 10), Color(col, 0.7 * a), 1.5)
 
@@ -1590,9 +1590,9 @@ func _label_body(id: String, font: Font, placed: Array) -> void:
 	var col := Color(0.92, 0.9, 0.84, alpha)
 	if _hover_label == id:
 		col = Color(1.0, 0.8, 0.45, alpha)
-	_overlay.draw_string(font, pos2 + off + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT,
+	_overlay.draw_string(font, pos2 + off + Vector2(1, 1), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT,
 		Color(0, 0, 0, 0.7 * alpha))
-	_overlay.draw_string(font, pos2 + off, text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT, col)
+	_overlay.draw_string(font, pos2 + off, I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT, col)
 	_labels.append([rect, id])
 
 
@@ -1656,13 +1656,13 @@ func _label_colony(i: int, font: Font, placed: Array) -> void:
 		_overlay.draw_circle(pos2, 7.5, Color(0, 0, 0, 0.55 * alpha))
 		_overlay.draw_arc(pos2, 7.0, 0.0, TAU, 24, Color(accent, alpha), 2.0, true)
 		_overlay.draw_circle(pos2, 3.2, Color(accent, alpha))
-	_overlay.draw_string(font, pos2 + off + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT + 1,
+	_overlay.draw_string(font, pos2 + off + Vector2(1, 1), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT + 1,
 		Color(0, 0, 0, 0.75 * alpha))
-	_overlay.draw_string(font, pos2 + off, text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT + 1, Color(accent, alpha))
+	_overlay.draw_string(font, pos2 + off, I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT + 1, Color(accent, alpha))
 	var sub_at := pos2 + off + Vector2(0, ssize.y + 1)
-	_overlay.draw_string(font, sub_at + Vector2(1, 1), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT - 2,
+	_overlay.draw_string(font, sub_at + Vector2(1, 1), I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT - 2,
 		Color(0, 0, 0, 0.7 * alpha))
-	_overlay.draw_string(font, sub_at, sub, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT - 2, Color(0.85, 0.88, 0.92, 0.9 * alpha))
+	_overlay.draw_string(font, sub_at, I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT - 2, Color(0.85, 0.88, 0.92, 0.9 * alpha))
 	_labels.append([rect, id])
 
 
@@ -1704,8 +1704,8 @@ func _label_galaxy(font: Font, placed: Array) -> void:
 	var tsize := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT)
 	placed.append(Rect2(pos2 - Vector2(0, tsize.y), tsize))
 	var a := clampf((_galaxy_k - 0.3) / 0.4, 0.0, 1.0)
-	_overlay.draw_string(font, pos2 + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT, Color(0, 0, 0, 0.7 * a))
-	_overlay.draw_string(font, pos2, text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT, Color(1.0, 0.86, 0.62, a))
+	_overlay.draw_string(font, pos2 + Vector2(1, 1), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT, Color(0, 0, 0, 0.7 * a))
+	_overlay.draw_string(font, pos2, I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT, Color(1.0, 0.86, 0.62, a))
 
 
 func _label_star(s: Dictionary, font: Font, placed: Array) -> void:
@@ -1736,7 +1736,7 @@ func _label_star(s: Dictionary, font: Font, placed: Array) -> void:
 	var col := Color(0.78, 0.84, 0.95, alpha)
 	if _hover_label == s["id"]:
 		col = Color(1.0, 0.8, 0.45, alpha)
-	_overlay.draw_string(font, pos2 + off, text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT - 1, col)
+	_overlay.draw_string(font, pos2 + off, I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT - 1, col)
 	_labels.append([rect, s["id"]])
 
 
@@ -1756,8 +1756,8 @@ func _draw_readout(font: Font) -> void:
 			name = "수송선"
 		text = "%s에서 %s" % [name, Fmt.distance_km(cam.dist)]
 	var pos2 := Vector2(14, size.y - 66)
-	_overlay.draw_string(font, pos2 + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0, 0, 0, 0.7))
-	_overlay.draw_string(font, pos2, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.85, 0.88, 0.92, 0.9))
+	_overlay.draw_string(font, pos2 + Vector2(1, 1), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0, 0, 0, 0.7))
+	_overlay.draw_string(font, pos2, I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.85, 0.88, 0.92, 0.9))
 	var hd := cam.heading_deg()
 	if not is_nan(hd):
 		# 나침반: 북쪽(N) 화살표
@@ -1767,7 +1767,7 @@ func _draw_readout(font: Font) -> void:
 		var a := deg_to_rad(-hd) - PI * 0.5
 		var tip := c + Vector2(cos(a), sin(a)) * 14.0
 		_overlay.draw_line(c, tip, Color(0.95, 0.45, 0.35), 2.4, true)
-		_overlay.draw_string(font, tip + Vector2(-4, -4), "N", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 1, 1, 0.8))
+		_overlay.draw_string(font, tip + Vector2(-4, -4), I18n.t("N"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 1, 1, 0.8))
 
 
 ## 성능 표시 (설정): 초당 프레임, 이번 프레임의 CPU 시간(배치·도시·화면 위 그리기), 그리기 호출, 품질 단계
@@ -1786,7 +1786,7 @@ func _draw_perf(font: Font) -> void:
 		var w := font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
 		var p := Vector2(size.x - w - 14.0, y)
 		_overlay.draw_rect(Rect2(p - Vector2(6, 13), Vector2(w + 12, 18)), Color(0, 0, 0, 0.55))
-		_overlay.draw_string(font, p, line, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.75, 0.95, 0.8))
+		_overlay.draw_string(font, p, I18n.t(line), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.75, 0.95, 0.8))
 		y += 19.0
 
 

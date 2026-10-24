@@ -517,4 +517,4 @@ static func _tag(ov: Control, font: Font, at: Vector2, text: String, col: Color)
 		return
 	ov.draw_rect(r, Color(0.05, 0.06, 0.09, 0.8))
 	ov.draw_rect(Rect2(r.position, Vector2(3.0, r.size.y)), col)
-	ov.draw_string(font, r.position + Vector2(8.0, 14.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col.lightened(0.35))
+	ov.draw_string(font, r.position + Vector2(8.0, 14.0), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col.lightened(0.35))

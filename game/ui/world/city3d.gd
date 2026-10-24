@@ -1061,7 +1061,7 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 			if it["broken"]:
 				var blink := 0.55 + 0.45 * sin(_t * 6.0)
 				ov.draw_circle(s2, 10.0, Color(0.89, 0.34, 0.18, blink))
-				ov.draw_string(bold, s2 + Vector2(-3.5, 6), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
+				ov.draw_string(bold, s2 + Vector2(-3.5, 6), I18n.t("!"), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
 			elif it["building"]:
 				var r := Rect2(s2 - Vector2(22, 0), Vector2(44, 5))
 				ov.draw_rect(r, Color(0, 0, 0, 0.6))
@@ -1114,7 +1114,7 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 		var mp := view.get_local_mouse_position()
 		var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
 		ov.draw_rect(Rect2(mp + Vector2(14, 6), Vector2(w + 14, 22)), Color(0.06, 0.07, 0.1, 0.88))
-		ov.draw_string(font, mp + Vector2(21, 22), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Palette.TEXT)
+		ov.draw_string(font, mp + Vector2(21, 22), I18n.t(label), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Palette.TEXT)
 
 
 func _progress_of(it: Dictionary) -> float:
@@ -1150,12 +1150,12 @@ func _draw_tool_overlay(view: WorldView, ov: Control, font: Font, bold: Font) ->
 			var w := font.get_string_size(tool.reason, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
 			var at2 := (sp2 as Vector2) + Vector2(16, 10)
 			ov.draw_rect(Rect2(at2 - Vector2(6, 16), Vector2(w + 12, 22)), Color(0.12, 0.03, 0.02, 0.85))
-			ov.draw_string(font, at2, tool.reason, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1.0, 0.62, 0.5))
+			ov.draw_string(font, at2, I18n.t(tool.reason), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1.0, 0.62, 0.5))
 
 
 static func _shadow_text(ov: Control, font: Font, pos: Vector2, text: String, font_size: int, color: Color) -> void:
-	ov.draw_string(font, pos + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.7))
-	ov.draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+	ov.draw_string(font, pos + Vector2(1, 1), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.7))
+	ov.draw_string(font, pos, I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
 
 # ── 구역 판 ─────────────────────────────────────────────────────
@@ -1404,9 +1404,9 @@ func _draw_district_labels(view: WorldView, ov: Control, font: Font, bold: Font)
 		placed.append(rect)
 		ov.draw_rect(rect, Color(0.04, 0.05, 0.08, 0.45 * a))
 		ov.draw_rect(Rect2(rect.position, Vector2(3.0, rect.size.y)), Color(col, 0.95 * a))
-		ov.draw_string(bold, rect.position + Vector2(10, 14), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12,
+		ov.draw_string(bold, rect.position + Vector2(10, 14), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 12,
 			Color(col.lightened(0.45), a))
-		ov.draw_string(font, rect.position + Vector2(10, 27), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+		ov.draw_string(font, rect.position + Vector2(10, 27), I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
 			Color(0.82, 0.84, 0.88, 0.85 * a))
 
 
@@ -1490,5 +1490,5 @@ func _draw_way_signs(view: WorldView, ov: Control, font: Font, bold: Font) -> vo
 		var rect := Rect2(p - Vector2(w * 0.5, 18), Vector2(w, 36))
 		ov.draw_rect(rect, Color(0.12, 0.09, 0.03, 0.72 * a))
 		ov.draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2.0)), Color(1.0, 0.72, 0.35, 0.9 * a))
-		ov.draw_string(bold, rect.position + Vector2(9, 16), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1.0, 0.82, 0.55, a))
-		ov.draw_string(font, rect.position + Vector2(9, 31), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.86, 0.84, 0.8, 0.85 * a))
+		ov.draw_string(bold, rect.position + Vector2(9, 16), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1.0, 0.82, 0.55, a))
+		ov.draw_string(font, rect.position + Vector2(9, 31), I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.86, 0.84, 0.8, 0.85 * a))

@@ -13,8 +13,8 @@ func _draw() -> void:
 	if sim == null:
 		return
 	var font := get_theme_default_font()
-	draw_string(font, Vector2(12, size.y * 0.5 - 2), "일조 예보", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Palette.TEXT)
-	draw_string(font, Vector2(12, size.y * 0.5 + 14), "96시간", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.MUTED)
+	draw_string(font, Vector2(12, size.y * 0.5 - 2), I18n.t("일조 예보"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Palette.TEXT)
+	draw_string(font, Vector2(12, size.y * 0.5 + 14), I18n.t("96시간"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.MUTED)
 	var x0 := LABEL_W
 	var w := size.x - x0 - 12
 	var slot := w / HOURS
@@ -31,5 +31,5 @@ func _draw() -> void:
 			var x := x0 + i * slot
 			draw_line(Vector2(x, y - 2), Vector2(x, y + h + 2), Palette.TEXT.darkened(0.3), 1.0)
 			var dt := sim.date_dict(hh)
-			draw_string(font, Vector2(x + 3, size.y - 4), "%d.%d" % [dt["month"], dt["day"]], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.MUTED)
+			draw_string(font, Vector2(x + 3, size.y - 4), I18n.t("%d.%d" % [dt["month"], dt["day"]]), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.MUTED)
 	draw_rect(Rect2(x0 - 1, y - 3, 3, h + 6), Palette.TEXT)

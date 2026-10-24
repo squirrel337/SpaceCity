@@ -113,7 +113,7 @@ func _draw() -> void:
 	var font: Font = ThemeFactory.regular if ThemeFactory.regular else get_theme_default_font()
 	var bold: Font = ThemeFactory.bold if ThemeFactory.bold else font
 	# 제목과 범례 (줄이 둘 이상일 때 — 색은 표시에만, 글은 글자 색). 범례가 넘치면 다음 줄로
-	draw_string(bold, Vector2(2, 15), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Palette.TEXT)
+	draw_string(bold, Vector2(2, 15), I18n.t(title), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Palette.TEXT)
 	var lx := 8.0 + bold.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 10.0
 	var ly := 0.0
 	if lines.size() >= 2:
@@ -124,7 +124,7 @@ func _draw() -> void:
 				lx = 2.0
 				ly += LEGEND_H
 			draw_rect(Rect2(Vector2(lx, 6 + ly), Vector2(14, 3)), l["color"])
-			draw_string(font, Vector2(lx + 18, 15 + ly), name, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.MUTED)
+			draw_string(font, Vector2(lx + 18, 15 + ly), I18n.t(name), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.MUTED)
 			lx += lw
 	var top := PAD_T + ly
 	var w := size.x - PAD_L - PAD_R
@@ -138,9 +138,9 @@ func _draw() -> void:
 	for t in _ticks(r.x, r.y):
 		var y: float = (to_px.call(_x0, t) as Vector2).y
 		draw_line(Vector2(PAD_L, y), Vector2(PAD_L + w, y), Color(Palette.LINE, 0.9), 1.0)
-		draw_string(font, Vector2(0, y + 4), _num(t), HORIZONTAL_ALIGNMENT_RIGHT, PAD_L - 6, 10, Palette.DIM)
-	draw_string(font, Vector2(PAD_L, size.y - 4), "%d일" % _x0, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Palette.DIM)
-	draw_string(font, Vector2(PAD_L + w - 60, size.y - 4), "%d일" % _x1, HORIZONTAL_ALIGNMENT_RIGHT, 60, 10, Palette.DIM)
+		draw_string(font, Vector2(0, y + 4), I18n.t(_num(t)), HORIZONTAL_ALIGNMENT_RIGHT, PAD_L - 6, 10, Palette.DIM)
+	draw_string(font, Vector2(PAD_L, size.y - 4), I18n.t("%d일" % _x0), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Palette.DIM)
+	draw_string(font, Vector2(PAD_L + w - 60, size.y - 4), I18n.t("%d일" % _x1), HORIZONTAL_ALIGNMENT_RIGHT, 60, 10, Palette.DIM)
 	# 줄 (2 px, 화면 너비만큼만 — 하루가 한 점보다 촘촘하면 건너뛴다)
 	for l in lines:
 		var days: PackedInt32Array = l["days"]
@@ -190,7 +190,7 @@ func _draw() -> void:
 		var at := Vector2(maxf(PAD_L, minf(hx + 8.0, size.x - tw - 8.0)), top + 12.0)
 		draw_rect(Rect2(at - Vector2(4, 11), Vector2(tw + 8, 14.0 * rows.size() + 1.0)), Color(Palette.PANEL, 0.92))
 		for k in rows.size():
-			draw_string(font, at + Vector2(0, 14.0 * k), rows[k], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.TEXT)
+			draw_string(font, at + Vector2(0, 14.0 * k), I18n.t(rows[k]), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.TEXT)
 
 
 ## 그 날의 값 (그날 기록이 없으면 그 앞의 마지막 값, 기록 전이면 null)

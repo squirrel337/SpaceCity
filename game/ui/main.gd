@@ -80,6 +80,7 @@ var panel_scroll: ScrollContainer
 
 
 func _ready() -> void:
+	I18n.apply()                         # 설정의 언어 (한국어 · English) — 화면을 만들기 전에
 	theme = ThemeFactory.build()
 	get_tree().auto_accept_quit = false
 	get_tree().quit_on_go_back = false
@@ -223,6 +224,7 @@ func _build() -> void:
 	add_child(modal)
 	settings_panel = SettingsPanel.new()
 	settings_panel.changed.connect(func(): world.apply_settings())
+	settings_panel.lang_changed.connect(_on_lang_changed)
 	add_child(settings_panel)
 
 
@@ -1541,6 +1543,21 @@ func _toast(text: String, kind: String, quiet := false) -> void:
 	tween.tween_interval(4.0)
 	tween.tween_property(p, "modulate:a", 0.0, 0.6)
 	tween.tween_callback(p.queue_free)
+
+
+## 언어를 바꿨다: 라벨·단추는 저절로 다시 번역된다 — 직접 그리는 화면과 숫자 글을 다시 그린다
+func _on_lang_changed() -> void:
+	_tab_sim.clear()
+	for k in tabs:
+		if tabs[k].has_method("rebuild"):
+			tabs[k].rebuild()
+	_refresh_tab()
+	_dirty = true
+	_refresh_live()
+	city_view.queue_redraw()
+	forecast.queue_redraw()
+	dv_map.queue_redraw()
+	_update_colony_ui()
 
 
 ## 기록 글에 맞는 효과음 (없으면 알림 종류의 소리)

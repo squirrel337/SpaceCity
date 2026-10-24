@@ -407,12 +407,12 @@ func draw_metros(font: Font, placed: Array) -> void:
 		if clash:
 			continue
 		placed.append(rect)
-		ov.draw_string(font, pos2 + off + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0, 0, 0, 0.75 * a))
-		ov.draw_string(font, pos2 + off, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(col, a))
+		ov.draw_string(font, pos2 + off + Vector2(1, 1), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0, 0, 0, 0.75 * a))
+		ov.draw_string(font, pos2 + off, I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(col, a))
 		if sub != "":
 			var at := pos2 + off + Vector2(0, ssize.y + 1)
-			ov.draw_string(font, at + Vector2(1, 1), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2, Color(0, 0, 0, 0.7 * a))
-			ov.draw_string(font, at, sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2, Color(0.8, 0.82, 0.86, 0.9 * a))
+			ov.draw_string(font, at + Vector2(1, 1), I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2, Color(0, 0, 0, 0.7 * a))
+			ov.draw_string(font, at, I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2, Color(0.8, 0.82, 0.86, 0.9 * a))
 		view._labels.append([rect, id])
 
 
@@ -475,10 +475,10 @@ func draw_regions(font: Font, placed: Array) -> void:
 		if clash:
 			continue
 		placed.append(rect)
-		ov.draw_string(font, pos2 + off + Vector2(1, 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0, 0, 0, 0.75 * a))
-		ov.draw_string(font, pos2 + off, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(col.lightened(0.15), a))
+		ov.draw_string(font, pos2 + off + Vector2(1, 1), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0, 0, 0, 0.75 * a))
+		ov.draw_string(font, pos2 + off, I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(col.lightened(0.15), a))
 		if sub != "":
 			var at := pos2 + off + Vector2(0, ssize.y + 1)
-			ov.draw_string(font, at + Vector2(1, 1), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2, Color(0, 0, 0, 0.7 * a))
-			ov.draw_string(font, at, sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2, Color(0.8, 0.82, 0.86, 0.9 * a))
+			ov.draw_string(font, at + Vector2(1, 1), I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2, Color(0, 0, 0, 0.7 * a))
+			ov.draw_string(font, at, I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, fs - 2, Color(0.8, 0.82, 0.86, 0.9 * a))
 		view._labels.append([rect, id])

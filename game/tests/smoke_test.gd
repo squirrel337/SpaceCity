@@ -65,6 +65,7 @@ func _process(_delta: float) -> bool:
 		_speed_check()
 		_sound_check()
 		_tutorial_check()
+		_i18n_check()
 		main._on_module_tapped("hab_module")
 		main._show_help()
 		main._show_report()
@@ -1959,6 +1960,44 @@ func _tutorial_check() -> void:
 	main.modal.visible = false
 	Settings.set_value("tutorial/done", old)
 	main._select_tab("life")
+
+
+## 영어: 번역 목록(i18n_extract.py)의 95% 넘게 번역이 있고 한글이 남지 않았다, 원문 그대로 · 형식 틀(값도 번역) · 조각 나누기,
+## 단위(Fmt), 언어를 바꾸면 화면이 다시 그려진다, 한국어로 돌아온다
+func _i18n_check() -> void:
+	var cat: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://i18n/catalog.json"))
+	var en: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://i18n/en.json"))
+	_check(cat is Dictionary and en is Dictionary, "번역 목록이나 영어 번역을 읽지 못했다")
+	if not (cat is Dictionary and en is Dictionary):
+		return
+	var have := 0
+	var hangul := RegEx.create_from_string("[\\x{ac00}-\\x{d7a3}]")
+	var left := 0
+	for k in cat:
+		if (en as Dictionary).has(k):
+			have += 1
+			if hangul.search(String(en[k])) != null:
+				left += 1
+	var cover := float(have) / maxf(1.0, float((cat as Dictionary).size()))
+	_check(cover >= 0.95, "영어 번역이 목록의 %.1f%%뿐이다" % (cover * 100.0))
+	_check(left == 0, "영어 번역에 한글이 남았다 (%d개)" % left)
+	I18n.apply("en")
+	_check(I18n.is_en() and TranslationServer.get_locale() == "en", "영어로 바뀌지 않았다")
+	var life := TranslationServer.translate("생명유지")
+	_check(life == String(en.get("생명유지", "")) and hangul.search(life) == null, "탭 이름이 영어가 아니다 (%s)" % life)
+	if (en as Dictionary).has("%s 항로") and (en as Dictionary).has("화성"):
+		var want := I18n._fill(String(en["%s 항로"]), [String(en["화성"])])
+		_check(I18n.t("화성 항로") == want, "형식 틀 번역이 맞지 않다 (%s / %s)" % [I18n.t("화성 항로"), want])
+	var joined := I18n.t("생명유지 · 전력")
+	_check(joined == "%s · %s" % [life, String(en.get("전력", "전력"))], "이어 붙인 글을 나눠 번역하지 못했다 (%s)" % joined)
+	_check(Fmt.days(30.0) == "30 d" and Fmt.hours(5.0) == "5 h", "영어 단위가 아니다 (%s, %s)" % [Fmt.days(30.0), Fmt.hours(5.0)])
+	main._on_lang_changed()
+	main._select_tab("transport")
+	main._select_tab("life")
+	I18n.apply("ko")
+	main._on_lang_changed()
+	_check(not I18n.is_en() and TranslationServer.translate("생명유지") == "생명유지" and Fmt.days(30.0) == "30일", "한국어로 돌아오지 못했다")
+	print("smoke: i18n %.1f%% of %d strings, life tab \"%s\"" % [cover * 100.0, (cat as Dictionary).size(), life])
 
 
 ## 그 노드 아래 글(라벨·단추)

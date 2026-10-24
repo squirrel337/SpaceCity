@@ -377,7 +377,7 @@ func _routes_section() -> void:
 	amount.max_value = 300.0 if float(g[2]) > 1.0 else 2000.0
 	amount.step = 0.5 if float(g[2]) > 1.0 else 1.0
 	amount.value = float(_form["amount"])
-	amount.suffix = String(g[3])
+	amount.suffix = I18n.t(String(g[3]))           # 고정 글자 칸이라 저절로 번역되지 않는다
 	amount.custom_minimum_size = Vector2(110, 32)
 	amount.value_changed.connect(func(v: float): _form["amount"] = v)
 	form.add_child(amount)
@@ -386,7 +386,7 @@ func _routes_section() -> void:
 	every.max_value = 120
 	every.step = 1
 	every.value = int(_form["every"])
-	every.suffix = "일마다"
+	every.suffix = I18n.t("일마다")
 	every.custom_minimum_size = Vector2(120, 32)
 	every.value_changed.connect(func(v: float): _form["every"] = int(v))
 	form.add_child(every)

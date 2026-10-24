@@ -1,15 +1,18 @@
 class_name SettingsPanel
 extends Control
-## 설정 카드 — 그래픽 품질(자동·단계와 감지한 GPU), 지도에 보일 것, 성능 표시, 소리(전체·효과음·환경음 음량, 끄기).
+## 설정 카드 — 언어(한국어 · English), 그래픽 품질(자동·단계와 감지한 GPU), 지도에 보일 것, 성능 표시,
+## 소리(전체·효과음·환경음 음량, 끄기).
 ## 바꾸면 바로 적용하고 저장한다.
 
 signal changed
+signal lang_changed
 
 var _level_buttons := {}
 var _gpu_label: Label
 var _now_label: Label
 var _checks := {}
 var _sliders := {}
+var _lang_buttons := {}
 
 
 func _init() -> void:
@@ -39,6 +42,25 @@ func _init() -> void:
 	title.add_theme_font_override("font", ThemeFactory.bold)
 	title.add_theme_font_size_override("font_size", 24)
 	v.add_child(title)
+	v.add_child(_section("언어 · Language"))
+	var lrow := HBoxContainer.new()
+	lrow.add_theme_constant_override("separation", 6)
+	var lgroup := ButtonGroup.new()
+	for code in I18n.LANGS:
+		var lb := Button.new()
+		lb.text = String(I18n.LANGS[code])
+		lb.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED     # 언어 이름은 그 언어로
+		lb.toggle_mode = true
+		lb.button_group = lgroup
+		lb.custom_minimum_size = Vector2(120, 44)
+		var c2: String = code
+		lb.pressed.connect(func():
+			if I18n.lang != c2:
+				I18n.set_lang(c2)
+				lang_changed.emit())
+		lrow.add_child(lb)
+		_lang_buttons[code] = lb
+	v.add_child(lrow)
 	v.add_child(_section("그래픽 품질"))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
@@ -148,6 +170,8 @@ func _refresh() -> void:
 	for key in _checks:
 		var c: CheckButton = _checks[key][0]
 		c.set_pressed_no_signal(bool(Settings.value(key, _checks[key][1])))
+	for code in _lang_buttons:
+		(_lang_buttons[code] as Button).set_pressed_no_signal(code == I18n.lang)
 	for key2 in _sliders:
 		var sl: HSlider = _sliders[key2][0]
 		sl.set_value_no_signal(float(Settings.value(key2, _sliders[key2][1])))
