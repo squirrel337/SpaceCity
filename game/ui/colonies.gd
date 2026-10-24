@@ -168,6 +168,7 @@ func step() -> Array:
 			CityExplore.step(list[i], s.current_day())       # 둘레 탐사 (모든 도시)
 			CityTrade.step(list[i], s.current_day(), self)   # 수출 계약 (모든 도시)
 			CityPeople.step(list[i], s.current_day(), self)  # 이름 있는 정착민·이야기 (모든 도시)
+			CityPolitics.step(list[i], s.current_day())      # 모임의 지지·평의회 정책·회기 (모든 도시)
 			_record_hist(list[i])                            # 통계: 날마다 지원 점수
 	var arrived := []
 	for e in expeditions.duplicate():
@@ -472,7 +473,7 @@ func to_save() -> Dictionary:
 			"extra": int(c.get("extra", -100000)), "redev": int(c.get("redev", -1)), "redev_txt": String(c.get("redev_txt", "")),
 			"progress": c.get("progress", {}), "research": c.get("research", {}), "explore": c.get("explore", {}),
 			"trade": c.get("trade", {}), "delegate": c.get("delegate", {}), "hist": c.get("hist", {}),
-			"people": c.get("people", {}),
+			"people": c.get("people", {}), "politics": c.get("politics", {}),
 			"oplog": (c.get("oplog", []) as Array).slice(-120)})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
@@ -542,6 +543,16 @@ func load_save(data: Dictionary) -> bool:
 				"boosts": pd.get("boosts", []) if pd.get("boosts") is Array else [], "seen": pd.get("seen", {}) if pd.get("seen") is Dictionary else {},
 				"pending": pd.get("pending", {}) if pd.get("pending") is Dictionary else {}, "story": pd.get("story", []) if pd.get("story") is Array else []}
 			CityPeople.apply(entry)
+		if cd.get("politics") is Dictionary and cd["politics"].get("policy") is Dictionary:
+			var pl: Dictionary = cd["politics"]
+			var pol := {}
+			for k in pl["policy"]:
+				pol[k] = int(pl["policy"][k])
+			entry["politics"] = {"policy": pol, "approval": pl.get("approval", {}), "next": int(pl.get("next", 0)),
+				"strike": pl.get("strike", {}) if pl.get("strike") is Dictionary else {},
+				"events": pl.get("events", {"tech": [], "contract": [], "death": []}), "seen": pl.get("seen", {"techs": 0, "done": 0, "deaths": 0}),
+				"last": pl.get("last", {}), "calm": pl.get("calm", {})}
+			CityPolitics.apply(entry)
 		if cd.get("delegate") is Dictionary:
 			entry["delegate"] = cd["delegate"]
 			CityAuto.sync_policy(entry)

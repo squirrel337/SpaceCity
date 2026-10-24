@@ -1,0 +1,41 @@
+{
+  "_meta": {
+    "about": "정착민 정치 (CityPolitics — 시뮬레이션 밖의 규칙, 모든 도시). 도시마다 네 모임(factions)의 지지(0~100)가 날마다 목표 쪽으로 drift만큼 다가간다. 목표 = 50 + 정책의 반응(policies.options.likes) + 도시 형편(terms). 평의회 정책은 세 칸 가운데 하나 — 고른 칸의 보정(effect)이 CityExt의 politics 몫으로. session_days마다 평의회 회기: 모임 수로 고른 평균 지지가 support_at 넘으면 사기·신뢰가 오르고, unrest_at 아래면 내린다. 지지가 strike_at 아래인 모임은 strike_days 동안 파업한다 (일하는 효율 strike_k). 직접 운영은 개척 탭에서 정책을 고르고, 자동 운영(또는 정치를 맡긴 도시)은 발전 모드로 고르고 가장 불만인 모임을 달랜다",
+    "terms": "morale(사기 − 60)·trust(신뢰 − 60)에 곱하는 값, parts_low(부품이 60 아래면), tech(지난 180일 기술마다), contract(지난 180일 보낸 계약마다 — 10까지), death(지난 365일 사망마다), queue(짓는 중인 건물이 있으면), finds(탐사 발견마다 — 10까지), crowded(정착민이 집의 95%를 넘으면)"
+  },
+  "drift": 0.08, "session_days": 120, "support_at": 65, "unrest_at": 40, "strike_at": 25, "strike_days": 15, "strike_k": 0.88,
+  "session": {"good": {"morale": 2, "trust": 1}, "bad": {"morale": -3, "trust": -2}},
+  "factions": [
+    {"id": "engineers", "name": "기술자 연합", "text": "짓고 고치는 사람들 — 일감과 부품, 느슨한 규정을 바란다",
+      "terms": {"queue": 4, "parts_low": -12, "morale": 0.2}},
+    {"id": "science", "name": "과학 위원회", "text": "연구와 탐사 — 새 기술과 발견을 바란다",
+      "terms": {"tech": 1.5, "finds": 2, "morale": 0.2}},
+    {"id": "commons", "name": "공유지 연합", "text": "정착민의 살림과 안전 — 쉬는 시간과 엄격한 안전을 바란다",
+      "terms": {"morale": 0.6, "death": -10, "crowded": -8}},
+    {"id": "earth", "name": "지구 우호회", "text": "지구와의 관계 — 신뢰와 수출, 홍보를 바란다",
+      "terms": {"trust": 0.5, "contract": 2}}
+  ],
+  "policies": [
+    {"id": "hours", "name": "근무 시간", "default": 1, "options": [
+      {"name": "짧게", "effect": {"work_k": 0.95, "morale": 2}, "likes": {"commons": 12, "engineers": -6}},
+      {"name": "보통", "effect": {}, "likes": {}},
+      {"name": "길게", "effect": {"work_k": 1.06, "morale": -3}, "likes": {"engineers": 10, "commons": -14}}]},
+    {"id": "research", "name": "연구 지원", "default": 1, "options": [
+      {"name": "적게", "effect": {"rp_k": 0.9, "make_k": 1.03}, "likes": {"science": -15, "engineers": 4}},
+      {"name": "보통", "effect": {}, "likes": {}},
+      {"name": "많이", "effect": {"rp_k": 1.12, "make_k": 0.97}, "likes": {"science": 15, "engineers": -4}}]},
+    {"id": "promotion", "name": "지구 홍보", "default": 1, "options": [
+      {"name": "적게", "effect": {"work_k": 1.01}, "likes": {"earth": -10}},
+      {"name": "보통", "effect": {}, "likes": {}},
+      {"name": "많이", "effect": {"support_day": 3, "work_k": 0.98}, "likes": {"earth": 12, "commons": -3}}]},
+    {"id": "safety", "name": "안전 규정", "default": 1, "options": [
+      {"name": "느슨하게", "effect": {"build_k": 1.05, "morale": -1}, "likes": {"engineers": 8, "commons": -10}},
+      {"name": "보통", "effect": {}, "likes": {}},
+      {"name": "엄격하게", "effect": {"build_k": 0.94, "morale": 1.5}, "likes": {"commons": 10, "engineers": -8}}]}
+  ],
+  "mode_policy": {
+    "research": {"research": 2}, "tech": {"research": 2}, "trade": {"promotion": 2}, "finance": {"promotion": 2},
+    "industry": {"hours": 2}, "resources": {"hours": 2}, "energy": {"safety": 0}, "residential": {"hours": 0, "safety": 2},
+    "tourism": {"promotion": 2, "safety": 2}
+  }
+}

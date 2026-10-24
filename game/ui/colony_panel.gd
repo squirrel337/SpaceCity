@@ -106,6 +106,7 @@ func rebuild() -> void:
 		body_box.add_child(_explore_section(here))
 		body_box.add_child(_trade_section(here))
 		body_box.add_child(_people_section(here))
+		body_box.add_child(_politics_section(here))
 	var cands := mgr.candidates()
 	for body in Colonies.BODY_ORDER:
 		var cities := []
@@ -453,6 +454,95 @@ func _explore_section(i: int) -> Control:
 					label.text = "? %s — 아직 모른다" % where
 			b.visible = String(site["state"]) == "unknown"
 			b.disabled = CityExplore.can_send(c, k) != "")
+	return card
+
+
+## 평의회 (CityPolitics): 모임마다 지지 막대와 목표 쪽, 정책마다 세 칸, 다음 회기·지난 회기·파업
+func _politics_section(i: int) -> Control:
+	var c: Dictionary = mgr.list[i]
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 10))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	card.add_child(v)
+	v.add_child(ThemeFactory.heading("평의회 — 모임의 지지와 정책", 16))
+	var head := ThemeFactory.muted("", 13)
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(head)
+	var meters := {}
+	for f in CityPolitics.data()["factions"]:
+		var m := Meter.new(String(f["name"]))
+		m.tooltip_text = String(f.get("text", ""))
+		v.add_child(m)
+		meters[String(f["id"])] = m
+	var groups := {}
+	for p in CityPolitics.data()["policies"]:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		var name := Label.new()
+		name.text = String(p["name"])
+		name.custom_minimum_size = Vector2(84, 0)
+		name.add_theme_font_size_override("font_size", 13)
+		row.add_child(name)
+		var g := ButtonGroup.new()
+		var buttons: Array = []
+		for k in (p["options"] as Array).size():
+			var opt: Dictionary = p["options"][k]
+			var b := Button.new()
+			b.text = String(opt["name"])
+			b.toggle_mode = true
+			b.button_group = g
+			b.custom_minimum_size = Vector2(0, 32)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var likes := PackedStringArray()
+			for fid in opt.get("likes", {}):
+				likes.append("%s %s" % [String(CityPolitics.faction(String(fid))["name"]), CityPolitics._sign(float(opt["likes"][fid]))])
+			b.tooltip_text = "%s%s" % [CityResearch.effect_text(opt["effect"]) if not (opt["effect"] as Dictionary).is_empty() else "보정 없음",
+				(" · 지지: " + ", ".join(likes)) if not likes.is_empty() else ""]
+			var pid := String(p["id"])
+			var idx := k
+			b.pressed.connect(func():
+				CityPolitics.set_policy(c, pid, idx)
+				_live_ms = 0
+				update_view())
+			row.add_child(b)
+			buttons.append(b)
+		v.add_child(row)
+		groups[String(p["id"])] = buttons
+	var foot := ThemeFactory.muted("", 12)
+	foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(foot)
+	_live.append(func():
+		var st := CityPolitics.state(c)
+		var sim2: CitySim = c["sim"]
+		var day := sim2.current_day()
+		var auto := CityAuto.on(c, "politics")
+		head.text = "평균 지지 %d · 다음 회기 %d일 뒤%s" % [int(round(CityPolitics.mean(c))), maxi(0, int(st["next"]) - day),
+			" — 시드가 정책을 정한다 (자동 운영·위임)" if auto else ""]
+		for fid in meters:
+			var a := float(st["approval"].get(fid, 50.0))
+			var t := CityPolitics.target(c, String(fid), day)
+			var col := Palette.GREEN if a >= 60.0 else (Palette.AMBER if a >= 40.0 else Palette.RED)
+			var arrow := "↑" if t > a + 1.0 else ("↓" if t < a - 1.0 else "→")
+			(meters[fid] as Meter).set_values(a / 100.0, "%d %s" % [int(round(a)), arrow], "목표 %d — %s" % [int(round(t)),
+				String(CityPolitics.faction(String(fid)).get("text", ""))], col)
+		for pid in groups:
+			var cur := int(st["policy"].get(pid, 1))
+			var bs: Array = groups[pid]
+			for k in bs.size():
+				(bs[k] as Button).set_pressed_no_signal(k == cur)
+				(bs[k] as Button).disabled = auto
+		var lines := PackedStringArray()
+		var stk: Dictionary = st["strike"]
+		if not stk.is_empty():
+			lines.append("파업 중 — %s (%d일 남음, 일하는 효율 ×%s)" % [String(CityPolitics.faction(String(stk["faction"]))["name"]),
+				maxi(0, int(stk["until"]) - day), str(CityPolitics.data().get("strike_k", 0.88))])
+		var last: Dictionary = st.get("last", {})
+		if not last.is_empty():
+			lines.append("지난 회기 (%d일째): 평균 지지 %d — %s" % [int(last["day"]), int(round(float(last["mean"]))), String(last["result"])])
+		lines.append("회기마다 평균 지지 %d 넘으면 사기·신뢰가 오르고 %d 아래면 내린다. 지지 %d 아래인 모임은 파업한다" % [
+			int(CityPolitics.data()["support_at"]), int(CityPolitics.data()["unrest_at"]), int(CityPolitics.data()["strike_at"])])
+		foot.text = "\n".join(lines))
 	return card
 
 

@@ -8,7 +8,7 @@ extends VBoxContainer
 const KIND_COLOR := {"info": Palette.MUTED, "build": Palette.MUTED, "good": Palette.GREEN, "warn": Palette.AMBER,
 	"critical": Palette.RED, "death": Palette.RED}
 const DOMAIN_COLOR := {"build": Palette.AMBER, "research": Palette.BLUE, "land": Palette.GREEN, "explore": Palette.TEXT,
-	"trade": Palette.AMBER, "mega": Palette.GREEN}
+	"trade": Palette.AMBER, "mega": Palette.GREEN, "politics": Palette.PURPLE}
 
 const SHOW := 120
 

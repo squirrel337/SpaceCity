@@ -1710,6 +1710,13 @@ func _on_modal_choice(context: String, choice: String) -> void:
 					return
 		"storm":
 			sim.resolve_storm(choice)
+			var sc: Dictionary = colonies.list[active]
+			match choice:                               # 모임의 지지 (CityPolitics)
+				"essential":
+					CityPolitics.nudge(sc, "commons", -12.0)
+					CityPolitics.nudge(sc, "engineers", 3.0)
+				"council":
+					CityPolitics.nudge(sc, "commons", 8.0)
 			_dirty = true
 		"event":
 			CityPeople.resolve(colonies.list[active], int(choice), colonies)

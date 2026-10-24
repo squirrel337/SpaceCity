@@ -59,6 +59,7 @@ func _process(_delta: float) -> bool:
 		_demolish_move_check()
 		_stats_check()
 		_people_check()
+		_politics_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -1345,6 +1346,47 @@ func _people_check() -> void:
 		"사람들이 저장 왕복에서 달라졌다")
 	print("smoke: people — %s, story %s" % [str((st["people"] as Array).map(func(p): return "%s(%s)" % [p["name"], p["role"]])),
 		String(pend["title"])])
+
+
+## 정치: 모임 넷이 50에서, 정책 칸의 보정이 시뮬레이션에, 정책이 모임의 목표를 움직이고 지지가 그쪽으로 다가간다. 회기 — 평균이
+## 낮으면 사기·신뢰가 내리고 바닥인 모임은 파업 (일하는 효율), 파업은 끝난다. 자동 운영·맡긴 도시는 발전 모드의 정책. 저장 왕복
+func _politics_check() -> void:
+	var ps := CitySim.new(7, 40.0, "")
+	var c := {"sim": ps, "plan": CityPlan.create(ps, BaseLayout.new("ridge")), "site": ps.site_id, "name": "시험 도시", "mode": ""}
+	var st := CityPolitics.state(c)
+	_check(st["approval"].size() == 4 and is_equal_approx(CityPolitics.mean(c), 50.0), "모임 넷이 50에서 시작하지 않았다")
+	var t0 := CityPolitics.target(c, "engineers", 0)
+	_check(CityPolitics.set_policy(c, "hours", 2) and absf(float(c["ext_parts"]["politics"]["work_k"]) - 1.06) < 1e-6,
+		"근무 시간 '길게'의 보정이 시뮬레이션에 없다")
+	_check(CityPolitics.target(c, "engineers", 0) > t0 + 5.0 and CityPolitics.target(c, "commons", 0) < 50.0, "정책이 모임의 목표를 움직이지 않았다")
+	var a0 := float(st["approval"]["engineers"])
+	for d in range(1, 20):
+		CityPolitics.step(c, d)
+	_check(float(st["approval"]["engineers"]) > a0 + 3.0, "지지가 목표 쪽으로 다가가지 않았다")
+	# 불만 회기와 파업
+	for fid in st["approval"]:
+		st["approval"][fid] = 30.0
+	st["approval"]["commons"] = 10.0
+	var m0 := ps.morale
+	var tr0 := ps.trust
+	CityPolitics.session(c, 30)
+	_check(ps.morale < m0 and ps.trust < tr0 and String((st["strike"] as Dictionary).get("faction", "")) == "commons"
+		and float(c["ext_parts"]["politics"]["work_k"]) < 1.0, "불만 회기에 사기·신뢰가 내리지 않았거나 파업이 없다")
+	CityPolitics.step(c, 30 + int(CityPolitics.data()["strike_days"]) + 1)
+	_check((st["strike"] as Dictionary).is_empty() and float(c["ext_parts"]["politics"]["work_k"]) > 1.0, "파업이 끝나지 않았다")
+	# 자동 운영: 연구 중심 도시는 연구 지원 '많이'
+	var pa := CitySim.new(9, 40.0, "good")
+	var ca := {"sim": pa, "plan": CityPlan.create(pa, BaseLayout.new("ridge")), "site": pa.site_id, "name": "자동", "mode": "research"}
+	CityPolitics.step(ca, 1)
+	_check(int(CityPolitics.state(ca)["policy"]["research"]) == 2 and (ca.get("oplog", []) as Array).size() >= 1, "자동 운영이 발전 모드의 정책을 고르지 않았다")
+	# 맡기기
+	CityAuto.set_delegate(c, "politics", true)
+	c["mode"] = "trade"
+	CityPolitics.step(c, 40)
+	_check(int(st["policy"]["promotion"]) == 2, "정치를 맡긴 도시가 발전 모드의 정책을 고르지 않았다")
+	var back: Variant = JSON.parse_string(JSON.stringify(st))
+	_check(back is Dictionary and int(back["policy"]["promotion"]) == 2 and (back["approval"] as Dictionary).size() == 4, "정치가 저장 왕복에서 달라졌다")
+	print("smoke: politics — mean %.0f, policy %s, last %s" % [CityPolitics.mean(c), str(st["policy"]), str(st["last"])])
 
 
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.
