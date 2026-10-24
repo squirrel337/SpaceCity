@@ -1352,6 +1352,8 @@ func _refresh_live() -> void:
 	_set_chip("pop", "%d명" % int(pop), "인구 · 주거 %d" % int(sim.housing_cap), Palette.AMBER if pop > sim.housing_cap else Palette.TEXT)
 	_set_chip("morale", str(int(round(sim.morale))), "사기", Palette.level_color(sim.morale, 50, 35))
 	_set_chip("trust", str(int(round(sim.trust))), "신뢰", Palette.level_color(sim.trust, 40, 30))
+	if world.city != null and active >= 0 and active < colonies.list.size():
+		world.city.era_text = String(CityProgress.data()["eras"][CityProgress.era_of(colonies.list[active])].get("short", ""))
 	city_view.queue_redraw()
 	forecast.queue_redraw()
 	tabs[current_tab].update_view()

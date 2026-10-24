@@ -44,6 +44,9 @@ var land := {}                     # 사들인 땅 구역: Vector2i(구역 번�
 var land_rev := 0                  # 땅을 살 때마다 +1
 var works: Array = []              # 길 공사 (RoadWorks — 넓히기·노선): {kind, a, b, type, p 공정, days, len, cost …}
 var works_rev := 0                 # 길 공사가 늘거나 끝날 때마다 +1
+var mega: Array = []               # 짓는 메가프로젝트 (CityProgress): {id, cell: 땅 구역, stage: 단계, p: 그 단계의 공정}
+var mega_done: Array = []          # 다 지은 메가프로젝트: {id, cell}
+var mega_rev := 0                  # 메가프로젝트가 늘거나 단계가 바뀌거나 끝날 때마다 +1
 var ground: SiteGround             # 이 도시의 땅 (높이·물 — 땅 구역의 비탈, 새 땅의 건물 비탈). 없으면 따지지 않는다
 var body := ""                     # 이 도시가 선 천체 (활주로가 있나)
 var runway_at: Array = []          # 활주로 자리 [쪽("+x"·"-x"·"+y"·"-y"), 땅 구역 줄 번호] — 처음 정하면 저장한다 (땅을 사도 옮겨 가지 않게)
@@ -529,6 +532,9 @@ func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1, ignor
 	for w in works:
 		if _seg_rect_dist(w["a"], w["b"], r) < LayoutData.road_half(String(w["type"])) + 0.5:
 			return "길 공사 자리다 (%s)" % RoadWorks.title(w)
+	for mr in mega_rects():
+		if (mr as Rect2).intersects(r):
+			return "메가프로젝트 자리다"
 	if flooded_in(r) > 0:
 		return "물에 잠긴 땅이다 — 먼저 메운다"
 	return _ground_reason(r)
@@ -708,6 +714,9 @@ func road_check(a: Vector2, b: Vector2, type: String = "street", cross := true) 
 	for i in idx:
 		if _seg_rect_dist(a, b, (_brect[i] as Rect2).grow(-0.3)) < hw:
 			return "건물(%s)을 지나간다" % GameData.module_name(String(buildings[i]["id"]))
+	for mr in mega_rects():
+		if _seg_rect_dist(a, b, (mr as Rect2).grow(-1.0)) < hw:
+			return "메가프로젝트 자리를 지나간다"
 	var up := LayoutData.raised(type)
 	if up:
 		if ground != null and (ground.water_at(a) or ground.water_at(b)):
@@ -1264,6 +1273,34 @@ func zone_free_block(district: String) -> bool:
 	return not best.is_empty() and set_district(best["center"], district)
 
 
+# ── 메가프로젝트 자리 ──────────────────────────────────────────
+const MEGA_INSET := 6.0            # 메가프로젝트는 땅 구역의 둘레 길 안쪽에 선다
+
+
+## 메가프로젝트 자리 (짓는 것과 다 지은 것): 땅 구역에서 둘레 길을 뺀 사각형
+func mega_rects() -> Array:
+	var out := []
+	for w in mega + mega_done:
+		out.append(parcel_rect(w["cell"]).grow(-MEGA_INSET))
+	return out
+
+
+## 메가프로젝트 자리: 구역 안쪽의 길(구역을 네 블록으로 나누는 길)을 걷어 낸다 — 둘레 길은 이웃 땅과 나눠 쓰므로 남긴다
+func clear_parcel_roads(c: Vector2i) -> void:
+	var r := parcel_rect(c).grow(-2.0)
+	var gone: Array = []
+	for k in edges.size():
+		if r.has_point(((nodes[edges[k].x] as Vector2) + (nodes[edges[k].y] as Vector2)) * 0.5):
+			gone.append(k)
+	gone.reverse()
+	for k in gone:
+		edges.remove_at(k)
+		etypes.remove_at(k)
+	if not gone.is_empty():
+		_tidy()
+		_roads_changed()
+
+
 # ── 재건축 ─────────────────────────────────────────────────────
 ## 지어진 건물 uid의 자리에 kind가 들어가나 (그 건물을 빼고 따진다 — 다른 건물·길·땅 밖에 걸리지 않게): 그 자리 그대로,
 ## 돌려서, 넓어진 만큼 네 쪽으로 밀어서 본다. 겹치는 이웃이 absorb의 종류(지어진 것)면 둘까지 함께 헐어 자리를 낸다.
@@ -1417,6 +1454,9 @@ func parcel_empty(c: Vector2i) -> bool:
 func can_release(c: Vector2i) -> bool:
 	if not land.has(c) or not parcel_empty(c):
 		return false
+	for w in mega + mega_done:
+		if w["cell"] == c:
+			return false                # 메가프로젝트 자리
 	var seen := {}
 	var todo: Array = []
 	for k in land:
@@ -2391,6 +2431,9 @@ func to_save() -> Dictionary:
 		out["runway"] = runway_at.duplicate()
 	if not works.is_empty():
 		out["works"] = RoadWorks.to_save(works)
+	if not mega.is_empty() or not mega_done.is_empty():
+		out["mega"] = mega.map(func(w): return [w["id"], w["cell"].x, w["cell"].y, int(w["stage"]), snappedf(float(w["p"]), 0.0001)])
+		out["mega_done"] = mega_done.map(func(w): return [w["id"], w["cell"].x, w["cell"].y])
 	return out
 
 
@@ -2452,6 +2495,12 @@ static func from_save(data: Variant, sim: CitySim, p_layout: BaseLayout = null, 
 	if rs is Array and rs.size() == 2 and String(rs[0]) in ["+x", "-x", "+y", "-y"]:
 		plan.runway_at = [String(rs[0]), int(rs[1])]
 	plan.works = RoadWorks.from_save(data.get("works"))
+	for w in data.get("mega", []):
+		if w is Array and w.size() >= 5 and not CityProgress.mega(String(w[0])).is_empty():
+			plan.mega.append({"id": String(w[0]), "cell": Vector2i(int(w[1]), int(w[2])), "stage": int(w[3]), "p": float(w[4])})
+	for w in data.get("mega_done", []):
+		if w is Array and w.size() >= 3 and not CityProgress.mega(String(w[0])).is_empty():
+			plan.mega_done.append({"id": String(w[0]), "cell": Vector2i(int(w[1]), int(w[2]))})
 	plan.road_rev += 1
 	plan._ensure_taxiway()
 	if sim != null and sync_now:

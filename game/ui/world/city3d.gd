@@ -20,6 +20,7 @@ var traffic: BaseTraffic
 var hovered := ""
 var hovered_pos := Vector3.ZERO
 var title := "섀클턴 시드 시티"     # 왼쪽 위 이름 (식민지 이름)
+var era_text := ""                 # 이름 옆의 시대 (CityProgress)
 
 var _items: Array = []
 var _sig := ""
@@ -34,6 +35,7 @@ var cover_on := false             # '범위' 보기: 의료·여가·대피 시�
 var _cover: MeshInstance3D
 var _cover_sig := ""
 var _trains: LineTrains           # 모노레일·자기부상 궤도의 열차
+var _mega: MegaView               # 메가프로젝트 (짓는 것·다 지은 것)
 var _grow_t := 0.0
 var _agents_root: Node3D
 var _agent_nodes := {}            # uid → {node, plume, yaw}
@@ -87,6 +89,8 @@ func setup(p_ground: SiteGround) -> void:
 	add_child(_works)
 	_trains = LineTrains.new()
 	add_child(_trains)
+	_mega = MegaView.new()
+	add_child(_mega)
 	_agents_root = Node3D.new()
 	add_child(_agents_root)
 	ground.terrain_ready.connect(_on_terrain_ready)
@@ -201,6 +205,7 @@ func update(delta: float, speed_level: int) -> void:
 		_grow_sites()
 		if heights_ok:
 			_works.refresh(plan, _local)
+			_mega.refresh(plan, _local)
 	if cover_on and heights_ok:
 		_update_cover()
 	if heights_ok:
@@ -1051,6 +1056,9 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 		if sim.bat_cap + sim.rfc_cap > 0.0:
 			state += " — 태양광 0 kW, 축전 %s" % Fmt.pct((sim.battery + sim.rfc) / maxf(1.0, sim.bat_cap + sim.rfc_cap))
 	_shadow_text(ov, bold, Vector2(16, 76), title, 17, Palette.TEXT)        # 위쪽은 고정점 경로 막대
+	if era_text != "":
+		_shadow_text(ov, font, Vector2(26 + bold.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x, 76), era_text, 13,
+			Palette.AMBER.lightened(0.2))
 	_shadow_text(ov, font, Vector2(16, 96), state, 13, Palette.AMBER if lit else Palette.BLUE)
 	var warn := ""
 	if not sim.pending_storm.is_empty():

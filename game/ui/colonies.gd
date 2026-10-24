@@ -152,6 +152,7 @@ func step() -> Array:
 		if s.hour % 24 == 0:
 			CityDev.step_day(list[i], i)          # 그 도시의 하루가 끝났다 — 발전 모드 (도시마다 다른 시간에)
 			CityServices.step(list[i], s.current_day(), i)   # 시설 영향 범위·통근·물류 (모든 도시)
+			CityProgress.step(list[i], s.current_day())      # 이정표·시대·메가프로젝트 (모든 도시)
 	var arrived := []
 	for e in expeditions.duplicate():
 		if hour >= int(e["arrive"]):
@@ -439,7 +440,8 @@ func to_save() -> Dictionary:
 		cols.append({"name": c["name"], "site": c["site"], "founded": c["founded"],
 			"sim": (c["sim"] as CitySim).to_save(), "plan": (c["plan"] as CityPlan).to_save(),
 			"mode": String(c.get("mode", "")), "idle": c.get("idle", {}), "bought": int(c.get("bought", -100000)),
-			"extra": int(c.get("extra", -100000)), "redev": int(c.get("redev", -1)), "redev_txt": String(c.get("redev_txt", ""))})
+			"extra": int(c.get("extra", -100000)), "redev": int(c.get("redev", -1)), "redev_txt": String(c.get("redev_txt", "")),
+			"progress": c.get("progress", {})})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
 		"metro_fn": metro_fn.to_save()}
@@ -481,6 +483,11 @@ func load_save(data: Dictionary) -> bool:
 		entry["extra"] = int(cd.get("extra", -100000))
 		entry["redev"] = int(cd.get("redev", -1))
 		entry["redev_txt"] = String(cd.get("redev_txt", ""))
+		if cd.get("progress") is Dictionary:
+			var pg: Dictionary = cd["progress"]
+			entry["progress"] = {"done": pg.get("done", {}) if pg.get("done") is Dictionary else {}, "era": int(pg.get("era", 0)),
+				"built": pg.get("built", []) if pg.get("built") is Array else []}
+			CityProgress.apply_effects(entry)
 		list.append(entry)
 	expeditions = []
 	for e in data.get("expeditions", []):

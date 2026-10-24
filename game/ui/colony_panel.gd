@@ -98,6 +98,7 @@ func rebuild() -> void:
 	if here >= 0:
 		body_box.add_child(_dev_section(here))
 		body_box.add_child(_services_section(here))
+		body_box.add_child(_progress_section(here))
 	var cands := mgr.candidates()
 	for body in Colonies.BODY_ORDER:
 		var cities := []
@@ -212,6 +213,83 @@ func _services_section(i: int) -> Control:
 		lines.text = "닿는 사람: 의료 %s · 여가 %s · 대피 %s\n통근 평균 %.1f분 · 물류 평균 %s km\n보정: %s" % [
 			Fmt.pct(float(cv.get("care", 0.0))), Fmt.pct(float(cv.get("leisure", 0.0))), Fmt.pct(float(cv.get("shelter", 0.0))),
 			float(m.get("commute_min", 0.0)), Fmt.n(float(m.get("freight_km", 0.0)), 2), CityExt.text((c["sim"] as CitySim).ext)])
+	return card
+
+
+## 고른 도시의 시대·이정표·메가프로젝트 (CityProgress): 지금 시대와 다음 시대에 필요한 이정표, 아직 이루지 못한 이정표,
+## 메가프로젝트마다 지은 것·짓는 공정·짓기 단추(직접 운영 — 자동 운영은 자재가 넉넉하면 스스로 짓는다)
+func _progress_section(i: int) -> Control:
+	var c: Dictionary = mgr.list[i]
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 10))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	card.add_child(v)
+	var head := ThemeFactory.heading("", 16)
+	v.add_child(head)
+	var lines := ThemeFactory.muted("", 13)
+	lines.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lines.add_theme_color_override("font_color", Palette.TEXT.darkened(0.05))
+	v.add_child(lines)
+	var rows: Array = []                   # [메가프로젝트 id, 설명 Label, 짓기 Button]
+	for m in CityProgress.data()["megaprojects"]:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var label := ThemeFactory.muted("", 12)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(label)
+		var b := Button.new()
+		b.text = "짓기"
+		b.custom_minimum_size = Vector2(64, 34)
+		var id := String(m["id"])
+		b.pressed.connect(func():
+			if CityProgress.start(c, id):
+				update_view())
+		row.add_child(b)
+		v.add_child(row)
+		rows.append([id, label, b])
+	_live.append(func():
+		var st := CityProgress.state(c)
+		var era := int(st["era"])
+		var eras: Array = CityProgress.data()["eras"]
+		head.text = "%s · %s" % [CityProgress.era_name(era), String(eras[era].get("text", ""))] if era < eras.size() else ""
+		var done: Dictionary = st["done"]
+		var txt := "이룬 이정표 %d / %d" % [done.size(), (CityProgress.data()["milestones"] as Array).size()]
+		if era + 1 < eras.size():
+			var need := PackedStringArray()
+			for id in eras[era + 1].get("needs", []):
+				need.append(("✓ " if done.has(id) else "· ") + CityProgress.milestone_name(String(id)))
+			txt += "\n다음 — %s: %s" % [String(eras[era + 1]["name"]), ", ".join(need)]
+		var todo := PackedStringArray()
+		for ms in CityProgress.data()["milestones"]:
+			if not done.has(String(ms["id"])) and todo.size() < 4:
+				todo.append("%s(%s)" % [String(ms["name"]), String(ms.get("text", ""))])
+		if not todo.is_empty():
+			txt += "\n남은 이정표: " + " · ".join(todo)
+		lines.text = txt
+		var plan: CityPlan = c["plan"]
+		for r in rows:
+			var m := CityProgress.mega(String(r[0]))
+			var label: Label = r[1]
+			var b: Button = r[2]
+			var stages: Array = m["stages"]
+			var desc := "%s — %s (%s)" % [String(m["name"]), String(m.get("text", "")), CityProgress.effect_text(m.get("effect", {}))]
+			b.visible = false
+			if String(r[0]) in st["built"]:
+				label.text = "✓ " + desc
+				continue
+			var going := {}
+			for w in plan.mega:
+				if String(w["id"]) == String(r[0]):
+					going = w
+			if not going.is_empty():
+				label.text = "%s\n짓는 중: %d/%d단계 %s — %s" % [desc, int(going["stage"]) + 1, stages.size(),
+					String(stages[int(going["stage"])]["name"]), Fmt.pct(float(going["p"]))]
+				continue
+			var why := CityProgress.can_start(c, String(r[0]))
+			b.visible = why == ""
+			label.text = desc + ("\n첫 단계 %s · %d단계" % [CityPlan.cost_text(stages[0]["cost"]), stages.size()] if why == "" else "\n" + why))
 	return card
 
 

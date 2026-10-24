@@ -49,6 +49,7 @@ func _process(_delta: float) -> bool:
 		_redevelop_check()
 		_roadworks_check()
 		_services_check()
+		_progress_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -810,6 +811,49 @@ func _services_check() -> void:
 	main.world.show_cover(false)
 	print("smoke: services care %s leisure %s, commute %.1f min, freight %.2f km, ext %s" % [Fmt.pct(float(cv["care"])),
 		Fmt.pct(float(cv["leisure"])), float(m["commute_min"]), float(m["freight_km"]), CityExt.text(ss.ext)])
+
+
+## 시대·이정표·메가프로젝트: 이정표를 이루면 지원 점수를 받고 시대가 오른다. 메가프로젝트는 빈 산 땅 구역에 단계마다 값을 내며
+## 짓고 (짓는 동안 그 자리에 건물을 놓지 않는다), 다 지으면 효과가 시뮬레이션 보정으로 남는다 (집이 는다). 저장 왕복, 3D 모습
+func _progress_check() -> void:
+	var ps := CitySim.new(7, 40.0, "good")
+	var pp := CityPlan.create(ps, BaseLayout.new("ridge"))
+	var c := {"sim": ps, "plan": pp, "mode": ""}
+	var sup0 := ps.support
+	var news := CityProgress.check(c, ps.current_day())
+	_check("백 명의 도시" in news and ps.support > sup0, "정착민 100명 이정표를 이루지 못했다 (%s)" % str(news))
+	for t in GameData.TECHS.keys().slice(0, 8):
+		ps.techs[t] = true
+	CityProgress.check(c, ps.current_day())
+	_check(CityProgress.era_of(c) == 1, "이정표를 이뤘는데 시대가 오르지 않았다")
+	ps.techs["sintered_construction"] = true
+	ps.stock["parts"] = 5000.0
+	ps.stock["metal_t"] = 200.0
+	ps.support = 5000.0
+	_check(CityProgress.can_start(c, "grand_dome").begins_with("빈 땅 구역"), "빈 땅 구역 없이 메가프로젝트를 시작할 수 있다")
+	_check(CityProgress._buy_site(c) and CityProgress.start(c, "grand_dome"), "메가프로젝트를 시작하지 못했다: " + CityProgress.can_start(c, "grand_dome"))
+	var w: Dictionary = pp.mega[0]
+	var r := pp.parcel_rect(w["cell"])
+	_check(pp.check_spot("crew_capsule", r.get_center(), 0) == "메가프로젝트 자리다", "메가프로젝트 자리에 건물을 놓을 수 있다: "
+		+ pp.check_spot("crew_capsule", r.get_center(), 0))
+	var back := CityPlan.from_save(JSON.parse_string(JSON.stringify(pp.to_save())), ps, BaseLayout.new("ridge"))
+	_check(back.mega.size() == 1 and back.mega[0]["cell"] == w["cell"], "메가프로젝트가 저장 왕복에서 달라졌다")
+	var view := MegaView.new()
+	view.refresh(pp, func(p: Vector2, above: float) -> Vector3: return Vector3(p.x, above, -p.y))
+	_check(view.get_child_count() == 1, "메가프로젝트 공사가 3D에 없다")
+	view.free()
+	var cap0 := ps.housing_cap
+	var days := 0
+	for d in 300:
+		CityProgress.advance(c)
+		days += 1
+		if pp.mega.is_empty():
+			break
+	_check(pp.mega.is_empty() and pp.mega_done.size() == 1 and ps.housing_cap >= cap0 + 79.99, "메가프로젝트가 끝났는데 집이 늘지 않았다")
+	var news2 := CityProgress.check(c, ps.current_day())
+	_check("첫 메가프로젝트" in news2, "메가프로젝트 이정표를 이루지 못했다")
+	print("smoke: progress era %s, grand dome in %d days, housing %d → %d, milestones %d" % [CityProgress.era_name(CityProgress.era_of(c)),
+		days, int(cap0), int(ps.housing_cap), (CityProgress.state(c)["done"] as Dictionary).size()])
 
 
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.

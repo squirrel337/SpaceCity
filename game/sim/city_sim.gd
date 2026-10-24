@@ -61,7 +61,7 @@ var seq := 0
 var stock := {}
 var cohorts: Array = []          # [인원, 누적 선량 mSv, 귀환 대기]
 var morale := 0.0
-var ext := {"morale": 0.0, "work_k": 1.0, "make_k": 1.0}   # 시뮬레이션 밖의 보정 (CityServices — 자리로 셈한다). 기본값이면 파이썬과 같다
+var ext := {"morale": 0.0, "work_k": 1.0, "make_k": 1.0}   # 시뮬레이션 밖의 보정 (CityExt — 도시 기능의 자리·메가프로젝트 …). 기본값이면 파이썬과 같다
 var trust := 0.0
 var trust_memory := 0.0          # 사건이 남긴 신뢰의 흔적. 반감기 약 1년
 var support := 0.0
@@ -364,6 +364,7 @@ func refresh() -> void:
 	housing_cap = 0.0
 	for mid in with_prov("housing"):
 		housing_cap += float(prov(mid, "housing")) * int(counts.get(mid, 0))
+	housing_cap += float(ext.get("housing_add", 0.0))       # 메가프로젝트의 집 (기본 0)
 	air = maxf(1.0, housing_cap) * float(C["air_kg_per_housing"])
 	co2_floor = ppm_to_kg(C["co2_ppm"]["floor"])
 	var bonus := 1.5 if techs.has("shielding_2") else 1.0
@@ -780,7 +781,7 @@ func _queue_order(a: Dictionary, b: Dictionary) -> bool:
 func work_robots() -> void:
 	var s := stock
 	var speed := 1.5 if techs.has("autonomous_robots_2") else 1.0
-	var rd: float = (robots - robots_broken) * speed * build_k
+	var rd: float = (robots - robots_broken) * speed * build_k * float(ext.get("build_k", 1.0))
 	var boost := 0.0           # 교통·로봇 시설: 자재와 로봇이 빨리 돌아 작업량이 는다 (합은 50%까지)
 	for m in with_prov("build_boost"):
 		boost += wk[m] * float(prov(m, "build_boost"))
@@ -944,7 +945,8 @@ func research() -> void:
 			rp_direct += wk[m] * float(prov(m, "rp_day"))
 	var rp: float = (scientists * prod * p4_share * float(ext.get("work_k", 1.0))
 		+ rp_direct * p4_share
-		+ C["earth"]["earth_rp_day"])
+		+ C["earth"]["earth_rp_day"]
+		+ float(ext.get("rp_day", 0.0)) * p4_share)
 	last_rp = rp
 	rp_bank += rp
 	support += rp * C["earth"]["support_per_rp"]
@@ -984,6 +986,7 @@ func commerce() -> void:
 		made += wk[m] * float(prov(m, "support_day"))
 	if made:
 		support += made * share * float(ext.get("work_k", 1.0))
+	support += float(ext.get("support_day", 0.0))          # 메가프로젝트 (기본 0)
 	for m in with_prov("make"):
 		var n: int = wk[m]
 		if n:

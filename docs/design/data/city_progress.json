@@ -1,0 +1,62 @@
+{
+  "_meta": {
+    "about": "도시의 시대·이정표·메가프로젝트 (CityProgress — 시뮬레이션 밖의 규칙). 이정표는 도시마다 한 번 이루고 상(지원 점수)을 받는다. 시대는 이룬 이정표로 오른다. 메가프로젝트는 시대·기술이 되면 빈 땅 구역 하나에 단계마다 값을 내며 짓고, 다 지으면 그 도시에 효과가 남는다",
+    "milestones": "id, name, text, when(조건: pop 정착민 · techs 연구 수 · land 산 땅 구역 · built {종류|계열: 수} · roads [길 종류 …] 가운데 하나라도 · days 날수와 deaths 0 · mega 지은 메가프로젝트 수), reward(support)",
+    "eras": "차례대로: name, short, text, needs(이룬 이정표 id들)",
+    "megaprojects": "id, name, text, era(그 시대부터), tech(필요 기술 — 없으면 null), stages [{name, cost{parts, metal_t}, days}], effect(housing 집 · morale 사기 · support_day 지원 점수/일 · rp_day 연구/일 · build_k 로봇 작업량 배율), look(3D 모양: driver 질량 투사기 · ring 회전 거주 고리 · dome 대형 돔 · dish 전파 접시 · tether 궤도 승강기)"
+  },
+  "milestones": [
+    {"id": "pop100", "name": "백 명의 도시", "text": "정착민 100명", "when": {"pop": 100}, "reward": {"support": 80}},
+    {"id": "pop250", "name": "정착 도시", "text": "정착민 250명", "when": {"pop": 250}, "reward": {"support": 150}},
+    {"id": "pop500", "name": "오백 명", "text": "정착민 500명", "when": {"pop": 500}, "reward": {"support": 300}},
+    {"id": "pop1000", "name": "천 명의 도시", "text": "정착민 1,000명", "when": {"pop": 1000}, "reward": {"support": 600}},
+    {"id": "tech8", "name": "연구 기반", "text": "기술 8가지", "when": {"techs": 8}, "reward": {"support": 100}},
+    {"id": "tech16", "name": "기술 도시", "text": "기술 16가지", "when": {"techs": 16}, "reward": {"support": 250}},
+    {"id": "parts", "name": "부품 자급", "text": "부품 공장 계열 2기", "when": {"built": {"parts_fab": 2}}, "reward": {"support": 120}},
+    {"id": "land5", "name": "넓어지는 땅", "text": "산 땅 구역 5곳", "when": {"land": 5}, "reward": {"support": 100}},
+    {"id": "land10", "name": "도시권", "text": "산 땅 구역 10곳", "when": {"land": 10}, "reward": {"support": 200}},
+    {"id": "tower", "name": "첫 고층 타워", "text": "고층 타워 1기 (재건축)", "when": {"built": {"hab_tower": 1, "research_tower": 1, "finance_tower": 1, "hotel_tower": 1}}, "reward": {"support": 150}},
+    {"id": "viaduct", "name": "첫 고가 노선", "text": "고가 대로·고가 고속도로", "when": {"roads": ["elevated_avenue", "elevated_highway", "elevated_street"]}, "reward": {"support": 120}},
+    {"id": "train", "name": "궤도 열차", "text": "모노레일·자기부상 궤도", "when": {"roads": ["monorail", "maglev"]}, "reward": {"support": 200}},
+    {"id": "safe_year", "name": "무사고 한 해", "text": "사망자 없이 365일", "when": {"days": 365, "deaths": 0}, "reward": {"support": 200}},
+    {"id": "mega1", "name": "첫 메가프로젝트", "text": "메가프로젝트 하나를 다 짓는다", "when": {"mega": 1}, "reward": {"support": 400}}
+  ],
+  "eras": [
+    {"name": "시대 0 · 전초기지", "short": "전초기지", "text": "살아남는 것이 먼저다", "needs": []},
+    {"name": "시대 1 · 정착 도시", "short": "정착 도시", "text": "사람이 늘고 연구가 쌓인다", "needs": ["pop100", "tech8"]},
+    {"name": "시대 2 · 자립 도시", "short": "자립 도시", "text": "부품을 스스로 만들고 땅이 넓어진다", "needs": ["pop250", "parts", "land5"]},
+    {"name": "시대 3 · 궤도 도시", "short": "궤도 도시", "text": "고층과 궤도가 도시를 바꾼다", "needs": ["pop500", "tech16", "mega1"]}
+  ],
+  "megaprojects": [
+    {"id": "grand_dome", "name": "대형 돔 공원", "era": 1, "tech": "sintered_construction", "look": "dome",
+      "text": "지름 90 m 소결 돔 — 숲과 호수, 둘레에 집",
+      "stages": [{"name": "기초와 링", "cost": {"parts": 120, "metal_t": 4}, "days": 20},
+        {"name": "돔 껍질", "cost": {"parts": 180, "metal_t": 6}, "days": 30},
+        {"name": "숲과 호수", "cost": {"parts": 80}, "days": 15}],
+      "effect": {"housing": 80, "morale": 6}},
+    {"id": "deep_array", "name": "심우주 전파 접시", "era": 2, "tech": "space_weather_forecast", "look": "dish",
+      "text": "지름 80 m 전파 접시 — 먼 하늘을 듣는다",
+      "stages": [{"name": "받침과 회전대", "cost": {"parts": 150, "metal_t": 8}, "days": 25},
+        {"name": "접시 판", "cost": {"parts": 200, "metal_t": 10}, "days": 30},
+        {"name": "수신기", "cost": {"parts": 100}, "days": 10}],
+      "effect": {"rp_day": 40}},
+    {"id": "mass_driver", "name": "질량 투사기", "era": 2, "tech": "mass_driver", "look": "driver",
+      "text": "전자기 레일로 화물을 궤도에 쏜다 — 지구 지원 점수",
+      "stages": [{"name": "레일 기초", "cost": {"parts": 200, "metal_t": 12}, "days": 30},
+        {"name": "코일과 축전", "cost": {"parts": 260, "metal_t": 16}, "days": 35},
+        {"name": "시험 발사", "cost": {"parts": 60}, "days": 10}],
+      "effect": {"support_day": 14}},
+    {"id": "spin_ring", "name": "회전 거주 고리", "era": 3, "tech": "rotating_habitat", "look": "ring",
+      "text": "지름 120 m 회전 고리 — 1 g의 거주 구역",
+      "stages": [{"name": "중심축", "cost": {"parts": 220, "metal_t": 14}, "days": 30},
+        {"name": "고리 마디", "cost": {"parts": 320, "metal_t": 20}, "days": 45},
+        {"name": "회전 시험", "cost": {"parts": 80}, "days": 12}],
+      "effect": {"housing": 240, "morale": 4}},
+    {"id": "space_lift", "name": "궤도 승강기 지상국", "era": 3, "tech": "orbital_assembly", "look": "tether",
+      "text": "궤도 조립 정거장으로 이어지는 줄 — 로봇과 화물이 오르내린다",
+      "stages": [{"name": "닻 기초", "cost": {"parts": 260, "metal_t": 18}, "days": 35},
+        {"name": "승강 탑", "cost": {"parts": 300, "metal_t": 20}, "days": 40},
+        {"name": "줄 잇기", "cost": {"parts": 120, "metal_t": 6}, "days": 20}],
+      "effect": {"support_day": 18, "build_k": 1.1}}
+  ]
+}
