@@ -7,8 +7,10 @@ signal changed
 const PLAUSIBILITY := {"proven": "검증됨", "engineering": "공학적", "theoretical": "이론적"}
 
 var sim: CitySim
+var colony: Dictionary = {}       # 고른 식민지 (연구 갈림길·돌파 카드 — CityResearch)
 var status := Label.new()
 var progress := Meter.new("진행")
+var paths := VBoxContainer.new()  # 갈림길·돌파 카드
 var list := VBoxContainer.new()
 var _shape := ""         # 완료·대기 순서·지금 과제 — 바뀔 때만 목록을 다시 만든다
 
@@ -20,6 +22,8 @@ func _init() -> void:
 	status.add_theme_font_size_override("font_size", 14)
 	add_child(status)
 	add_child(progress)
+	paths.add_theme_constant_override("separation", 6)
+	add_child(paths)
 	add_child(HSeparator.new())
 	list.add_theme_constant_override("separation", 8)
 	add_child(list)
@@ -31,8 +35,9 @@ func bind(p_sim: CitySim) -> void:
 
 
 func _shape_sig() -> String:
-	return "%d|%d|%s|%s" % [sim.get_instance_id(), sim.techs.size(), ",".join(PackedStringArray(sim.research_queue)),
-		current_target()]
+	var rs := str(CityResearch.state(colony)) if not colony.is_empty() else ""
+	return "%d|%d|%s|%s|%s" % [sim.get_instance_id(), sim.techs.size(), ",".join(PackedStringArray(sim.research_queue)),
+		current_target(), rs]
 
 
 ## 날마다·탭을 고를 때: 기술의 상태가 그대로면 진행만 고친다
@@ -83,6 +88,60 @@ func rebuild() -> void:
 	var target := current_target()
 	for tid in sim.T:
 		list.add_child(_entry(tid, target))
+	_rebuild_paths()
+
+
+## 갈림길과 돌파 카드: 고른 방향, 고를 차례의 방향 단추 둘, 가진 카드, 고를 카드 단추 셋
+func _rebuild_paths() -> void:
+	for c in paths.get_children():
+		paths.remove_child(c)
+		c.queue_free()
+	if colony.is_empty():
+		return
+	var st := CityResearch.state(colony)
+	paths.add_child(ThemeFactory.heading("연구 갈림길 · 돌파", 16))
+	var brs: Array = CityResearch.data()["branches"]
+	var due := CityResearch.branch_due(colony)
+	for i in brs.size():
+		var br: Dictionary = brs[i]
+		var chosen := String((st["branches"] as Dictionary).get(str(i), ""))
+		if chosen != "":
+			var o := CityResearch.option(chosen)
+			paths.add_child(ThemeFactory.muted("✓ %s — %s (%s)" % [String(br["name"]), String(o["name"]), CityResearch.effect_text(o["effect"])], 13))
+		elif i == due:
+			paths.add_child(ThemeFactory.muted("%s — 하나를 고른다 (바꿀 수 없다)" % String(br["name"]), 13))
+			for o in br["options"]:
+				paths.add_child(_choice_button("%s — %s\n%s" % [String(o["name"]), String(o["text"]), CityResearch.effect_text(o["effect"])],
+					func(): CityResearch.choose_branch(colony, i, String(o["id"]))))
+		else:
+			var names := PackedStringArray()
+			for o in br["options"]:
+				names.append(String(o["name"]))
+			paths.add_child(ThemeFactory.muted("· 기술 %d가지에 %s: %s" % [int(br["at"]), String(br["name"]), " / ".join(names)], 12))
+	var owned := PackedStringArray()
+	for id in st["cards"]:
+		owned.append(String(CityResearch.card(String(id))["name"]))
+	paths.add_child(ThemeFactory.muted("돌파 카드 %d장%s" % [owned.size(), (": " + " · ".join(owned)) if not owned.is_empty() else
+		" — 기술을 알아낼 때마다 %d%%의 확률로 셋 가운데 하나를 고른다" % int(float(CityResearch.data().get("chance", 0.35)) * 100.0)], 12))
+	if not (st["pending"] as Array).is_empty():
+		paths.add_child(ThemeFactory.muted("돌파 — 하나를 고른다", 13))
+		for id in st["pending"]:
+			var cd := CityResearch.card(String(id))
+			paths.add_child(_choice_button("%s — %s\n%s" % [String(cd["name"]), String(cd["text"]), CityResearch.effect_text(cd["effect"])],
+				func(): CityResearch.choose_card(colony, String(id))))
+
+
+func _choice_button(text: String, on_press: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.custom_minimum_size = Vector2(0, 52)
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.pressed.connect(func():
+		on_press.call()
+		rebuild()
+		changed.emit())
+	return b
 
 
 func _entry(tid: String, target: String) -> Control:

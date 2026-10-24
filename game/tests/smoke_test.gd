@@ -50,6 +50,7 @@ func _process(_delta: float) -> bool:
 		_roadworks_check()
 		_services_check()
 		_progress_check()
+		_research_paths_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -854,6 +855,49 @@ func _progress_check() -> void:
 	_check("첫 메가프로젝트" in news2, "메가프로젝트 이정표를 이루지 못했다")
 	print("smoke: progress era %s, grand dome in %d days, housing %d → %d, milestones %d" % [CityProgress.era_name(CityProgress.era_of(c)),
 		days, int(cap0), int(ps.housing_cap), (CityProgress.state(c)["done"] as Dictionary).size()])
+
+
+## 연구 갈림길·돌파 카드: 기술 4가지에 첫 갈림길이 열리고, 직접 운영은 고를 때까지 기다리며 자동 운영은 모드에 맞춰 고른다.
+## 고른 효과가 시뮬레이션 보정으로 간다 (연구 배율). 돌파 카드는 같은 도시·같은 기술 수면 같은 셋이고, 하나를 고르면 효과가 더해진다
+func _research_paths_check() -> void:
+	var rs := CitySim.new(7, 40.0, "")
+	var c := {"sim": rs, "plan": CityPlan.create(rs, BaseLayout.new("ridge")), "mode": "research", "site": rs.site_id}
+	CityResearch.state(c)
+	for t in GameData.TECHS.keys().slice(0, 4):
+		rs.techs[t] = true
+	var data := CityResearch.data()
+	var ch0: float = data["chance"]
+	data["chance"] = 1.0
+	CityResearch.step(c)
+	_check(CityResearch.branch_due(c) == 0, "기술 4가지에 첫 갈림길이 열리지 않았다")
+	var pending: Array = (CityResearch.state(c)["pending"] as Array).duplicate()
+	_check(pending.size() == 3, "돌파 카드 셋을 뽑지 않았다 (%d)" % pending.size())
+	_check(CityResearch.choose_branch(c, 0, "people") and CityResearch.branch_due(c) == -1, "갈림길을 고르지 못했다")
+	_check(float(rs.ext.get("morale", 0.0)) >= 3.0, "갈림길 효과가 시뮬레이션 보정에 없다")
+	_check(CityResearch.choose_card(c, String(pending[0])) and (CityResearch.state(c)["pending"] as Array).is_empty(), "돌파 카드를 고르지 못했다")
+	# 같은 도시·같은 기술 수면 같은 카드
+	var rs2 := CitySim.new(7, 40.0, "")
+	var c2 := {"sim": rs2, "plan": c["plan"], "mode": "research", "site": rs2.site_id}
+	CityResearch.state(c2)
+	for t in GameData.TECHS.keys().slice(0, 4):
+		rs2.techs[t] = true
+	CityResearch.step(c2)
+	_check(CityResearch.state(c2)["pending"] == pending, "같은 도시·같은 기술 수인데 다른 돌파 카드가 나왔다")
+	# 자동 운영: 연구 모드는 셋째 갈림길에서 연구 도시를 고른다
+	var ra := CitySim.new(7, 40.0, "good")
+	var ca := {"sim": ra, "plan": c["plan"], "mode": "research", "site": ra.site_id}
+	CityResearch.state(ca)
+	for t in GameData.TECHS.keys().slice(0, 14):
+		ra.techs[t] = true
+	CityResearch.step(ca)
+	data["chance"] = ch0
+	var st: Dictionary = CityResearch.state(ca)
+	_check(String((st["branches"] as Dictionary).get("2", "")) == "science_city" and (st["pending"] as Array).is_empty()
+		and float(ra.ext.get("rp_k", 1.0)) > 1.1, "자동 운영(연구 모드)이 연구 도시를 고르지 않았다: %s" % str(st))
+	var back: Variant = JSON.parse_string(JSON.stringify(st))
+	_check(back is Dictionary and (back["branches"] as Dictionary).size() == 3, "연구 갈림길이 저장 왕복에서 달라졌다")
+	print("smoke: research paths — %s, cards %d, autopilot %s, rp ×%.2f" % [CityResearch.option("people")["name"],
+		(CityResearch.state(c)["cards"] as Array).size(), str((st["branches"] as Dictionary).values()), float(ra.ext.get("rp_k", 1.0))])
 
 
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.

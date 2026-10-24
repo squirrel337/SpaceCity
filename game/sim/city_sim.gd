@@ -947,6 +947,7 @@ func research() -> void:
 		+ rp_direct * p4_share
 		+ C["earth"]["earth_rp_day"]
 		+ float(ext.get("rp_day", 0.0)) * p4_share)
+	rp *= float(ext.get("rp_k", 1.0))               # 연구 카드·갈림길 (기본 1)
 	last_rp = rp
 	rp_bank += rp
 	support += rp * C["earth"]["support_per_rp"]

@@ -1,0 +1,52 @@
+{
+  "_meta": {
+    "about": "연구 갈림길과 돌파 카드 (CityResearch — 시뮬레이션 밖의 규칙). 효과는 그 도시의 시뮬레이션 보정(CitySim.ext)의 research 몫으로 건넨다 — 더하는 값(morale 사기 · support_day 지원 점수/일 · rp_day 연구/일 · housing_add 집)은 더하고 배율(work_k 일하는 효율 · make_k 만드는 효율 · build_k 로봇 작업량 · rp_k 연구)은 곱한다",
+    "branches": "연구한 기술이 at가지가 되면 그 도시가 두 방향(options) 가운데 하나를 고른다 — 한 번 고르면 바꾸지 않는다. 직접 운영은 연구 탭에서, 자동 운영은 발전 모드에 맞춰 스스로 고른다",
+    "cards": "기술 하나를 알아낼 때마다 chance의 확률로 카드 셋을 뽑아(아직 없는 것 가운데) 하나를 고른다 — 고를 때까지 다음 카드는 뽑지 않는다",
+    "mode_weights": "자동 운영이 고를 때 발전 모드마다 효과에 주는 무게 (배율은 (배율 − 1) × 100, 더하는 값은 그 값으로 셈한다)"
+  },
+  "chance": 0.35,
+  "branches": [
+    {"at": 4, "name": "첫 갈림길 — 일손",
+      "options": [
+        {"id": "automation", "name": "자동화 우선", "text": "로봇이 더 일하고 사람은 덜 붐빈다", "effect": {"build_k": 1.12, "morale": -1.0}},
+        {"id": "people", "name": "사람 우선", "text": "정착민의 삶과 일하는 방식을 먼저 다듬는다", "effect": {"morale": 3.0, "work_k": 1.03}}]},
+    {"at": 9, "name": "둘째 갈림길 — 지구와의 관계",
+      "options": [
+        {"id": "closed_loop", "name": "닫힌 순환", "text": "모든 것을 기지 안에서 다시 쓴다", "effect": {"make_k": 1.06, "morale": 1.0}},
+        {"id": "earth_link", "name": "지구와 함께", "text": "지구의 관심과 지원을 키운다", "effect": {"support_day": 6.0, "rp_day": 2.0}}]},
+    {"at": 14, "name": "셋째 갈림길 — 도시의 성격",
+      "options": [
+        {"id": "science_city", "name": "연구 도시", "text": "도시 전체가 실험실이 된다", "effect": {"rp_k": 1.12, "rp_day": 4.0}},
+        {"id": "works_city", "name": "산업 도시", "text": "공장과 로봇이 도시를 키운다", "effect": {"make_k": 1.08, "build_k": 1.06}}]}
+  ],
+  "cards": [
+    {"id": "catalyst", "name": "전해조 촉매 개선", "text": "산업 공정이 조금 빨라진다", "effect": {"make_k": 1.03}},
+    {"id": "joints", "name": "로봇 관절 표준화", "text": "로봇 수리가 줄어든다", "effect": {"build_k": 1.05}},
+    {"id": "lab_auto", "name": "실험실 자동화", "text": "연구원 한 명이 더 많은 실험을 돌린다", "effect": {"rp_k": 1.05}},
+    {"id": "quiet_habs", "name": "거주 모듈 방음", "text": "밤이 조용해진다", "effect": {"morale": 1.5}},
+    {"id": "local_diet", "name": "현지 식단", "text": "수경 농장 채소로 만든 새 요리", "effect": {"morale": 1.0, "work_k": 1.01}},
+    {"id": "pr_video", "name": "지구 홍보 영상", "text": "지구의 관심이 커진다", "effect": {"support_day": 2.5}},
+    {"id": "shuttle_timetable", "name": "통근 셔틀 시간표", "text": "기다리는 시간이 준다", "effect": {"work_k": 1.03}},
+    {"id": "recycling", "name": "자재 재활용", "text": "깎아 낸 부스러기도 다시 쓴다", "effect": {"make_k": 1.02, "build_k": 1.02}},
+    {"id": "compression", "name": "관측 자료 압축", "text": "지구로 보내는 자료가 늘어난다", "effect": {"rp_day": 3.0}},
+    {"id": "commons_kitchen", "name": "공동 주방", "text": "함께 먹는 저녁", "effect": {"morale": 2.0}},
+    {"id": "brick_spec", "name": "레골리스 벽돌 규격", "text": "인쇄한 벽돌이 바로 맞는다", "effect": {"build_k": 1.04}},
+    {"id": "bunk_design", "name": "접이식 침실", "text": "같은 모듈에 몇 사람 더", "effect": {"housing_add": 12.0}},
+    {"id": "sunrise_ritual", "name": "해돋이 모임", "text": "긴 밤이 끝나는 날의 축제", "effect": {"morale": 1.0, "support_day": 1.0}},
+    {"id": "ai_scheduler", "name": "작업 배치 인공지능", "text": "로봇과 사람의 일을 함께 짠다", "effect": {"build_k": 1.03, "work_k": 1.02}}
+  ],
+  "mode_weights": {
+    "": {},
+    "research": {"rp_k": 2.0, "rp_day": 2.0},
+    "trade": {"support_day": 2.0, "make_k": 1.5},
+    "tech": {"rp_k": 1.5, "make_k": 1.5, "build_k": 1.5},
+    "finance": {"support_day": 2.0, "work_k": 1.5},
+    "transport": {"work_k": 2.0, "build_k": 1.5},
+    "residential": {"morale": 2.0, "housing_add": 2.0},
+    "industry": {"make_k": 2.0, "build_k": 2.0},
+    "resources": {"make_k": 2.0, "build_k": 1.5},
+    "energy": {"make_k": 1.5, "build_k": 1.5},
+    "tourism": {"morale": 2.0, "support_day": 1.5}
+  }
+}
