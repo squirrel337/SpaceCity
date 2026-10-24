@@ -5,7 +5,7 @@ extends RefCounted
 ## 물건(만드는 계열이 있거나 비축이 넉넉한 것)을, 지구의 사는 쪽이나 다른 도시가 산다. 제안은 offer_days 뒤에 사라진다.
 ## 받으면 deadline_days 안에 보내야 한다 — 보내면 지원 점수와 신뢰, 다른 도시가 샀으면 그 도시 비축에 더해진다
 ## (화물 착륙선이 내려와 싣고 간다). 못 보내면 신뢰와 사기를 잃는다.
-## 직접 운영은 '개척' 탭에서 받고 보낸다. 자동 운영은 남는 양(비축 − 남길 양)을 보고 스스로 받고 보낸다.
+## 직접 운영은 '개척' 탭에서 받고 보낸다. 자동 운영(또는 계약을 맡긴 도시 — CityAuto)은 남는 양(비축 − 남길 양)을 보고 스스로 받고 보낸다.
 ## 상태는 c["trade"]: {offers: [제안], active: [받은 계약], next: 다음 제안 날, serial, done, failed, earned}
 ##   제안·계약: {id, good, amount(보이는 단위), reward, buyer(이름), to(산 도시의 부지 — 지구면 ""), expires·due(시간), days}
 
@@ -85,7 +85,7 @@ static func step(c: Dictionary, day: int, mgr: Colonies = null) -> void:
 	if day >= int(st["next"]):
 		st["next"] = day + int(d.get("every_days", 20))
 		_offer(c, day, mgr)
-	if sim.autopilot != null:
+	if CityAuto.on(c, "trade"):
 		_auto(c, mgr)
 
 
@@ -205,13 +205,14 @@ static func _auto(c: Dictionary, mgr: Colonies) -> void:
 		for a in st["active"]:
 			if String(a["good"]) == String(o["good"]):
 				pending += float(a["amount"])
-		if spare(sim, g) - pending >= float(o["amount"]) * k:
-			accept(c, int(o["id"]))
+		if spare(sim, g) - pending >= float(o["amount"]) * k and accept(c, int(o["id"])):
+			CityAuto.record(c, "trade", "계약을 받았다 — %s에 %s (지원 점수 +%d): 남는 %s %s" % [String(o["buyer"]), amount_text(o),
+				int(o["reward"]), _num(spare(sim, g), g), String(g.get("unit", ""))])
 	var act: Array = (st["active"] as Array).duplicate()
 	act.sort_custom(func(x, y): return int(x["due"]) < int(y["due"]))
 	for a in act:
-		if spare(sim, good(String(a["good"]))) >= float(a["amount"]):
-			deliver(c, int(a["id"]), mgr)
+		if spare(sim, good(String(a["good"]))) >= float(a["amount"]) and deliver(c, int(a["id"]), mgr):
+			CityAuto.record(c, "trade", "계약을 보냈다 — %s에 %s (지원 점수 +%d)" % [String(a["buyer"]), amount_text(a), int(a["reward"])])
 
 
 static func _num(v: float, g: Dictionary) -> String:

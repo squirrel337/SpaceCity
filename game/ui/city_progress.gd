@@ -57,13 +57,14 @@ static func step(c: Dictionary, day: int) -> Array:
 	var news: Array = check(c, day)
 	advance(c)
 	var sim: CitySim = c["sim"]
-	if sim.autopilot != null and (c["plan"] as CityPlan).mega.is_empty() and posmod(day, 10) == 5:
+	if CityAuto.on(c, "mega") and (c["plan"] as CityPlan).mega.is_empty() and posmod(day, 10) == 5:
 		for m in data()["megaprojects"]:
 			var why := can_start(c, String(m["id"]))
 			if why.begins_with("빈 땅 구역이 없다") and _rich(sim, m) and _buy_site(c):
+				CityAuto.record(c, "mega", "메가프로젝트 자리 — 땅 구역을 샀다: %s를 지을 빈 구역이 없다" % String(m["name"]))
 				why = can_start(c, String(m["id"]))
-			if why == "" and _rich(sim, m):
-				start(c, String(m["id"]))
+			if why == "" and _rich(sim, m) and start(c, String(m["id"])):
+				CityAuto.record(c, "mega", "메가프로젝트 — %s를 짓기 시작했다: 부품·금속이 첫 단계의 세 배를 넘는다" % String(m["name"]))
 				break
 	return news
 

@@ -53,7 +53,7 @@ static func branch_due(c: Dictionary) -> int:
 static func step(c: Dictionary) -> void:
 	var st := state(c)
 	var sim: CitySim = c["sim"]
-	var auto := sim.autopilot != null
+	var auto := CityAuto.on(c, "research")
 	var n := sim.techs.size()
 	while int(st["techs"]) < n:
 		st["techs"] = int(st["techs"]) + 1
@@ -99,7 +99,7 @@ static func _draw(c: Dictionary, n: int) -> void:
 	if pick.is_empty():
 		return
 	st["pending"] = pick
-	if sim.autopilot == null:
+	if not CityAuto.on(c, "research"):
 		sim.note("돌파 — 연구에서 새 길이 셋 열렸다. 연구 탭에서 하나를 고른다", "good")
 
 
@@ -120,6 +120,9 @@ static func choose_branch(c: Dictionary, i: int, id: String, auto := false) -> b
 		return false
 	(st["branches"] as Dictionary)[str(i)] = id
 	apply(c)
+	if auto:
+		CityAuto.record(c, "research", "갈림길 — %s: %s (%s): 발전 모드에 가장 맞는 효과" % [String(data()["branches"][i]["name"]),
+			String(option(id)["name"]), effect_text(option(id)["effect"])])
 	(c["sim"] as CitySim).note("%s갈림길 — %s: %s (%s)" % ["자동 운영 · " if auto else "", String(data()["branches"][i]["name"]),
 		String(option(id)["name"]), effect_text(option(id)["effect"])], "info" if auto else "good")
 	return true
@@ -132,6 +135,9 @@ static func choose_card(c: Dictionary, id: String, auto := false) -> bool:
 	(st["cards"] as Array).append(id)
 	st["pending"] = []
 	apply(c)
+	if auto:
+		CityAuto.record(c, "research", "돌파 카드 — %s (%s): 셋 가운데 발전 모드에 가장 맞는 것" % [String(card(id)["name"]),
+			effect_text(card(id)["effect"])])
 	(c["sim"] as CitySim).note("%s돌파 카드 — %s: %s" % ["자동 운영 · " if auto else "", String(card(id)["name"]), effect_text(card(id)["effect"])],
 		"info" if auto else "good")
 	return true

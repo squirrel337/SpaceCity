@@ -118,6 +118,7 @@ static func start_next(c: Dictionary) -> bool:
 		plan.works.append(w)
 		plan.works_rev += 1
 		sim.note("길 공사 — %s %d m를 놓는다 (%d일)" % [title(w), int(round(len_m)), int(ceil(float(w["days"])))], "build")
+		CityAuto.record(c, "land", "길 공사 — %s %d m: 정착민 %d명이 넘었다" % [title(w), int(round(len_m)), int(line.get("min_pop", 0))])
 		return true
 	var wd: Dictionary = rw.get("widen", {})
 	if wd.is_empty() or pop < float(wd.get("min_pop", 150)):
@@ -136,6 +137,7 @@ static func start_next(c: Dictionary) -> bool:
 	plan.works.append(ww)
 	plan.works_rev += 1
 	sim.note("길 공사 — %s %d m (통행량 %d)" % [title(ww), int(round(len_w)), int(run["load"])], "build")
+	CityAuto.record(c, "land", "길 공사 — %s %d m: 통행량 %d이 그 길이 감당할 만큼을 넘었다" % [title(ww), int(round(len_w)), int(run["load"])])
 	return true
 
 

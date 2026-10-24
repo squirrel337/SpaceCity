@@ -68,8 +68,10 @@ func _seed_for(site_id: String) -> int:
 
 func _entry(sim: CitySim, plan: CityPlan, founded: int) -> Dictionary:
 	var site := GameData.site(sim.site_id)
-	return {"name": String(site.get("name", sim.site_id)), "short": String(site.get("short", site.get("name", ""))),
+	var c := {"name": String(site.get("name", sim.site_id)), "short": String(site.get("short", site.get("name", ""))),
 		"site": sim.site_id, "body": String(site.get("body", "moon")), "sim": sim, "plan": plan, "founded": founded}
+	plan.on_auto = CityAuto.recorder(c)          # 배치 계획이 스스로 한 땅 일을 운영 기록으로
+	return c
 
 
 func _found_at(site_id: String, at_hour: int, seed: int) -> Dictionary:
@@ -148,7 +150,10 @@ func step() -> Array:
 	hour += 1
 	for i in list.size():
 		var s: CitySim = list[i]["sim"]
+		var seq0 := s.seq
+		(list[i]["plan"] as CityPlan).auto_land = CityAuto.on(list[i], "land")
 		s.advance_hour()
+		CityAuto.record_builds(list[i], seq0)            # 추천 운영(자동 운영·살림 건설 위임)이 넣은 건물 — 운영 기록
 		if s.hour % 24 == 0:
 			CityDev.step_day(list[i], i)          # 그 도시의 하루가 끝났다 — 발전 모드 (도시마다 다른 시간에)
 			CityServices.step(list[i], s.current_day(), i)   # 시설 영향 범위·통근·물류 (모든 도시)
@@ -446,7 +451,8 @@ func to_save() -> Dictionary:
 			"mode": String(c.get("mode", "")), "idle": c.get("idle", {}), "bought": int(c.get("bought", -100000)),
 			"extra": int(c.get("extra", -100000)), "redev": int(c.get("redev", -1)), "redev_txt": String(c.get("redev_txt", "")),
 			"progress": c.get("progress", {}), "research": c.get("research", {}), "explore": c.get("explore", {}),
-			"trade": c.get("trade", {})})
+			"trade": c.get("trade", {}), "delegate": c.get("delegate", {}),
+			"oplog": (c.get("oplog", []) as Array).slice(-120)})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
 		"metro_fn": metro_fn.to_save()}
@@ -503,6 +509,12 @@ func load_save(data: Dictionary) -> bool:
 		if cd.get("explore") is Dictionary and cd["explore"].get("sites") is Array:
 			entry["explore"] = {"sites": cd["explore"]["sites"], "trip": cd["explore"].get("trip", {}) if cd["explore"].get("trip") is Dictionary else {}}
 			CityExplore.apply(entry)
+		if cd.get("delegate") is Dictionary:
+			entry["delegate"] = cd["delegate"]
+			CityAuto.sync_policy(entry)
+		if cd.get("oplog") is Array:
+			entry["oplog"] = (cd["oplog"] as Array).filter(func(x): return x is Array and x.size() >= 3) \
+				.map(func(x): return [int(x[0]), String(x[1]), String(x[2])])
 		if cd.get("trade") is Dictionary and cd["trade"].get("offers") is Array:
 			var td: Dictionary = cd["trade"]
 			entry["trade"] = {"offers": td["offers"], "active": td.get("active", []) if td.get("active") is Array else [],

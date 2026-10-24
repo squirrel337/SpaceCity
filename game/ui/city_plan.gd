@@ -51,6 +51,8 @@ var scars: Array = []              # 최근 재난 (CityHazards): {kind, a, b �
 var ground: SiteGround             # 이 도시의 땅 (높이·물 — 땅 구역의 비탈, 새 땅의 건물 비탈). 없으면 따지지 않는다
 var body := ""                     # 이 도시가 선 천체 (활주로가 있나)
 var site_id := ""                  # 이 도시의 부지 (방위 — north_dir)
+var auto_land := false             # 땅을 시드가 맡았다 (위임 — CityAuto, Colonies가 정한다): 자리가 없으면 땅을 산다
+var on_auto: Callable              # 스스로 한 땅 일을 운영 기록으로 (CityAuto.recorder — 없으면 적지 않는다)
 var runway_at: Array = []          # 활주로 자리 [쪽("+x"·"-x"·"+y"·"-y"), 땅 구역 줄 번호] — 처음 정하면 저장한다 (땅을 사도 옮겨 가지 않게)
 var _runway := {}
 var _runway_key := ""
@@ -332,7 +334,7 @@ func entry_of_seq(seq: int) -> Dictionary:
 
 # ── 자동 배치 ───────────────────────────────────────────────────
 func _auto_place(kind: String, seq: int, tile: String, sim: CitySim = null) -> Dictionary:
-	var auto := sim != null and sim.autopilot != null and fam(kind) != "solar_tower"
+	var auto := (auto_land or CityAuto.full(sim)) and fam(kind) != "solar_tower"
 	# 자동 운영: 기본 자리와 그 구획의 블록이 다 찼으면 (구획을 가리지 않는 빈터 찾기 전에) 그 구획 가까이의 땅 구역을 산다
 	var spot := suggest(kind, tile, not auto)
 	if spot.is_empty() and auto and _auto_expand(kind, sim):
@@ -1253,6 +1255,7 @@ func _auto_expand(kind: String, sim: CitySim) -> bool:
 	if zone_free_block(district):
 		if sim != null:
 			sim.note("자동 운영 — 빈 블록을 %s 구획으로 정했다" % LayoutData.zone_name(district), "info")
+			_rec("land", "빈 블록을 %s 구획으로 정했다: %s을(를) 놓을 자리가 없다" % [LayoutData.zone_name(district), GameData.module_name(kind)])
 		return true
 	return expand_zone(district, sim, LayoutData.land()["auto_reserve"], "자동 운영")
 
@@ -1338,6 +1341,12 @@ func where_text(p: Vector2) -> String:
 	if rel.length() >= 1000.0:
 		return "%s쪽 %.1f km" % [dir, rel.length() / 1000.0]
 	return "%s쪽 %d m" % [dir, int(round(rel.length() / 10.0)) * 10]
+
+
+## 스스로 한 일을 운영 기록으로 (on_auto가 있으면)
+func _rec(domain: String, text: String) -> void:
+	if on_auto.is_valid():
+		on_auto.call(domain, text)
 
 
 ## 지어진 건물 uid를 그 종류의 맨 뒤로 (재난에 부서진 건물이 고장 표시를 받는다 — 고장은 그 종류의 뒤쪽 건물에 붙는다)
@@ -1498,6 +1507,8 @@ func expand_zone(district: String, sim: CitySim, reserve: Dictionary, why: Strin
 	if sim != null:
 		sim.note("%s — 땅 구역을 사서 %s 블록 %d개를 늘렸다 (%s)" % [why, LayoutData.zone_name(district), n,
 			cost_text(best["cost"])], "info")
+		_rec("land", "%s — 땅 구역을 사서 %s 블록 %d개를 늘렸다 (%s): 그 구획에 빈 블록이 없다" % [why, LayoutData.zone_name(district), n,
+			cost_text(best["cost"])])
 	return true
 
 
@@ -1600,6 +1611,7 @@ func release_parcel(c: Vector2i, sim: CitySim, why: String) -> bool:
 			else:
 				sim.stock[k] = float(sim.stock.get(k, 0.0)) + float(back[k])
 		sim.note("%s — 빈 땅 구역을 돌려주었다 (%s 돌려받음)" % [why, cost_text(back)], "info")
+		_rec("land", "%s — 빈 땅 구역을 돌려주었다 (%s 돌려받음): 도시가 비었고 그 구역은 오래 비어 있었다" % [why, cost_text(back)])
 	_touch()
 	return true
 

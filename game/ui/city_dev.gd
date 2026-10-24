@@ -17,7 +17,8 @@ extends RefCounted
 ##   재건축 (모드와 상관없이 자동 운영 도시 모두): 도시가 커지면(redevelop.min_pop) every_days마다, 계열에서 촘촘한 건물의
 ##       몫이 정착민에 따른 목표에 못 미치거나 그 구획이 붐비면 땅 넓이당 값이 낮은 건물을 헐고 그 자리에 값이 가장 높은
 ##       종류(고층 타워 …)를 짓는다 — 한 도시에 한 번에 한 곳 (redevelop)
-## 자동 운영을 끄면 아무것도 하지 않는다 (방향은 남아 있다가 다시 켜면 이어진다).
+## 자동 운영을 끄면 맡긴 분야(위임 — CityAuto: 살림 건설·연구·땅)만 한다 (방향은 남아 있다가 다시 켜면 이어진다).
+## 한 일은 운영 기록에 남는다.
 
 const LAND_EVERY := 3              # 땅을 따지는 간격 (일) — 도시마다 다른 날에
 const IDLE_DAYS := 30              # 이만큼 빈 산 구역만 돌려준다
@@ -39,12 +40,19 @@ static func mode_color(id: String) -> Color:
 ## 도시의 하루가 끝난 뒤 (Colonies.step). index: 목록 순서 — 땅을 따지는 날을 도시마다 엇갈린다
 static func step_day(c: Dictionary, index: int) -> void:
 	var sim: CitySim = c["sim"]
-	if sim.autopilot == null:
+	var build := CityAuto.on(c, "build")
+	var research := CityAuto.on(c, "research")
+	var land := CityAuto.on(c, "land")
+	if not (build or research or land):
 		return
 	var id := String(c.get("mode", ""))
 	var m := LayoutData.dev_mode(id)
-	_research(sim, m)
-	_build(c, sim, m, id)
+	if research:
+		_research(c, sim, m)
+	if build:
+		_build(c, sim, m, id)
+	if not land:
+		return
 	var day := sim.current_day()
 	if posmod(day + index, LAND_EVERY) == 0:
 		land_step(c, day)
@@ -54,7 +62,11 @@ static func step_day(c: Dictionary, index: int) -> void:
 	RoadWorks.step(c, day, index)
 
 
-static func _research(sim: CitySim, m: Dictionary) -> void:
+## 연구: 맡긴 직접 운영 도시는 연구 차례를 추천 순서로 채워 두고, 발전 모드의 기술을 둘째 자리로 당긴다
+static func _research(c: Dictionary, sim: CitySim, m: Dictionary) -> void:
+	if not CityAuto.full(sim) and CityAuto.fill_research(sim):
+		CityAuto.record(c, "research", "연구 차례를 추천 순서로 채웠다 — 다음은 %s" % (
+			String(GameData.TECHS[sim.research_queue[0]]["name"]) if not sim.research_queue.is_empty() else "없음"))
 	var want: Array = m.get("research", [])
 	var q := sim.research_queue
 	for i in range(want.size() - 1, -1, -1):
@@ -67,6 +79,8 @@ static func _research(sim: CitySim, m: Dictionary) -> void:
 		if at > 0:
 			q.remove_at(at)
 		q.insert(mini(1, q.size()), t)
+		CityAuto.record(c, "research", "연구 차례 — %s을(를) 앞으로 당겼다 (발전 모드 %s)" % [String(GameData.TECHS[t]["name"]),
+			mode_name(String(c.get("mode", "")))])
 
 
 ## 방향 건물의 목표 수: 기본 + 정착민 100명마다 더
@@ -92,7 +106,9 @@ static func _build(c: Dictionary, sim: CitySim, m: Dictionary, id: String) -> vo
 		if sim.build_block_reason(mid, reserve) != "":
 			continue                  # 연구가 안 됐거나 자재가 모자라다 — 다음 건물
 		if sim.enqueue(mid, tile, reserve):
-			sim.note("발전 모드(%s) — %s 착공" % [mode_name(id), GameData.module_name(mid)], "build")
+			var t := "발전 모드(%s) — %s 착공" % [mode_name(id), GameData.module_name(mid)]
+			sim.note(t, "build")
+			CityAuto.record(c, "build", "%s: 목표 %d채에 못 미친다" % [t, target(w, pop)])
 		return
 	_extra(c, sim, m, id, reserve)
 
@@ -122,7 +138,9 @@ static func _extra(c: Dictionary, sim: CitySim, m: Dictionary, id: String, reser
 			best = mid
 	if best != "" and sim.enqueue(best, "", reserve):
 		c["extra"] = day
-		sim.note("발전 모드(%s) — 남는 자재로 %s 착공" % [mode_name(id), GameData.module_name(best)], "build")
+		var t := "발전 모드(%s) — 남는 자재로 %s 착공" % [mode_name(id), GameData.module_name(best)]
+		sim.note(t, "build")
+		CityAuto.record(c, "build", t + ": 목표를 다 채웠고 부품이 넉넉하다")
 
 
 ## 더 지어도 쓸모가 있나: 집이 이미 넉넉하면(정착민의 두 배 + 다음 유인선) 거주는, 연구원이 모자라면 연구동은 그만
@@ -161,7 +179,10 @@ static func land_step(c: Dictionary, day: int) -> bool:
 	if best != "":
 		# 구획 넓히기: 가진 땅 안의 빈 블록부터 (땅을 사지 않는다), 없으면 땅 구역을 산다
 		if plan.zone_free_block(best):
-			sim.note("%s — 빈 블록을 %s 구획으로 정했다" % [why, LayoutData.zone_name(best)], "info")
+			var t := "%s — 빈 블록을 %s 구획으로 정했다" % [why, LayoutData.zone_name(best)]
+			sim.note(t, "info")
+			var u: Array = use[best]
+			CityAuto.record(c, "land", "%s: 구획이 %d%% 찼다" % [t, int(round(float(u[0]) / maxf(float(u[1]), 1.0) * 100.0))])
 			return false
 		if plan.land.size() < int(ld.get("max", 8)) and plan.expand_zone(best, sim, reserve, why):
 			c["bought"] = day
@@ -312,7 +333,9 @@ static func redevelop(c: Dictionary) -> bool:
 			var names := GameData.module_name(from) + (" 등 %d채" % gone.size() if gone.size() > 1 else "")
 			c["redev"] = sim.seq
 			c["redev_txt"] = "%s → %s" % [names, GameData.module_name(to)]
-			sim.note("재건축 — %s을(를) 헐고 그 자리에 %s을(를) 짓는다" % [names, GameData.module_name(to)], "build")
+			var t := "재건축 — %s을(를) 헐고 그 자리에 %s을(를) 짓는다" % [names, GameData.module_name(to)]
+			sim.note(t, "build")
+			CityAuto.record(c, "land", t + ": 땅 넓이당 값이 낮다")
 			return true
 	return false
 

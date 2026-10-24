@@ -97,7 +97,7 @@ static func send(c: Dictionary, i: int) -> bool:
 
 
 ## 날마다 (Colonies.step — 모든 도시): 조사가 끝났으면 발견을 드러내고 보상을 준다, 돌아왔으면 탐사대를 비운다.
-## 자동 운영은 every_days마다 가장 가까운 탐사지로 보낸다
+## 자동 운영(또는 탐사를 맡긴 도시 — CityAuto)은 every_days마다 가장 가까운 탐사지로 보낸다
 static func step(c: Dictionary, day: int) -> void:
 	var st := state(c)
 	var sim: CitySim = c["sim"]
@@ -109,7 +109,7 @@ static func step(c: Dictionary, day: int) -> void:
 			_reward(c, s)
 		if sim.hour >= int(trip["back"]):
 			st["trip"] = {}
-	if sim.autopilot != null and (st["trip"] as Dictionary).is_empty() and posmod(day, int(data().get("every_days", 15))) == 7:
+	if CityAuto.on(c, "explore") and (st["trip"] as Dictionary).is_empty() and posmod(day, int(data().get("every_days", 15))) == 7:
 		var best := -1
 		var best_d := INF
 		for i in (st["sites"] as Array).size():
@@ -117,8 +117,9 @@ static func step(c: Dictionary, day: int) -> void:
 			if String(st["sites"][i]["state"]) == "unknown" and d < best_d:
 				best_d = d
 				best = i
-		if best >= 0 and sim.can_afford(data().get("cost", {}), 200.0):
-			send(c, best)
+		if best >= 0 and sim.can_afford(data().get("cost", {}), 200.0) and send(c, best):
+			CityAuto.record(c, "explore", "탐사대 — %s의 탐사지로 보냈다: 아직 모르는 곳 가운데 가장 가깝다" %
+				(c["plan"] as CityPlan).where_text(site_pos(st["sites"][best])))
 
 
 static func _reward(c: Dictionary, s: Dictionary) -> void:

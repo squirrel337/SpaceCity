@@ -97,6 +97,7 @@ func rebuild() -> void:
 	var here := mgr.index_of_sim(sim) if sim != null else -1
 	if here >= 0:
 		body_box.add_child(_dev_section(here))
+		body_box.add_child(_delegate_section(here))
 		body_box.add_child(_services_section(here))
 		body_box.add_child(_progress_section(here))
 		body_box.add_child(_explore_section(here))
@@ -174,7 +175,9 @@ func _dev_section(i: int) -> Control:
 	v.add_child(goal)
 	_live.append(func():
 		var st := CityDev.status(c)
-		var auto := "자동 운영 — 이 방향으로 짓는다" if s.autopilot != null else "직접 운영 — 방향을 고르면 자동 운영을 켠다"
+		var auto := "자동 운영 — 이 방향으로 짓는다" if CityAuto.full(s) else (
+			"직접 운영 · 위임 %d가지 — 맡긴 분야는 이 방향으로" % CityAuto.count(c) if CityAuto.count(c) > 0
+			else "직접 운영 — 방향을 고르면 자동 운영을 켠다")
 		now.text = "지금: %s · %s · 산 땅 구역 %d/%d · 구획이 찬 정도 %s" % [CityDev.mode_name(cur), auto, int(st["land"]),
 			int(st["max"]), Fmt.pct(float(st["fill"]))]
 		var parts := PackedStringArray()
@@ -186,6 +189,55 @@ func _dev_section(i: int) -> Control:
 			goal.text += "\n재건축 중: %s" % String(st["redev"])
 		if not (st["works"] as PackedStringArray).is_empty():
 			goal.text += "\n길 공사: " + " · ".join(st["works"]))
+	return card
+
+
+## 위임: 직접 운영하면서 분야를 골라 시드에게 맡긴다 (CityAuto). 맡긴 분야에서 시드가 한 일은 '기록' 탭의 운영 기록에 남는다
+func _delegate_section(i: int) -> Control:
+	var c: Dictionary = mgr.list[i]
+	var s: CitySim = c["sim"]
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 10))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	card.add_child(v)
+	v.add_child(ThemeFactory.heading("위임 — 시드에게 맡길 분야", 16))
+	var now := ThemeFactory.muted("", 13)
+	now.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(now)
+	var checks: Array = []
+	for d in CityAuto.DOMAINS:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		var cb := CheckButton.new()
+		cb.text = d[1]
+		cb.custom_minimum_size = Vector2(170, 36)
+		cb.button_pressed = bool((c.get("delegate", {}) as Dictionary).get(d[0], false))
+		var dom: String = d[0]
+		cb.toggled.connect(func(on: bool):
+			CityAuto.set_delegate(c, dom, on)
+			_live_ms = 0
+			update_view()
+			changed.emit())
+		row.add_child(cb)
+		var t := ThemeFactory.muted(d[2], 12)
+		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(t)
+		v.add_child(row)
+		checks.append(cb)
+	_live.append(func():
+		var lg: Array = c.get("oplog", []) if c.get("oplog") is Array else []
+		var last := ""
+		if not lg.is_empty():
+			var e: Array = lg[-1]
+			last = "\n최근: %s · %s" % [CityAuto.domain_name(String(e[1])), String(e[2])]
+		if CityAuto.full(s):
+			now.text = "자동 운영 중 — 시드가 모든 분야를 맡는다. 자동 운영을 끄면 아래에서 고른 분야만 맡는다." + last
+		else:
+			now.text = ("직접 운영 · 맡긴 분야 %d가지 — 시드가 한 일은 '기록' 탭의 운영 기록에 까닭과 함께 남는다." % CityAuto.count(c)) + last
+		for cb in checks:
+			(cb as CheckButton).modulate = Color(1, 1, 1, 0.55 if CityAuto.full(s) else 1.0))
 	return card
 
 
@@ -376,7 +428,7 @@ func _trade_section(i: int) -> Control:
 		var st := CityTrade.state(c)
 		var sim2: CitySim = c["sim"]
 		status.text = "보낸 계약 %d건 · 지원 점수 +%d · 놓친 계약 %d건 · 한 번에 %d건까지%s" % [int(st["done"]), int(st["earned"]),
-			int(st["failed"]), CityTrade.max_active(c), " — 자동 운영이 남는 양으로 받고 보낸다" if sim2.autopilot != null else ""]
+			int(st["failed"]), CityTrade.max_active(c), " — 시드가 남는 양으로 받고 보낸다" if CityAuto.on(c, "trade") else ""]
 		var parts := PackedStringArray()
 		for a in st["active"]:
 			parts.append("a%d" % int(a["id"]))
@@ -477,7 +529,8 @@ func _colony_row(i: int) -> Control:
 		if s.in_dust_storm():
 			lit = "먼지 폭풍"
 		line.text = "%s명 · %d일째 · %s · %s · 사기 %d · 신뢰 %d" % [Fmt.n(s.population()), s.current_day() + 1,
-			"자동 운영" if s.autopilot != null else "직접 운영", lit, int(round(s.morale)), int(round(s.trust))])
+			"자동 운영" if CityAuto.full(s) else ("직접 운영 · 위임 %d" % CityAuto.count(c) if CityAuto.count(c) > 0 else "직접 운영"),
+			lit, int(round(s.morale)), int(round(s.trust))])
 	return row
 
 

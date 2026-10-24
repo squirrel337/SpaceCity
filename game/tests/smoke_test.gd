@@ -54,6 +54,7 @@ func _process(_delta: float) -> bool:
 		_hazards_check()
 		_explore_check()
 		_trade_check()
+		_delegate_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -1068,6 +1069,55 @@ func _trade_check() -> void:
 	_check(int(sa["done"]) >= 1, "자동 운영이 계약을 보내지 않았다: %s" % str(sa))
 	print("smoke: trade — offers %s, delivered %s to 헬라스, autopilot done %d earned %d" % [
 		str((st["offers"] as Array).map(func(x): return CityTrade.amount_text(x))), CityTrade.amount_text(o), int(sa["done"]), int(sa["earned"])])
+
+
+## 위임과 운영 기록: 살림 건설만 맡기면 위임 정책이 붙어 추천 운영대로 짓되 연구 차례는 그대로, 지은 것은 까닭과 함께 기록된다.
+## 연구를 맡기면 연구 차례가 찬다, 탐사를 맡기면 스스로 보낸다. 시뮬레이션 저장에는 자동 운영으로 남지 않고 위임 상태로 다시 붙는다.
+## 기록 탭의 운영 기록 보기
+func _delegate_check() -> void:
+	var ds := CitySim.new(7, 40.0, "")
+	var c := {"sim": ds, "plan": CityPlan.create(ds, BaseLayout.new("ridge")), "mode": "", "site": ds.site_id, "name": "위임 도시"}
+	(c["plan"] as CityPlan).on_auto = CityAuto.recorder(c)
+	ds.research_queue = ["robot_fabrication"]
+	_check(CityAuto.count(c) == 0 and not CityAuto.on(c, "build"), "아무것도 맡기지 않았는데 위임이 있다")
+	CityAuto.set_delegate(c, "build", true)
+	_check(ds.autopilot is DelegatePolicy and not CityAuto.full(ds) and CityAuto.on(c, "build") and not CityAuto.on(c, "land"),
+		"살림 건설만 맡겼는데 위임 정책이 맞지 않다")
+	for h in 24 * 40:
+		var seq0 := ds.seq
+		ds.advance_hour()
+		CityAuto.record_builds(c, seq0)
+		if ds.hour % 24 == 0:
+			CityDev.step_day(c, 0)
+	var builds := (c["oplog"] as Array).filter(func(e): return String(e[1]) == "build" and String(e[2]).begins_with("짓기 시작 — "))
+	_check(not builds.is_empty() and String(builds[0][2]).contains(": "), "맡긴 살림 건설이 운영 기록에 까닭과 함께 없다: %s" % str(c.get("oplog")))
+	_check(ds.research_queue.has("robot_fabrication") or ds.techs.has("robot_fabrication"), "살림 건설만 맡겼는데 연구 차례가 바뀌었다")
+	_check(String(ds.to_save()["autopilot"]) == "", "위임 정책이 시뮬레이션 저장에 자동 운영으로 남았다")
+	var back := {"sim": CitySim.from_save(JSON.parse_string(JSON.stringify(ds.to_save()))), "delegate": JSON.parse_string(JSON.stringify(c["delegate"]))}
+	CityAuto.sync_policy(back)
+	_check((back["sim"] as CitySim).autopilot is DelegatePolicy, "불러온 도시에 위임 정책이 다시 붙지 않았다")
+	CityAuto.set_delegate(c, "research", true)
+	_check(ds.research_queue.size() >= 3 and (c["oplog"] as Array).any(func(e): return String(e[1]) == "research"), "연구를 맡겼는데 연구 차례가 차지 않았다")
+	ds.stock["parts"] = 2000.0
+	CityAuto.set_delegate(c, "explore", true)
+	CityExplore.step(c, 7)
+	_check(not (CityExplore.state(c)["trip"] as Dictionary).is_empty() and (c["oplog"] as Array).any(func(e): return String(e[1]) == "explore"),
+		"탐사를 맡겼는데 탐사대를 보내지 않았다")
+	CityAuto.set_delegate(c, "build", false)
+	_check(ds.autopilot == null, "살림 건설을 되찾았는데 위임 정책이 남았다")
+	var full := {"sim": CitySim.new(7, 40.0, "good")}
+	_check(CityAuto.full(full["sim"]) and CityAuto.on(full, "trade") and CityAuto.count(full) == CityAuto.DOMAINS.size(), "자동 운영이 모든 분야를 맡지 않았다")
+	# 기록 탭: 운영 기록 보기
+	var lp := LogPanel.new()
+	lp.colony = c
+	lp.bind(ds)
+	lp._set_view("ops")
+	_check(lp.list.get_child_count() >= 3, "운영 기록 보기가 비었다")
+	lp._filter = "explore"
+	lp.update_view()
+	_check(lp.list.get_child_count() == 2, "운영 기록을 분야로 거르지 못했다 (%d — 맡긴 일과 보낸 일)" % lp.list.get_child_count())
+	lp.free()
+	print("smoke: delegate — %d entries, first build %s" % [(c["oplog"] as Array).size(), String(builds[0][2]) if not builds.is_empty() else "-"])
 
 
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.

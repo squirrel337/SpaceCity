@@ -748,8 +748,9 @@ func _activate(index: int, fly: bool = true) -> void:
 	world.city.title = String(c["name"])
 	world.city.colony = c
 	tabs["research"].colony = c
+	tabs["log"].colony = c
 	forecast.sim = sim
-	auto_button.set_pressed_no_signal(sim.autopilot != null)
+	auto_button.set_pressed_no_signal(CityAuto.full(sim))
 	_update_colony_ui()
 	if fly:
 		if view_mode != "world":
@@ -1208,7 +1209,7 @@ func _step() -> void:
 	for i in colonies.step():
 		_on_founded(i)
 	if not sim.pending_storm.is_empty():
-		if sim.autopilot != null and _fast():
+		if CityAuto.full(sim) and _fast():
 			# 빠르게 흐르는 중이고 자동 운영이면: 시드가 추첨으로 정한다 (다른 식민지와 같은 규칙)
 			sim.resolve_storm("lottery")
 			_toast("자동 운영 — 태양 양성자 폭풍: 대피소 추첨으로 정했다", "warn")
@@ -1619,7 +1620,7 @@ func _on_dev_mode(index: int, mode: String) -> void:
 	var c: Dictionary = colonies.list[index]
 	var s: CitySim = c["sim"]
 	c["mode"] = mode
-	if s.autopilot == null:
+	if not CityAuto.full(s):
 		s.autopilot = AutoPolicy.new("good")
 		s.autopilot.configure(s)
 		if s == sim:
@@ -1643,5 +1644,8 @@ func _on_auto(on: bool) -> void:
 		_toast("자동 운영 — 시드가 추천 운영 방침으로 짓고 연구한다", "good")
 	else:
 		sim.autopilot = null
-		_toast("자동 운영 끔 — 이제 직접 짓고 연구를 고른다", "warn")
+		var c: Dictionary = colonies.list[active]
+		CityAuto.sync_policy(c)                      # 살림 건설을 맡겼으면 위임 정책을 붙인다
+		var n := CityAuto.count(c)
+		_toast("자동 운영 끔 — 이제 직접 짓고 연구를 고른다" + (" (맡긴 분야 %d가지는 시드가 한다)" % n if n > 0 else ""), "warn")
 	_dirty = true
