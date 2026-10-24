@@ -521,6 +521,8 @@ func _arrive(col: Colonies, t: Dictionary) -> void:
 				d_sim.note("비상 보급편 도착 — %s" % cargo_text(cargo), "good")
 			"rush":
 				d_sim.note("부품 급송 셔틀 도착 — %s" % cargo_text(cargo), "info")
+			"route":
+				d_sim.note("정기 교역 도착 — %s에서 %s" % [node_name(String(t["from"])), cargo_text(cargo)], "info")
 		if tons > 0.0 or settlers > 0:
 			_flow(dst, "in_t", tons)
 			_flow(dst, "in_p", settlers)

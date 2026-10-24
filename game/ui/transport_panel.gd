@@ -18,6 +18,9 @@ var box := VBoxContainer.new()
 var _live: Array = []
 var _open := {"space": true, "local": true, "feeder": false, "air": false}
 var _shape := ""         # 노선·켜짐·펼침·운영 중인 대도시 — 바뀔 때만 다시 만든다 (나머지는 _live가 고친다)
+var _form := {"from": "", "to": "", "key": "water_kg", "amount": 5.0, "every": 7}   # 정기 교역을 더하는 칸 (다시 만들어도 이어 간다)
+var _form_note := ""
+const ROUTE_AMOUNT := {"water_kg": 5.0, "o2_kg": 2.0, "food_kg": 2.0, "parts": 50.0, "metal_t": 5.0}   # 물건을 고르면 넣는 양
 
 
 func _init() -> void:
@@ -77,8 +80,9 @@ func update_view() -> void:
 
 func _shape_sig() -> String:
 	var fn := mgr.metro_fn
-	return "%d|%d|%s|%s|%d|%d" % [mgr.transport.lines.size(), mgr.transport.rev, str(_open),
-		",".join(PackedStringArray(fn.keys_with_ops())), fn.active_keys().size(), fn.modes.metros.size()]
+	return "%d|%d|%s|%s|%d|%d|%d|%d" % [mgr.transport.lines.size(), mgr.transport.rev, str(_open),
+		",".join(PackedStringArray(fn.keys_with_ops())), fn.active_keys().size(), fn.modes.metros.size(), mgr.routes.size(),
+		mgr.list.size()]
 
 
 ## 탭을 고를 때·날마다: 모양이 그대로면 글만 고친다 (다시 만들면 노선이 많을 때 수십 ms)
@@ -110,6 +114,7 @@ func rebuild() -> void:
 			_:
 				by_group["air"].append(l)
 	by_group["local"].sort_custom(func(a, b): return Colonies.BODY_ORDER.find(a["body"]) < Colonies.BODY_ORDER.find(b["body"]))
+	_routes_section()
 	_metro_section()
 	for g in GROUPS:
 		var ls: Array = by_group[g[0]]
@@ -140,6 +145,154 @@ func rebuild() -> void:
 	if tr.lines.is_empty():
 		box.add_child(ThemeFactory.muted("아직 이을 도시가 없다."))
 	update_view()
+
+
+## 정기 교역 (CityRoutes): 더하는 칸 (보내는 도시 → 받는 도시 · 물건 · 양 · 며칠마다)과 정한 것들 (켜기 · 지난 번 · 지우기)
+func _routes_section() -> void:
+	box.add_child(HSeparator.new())
+	box.add_child(ThemeFactory.heading("정기 교역 · %d" % mgr.routes.size(), 15))
+	box.add_child(ThemeFactory.muted("정한 날마다 보내는 도시의 남는 몫(사람이 쓸 날수·부품 200·금속 20을 남기고)에서 실어 그 노선의 특별편으로 " +
+		"보낸다 — 같은 천체의 도시끼리, 지구 우주항과 달 고향 사이 셔틀로. 셔틀은 보내는 도시가 운임(지원 점수)을 낸다. " +
+		"행성 사이는 수송선이 발사 창마다 모자란 것을 실어 나른다.", 12))
+	var sites: Array = []
+	for c in mgr.list:
+		sites.append(String(c["site"]))
+	if sites.size() < 2:
+		box.add_child(ThemeFactory.muted("도시가 둘 이상이어야 한다.", 12))
+		return
+	if not String(_form["from"]) in sites:
+		_form["from"] = sim.site_id if sim != null and sim.site_id in sites else sites[0]
+	if not String(_form["to"]) in sites or String(_form["to"]) == String(_form["from"]):
+		_form["to"] = ""
+		for s2 in sites:
+			if not CityRoutes.link(mgr, String(_form["from"]), s2).is_empty():
+				_form["to"] = s2
+				break
+		if String(_form["to"]) == "":
+			_form["to"] = sites[1] if sites[0] == String(_form["from"]) else sites[0]
+	var form := HFlowContainer.new()
+	form.add_theme_constant_override("h_separation", 6)
+	form.add_theme_constant_override("v_separation", 6)
+	var pick := func(ids: Array, names: Array, cur: String, field: String) -> OptionButton:
+		var ob := OptionButton.new()
+		ob.add_theme_font_size_override("font_size", 13)
+		ob.custom_minimum_size = Vector2(0, 44 if OS.has_feature("mobile") else 32)
+		ob.fit_to_longest_item = false
+		for i in ids.size():
+			ob.add_item(String(names[i]), i)
+			if String(ids[i]) == cur:
+				ob.select(i)
+		ob.item_selected.connect(func(i: int):
+			_form[field] = String(ids[i])
+			if field == "key":
+				_form["amount"] = float(ROUTE_AMOUNT.get(String(ids[i]), 1.0))
+			_form_note = ""
+			rebuild())
+		return ob
+	var names: Array = sites.map(func(x): return Transport.node_name(String(x)))
+	form.add_child(pick.call(sites, names, String(_form["from"]), "from"))
+	form.add_child(ThemeFactory.muted("→", 14))
+	form.add_child(pick.call(sites, names, String(_form["to"]), "to"))
+	var keys: Array = CityRoutes.GOODS.map(func(g): return String(g[0]))
+	form.add_child(pick.call(keys, CityRoutes.GOODS.map(func(g): return String(g[1])), String(_form["key"]), "key"))
+	var g := CityRoutes.good_of(String(_form["key"]))
+	var amount := SpinBox.new()
+	amount.min_value = 0.5 if float(g[2]) > 1.0 else 1.0
+	amount.max_value = 300.0 if float(g[2]) > 1.0 else 2000.0
+	amount.step = 0.5 if float(g[2]) > 1.0 else 1.0
+	amount.value = float(_form["amount"])
+	amount.suffix = String(g[3])
+	amount.custom_minimum_size = Vector2(110, 32)
+	amount.value_changed.connect(func(v: float): _form["amount"] = v)
+	form.add_child(amount)
+	var every := SpinBox.new()
+	every.min_value = 1
+	every.max_value = 120
+	every.step = 1
+	every.value = int(_form["every"])
+	every.suffix = "일마다"
+	every.custom_minimum_size = Vector2(120, 32)
+	every.value_changed.connect(func(v: float): _form["every"] = int(v))
+	form.add_child(every)
+	var add := Button.new()
+	add.text = "정기 교역 추가"
+	add.custom_minimum_size = Vector2(0, 44 if OS.has_feature("mobile") else 32)
+	add.pressed.connect(func():
+		var why := CityRoutes.add(mgr, String(_form["from"]), String(_form["to"]), String(_form["key"]), float(_form["amount"]),
+			int(_form["every"]))
+		_form_note = why if why != "" else "더했다 — 오늘 하루가 끝날 때 처음 떠난다"
+		changed.emit()
+		rebuild())
+	form.add_child(add)
+	box.add_child(form)
+	var why_now := CityRoutes.check(mgr, String(_form["from"]), String(_form["to"]), String(_form["key"]), float(_form["amount"]),
+		int(_form["every"]))
+	var note := ThemeFactory.muted(_form_note if _form_note != "" else (why_now if why_now != "" else "이어진 노선: %s" %
+		_route_way(String(_form["from"]), String(_form["to"]))), 12)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if why_now != "" and _form_note == "":
+		note.add_theme_color_override("font_color", Palette.AMBER)
+	box.add_child(note)
+	for r in mgr.routes:
+		box.add_child(_route_row(r))
+
+
+## 그 정기 교역이 탈 노선: "로버 화물 열차 · 1일 6시간 길"
+func _route_way(from: String, to: String) -> String:
+	var lk := CityRoutes.link(mgr, from, to)
+	if lk.is_empty():
+		return "없다"
+	var l := mgr.transport.line_by_id(String(lk[0]))
+	var h := int(lk[3]) if int(lk[3]) > 0 else int(l["trip_h"])
+	return "%s · %s 길%s" % [Transport.mode_name(String(l["mode"])), Fmt.hours(float(h)),
+		" · 운임 t마다 지원 %s" % Fmt.n(Transport.freight_per_t() * mgr.metro_fn.modes.freight_k(), 1) if String(l["role"]) == "shuttle" else ""]
+
+
+func _route_row(r: Dictionary) -> Control:
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 9))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
+	card.add_child(v)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 6)
+	v.add_child(top)
+	var on := CheckBox.new()
+	on.button_pressed = bool(r["on"])
+	on.tooltip_text = "이 정기 교역을 보낸다"
+	on.toggled.connect(func(p: bool):
+		r["on"] = p
+		changed.emit()
+		update_view())
+	top.add_child(on)
+	var title := Label.new()
+	title.text = CityRoutes.text(r)
+	title.add_theme_font_override("font", ThemeFactory.bold)
+	title.add_theme_font_size_override("font_size", 13)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(title)
+	var del := Button.new()
+	del.text = "지우기"
+	del.custom_minimum_size = Vector2(56, 34)
+	del.add_theme_font_size_override("font_size", 12)
+	var id := int(r["id"])
+	del.pressed.connect(func():
+		CityRoutes.remove(mgr, id)
+		_form_note = ""
+		changed.emit()
+		rebuild())
+	top.add_child(del)
+	var info := ThemeFactory.muted("", 12)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(info)
+	_live.append(func():
+		var g := CityRoutes.good_of(String(r["key"]))
+		var when := "멈춤" if not bool(r["on"]) else "다음 %s" % mgr.date_text(float(int(r["next"]) * 24))
+		info.text = "%d번 보냄 · 모두 %s %s · %s%s" % [int(r["sent"]), Fmt.n(float(r["moved"]), 1 if float(g[2]) > 1.0 else 0), g[3], when,
+			(" · 지난 번: " + String(r["last"])) if String(r["last"]) != "" else ""]
+		title.add_theme_color_override("font_color", Palette.TEXT if bool(r["on"]) else Palette.MUTED))
+	return card
 
 
 ## 대도시의 우주 시설: 시설이 있는 대도시마다 단계와 어제의 몫, 그리고 26곳으로 가는 단추

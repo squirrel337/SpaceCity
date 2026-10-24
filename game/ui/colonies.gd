@@ -30,6 +30,7 @@ var transport := Transport.new()   # 도시 사이 교통
 var metro_fn := MetroFunctions.new()   # 지구 대도시의 우주 시설 (도시 기능)
 var scenario := {}                 # 진행 중인 시나리오 (Scenario — 없으면 자유 놀이)
 var scenario_news := ""            # 이번 시간에 시나리오가 끝났으면 won·lost (main이 결과 창을 띄우고 비운다)
+var routes: Array = []             # 정기 교역 (CityRoutes — 플레이어가 정한 도시 사이의 정기 화물)
 
 
 ## 새 게임: 고향 도시와 천체마다의 기본 도시로 시작한다
@@ -39,6 +40,7 @@ func start(sim: CitySim, plan: CityPlan) -> void:
 	Scenario.apply_rules(self)
 	list = [_entry(sim, plan, 0)]
 	expeditions = []
+	routes = []
 	hour = sim.hour
 	start_unix = sim.start_unix
 	seed_value = sim.seed_value
@@ -180,6 +182,7 @@ func step() -> Array:
 	transport.step(self)
 	metro_fn.step_hour(self)
 	if hour % 24 == 0:
+		CityRoutes.step(self)                      # 정기 교역 — 날이 된 것을 그 노선의 특별편으로
 		share_techs()
 		metro_fn.step_day(self)
 		var r := Scenario.step(self)               # 시나리오 목표 (이기거나 지면 main이 결과 창을 띄운다)
@@ -477,7 +480,7 @@ func to_save() -> Dictionary:
 			"oplog": (c.get("oplog", []) as Array).slice(-120)})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
-		"metro_fn": metro_fn.to_save(), "scenario": scenario}
+		"metro_fn": metro_fn.to_save(), "scenario": scenario, "routes": routes}
 
 
 ## 저장을 읽는다 (판 1 = 도시 하나뿐이던 저장, 판 2 = 교통이 없던 저장). 기본 도시가 없던 저장이면 지금 시각에 세운다.
@@ -489,6 +492,7 @@ func load_save(data: Dictionary) -> bool:
 		var plan := CityPlan.from_save(data.get("plan"), s, BaseLayout.new(_layout_of(s.site_id)))
 		list = [_entry(s, plan, 0)]
 		expeditions = []
+		routes = []
 		hour = s.hour
 		start_unix = s.start_unix
 		seed_value = s.seed_value
@@ -578,6 +582,13 @@ func load_save(data: Dictionary) -> bool:
 	metro_fn.load_save(data.get("metro_fn", {}) if data.get("metro_fn") is Dictionary else {})
 	metro_fn.econ.seed_value = seed_value
 	transport.load_save(data.get("transport", {}) if data.get("transport") is Dictionary else {}, self)
+	routes = []
+	for r in (data["routes"] if data.get("routes") is Array else []):
+		if r is Dictionary and r.has("from") and r.has("to") and r.has("key"):
+			routes.append({"id": int(r.get("id", routes.size() + 1)), "from": String(r["from"]), "to": String(r["to"]),
+				"key": String(r["key"]), "amount": float(r.get("amount", 1.0)), "every": maxi(1, int(r.get("every", 7))),
+				"next": int(r.get("next", 0)), "on": bool(r.get("on", true)), "sent": int(r.get("sent", 0)),
+				"moved": float(r.get("moved", 0.0)), "last": String(r.get("last", ""))})
 	scenario = data.get("scenario", {}) if data.get("scenario") is Dictionary else {}
 	if not scenario.is_empty():
 		scenario["start"] = int(scenario.get("start", 0))

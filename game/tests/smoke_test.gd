@@ -1566,6 +1566,8 @@ func _colony_check() -> void:
 	_check(back.list.size() == col.list.size() and back.hour == col.hour, "불러온 도시·시각이 다르다")
 	_check(back.transport.lines.size() == col.transport.lines.size() and back.transport.trips.size() == col.transport.trips.size(),
 		"불러온 교통(노선·가는 편)이 다르다")
+	_check(back.routes.size() == col.routes.size() and not col.routes.is_empty()
+		and JSON.stringify(back.routes) == JSON.stringify(col.routes), "불러온 정기 교역이 다르다")
 	_check(back.metro_fn.modes.mode_of("metro_busan") == "parts_capital" and back.metro_fn.econ.commerce.has("metro_seoul")
 		and back.metro_fn.econ.seed_value == col.seed_value, "불러온 대도시 운영 방식·경제가 다르다")
 	# 판 2 저장(교통이 없던 저장)도 읽고 노선을 새로 짠다
@@ -1702,6 +1704,84 @@ func _transport_check(col: Colonies) -> void:
 	_economy_check(col)
 	_region_check(col)
 	_metro_ui_check(col)
+	_routes_check(col)
+
+
+## 그 노드 아래 글(라벨·단추)
+static func _texts(node: Node) -> Array:
+	var out: Array = []
+	if node is Label:
+		out.append((node as Label).text)
+	elif node is Button:
+		out.append((node as Button).text)
+	for ch in node.get_children():
+		out.append_array(_texts(ch))
+	return out
+
+
+## 정기 교역: 같은 도시·행성 사이는 안 된다, 헬라스 → 예제로 식량이 그 노선의 특별편으로 떠나 비축에서 빠지고 닿으면 더해진다,
+## 남는 몫이 없으면 건너뛴다, 날마다 차례, 셔틀은 운임을 낸다, 끄면 보내지 않는다, 교통 탭의 칸. 저장 왕복은 _colony_check에서
+func _routes_check(col: Colonies) -> void:
+	col.routes = []
+	_check(CityRoutes.check(col, "mars_hellas", "mars_hellas", "food_kg", 2.0, 3) != "", "같은 도시끼리 정기 교역을 더했다")
+	_check(CityRoutes.check(col, GameData.HOME_SITE, "mars_hellas", "food_kg", 2.0, 3) != "", "행성 사이에 정기 교역을 더했다")
+	_check(CityRoutes.add(col, "mars_hellas", "mars_jezero", "food_kg", 2.0, 3) == "" and col.routes.size() == 1, "정기 교역을 더하지 못했다")
+	var r: Dictionary = col.routes[0]
+	var hel: CitySim = col.list[col.index_of_site("mars_hellas")]["sim"]
+	var jez: CitySim = col.list[col.index_of_site("mars_jezero")]["sim"]
+	hel.stock["food_kg"] = float(hel.caps.get("food_kg", 20000.0)) * 0.95
+	var before := float(hel.stock["food_kg"])
+	var n_trips := col.transport.trips.size()
+	_check(CityRoutes.send(col, r), "정기 교역을 보내지 못했다: " + String(r["last"]))
+	var trip: Dictionary = col.transport.trips[-1] if col.transport.trips.size() > n_trips else {}
+	_check(not trip.is_empty() and String(trip.get("tag", "")) == "route" and String(trip["to"]) == "mars_jezero"
+		and absf(float(trip["cargo"].get("food_kg", 0.0)) - 2000.0) < 0.01, "정기 교역 편이 맞지 않다 %s" % str(trip))
+	_check(absf(before - float(hel.stock["food_kg"]) - 2000.0) < 0.01 and int(r["sent"]) == 1 and absf(float(r["moved"]) - 2.0) < 0.01,
+		"보낸 식량이 비축·누계에 맞지 않다")
+	if not trip.is_empty():
+		var j0 := float(jez.stock.get("food_kg", 0.0))
+		var n_notes := jez.notes.size()
+		for _i in range(int(trip["arrive"]) - col.hour):
+			col.step()
+		_check(float(jez.stock.get("food_kg", 0.0)) > j0 + 1000.0, "예제로에 정기 교역 식량이 닿지 않았다")
+		_check(jez.notes.slice(n_notes).any(func(x): return String(x[1]).begins_with("정기 교역 도착")), "도착 소식이 없다")
+	# 남는 몫이 없으면 건너뛴다
+	hel.stock["food_kg"] = CityTrade.keep(hel, CityTrade.good("food")) * 1000.0 + 100.0
+	_check(not CityRoutes.send(col, r) and String(r["last"]).contains("모자라"), "남는 몫이 없는데 보냈다")
+	# 날마다 차례: 날이 되면 한 번, 다음 차례는 every일 뒤
+	hel.stock["food_kg"] = float(hel.caps.get("food_kg", 20000.0)) * 0.95
+	var today := int(floor(col.hour / 24.0))
+	r["next"] = today
+	CityRoutes.step(col)
+	_check(int(r["sent"]) == 2 and int(r["next"]) == today + 3, "정기 교역의 차례가 맞지 않다 (%d번, 다음 %d)" % [int(r["sent"]), int(r["next"])])
+	CityRoutes.step(col)
+	_check(int(r["sent"]) == 2, "같은 날 정기 교역을 두 번 보냈다")
+	r["on"] = false
+	r["next"] = today
+	CityRoutes.step(col)
+	_check(int(r["sent"]) == 2, "끈 정기 교역을 보냈다")
+	r["on"] = true
+	# 셔틀: 지구 우주항 → 달 고향 부품, 보내는 도시가 운임을 낸다
+	var sh := col.transport.shuttle_line()
+	if not sh.is_empty():
+		var e_site := String(sh["a"] if Transport.node_body(String(sh["a"])) == "earth" else sh["b"])
+		var es: CitySim = col.list[col.index_of_site(e_site)]["sim"]
+		es.stock["parts"] = 2000.0
+		es.support = maxf(es.support, 500.0)
+		_check(CityRoutes.add(col, e_site, GameData.HOME_SITE, "parts", 40.0, 7) == "", "셔틀 정기 교역을 더하지 못했다")
+		var rs: Dictionary = col.routes[-1]
+		var sup0 := es.support
+		_check(CityRoutes.send(col, rs), "셔틀 정기 교역을 보내지 못했다: " + String(rs["last"]))
+		var fee := 40.0 * float(Transport.cargo_rule("parts")["t_per"]) * Transport.freight_per_t() * col.metro_fn.modes.freight_k()
+		_check(absf(sup0 - es.support - fee) < 0.01 and String(col.transport.trips[-1]["line"]) == String(sh["id"]),
+			"셔틀 정기 교역의 운임이 맞지 않다 (%.2f, 바람 %.2f)" % [sup0 - es.support, fee])
+	# 교통 탭: 더하는 칸과 정한 것들
+	var tp: TransportPanel = main.tabs["transport"]
+	tp.rebuild()
+	var texts := _texts(tp)
+	_check(texts.any(func(x): return x == "정기 교역 추가") and texts.any(func(x): return x.begins_with("헬라스")),
+		"교통 탭에 정기 교역 칸이 없다")
+	print("smoke: routes %s · %s" % [CityRoutes.text(r), String(r["last"])])
 
 
 ## 대도시의 우주 시설: 지원을 내고 짓고, 다 지으면 항공편이 더 싣고 더 자주 뜨며, 연구·지원이 들어온다. 저장 왕복
