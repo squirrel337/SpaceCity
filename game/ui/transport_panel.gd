@@ -6,6 +6,7 @@ extends VBoxContainer
 signal changed
 signal show_line(id: String)
 signal show_metro(key: String)
+signal show_map
 
 const GROUPS := [["space", "우주 노선 — 지구-달 셔틀 · 행성간 수송선"], ["local", "천체 안의 노선"],
 	["feeder", "지구 항공 — 대도시에서 우주항으로"], ["air", "지구 항공 — 대도시 국제선"]]
@@ -20,6 +21,8 @@ var _open := {"space": true, "local": true, "feeder": false, "air": false}
 var _shape := ""         # 노선·켜짐·펼침·운영 중인 대도시 — 바뀔 때만 다시 만든다 (나머지는 _live가 고친다)
 var _form := {"from": "", "to": "", "key": "water_kg", "amount": 5.0, "every": 7}   # 정기 교역을 더하는 칸 (다시 만들어도 이어 간다)
 var _form_note := ""
+var _ship_form := {"cls": "chem", "route": ""}                                 # 배 주문 칸
+var _ship_note := ""
 const ROUTE_AMOUNT := {"water_kg": 5.0, "o2_kg": 2.0, "food_kg": 2.0, "parts": 50.0, "metal_t": 5.0}   # 물건을 고르면 넣는 양
 
 
@@ -82,7 +85,7 @@ func _shape_sig() -> String:
 	var fn := mgr.metro_fn
 	return "%d|%d|%s|%s|%d|%d|%d|%d" % [mgr.transport.lines.size(), mgr.transport.rev, str(_open),
 		",".join(PackedStringArray(fn.keys_with_ops())), fn.active_keys().size(), fn.modes.metros.size(), mgr.routes.size(),
-		mgr.list.size()]
+		mgr.list.size()] + "|" + _fleet_sig()
 
 
 ## 탭을 고를 때·날마다: 모양이 그대로면 글만 고친다 (다시 만들면 노선이 많을 때 수십 ms)
@@ -115,6 +118,7 @@ func rebuild() -> void:
 				by_group["air"].append(l)
 	by_group["local"].sort_custom(func(a, b): return Colonies.BODY_ORDER.find(a["body"]) < Colonies.BODY_ORDER.find(b["body"]))
 	_routes_section()
+	_fleet_section()
 	_metro_section()
 	for g in GROUPS:
 		var ls: Array = by_group[g[0]]
@@ -145,6 +149,178 @@ func rebuild() -> void:
 	if tr.lines.is_empty():
 		box.add_child(ThemeFactory.muted("아직 이을 도시가 없다."))
 	update_view()
+
+
+## 함대의 모양: 배마다 항로·부두(고향 부두에 있으면 바꾸기·퇴역 단추가 생긴다), 주문, 기술 수 (주문할 수 있는 등급)
+func _fleet_sig() -> String:
+	var st := Fleet.state(mgr)
+	var pb := Fleet.port_body(mgr)
+	var bits := PackedStringArray()
+	for sh in st["ships"]:
+		bits.append("%d:%s:%s" % [int(sh["id"]), String(sh["route"]), "p" if String(sh["at"]) == pb else ("d" if String(sh["at"]) != "" else "t")])
+	return "%s|%d|%d|%s" % [",".join(bits), (st["orders"] as Array).size(), mgr.known_techs().size(), str(st.get("auto", true))]
+
+
+## 함대 (Fleet): 항로마다 배와 지난 창, 노는 배, 주문 중인 배, 주문 칸, 자동 운영, 최근 기록
+func _fleet_section() -> void:
+	var st := Fleet.state(mgr)
+	var pb := Fleet.port_body(mgr)
+	box.add_child(HSeparator.new())
+	var head := HBoxContainer.new()
+	var moving := (st["ships"] as Array).filter(func(x): return String(x["at"]) == "").size()
+	var title := ThemeFactory.heading("함대 · 배 %d척 · 가는 중 %d · 주문 %d" % [(st["ships"] as Array).size(), moving,
+		(st["orders"] as Array).size()], 15)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	head.add_child(title)
+	var see := Button.new()
+	see.text = "항로 지도"
+	see.tooltip_text = "Δv 항로 지도를 연다 (J)"
+	see.custom_minimum_size = Vector2(0, 32)
+	see.add_theme_font_size_override("font_size", 12)
+	see.pressed.connect(func(): show_map.emit())
+	head.add_child(see)
+	box.add_child(head)
+	box.add_child(ThemeFactory.muted("행성간 수송선은 떠나는 부두에 그 항로의 배가 있어야 발사 창에 떠나고, 실을 것이 없으면 쉰다. 떠날 때 " +
+		"보내는 도시가 추진제 값(지원 점수 — 로켓 방정식)을 낸다. 화학은 빠르지만 추진제를 많이 쓰고, 핵열은 메가와트급 원자로가 있어야 " +
+		"하며, 전기 추진은 싸지만 전이가 1.5배 걸리고 자리가 40이다. 극저온 추진제 생산을 알면 메탄·산소·수소를 만드는 도시는 현지 값으로 산다.", 12))
+	var auto := CheckButton.new()
+	auto.text = "함대 자동 운영 — 항로마다 배 둘, 모자라면 가장 알맞은 등급을 주문"
+	auto.button_pressed = bool(st.get("auto", true))
+	auto.custom_minimum_size.y = 36
+	auto.toggled.connect(func(on: bool):
+		st["auto"] = on
+		changed.emit())
+	box.add_child(auto)
+	var route_ids: Array = Fleet.routes(mgr)
+	for r in route_ids:
+		var card := PanelContainer.new()
+		card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 9))
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", 3)
+		card.add_child(v)
+		var ships := Fleet.ships_of(mgr, r)
+		var t := Label.new()
+		t.text = "%s 항로 — Δv %s / %s km/s · 배 %d척" % [Fleet.body_name(r), Fmt.n(Fleet.route_dv(pb, r), 1),
+			Fmt.n(Fleet.route_dv(r, pb), 1), ships.size()]
+		t.add_theme_font_override("font", ThemeFactory.bold)
+		t.add_theme_font_size_override("font_size", 13)
+		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(t)
+		for sh in ships:
+			v.add_child(_ship_row(sh, route_ids))
+		var last := ThemeFactory.muted("", 12)
+		last.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(last)
+		var rr: String = r
+		_live.append(func():
+			var stt: Variant = (st["status"] as Dictionary).get(rr)
+			last.text = ("지난 창 (%s): %s" % [mgr.date_text(float(stt[0])), String(stt[1])]) if stt is Array else "아직 지난 창이 없다")
+		box.add_child(card)
+	var spare := (st["ships"] as Array).filter(func(x): return String(x["route"]) == "")
+	if not spare.is_empty():
+		box.add_child(ThemeFactory.muted("노는 배 %d척" % spare.size(), 13))
+		for sh in spare:
+			box.add_child(_ship_row(sh, route_ids))
+	for o in st["orders"]:
+		var ol := ThemeFactory.muted("◇ %s · %s · %s 완성 · %s" % [String(o["name"]), Fleet.cls_name(String(o["cls"])),
+			mgr.date_text(float(o["ready"])), ("%s 항로" % Fleet.body_name(String(o["route"]))) if String(o["route"]) != "" else "고향 부두"], 12)
+		ol.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(ol)
+	# 주문 칸
+	var form := HFlowContainer.new()
+	form.add_theme_constant_override("h_separation", 6)
+	form.add_theme_constant_override("v_separation", 6)
+	var cls_ids: Array = Fleet.data().get("classes", {}).keys()
+	var cpick := OptionButton.new()
+	cpick.add_theme_font_size_override("font_size", 13)
+	cpick.custom_minimum_size = Vector2(0, 44 if OS.has_feature("mobile") else 32)
+	for i in cls_ids.size():
+		cpick.add_item(Fleet.cls_name(String(cls_ids[i])), i)
+		if String(cls_ids[i]) == String(_ship_form["cls"]):
+			cpick.select(i)
+	cpick.item_selected.connect(func(i: int):
+		_ship_form["cls"] = String(cls_ids[i])
+		_ship_note = ""
+		rebuild())
+	form.add_child(cpick)
+	var rpick := OptionButton.new()
+	rpick.add_theme_font_size_override("font_size", 13)
+	rpick.custom_minimum_size = Vector2(0, 44 if OS.has_feature("mobile") else 32)
+	var r_opts: Array = [""] + route_ids
+	if not String(_ship_form["route"]) in r_opts:
+		_ship_form["route"] = String(route_ids[0]) if not route_ids.is_empty() else ""
+	for i in r_opts.size():
+		rpick.add_item(("%s 항로" % Fleet.body_name(String(r_opts[i]))) if String(r_opts[i]) != "" else "고향 부두 (노는 배)", i)
+		if String(r_opts[i]) == String(_ship_form["route"]):
+			rpick.select(i)
+	rpick.item_selected.connect(func(i: int):
+		_ship_form["route"] = String(r_opts[i])
+		_ship_note = ""
+		rebuild())
+	form.add_child(rpick)
+	var order := Button.new()
+	order.text = "배 주문"
+	order.custom_minimum_size = Vector2(0, 44 if OS.has_feature("mobile") else 32)
+	order.pressed.connect(func():
+		var why := Fleet.order(mgr, String(_ship_form["cls"]), String(_ship_form["route"]))
+		_ship_note = why if why != "" else "주문했다"
+		changed.emit()
+		rebuild())
+	form.add_child(order)
+	box.add_child(form)
+	var why_now := Fleet.order_reason(mgr, String(_ship_form["cls"]), String(_ship_form["route"]))
+	var cost := ThemeFactory.muted("%s — %s%s" % [Fleet.cls_name(String(_ship_form["cls"])), Fleet.cost_text(Fleet.order_cost(mgr,
+		String(_ship_form["cls"]))), (" · " + (_ship_note if _ship_note != "" else why_now)) if _ship_note != "" or why_now != "" else ""], 12)
+	cost.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if why_now != "" and _ship_note == "":
+		cost.add_theme_color_override("font_color", Palette.AMBER)
+	box.add_child(cost)
+	var lg: Array = st["log"]
+	for e in lg.slice(maxi(0, lg.size() - 4)):
+		var ll := ThemeFactory.muted("%s · %s" % [mgr.date_text(float(e[0])), String(e[1])], 11)
+		ll.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(ll)
+
+
+## 배 한 줄: 이름·등급·자리·건넌 수, 고향 부두에 있으면 항로 바꾸기와 퇴역
+func _ship_row(sh: Dictionary, route_ids: Array) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var lab := Label.new()
+	lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lab.add_theme_font_size_override("font_size", 12)
+	row.add_child(lab)
+	_live.append(func(): lab.text = "◆ " + Fleet.ship_text(mgr, sh))
+	if String(sh["at"]) != Fleet.port_body(mgr):
+		return row
+	var id := int(sh["id"])
+	var move := OptionButton.new()
+	move.add_theme_font_size_override("font_size", 12)
+	move.custom_minimum_size = Vector2(0, 40 if OS.has_feature("mobile") else 30)
+	move.tooltip_text = "이 배의 항로를 바꾼다 (고향 부두에 있을 때만)"
+	var opts: Array = [""] + route_ids
+	for i in opts.size():
+		move.add_item(("%s 항로" % Fleet.body_name(String(opts[i]))) if String(opts[i]) != "" else "쉬게", i)
+		if String(opts[i]) == String(sh["route"]):
+			move.select(i)
+	move.item_selected.connect(func(i: int):
+		Fleet.assign(mgr, id, String(opts[i]))
+		changed.emit()
+		rebuild())
+	row.add_child(move)
+	var ret := Button.new()
+	ret.text = "퇴역"
+	ret.tooltip_text = "해체한다 — 주문 부품의 30%를 돌려받는다"
+	ret.custom_minimum_size = Vector2(52, 40 if OS.has_feature("mobile") else 30)
+	ret.add_theme_font_size_override("font_size", 12)
+	ret.pressed.connect(func():
+		Fleet.retire(mgr, id)
+		changed.emit()
+		rebuild())
+	row.add_child(ret)
+	return row
 
 
 ## 정기 교역 (CityRoutes): 더하는 칸 (보내는 도시 → 받는 도시 · 물건 · 양 · 며칠마다)과 정한 것들 (켜기 · 지난 번 · 지우기)

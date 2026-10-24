@@ -31,6 +31,7 @@ var metro_fn := MetroFunctions.new()   # 지구 대도시의 우주 시설 (도�
 var scenario := {}                 # 진행 중인 시나리오 (Scenario — 없으면 자유 놀이)
 var scenario_news := ""            # 이번 시간에 시나리오가 끝났으면 won·lost (main이 결과 창을 띄우고 비운다)
 var routes: Array = []             # 정기 교역 (CityRoutes — 플레이어가 정한 도시 사이의 정기 화물)
+var fleet := {}                    # 함대 (Fleet — 행성간 항로를 오가는 배)
 
 
 ## 새 게임: 고향 도시와 천체마다의 기본 도시로 시작한다
@@ -50,6 +51,7 @@ func start(sim: CitySim, plan: CityPlan) -> void:
 	metro_fn.econ.seed_value = seed_value
 	transport.reset()
 	transport.rebuild(self)
+	Fleet.start(self)
 
 
 ## 아직 없는 기본 도시를 세운다 (새 게임, 기본 도시가 없던 옛 저장). 도시마다 몇 시간씩 앞서 세운 것으로 해
@@ -183,6 +185,7 @@ func step() -> Array:
 	metro_fn.step_hour(self)
 	if hour % 24 == 0:
 		CityRoutes.step(self)                      # 정기 교역 — 날이 된 것을 그 노선의 특별편으로
+		Fleet.step_day(self)                       # 함대 — 다 지은 배, 자동 운영
 		share_techs()
 		metro_fn.step_day(self)
 		var r := Scenario.step(self)               # 시나리오 목표 (이기거나 지면 main이 결과 창을 띄운다)
@@ -480,7 +483,7 @@ func to_save() -> Dictionary:
 			"oplog": (c.get("oplog", []) as Array).slice(-120)})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
-		"metro_fn": metro_fn.to_save(), "scenario": scenario, "routes": routes}
+		"metro_fn": metro_fn.to_save(), "scenario": scenario, "routes": routes, "fleet": fleet}
 
 
 ## 저장을 읽는다 (판 1 = 도시 하나뿐이던 저장, 판 2 = 교통이 없던 저장). 기본 도시가 없던 저장이면 지금 시각에 세운다.
@@ -501,6 +504,7 @@ func load_save(data: Dictionary) -> bool:
 		metro_fn.reset()
 		metro_fn.econ.seed_value = seed_value
 		transport.load_save({}, self)
+		Fleet.start(self)
 		scenario = {}
 		scenario_news = ""
 		Scenario.apply_rules(self)
@@ -582,6 +586,7 @@ func load_save(data: Dictionary) -> bool:
 	metro_fn.load_save(data.get("metro_fn", {}) if data.get("metro_fn") is Dictionary else {})
 	metro_fn.econ.seed_value = seed_value
 	transport.load_save(data.get("transport", {}) if data.get("transport") is Dictionary else {}, self)
+	Fleet.load_state(self, data.get("fleet"))
 	routes = []
 	for r in (data["routes"] if data.get("routes") is Array else []):
 		if r is Dictionary and r.has("from") and r.has("to") and r.has("key"):

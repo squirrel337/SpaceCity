@@ -294,7 +294,7 @@ func _map_check() -> void:
 	main._set_view("list")
 	_check(main.city_view.visible and not w.visible, "목록으로 바뀌지 않았다")
 	main._set_view("world")
-	_check(w.visible and main.view_buttons.size() == 2, "보기가 3D·목록 둘이 아니다")
+	_check(w.visible and main.view_buttons.size() == 3, "보기가 3D·목록·항로 셋이 아니다")
 	print("smoke: base %d robots working, %d agents" % [working, traffic.agents.size()])
 
 
@@ -1568,6 +1568,7 @@ func _colony_check() -> void:
 		"불러온 교통(노선·가는 편)이 다르다")
 	_check(back.routes.size() == col.routes.size() and not col.routes.is_empty()
 		and JSON.stringify(back.routes) == JSON.stringify(col.routes), "불러온 정기 교역이 다르다")
+	_check(JSON.stringify(back.fleet) == JSON.stringify(col.fleet), "불러온 함대가 다르다")
 	_check(back.metro_fn.modes.mode_of("metro_busan") == "parts_capital" and back.metro_fn.econ.commerce.has("metro_seoul")
 		and back.metro_fn.econ.seed_value == col.seed_value, "불러온 대도시 운영 방식·경제가 다르다")
 	# 판 2 저장(교통이 없던 저장)도 읽고 노선을 새로 짠다
@@ -1705,6 +1706,134 @@ func _transport_check(col: Colonies) -> void:
 	_region_check(col)
 	_metro_ui_check(col)
 	_routes_check(col)
+	_fleet_check(col)
+
+
+## 함대·항로 지도: 로켓 방정식(문서의 예), 저궤도 사이 Δv, 3년 동안 항로마다 배가 있다, 부두에 배가 있어야 떠나고 보내는 도시가
+## 추진제 값을 낸다, 닿으면 그 천체 부두에, 배가 없으면·값이 모자라면 놓친다, 빈 배로 건너가 양쪽에 둔다, 주문(기술·값)·완성·퇴역,
+## 자동 운영이 빈 항로를 채운다, 항로 지도의 자리·누르기·카드, 3D 고정점의 배 이름
+func _fleet_check(col: Colonies) -> void:
+	var st := Fleet.state(col)
+	_check(absf(Fleet.prop_t(450.0, 3.6, 100.0) - 139.0) < 1.5, "로켓 방정식이 문서의 예(139 t)와 다르다 (%.1f)" % Fleet.prop_t(450.0, 3.6, 100.0))
+	_check(absf(Fleet.route_dv("moon", "mars") - 1.7) < 0.01 and absf(Fleet.route_dv("mars", "moon") - 3.8) < 0.01,
+		"달–화성 Δv가 맞지 않다 (%.2f / %.2f)" % [Fleet.route_dv("moon", "mars"), Fleet.route_dv("mars", "moon")])
+	_check((Fleet.path("llo", "lmo")["path"] as Array) == ["llo", "l1", "mars_tr", "lmo"], "달–화성 길이 L1·화성 전이를 지나지 않는다")
+	var routes := Fleet.routes(col)
+	_check(routes.size() == 5, "행성간 항로가 다섯이 아니다 %s" % str(routes))
+	for r in routes:
+		var have := Fleet.ships_of(col, r).size() + (st["orders"] as Array).filter(func(o): return String(o["route"]) == r).size()
+		_check(have >= 1, "3년 뒤 %s 항로에 배가 없다" % r)
+	var trips_with_ship := 0
+	for c in col.list:
+		for nn in (c["sim"] as CitySim).notes:
+			if String(nn[1]).begins_with("행성간 수송선 출발"):
+				trips_with_ship += 1
+	_check(trips_with_ship >= 1, "3년 동안 행성간 수송선이 한 번도 떠나지 않았다")
+	# 떠나기: 고향 부두와 화성 부두에 배를 하나씩 두고, 헬라스에 식량이 모자라게
+	var l := Fleet.line_of(col, "mars")
+	var home: CitySim = col.list[col.index_of_site(String(l["a"]))]["sim"]
+	var hel: CitySim = col.list[col.index_of_site(String(l["b"]))]["sim"]
+	var mars_ships := Fleet.ships_of(col, "mars")
+	while mars_ships.size() < 2:
+		mars_ships.append(Fleet._add_ship(col, "chem", "mars", "moon"))
+	for t0 in col.transport.trips.duplicate():
+		if t0.has("ship") and mars_ships.any(func(x): return int(x["id"]) == int(t0["ship"])):
+			col.transport.trips.erase(t0)
+	mars_ships[0]["at"] = Fleet.port_body(col)
+	mars_ships[0]["to"] = ""
+	for i in range(1, mars_ships.size()):
+		mars_ships[i]["at"] = "mars"
+		mars_ships[i]["to"] = ""
+	home.support = maxf(home.support, 5000.0)
+	home.stock["food_kg"] = maxf(float(home.stock["food_kg"]), float(home.caps.get("food_kg", 20000.0)) * 0.9)
+	hel.stock["food_kg"] = 50.0
+	var sup0 := home.support
+	var n0 := col.transport.trips.size()
+	col.transport._depart_ship(col, l, 0)
+	var trip: Dictionary = col.transport.trips[-1] if col.transport.trips.size() > n0 else {}
+	_check(not trip.is_empty() and trip.has("ship") and String(trip["to"]) == String(l["b"]), "화성 수송선이 배와 함께 떠나지 않았다")
+	if not trip.is_empty():
+		var sh := Fleet.ship(col, int(trip["ship"]))
+		var paid := sup0 - home.support
+		var want := Fleet.trip(col, String(sh["cls"]), Fleet.port_body(col), "mars", Transport.cargo_t(trip["cargo"]),
+			Transport.count_people(trip["people"]), home)
+		_check(String(sh["at"]) == "" and String(sh["to"]) == "mars" and absf(paid - float(want["cost"])) < 0.5,
+			"떠난 배의 자리·추진제 값이 맞지 않다 (낸 값 %.1f, 바람 %.1f)" % [paid, float(want["cost"])])
+		trip["arrive"] = col.hour + 1
+		col.step()
+		_check(String(sh["at"]) == "mars", "닿은 배가 화성 부두에 없다 (%s)" % String(sh["at"]))
+	# 고향 부두에 배가 없다 — 실을 것이 있어도 놓친다
+	hel.stock["food_kg"] = 50.0
+	var go := Fleet.launch(col, l, 0, home, hel, {})
+	_check(not go.has("ship") and String(go.get("why", "")).contains("배가 없어"), "부두에 배가 없는데 떠나려 했다 %s" % str(go))
+	# 화성 부두에 둘, 고향에 없다 — 실을 것이 없어도 하나가 빈 배로 돌아온다. 값이 모자라면 놓친다
+	hel.support = maxf(hel.support, 5000.0)
+	var back := Fleet.launch(col, l, 1, hel, home, {})
+	_check(back.has("ship"), "고향 부두가 비었는데 화성의 배가 돌아오지 않는다: %s" % str(back.get("why", "")))
+	var keep := hel.support
+	hel.support = 0.0
+	var poor := Fleet.launch(col, l, 1, hel, home, {})
+	_check(not poor.has("ship") and String(poor.get("why", "")).contains("모자라"), "추진제 값이 없는데 떠나려 했다")
+	hel.support = keep
+	# 주문: 핵열은 기술이 있어야, 화학은 값을 내고 날이 차면 고향 부두에
+	var known := col.known_techs()
+	if not known.has("megawatt_fission"):
+		_check(Fleet.order_reason(col, "ntr", "mars").contains("있어야"), "메가와트급 원자로 없이 핵열 화물선을 주문할 수 있다")
+	home.support = maxf(home.support, 5000.0)
+	home.stock["parts"] = maxf(float(home.stock.get("parts", 0.0)), 1000.0)
+	home.stock["metal_t"] = maxf(float(home.stock.get("metal_t", 0.0)), 200.0)      # 궤도 조립을 알면 금속도 든다
+	var parts0 := float(home.stock["parts"])
+	var n_orders := (st["orders"] as Array).size()
+	var why_order := Fleet.order(col, "chem", "")
+	_check(why_order == "" and (st["orders"] as Array).size() == n_orders + 1, "화학 화물선을 주문하지 못했다: " + why_order)
+	if (st["orders"] as Array).size() == n_orders:
+		return
+	var o: Dictionary = st["orders"][-1]
+	_check(absf(parts0 - float(home.stock["parts"]) - float(Fleet.order_cost(col, "chem")["parts"])) < 0.01, "주문 부품을 내지 않았다")
+	o["ready"] = col.hour
+	var auto0: bool = st["auto"]
+	st["auto"] = false
+	Fleet.step_day(col)
+	var made := Fleet.ship(col, int(o["id"]))
+	_check(not made.is_empty() and String(made["at"]) == Fleet.port_body(col) and String(made["route"]) == "", "주문한 배가 고향 부두에 없다")
+	_check(Fleet.assign(col, int(made["id"]), "ceres") == "" and String(made["route"]) == "ceres", "배의 항로를 바꾸지 못했다")
+	var parts1 := float(home.stock["parts"])
+	_check(Fleet.retire(col, int(made["id"])) == "" and Fleet.ship(col, int(made["id"])).is_empty()
+		and float(home.stock["parts"]) > parts1, "퇴역한 배가 남았거나 부품을 돌려받지 못했다")
+	# 자동 운영: 세레스 항로의 배를 모두 빼면 노는 배를 보내거나 주문해 둘로 맞춘다
+	st["ships"] = (st["ships"] as Array).filter(func(x): return String(x["route"]) != "ceres" or String(x["at"]) == "")
+	st["orders"] = (st["orders"] as Array).filter(func(x): return String(x["route"]) != "ceres")
+	st["auto"] = true
+	home.support = maxf(home.support, 20000.0)
+	home.stock["parts"] = maxf(float(home.stock["parts"]), 2000.0)
+	home.stock["metal_t"] = maxf(float(home.stock.get("metal_t", 0.0)), 200.0)
+	Fleet.step_day(col)
+	var ceres_n := Fleet.ships_of(col, "ceres").size() + (st["orders"] as Array).filter(func(x): return String(x["route"]) == "ceres").size()
+	_check(ceres_n >= 2, "자동 운영이 세레스 항로를 채우지 않았다 (%d)" % ceres_n)
+	st["auto"] = auto0
+	# 항로 지도: 노드 자리, 누르기, 카드
+	main._set_view("map")
+	var m: DvMapView = main.dv_map
+	m.refresh(true)
+	_check(m._pos.size() == (Fleet.data()["nodes"] as Array).size(), "항로 지도에 노드 자리가 모자란다 (%d)" % m._pos.size())
+	if m._pos.has("lmo") and m._pos.has("moon_s"):
+		_check(m.hit(m._pos["lmo"]) == "mars" and m.hit(m._pos["moon_s"]) == "n:moon_s", "항로 지도에서 노드를 고르지 못했다")
+		_check((m._pos["earth_s"] as Vector2).y > (m._pos["moon_s"] as Vector2).y, "지구 우물이 달보다 얕게 그려졌다")
+	m.selected = "mars"
+	m._sig = ""
+	m.refresh(true)
+	_check(_texts(m).any(func(x): return x == "화성 항로"), "항로 지도 카드에 화성 항로가 없다")
+	m.selected = "n:moon_s"
+	m._sig = ""
+	m.refresh(true)
+	_check(_texts(m).any(func(x): return x == "그 도시로"), "달 표면 카드에 도시로 가는 단추가 없다")
+	main._set_view("world")
+	_check(not m.visible and main.world.visible, "항로 지도에서 3D로 돌아오지 못했다")
+	var tp: TransportPanel = main.tabs["transport"]
+	tp.rebuild()
+	_check(_texts(tp).any(func(x): return x.begins_with("함대 · 배")), "교통 탭에 함대 칸이 없다")
+	print("smoke: fleet %d ships, %d orders, mars Δv %.1f/%.1f, best %s" % [(st["ships"] as Array).size(), (st["orders"] as Array).size(),
+		Fleet.route_dv("moon", "mars"), Fleet.route_dv("mars", "moon"), ", ".join(PackedStringArray(routes.map(func(r): return "%s:%s" % [r, Fleet.best_class(col, r)])))])
 
 
 ## 그 노드 아래 글(라벨·단추)

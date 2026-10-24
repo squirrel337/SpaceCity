@@ -80,7 +80,7 @@
 | [09 온보딩·제작](09-onboarding-production.md) | 첫 1시간 스크립트, MVP 수직 슬라이스 명세, 마일스톤, 팀, 리스크, 남은 결정 |
 | [용어집](glossary.md) | 게임 용어 정의 |
 | [game/](../../game/README.md) | 실행 가능한 시대 0 프로토타입 (Godot 4.7) — Windows exe·Android APK 빌드, 파이썬 시뮬레이터와의 일치 시험 |
-| [data/](data/) · [sim/](sim/) · [mockups/](mockups/) · [images/](images/) | 시대 0 데이터(JSON — 모듈·기술, 도시 부지 18곳의 보정·원정 `city_sites.json`, 3D 세계의 천체·밝은 별·월면 지형 `sky.json`, 암석·얼음 천체의 겉모습(분지·화산·협곡·바다·팔레트) `surfaces.json`, 도시 사이 교통의 탈것·싣는 규칙 `transport.json`, 지구의 대도시 26곳과 우주 시설·운영 방식·상권·금융가, 상업·금융 규칙, 반도체·AI 데이터센터 지역 24곳 `earth_cities.json`, 길 종류·구획·땅 고치기·재건축·길 공사·도시 기능의 자리 `city_layout.json`, 이정표·시대·메가프로젝트 `city_progress.json`, 연구 갈림길·돌파 카드 `city_research.json`, 위치가 있는 재난·둘레 탐사 `city_hazards.json`, 수출 계약 `city_trade.json`, 시나리오·도전 모드 `scenarios.json`, 이름 있는 정착민·이야기 `city_people.json`, 정착민 정치 `city_politics.json`), 밸런스 시뮬레이터·차트 스크립트, UI 목업 원본(HTML), 렌더한 이미지 |
+| [data/](data/) · [sim/](sim/) · [mockups/](mockups/) · [images/](images/) | 시대 0 데이터(JSON — 모듈·기술, 도시 부지 18곳의 보정·원정 `city_sites.json`, 3D 세계의 천체·밝은 별·월면 지형 `sky.json`, 암석·얼음 천체의 겉모습(분지·화산·협곡·바다·팔레트) `surfaces.json`, 도시 사이 교통의 탈것·싣는 규칙 `transport.json`, 지구의 대도시 26곳과 우주 시설·운영 방식·상권·금융가, 상업·금융 규칙, 반도체·AI 데이터센터 지역 24곳 `earth_cities.json`, 길 종류·구획·땅 고치기·재건축·길 공사·도시 기능의 자리 `city_layout.json`, 이정표·시대·메가프로젝트 `city_progress.json`, 연구 갈림길·돌파 카드 `city_research.json`, 위치가 있는 재난·둘레 탐사 `city_hazards.json`, 수출 계약 `city_trade.json`, 시나리오·도전 모드 `scenarios.json`, 이름 있는 정착민·이야기 `city_people.json`, 정착민 정치 `city_politics.json`, Δv 항로 지도·함선 등급·추진제 값 `system_map.json`), 밸런스 시뮬레이터·차트 스크립트, UI 목업 원본(HTML), 렌더한 이미지 |
 
 ## 카탈로그에서 바뀐 점
 

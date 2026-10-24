@@ -188,10 +188,11 @@ func ships() -> Array:
 		if l.is_empty() or String(l["kind"]) != "ship":
 			continue
 		var left := maxf(0.0, (float(t_rec["arrive"]) - float(view.mgr.hour)) / 24.0)
+		var sh := Fleet.ship(view.mgr, int(t_rec["ship"])) if t_rec.has("ship") else {}
 		out.append({"kind": "ship", "id": "%s|%d" % [t_rec["line"], int(t_rec["depart"])],
 			"body": Transport.window_body(Transport.node_body(String(t_rec["from"]))),
-			"name": "수송선 %s → %s · %d일 남음" % [Transport.node_name(String(t_rec["from"])),
-				Transport.node_name(String(t_rec["to"])), int(ceil(left))]})
+			"name": "%s %s → %s · %d일 남음" % [("%s(%s)" % [String(sh["name"]), Fleet.cls_short(String(sh["cls"]))]) if not sh.is_empty() else "수송선",
+				Transport.node_name(String(t_rec["from"])), Transport.node_name(String(t_rec["to"])), int(ceil(left))]})
 	return out
 
 

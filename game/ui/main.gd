@@ -40,6 +40,7 @@ var _dirty := true
 
 var city_view: CityView
 var world: WorldView
+var dv_map: DvMapView                # 항로 지도 (왼쪽 큰 화면의 '항로')
 var plan: CityPlan
 var tool := PlaceTool.new()
 var place_bar: PanelContainer
@@ -139,6 +140,17 @@ func _build() -> void:
 	world.site_picked.connect(_on_site_picked)
 	world.mgr = colonies
 	city_area.add_child(world)
+	dv_map = DvMapView.new()
+	dv_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dv_map.mgr = colonies
+	dv_map.visible = false
+	dv_map.colony_picked.connect(func(i: int):
+		_set_view("world")
+		_on_colony_view(i))
+	dv_map.changed.connect(func():
+		_refresh_tab()
+		_dirty = true)
+	city_area.add_child(dv_map)
 	city_area.add_child(_build_view_switch())
 	city_area.add_child(_build_place_bar())
 	anchor_bar = AnchorBar.new()
@@ -207,7 +219,7 @@ func _build_view_switch() -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
 	var group := ButtonGroup.new()
-	for pair in [["world", "3D"], ["list", "목록"]]:
+	for pair in [["world", "3D"], ["list", "목록"], ["map", "항로"]]:
 		var b := Button.new()
 		b.text = pair[1]
 		b.toggle_mode = true
@@ -238,6 +250,7 @@ func _build_view_switch() -> Control:
 	road_button = plan_buttons["road"]
 	view_buttons["world"].tooltip_text = "식민지의 도시 — 끌어서 돌리고, 휠·두 손가락으로 확대해 행성과 별까지 (M)"
 	view_buttons["list"].tooltip_text = "모듈 목록 (M)"
+	view_buttons["map"].tooltip_text = "항로 지도 — Δv(km/s)로 그린 태양계: 발사 창, 수송선, 함대와 배 주문 (J)"
 	world_row = HBoxContainer.new()
 	world_row.add_theme_constant_override("separation", 4)
 	row.add_child(world_row)
@@ -552,14 +565,20 @@ func _set_view(mode: String) -> void:
 	view_mode = mode
 	world.visible = mode == "world"
 	city_view.visible = mode == "list"
+	dv_map.visible = mode == "map"
 	world_row.visible = mode == "world"
 	for k in view_buttons:
 		view_buttons[k].set_pressed_no_signal(k == mode)
 	for k in plan_buttons:
-		(plan_buttons[k] as Button).visible = mode != "list"
-	if mode == "list" and tool.active():
+		(plan_buttons[k] as Button).visible = mode == "world"
+	if mode != "world" and tool.active():
 		tool.stop()
 	city_view.queue_redraw()
+	if mode == "map":
+		dv_map.active = active
+		dv_map.open(String(colonies.list[active]["body"]) if active >= 0 and active < colonies.list.size() else "mars")
+	# 알림: 항로 지도에서는 오른쪽 아래 카드 위로
+	toasts.offset_bottom = -(dv_map.size.y - dv_map.card_top() + 8.0) if mode == "map" else -62.0
 
 
 func _build_top_bar() -> Control:
@@ -697,6 +716,7 @@ func _build_side() -> Control:
 		_on_player_change())
 	tabs["transport"].mgr = colonies
 	tabs["transport"].changed.connect(_on_player_change)
+	tabs["transport"].show_map.connect(func(): _set_view("map"))
 	tabs["transport"].show_line.connect(func(id: String):
 		if view_mode != "world":
 			_set_view("world")
@@ -1036,6 +1056,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_select_tab("colony")
 		KEY_M:
 			_set_view("list" if view_mode == "world" else "world")
+		KEY_J:
+			_set_view("map" if view_mode != "map" else "world")
 		_:
 			return
 	get_viewport().set_input_as_handled()
@@ -1412,6 +1434,9 @@ func _refresh_live() -> void:
 		world.city.goal_text = Scenario.summary(colonies)
 	city_view.queue_redraw()
 	forecast.queue_redraw()
+	if dv_map.visible:
+		dv_map.active = active
+		dv_map.refresh()
 	tabs[current_tab].update_view()
 	_update_markers()
 

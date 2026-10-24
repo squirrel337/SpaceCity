@@ -28,6 +28,7 @@ SOURCES = {
     "scenarios.json": ROOT / "docs" / "design" / "data" / "scenarios.json",
     "city_people.json": ROOT / "docs" / "design" / "data" / "city_people.json",
     "city_politics.json": ROOT / "docs" / "design" / "data" / "city_politics.json",
+    "system_map.json": ROOT / "docs" / "design" / "data" / "system_map.json",
     "nearby_stars.json": ROOT / "docs" / "concept" / "examples" / "nearby_stars.json",
 }
 FILES = tuple(SOURCES)

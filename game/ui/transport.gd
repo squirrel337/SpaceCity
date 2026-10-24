@@ -427,6 +427,9 @@ func _catch_up(col: Colonies, l: Dictionary) -> void:
 
 
 func _depart(col: Colonies, l: Dictionary, dir: int) -> void:
+	if String(l["kind"]) == "ship":
+		_depart_ship(col, l, dir)
+		return
 	var src := String(l["a"] if dir == 0 else l["b"])
 	var dst := String(l["b"] if dir == 0 else l["a"])
 	var md := mode(l["mode"])
@@ -458,17 +461,11 @@ func _depart(col: Colonies, l: Dictionary, dir: int) -> void:
 		_:
 			if s_sim != null and d_sim != null:
 				var freight := 0.0
-				if String(l["kind"]) in ["ferry", "ship"]:
+				if String(l["kind"]) == "ferry":
 					freight = float(D.get("freight", {}).get("support_per_t", 0.0)) * col.metro_fn.modes.freight_k()
 				var inc2 := incoming(dst)
 				cargo = _plan_cargo(s_sim, d_sim, float(md.get("cap_t", 0.0)), freight, inc2)
 				_load(s_sim, cargo, freight)
-				# 먼 행성으로 가는 수송선: 우주 산업 수도가 그 천체의 모자란 부품을 사서 더 싣는다 (운영비로)
-				if String(l["kind"]) == "ship" and node_body(dst) != "moon":
-					var room := float(md.get("cap_t", 0.0)) - cargo_t(cargo)
-					var extra_p := col.metro_fn.modes.ship_parts(col, node_body(dst), room, col.metro_fn)
-					if extra_p > 0.0:
-						cargo["parts"] = float(cargo.get("parts", 0.0)) + extra_p
 				var n2 := _plan_people(s_sim, d_sim, int(md.get("seats", 0)), int(inc2.get("people", 0)))
 				if n2 > 0:
 					people = _take_people(s_sim, n2)
@@ -483,14 +480,59 @@ func _depart(col: Colonies, l: Dictionary, dir: int) -> void:
 		_flow(src, "out_p", settlers)
 	if s_sim != null:
 		_event("dep", src, dst, l)
-	if l["kind"] == "ship" and s_sim != null:
-		s_sim.note("행성간 수송선 출발 — %s행 (%s). %s 도착 예정" % [node_name(dst), load_text(cargo, settlers),
-			col.date_text(float(t["arrive"]))], "info")
-	# 다음 출발
-	if l["kind"] == "ship":
-		l["next"][dir] = _next_window_h(col, l, dir, col.hour + 24 * 30)
-	else:
-		l["next"][dir] = col.hour + maxi(1, int(l["every_h"]))
+	l["next"][dir] = col.hour + maxi(1, int(l["every_h"]))      # 다음 출발 (수송선은 _depart_ship)
+
+
+## 행성간 수송선 (Fleet): 떠나는 부두에 이 항로의 배가 있어야 떠난다 — 실을 것이 없으면 쉬고 (저쪽 부두에 배를 두려고 빈 배로
+## 건너가기도 한다), 보내는 도시가 추진제 값(지원 점수)을 낸다. 전기 추진은 전이가 길다. 다음 창은 그대로 셈한다
+func _depart_ship(col: Colonies, l: Dictionary, dir: int) -> void:
+	var src := String(l["a"] if dir == 0 else l["b"])
+	var dst := String(l["b"] if dir == 0 else l["a"])
+	l["next"][dir] = _next_window_h(col, l, dir, col.hour + 24 * 30)
+	var s_sim := _sim(col, src)
+	var d_sim := _sim(col, dst)
+	if s_sim == null or d_sim == null:
+		return
+	var route := Fleet.route_of(l)
+	var go := Fleet.launch(col, l, dir, s_sim, d_sim, incoming(dst))
+	if not go.has("ship"):
+		var why := String(go.get("why", ""))
+		Fleet.set_status(col, route, "%s → %s: %s" % [node_name(src), node_name(dst), why if why != "" else "실을 것이 없어 쉬었다"])
+		if why != "":
+			s_sim.note("행성간 수송선 — %s행: %s" % [node_name(dst), why], "warn")
+		return
+	var sh: Dictionary = go["ship"]
+	var cargo: Dictionary = go["cargo"]
+	_load(s_sim, cargo, 0.0)
+	# 먼 행성으로 가는 수송선: 우주 산업 수도가 그 천체의 모자란 부품을 사서 더 싣는다 (운영비로)
+	if node_body(dst) != "moon":
+		var room := minf(float(mode(l["mode"]).get("cap_t", 0.0)), float(Fleet.cls(String(sh["cls"])).get("cap_t", 300.0))) - cargo_t(cargo)
+		var extra_p := col.metro_fn.modes.ship_parts(col, node_body(dst), room, col.metro_fn)
+		if extra_p > 0.0:
+			cargo["parts"] = float(cargo.get("parts", 0.0)) + extra_p
+	var people: Array = _take_people(s_sim, int(go["people"])) if int(go["people"]) > 0 else []
+	var settlers := count_people(people)
+	# 실은 그대로 (덤으로 실은 부품까지) 추진제를 다시 셈한다
+	var fin := Fleet.trip(col, String(sh["cls"]), node_body(src), node_body(dst), cargo_t(cargo), settlers, s_sim)
+	go["cost"] = float(fin["cost"])
+	go["prop_t"] = float(fin["prop_t"])
+	s_sim.support -= float(go["cost"])
+	var t := {"line": l["id"], "from": src, "to": dst, "depart": col.hour,
+		"arrive": col.hour + maxi(1, int(round(float(l["trip_h"]) * float(go["time_k"])))), "cargo": cargo, "people": people,
+		"pax": settlers, "mode": l["mode"], "kind": l["kind"], "ship": int(sh["id"])}
+	trips.append(t)
+	trip_rev += 1
+	Fleet.depart(sh, node_body(dst))
+	var tons := cargo_t(cargo)
+	if tons > 0.0 or settlers > 0:
+		_flow(src, "out_t", tons)
+		_flow(src, "out_p", settlers)
+	_event("dep", src, dst, l)
+	var fuel := "추진제 %s t · 지원 %s%s" % [Fmt.n(float(go["prop_t"]), 1), Fmt.n(float(go["cost"])), " (현지 생산)" if bool(go["local"]) else ""]
+	var what := load_text(cargo, settlers) if tons > 0.0 or settlers > 0 else "빈 배 — 저쪽 부두에 배를 둔다"
+	s_sim.note("행성간 수송선 출발 — %s(%s) %s행 (%s). %s · %s 도착 예정" % [String(sh["name"]), Fleet.cls_short(String(sh["cls"])),
+		node_name(dst), what, fuel, col.date_text(float(t["arrive"]))], "info")
+	Fleet.set_status(col, route, "%s → %s: %s 떠남 — %s · %s" % [node_name(src), node_name(dst), String(sh["name"]), what, fuel])
 
 
 func _arrive(col: Colonies, t: Dictionary) -> void:
@@ -529,6 +571,7 @@ func _arrive(col: Colonies, t: Dictionary) -> void:
 			CitySim._add(d_sim.stats, "transport_in", 1)
 		if t["kind"] == "ship":
 			d_sim.note("행성간 수송선 도착 — %s에서 (%s)" % [node_name(String(t["from"])), load_text(cargo, settlers)], "good")
+	Fleet.arrive(col, t, dst)
 	if Metros.is_metro(String(t["to"])) and int(t.get("pax", 0)) > 0:
 		col.metro_fn.econ.note_pax(String(t["to"]), int(t["pax"]))
 	var l := line_by_id(String(t["line"]))
@@ -852,6 +895,8 @@ func load_save(data_in: Dictionary, col: Colonies) -> void:
 				"pax": int(t.get("pax", 0)), "mode": String(t.get("mode", "")), "kind": String(t.get("kind", "ground"))}
 			if String(t.get("tag", "")) != "":
 				tr["tag"] = String(t["tag"])
+			if t.has("ship"):
+				tr["ship"] = int(t["ship"])                 # 그 편을 탄 배 (Fleet)
 			trips.append(tr)
 			trip_rev += 1
 		var fl: Dictionary = data_in.get("flow", {})
