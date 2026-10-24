@@ -175,11 +175,22 @@ func _draw() -> void:
 			draw_circle(to_px.call(float(hover_day), float(v)), 4.0, l["color"])
 			draw_arc(to_px.call(float(hover_day), float(v)), 4.0, 0.0, TAU, 16, Palette.PANEL_2, 2.0)   # 겹치는 표시의 테
 			parts.append("%s %s%s" % [String(l["name"]), _num(float(v)), unit])
-		var txt := " · ".join(parts)
-		var tw := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
-		var at := Vector2(clampf(hx + 8.0, PAD_L, size.x - tw - 8.0), top + 12.0)
-		draw_rect(Rect2(at - Vector2(4, 11), Vector2(tw + 8, 15)), Color(Palette.PANEL, 0.92))
-		draw_string(font, at, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.TEXT)
+		# 값 읽기: 그래프 너비에 맞춰 여러 줄로 (줄이 많은 그래프)
+		var room := maxf(size.x - PAD_L - 8.0, 80.0)
+		var rows := PackedStringArray([""])
+		for part in parts:
+			var cand := part if rows[-1] == "" else rows[-1] + " · " + part
+			if rows[-1] != "" and font.get_string_size(cand, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x > room:
+				rows.append(part)
+			else:
+				rows[-1] = cand
+		var tw := 0.0
+		for row in rows:
+			tw = maxf(tw, font.get_string_size(row, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x)
+		var at := Vector2(maxf(PAD_L, minf(hx + 8.0, size.x - tw - 8.0)), top + 12.0)
+		draw_rect(Rect2(at - Vector2(4, 11), Vector2(tw + 8, 14.0 * rows.size() + 1.0)), Color(Palette.PANEL, 0.92))
+		for k in rows.size():
+			draw_string(font, at + Vector2(0, 14.0 * k), rows[k], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.TEXT)
 
 
 ## 그 날의 값 (그날 기록이 없으면 그 앞의 마지막 값, 기록 전이면 null)
