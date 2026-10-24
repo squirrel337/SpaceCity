@@ -170,6 +170,7 @@ func sync(sim: CitySim, budget_us: int = 0) -> void:
 		while have < want and not fin.is_empty():
 			var e: Dictionary = fin.pop_front()
 			e["seq"] = -1
+			e.erase("was")
 			have += 1
 		for e in fin:
 			buildings.erase(e)
@@ -305,6 +306,13 @@ func count_of(kind: String) -> int:
 		if e["id"] == kind:
 			n += 1
 	return n
+
+
+func kind_of_uid(uid: int) -> String:
+	for e in buildings:
+		if int(e["uid"]) == uid:
+			return String(e["id"])
+	return ""
 
 
 func entry_of_seq(seq: int) -> Dictionary:
@@ -472,7 +480,7 @@ func zone_of(at: Vector2) -> String:
 
 
 ## 땅 모양과 다른 건물·길만 따진다 (자재·연구는 check에서). 놓을 수 있으면 "", 아니면 까닭
-func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1) -> String:
+func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1, ignore: Dictionary = {}) -> String:
 	var r := rect_of(kind, at, rot)
 	for corner in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
 		if not in_land(corner, 2.0, 2.0):
@@ -497,7 +505,7 @@ func check_spot(kind: String, at: Vector2, rot: int, ignore_uid: int = -1) -> St
 	var k_people := _people(kind)
 	for bi in _near_buildings(r, k_clear):
 		var e: Dictionary = buildings[bi]
-		if int(e["uid"]) == ignore_uid:
+		if int(e["uid"]) == ignore_uid or ignore.has(int(e["uid"])):
 			continue
 		var er: Rect2 = _brect[bi]
 		if inner.intersects(er):
@@ -1218,7 +1226,89 @@ func _auto_expand(kind: String, sim: CitySim) -> bool:
 	var district: String = layout.district_of.get(fam(kind), "")
 	if district == "" or district in BaseLayout.SPECIAL:
 		return false
+	if zone_free_block(district):
+		if sim != null:
+			sim.note("자동 운영 — 빈 블록을 %s 구획으로 정했다" % LayoutData.zone_name(district), "info")
+		return true
 	return expand_zone(district, sim, LayoutData.land()["auto_reserve"], "자동 운영")
+
+
+## 구획 넓히기 (땅을 사기 전에): 가진 땅 안의 빈 블록(구획이 없는 블록) 가운데 그 구획 블록들에 가장 가까운 것을
+## 그 구획으로 정한다. 너무 작은 자투리 블록(600 m² 아래)은 두고. 정했으면 true
+func zone_free_block(district: String) -> bool:
+	var anchor := _zone_anchor(district)
+	var best := {}
+	var best_d := INF
+	for b in blocks():
+		if String(b["district"]) != "" or float(b["area"]) < 600.0:
+			continue
+		var c: Vector2 = b["center"]
+		if not in_land(c) or layout.special_at(c, 4.0):
+			continue
+		var d := c.distance_to(anchor)
+		if d < best_d:
+			best_d = d
+			best = b
+	return not best.is_empty() and set_district(best["center"], district)
+
+
+# ── 재건축 ─────────────────────────────────────────────────────
+## 지어진 건물 uid의 자리에 kind가 들어가나 (그 건물을 빼고 따진다 — 다른 건물·길·땅 밖에 걸리지 않게): 그 자리 그대로,
+## 돌려서, 넓어진 만큼 네 쪽으로 밀어서 본다. 겹치는 이웃이 absorb의 종류(지어진 것)면 둘까지 함께 헐어 자리를 낸다.
+## 들어가면 {at, rot, also: 함께 헐 uid들}, 아니면 {}
+func rebuild_spot(uid: int, kind: String, absorb: Dictionary = {}) -> Dictionary:
+	var old := {}
+	for e in buildings:
+		if int(e["uid"]) == uid and int(e["seq"]) < 0:
+			old = e
+			break
+	if old.is_empty():
+		return {}
+	var at0 := Vector2(float(old["x"]), float(old["y"]))
+	var of := foot_of(String(old["id"]), int(old["rot"]))
+	for rot: int in [int(old["rot"]), (int(old["rot"]) + 1) % 4]:
+		var d := ((foot_of(kind, rot) - of) * 0.5).max(Vector2.ZERO)
+		var offs: Array = [Vector2.ZERO]
+		for o: Vector2 in [Vector2(d.x, 0), Vector2(-d.x, 0), Vector2(0, d.y), Vector2(0, -d.y)]:
+			if o != Vector2.ZERO:
+				offs.append(o)
+		for o: Vector2 in offs:
+			var at := at0 + o
+			var r := rect_of(kind, at, rot).grow(-0.05)
+			var also := {}
+			var ok := true
+			for bi in _near_buildings(r):
+				var e: Dictionary = buildings[bi]
+				if int(e["uid"]) == uid or not r.intersects(_brect[bi]):
+					continue
+				if int(e["seq"]) < 0 and absorb.has(String(e["id"])) and also.size() < 2:
+					also[int(e["uid"])] = true
+				else:
+					ok = false
+					break
+			if ok and check_spot(kind, at, rot, uid, also).is_empty():
+				return {"at": at, "rot": rot, "also": also.keys()}
+	return {}
+
+
+## 재건축: 건물 uid(와 spot.also)를 헐고 그 자리(spot — rebuild_spot)에 kind를 짓는 공사(시뮬레이션 대기열의 seq)를 둔다.
+## 공사 자리는 헌 건물들을 was = [[종류, 모양, 방향, x, y] …]로 기억한다 (공사 앞부분에 헐리는 모습을 보인다)
+func rebuild(uid: int, kind: String, seq: int, spot: Dictionary) -> Dictionary:
+	var gone := {uid: true}
+	for u in spot.get("also", []):
+		gone[int(u)] = true
+	var was: Array = []
+	for i in range(buildings.size() - 1, -1, -1):
+		var old: Dictionary = buildings[i]
+		if gone.has(int(old["uid"])):
+			was.push_front([String(old["id"]), int(old["variant"]), int(old["rot"]), float(old["x"]), float(old["y"])])
+			buildings.remove_at(i)
+	_bidx_n = -1
+	_bgen += 1
+	var e := add_queued(kind, spot["at"], int(spot["rot"]), BaseScene.variant_of(kind, count_of(kind)), seq)
+	if not was.is_empty():
+		e["was"] = was
+	return e
 
 
 # ── 발전 모드의 땅 (넓히기·줄이기) ───────────────────────────────
@@ -2258,8 +2348,11 @@ func entry_at(p: Vector2) -> Dictionary:
 func to_save() -> Dictionary:
 	var bs := []
 	for e in buildings:
-		bs.append([int(e["uid"]), e["id"], snappedf(e["x"], 0.01), snappedf(e["y"], 0.01), int(e["rot"]),
-			int(e["variant"]), int(e["seq"]), e["tile"]])
+		var b := [int(e["uid"]), e["id"], snappedf(e["x"], 0.01), snappedf(e["y"], 0.01), int(e["rot"]),
+			int(e["variant"]), int(e["seq"]), e["tile"]]
+		if e.has("was") and int(e["seq"]) >= 0:
+			b.append(e["was"])
+		bs.append(b)
 	var ns := []
 	for p in nodes:
 		ns.append(snappedf(p.x, 0.01))
@@ -2299,6 +2392,13 @@ static func from_save(data: Variant, sim: CitySim, p_layout: BaseLayout = null, 
 			continue
 		plan.buildings.append({"uid": int(b[0]), "id": String(b[1]), "x": float(b[2]), "y": float(b[3]),
 			"rot": int(b[4]) % 4, "variant": int(b[5]), "seq": int(b[6]), "tile": String(b[7])})
+		if b.size() >= 9 and b[8] is Array and int(b[6]) >= 0:
+			var was: Array = []
+			for w in b[8]:
+				if w is Array and w.size() >= 5 and ArtLib.has("buildings", String(w[0])):
+					was.append([String(w[0]), int(w[1]), int(w[2]) % 4, float(w[3]), float(w[4])])
+			if not was.is_empty():
+				plan.buildings[-1]["was"] = was
 	var ns: Array = data.get("nodes", [])
 	for i in range(0, ns.size() - 1, 2):
 		plan.nodes.append(Vector2(float(ns[i]), float(ns[i + 1])))

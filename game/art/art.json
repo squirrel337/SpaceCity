@@ -1175,6 +1175,31 @@
     }
    ]
   },
+  "finance_tower": {
+   "foot": [
+    12,
+    12
+   ],
+   "height": 64.0,
+   "title": "금융 타워",
+   "variants": [
+    {
+     "height": 64.0
+    },
+    {
+     "height": 63.0
+    },
+    {
+     "height": 62.0
+    },
+    {
+     "height": 66.0
+    },
+    {
+     "height": 60.0
+    }
+   ]
+  },
   "fission_100kw": {
    "foot": [
     8,
@@ -1650,6 +1675,31 @@
     }
    ]
   },
+  "hab_tower": {
+   "foot": [
+    10,
+    8
+   ],
+   "height": 48.4,
+   "title": "고층 주거 타워",
+   "variants": [
+    {
+     "height": 48.4
+    },
+    {
+     "height": 47.9
+    },
+    {
+     "height": 48.3
+    },
+    {
+     "height": 47.7
+    },
+    {
+     "height": 48.6
+    }
+   ]
+  },
   "he3_fusion_pilot": {
    "foot": [
     20,
@@ -1772,6 +1822,31 @@
     },
     {
      "height": 0.8
+    }
+   ]
+  },
+  "hotel_tower": {
+   "foot": [
+    12,
+    12
+   ],
+   "height": 52.0,
+   "title": "고층 호텔",
+   "variants": [
+    {
+     "height": 52.0
+    },
+    {
+     "height": 51.0
+    },
+    {
+     "height": 54.0
+    },
+    {
+     "height": 53.0
+    },
+    {
+     "height": 54.0
     }
    ]
   },
@@ -3050,6 +3125,31 @@
     }
    ]
   },
+  "research_tower": {
+   "foot": [
+    9,
+    9
+   ],
+   "height": 36.2,
+   "title": "연구 타워",
+   "variants": [
+    {
+     "height": 36.2
+    },
+    {
+     "height": 36.3
+    },
+    {
+     "height": 35.7
+    },
+    {
+     "height": 36.0
+    },
+    {
+     "height": 35.7
+    }
+   ]
+  },
   "rfc_large": {
    "foot": [
     8,
@@ -3373,6 +3473,14 @@
    ],
    "height": 3.0,
    "title": "공사 중 (작은 건물)"
+  },
+  "scaffold_tower": {
+   "foot": [
+    10,
+    10
+   ],
+   "height": 30.0,
+   "title": "공사 중 (고층)"
   },
   "seed_vault": {
    "foot": [

@@ -28,6 +28,8 @@ var _seats := {}                  # 건물 uid → [앉는 자리, 기초(없으
 var _seats_sig := ""
 var _groups := {}                 # "sprite/변형" → MultiMeshInstance3D
 var _sites_root: Node3D
+var _growing: Array = []          # 공정에 따라 바뀌는 공사 현장: [MeshInstance3D, _items의 번호, 앉는 자리] (_grow_sites)
+var _grow_t := 0.0
 var _agents_root: Node3D
 var _agent_nodes := {}            # uid → {node, plume, yaw}
 var _uid := 0
@@ -184,6 +186,10 @@ func update(delta: float, speed_level: int) -> void:
 		return
 	if heights_ok:
 		_update_ways()
+	_grow_t += delta
+	if _grow_t >= 0.25:
+		_grow_t = 0.0
+		_grow_sites()
 	var sites := BaseScene.sites(sim, plan)
 	if transport != null:
 		traffic.intercity(transport, site_key, {"highways": highways, "runway": runway, "bearings": bearings})
@@ -242,10 +248,16 @@ func _seats_of(items: Array, plinths: Array) -> Array:
 
 
 ## 고장 수만 바뀌었다: 표시(이름표·고장 표지)와 누를 상자만 새로 — 멀티메시·공사 현장은 그대로
+## (그새 재건축이 헌 건물을 다 헐어 목록의 길이가 달라졌으면 다시 그린다)
 func _restatus() -> void:
-	_items = BaseScene.collect(sim, plan)
+	var items := BaseScene.collect(sim, plan)
+	if items.size() != _items.size():
+		_rebuild()
+		return
+	_items = items
 	var seats := _seats_of(_items, [])
 	_set_boxes(seats)
+	_grow_sites()
 
 
 func _rebuild() -> void:
@@ -286,22 +298,65 @@ func _rebuild() -> void:
 		m.instance_count = list.size()
 		for i in list.size():
 			m.set_instance_transform(i, seats[list[i]])
-	# 공사 현장 (비계): 따로
+	# 공사 현장 (비계 — 재건축이면 헐리는 헌 건물도): 따로
 	for c in _sites_root.get_children():
 		c.queue_free()
+	_growing.clear()
 	for i in _items.size():
 		var it: Dictionary = _items[i]
 		if not it["building"]:
 			continue
-		if not ModelLib.ready("buildings", it["sprite"], 0):
+		var v := int(it["variant"])
+		if not ModelLib.ready("buildings", it["sprite"], v):
 			_models_wait = true
 			continue
 		var mi := MeshInstance3D.new()
-		mi.mesh = ModelLib.mesh("buildings", it["sprite"], 0)
+		mi.mesh = ModelLib.mesh("buildings", it["sprite"], v)
 		mi.transform = seats[i]
 		_sites_root.add_child(mi)
+		if it.get("redev", false) or it.get("demolish", false) or String(it["sprite"]) == "scaffold_tower":
+			_growing.append([mi, i, seats[i]])
 	_set_boxes(seats)
 	_set_plinths(plinths)
+	_grow_sites()
+
+
+## 공사 현장을 공정에 맞춘다: 재건축이면 앞부분(BaseScene.DEMOLISH)에는 헌 건물이 위에서부터 낮아지고 새 건물의 비계는
+## 그 뒤에 선다. 높은 비계(scaffold_tower)는 바닥을 그 건물 크기에 맞추고 다 지은 높이의 12%부터 공정만큼 올라간다.
+## 누를 상자도 따라간다 (다 헐린 건물은 상자를 비운다)
+func _grow_sites() -> void:
+	if _growing.is_empty():
+		return
+	var prog := {}
+	for item in sim.queue:
+		prog[int(item["seq"])] = clampf(1.0 - float(item["rd"]) / maxf(1e-6, float(item["rd_total"])), 0.0, 1.0)
+	var demo := BaseScene.DEMOLISH
+	for g in _growing:
+		var mi: MeshInstance3D = g[0]
+		var i := int(g[1])
+		if i >= _items.size():
+			continue
+		var it: Dictionary = _items[i]
+		var seat: Transform3D = g[2]
+		var p := float(prog.get(int(it.get("seq", -1)), 1.0))
+		var k := Vector3.ONE
+		if it.get("demolish", false):
+			mi.visible = p < demo
+			k.y = maxf(1.0 - p / demo, 0.04)
+		else:
+			var q := p
+			if it.get("redev", false):
+				mi.visible = p >= demo
+				q = (p - demo) / (1.0 - demo)
+			if String(it["sprite"]) == "scaffold_tower":
+				var f := ArtLib.footprint(String(it["id"]))
+				var sf := ArtLib.footprint("scaffold_tower")
+				k = Vector3(f.x / sf.x, ArtLib.height(String(it["id"])) * clampf(q, 0.12, 1.0)
+					/ maxf(ArtLib.height("scaffold_tower"), 1.0), f.y / sf.y)
+		var xf := Transform3D(seat.basis * Basis.from_scale(k), seat.origin)
+		mi.transform = xf
+		if i < _boxes.size():
+			_boxes[i][0] = xf * mi.mesh.get_aabb() if mi.visible else AABB(xf.origin, Vector3.ZERO)
 
 
 ## 누를 상자 (모형이 아직이면 바닥 크기의 낮은 상자)
@@ -875,8 +930,8 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 	if dist_ok:
 		for b in _boxes:
 			var it: Dictionary = b[2]
-			if not (it["broken"] or it["building"]):
-				continue                         # 표시가 없는 건물은 화면 자리를 셈하지 않는다
+			if not (it["broken"] or it["building"]) or it.get("demolish", false):
+				continue                         # 표시가 없는 건물은 화면 자리를 셈하지 않는다 (헐리는 건물은 새 건물의 공사 현장이 보인다)
 			var box: AABB = b[0]
 			var top := global_transform * Vector3(box.get_center().x, box.end.y + 1.5, box.get_center().z)
 			var sp: Variant = view.screen_of(top)
@@ -927,17 +982,10 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 
 
 func _progress_of(it: Dictionary) -> float:
-	var e := {}
-	for b in plan.buildings:
-		if int(b["uid"]) == int(it["uid"]):
-			e = b
-			break
-	if e.is_empty():
-		return float(it["progress"])
 	for item in sim.queue:
-		if int(item["seq"]) == int(e["seq"]):
+		if int(item["seq"]) == int(it.get("seq", -1)):
 			return clampf(1.0 - float(item["rd"]) / maxf(1e-6, float(item["rd_total"])), 0.0, 1.0)
-	return 1.0
+	return float(it["progress"]) if not it.has("seq") else 1.0
 
 
 ## 자리 고르기: 놓을 수 없는 까닭(유령 옆), 일조 구역 이름

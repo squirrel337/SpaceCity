@@ -4641,6 +4641,108 @@
         }
       },
       "note": "유리 돔 속의 숲 — 정착민이 가장 좋아하는 산책길"
+    },
+    {
+      "id": "hab_tower",
+      "name": "고층 주거 타워",
+      "family": "hab_module",
+      "category": "habitat",
+      "priority": 1,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 180,
+        "metal_t": 4
+      },
+      "build_rd": 90,
+      "power_kw": 24,
+      "crew": 0,
+      "mtbf_days": 4000,
+      "repair": {
+        "parts": 4,
+        "rd": 3
+      },
+      "provides": {
+        "housing": 96,
+        "dose": "covered"
+      },
+      "note": "아래 세 층은 두꺼운 소결 벽과 물 벽으로 감싸고 그 위로 열다섯 층을 올린 주거 타워 — 같은 땅에 거주 모듈의 열두 배가 산다. 재건축으로 낮은 거주동을 헐고 선다"
+    },
+    {
+      "id": "research_tower",
+      "name": "연구 타워",
+      "family": "research_lab",
+      "category": "research",
+      "priority": 4,
+      "tech": "seed_distributed",
+      "start": 0,
+      "cost": {
+        "parts": 150,
+        "metal_t": 3
+      },
+      "build_rd": 70,
+      "power_kw": 70,
+      "crew": 30,
+      "mtbf_days": 2000,
+      "repair": {
+        "parts": 4,
+        "rd": 2
+      },
+      "provides": {
+        "rp_day": 30
+      },
+      "note": "층마다 실험실이 쌓인 연구 타워 — 꼭대기에 천문 돔과 접시 안테나. 연구원 서른 명이 좁은 땅에서 일한다"
+    },
+    {
+      "id": "finance_tower",
+      "name": "금융 타워",
+      "family": "space_bank",
+      "category": "commerce",
+      "priority": 4,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 200,
+        "metal_t": 5
+      },
+      "build_rd": 80,
+      "power_kw": 50,
+      "crew": 20,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 4,
+        "rd": 2
+      },
+      "provides": {
+        "support_day": 7
+      },
+      "note": "달 금융가의 마천루 — 은행·거래소·보험사가 한 건물에 들고, 꼭대기의 표지등이 지구에서도 보인다"
+    },
+    {
+      "id": "hotel_tower",
+      "name": "고층 호텔",
+      "family": "space_hotel",
+      "category": "commerce",
+      "priority": 4,
+      "tech": "local_manufacturing",
+      "start": 0,
+      "cost": {
+        "parts": 160,
+        "metal_t": 4
+      },
+      "build_rd": 70,
+      "power_kw": 45,
+      "crew": 12,
+      "mtbf_days": 3000,
+      "repair": {
+        "parts": 3,
+        "rd": 2
+      },
+      "provides": {
+        "morale": 4,
+        "support_day": 3
+      },
+      "note": "지구 관광객을 위한 고층 호텔 — 꼭대기 유리 돔 라운지에서 지구돋이를 본다"
     }
   ]
 }

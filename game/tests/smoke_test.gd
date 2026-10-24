@@ -46,6 +46,7 @@ func _process(_delta: float) -> bool:
 		_plan_check()
 		_types_check()
 		_devmodes_check()
+		_redevelop_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -240,7 +241,7 @@ func _map_check() -> void:
 	var layout: BaseLayout = main.plan.layout
 	_check(layout.capacity("hab_module") >= 30, "거주 모듈 자리가 모자란다")
 	_check(layout.capacity("solar_tower") == 38, "태양광 타워 자리가 능선 칸(8+10+20)과 다르다")
-	_check(main.sim.M.size() == 170 and GameData.FAMILY.size() == 34, "건물이 34계열 170종이 아니다")
+	_check(main.sim.M.size() == 174 and GameData.FAMILY.size() == 34, "건물이 34계열 174종이 아니다")
 	for kind in main.sim.M:
 		if GameData.family(kind) == kind:
 			_check(layout.capacity(kind) > 0, "기본 자리가 없는 계열: " + kind)
@@ -545,7 +546,7 @@ func _plan_check() -> void:
 
 
 func _types_check() -> void:
-	## 건물 170종: 계열 규칙으로 도는 시뮬레이션, 자리 찾기, 거리 규칙
+	## 건물 174종: 계열 규칙으로 도는 시뮬레이션, 자리 찾기, 거리 규칙
 	var v := CitySim.new(2061, 1.0, "variety")
 	for d in range(120):
 		for _i in range(24):
@@ -565,7 +566,7 @@ func _types_check() -> void:
 		var spot := plan.suggest(mid)
 		if not spot.is_empty():
 			placed += 1
-	_check(placed >= 125, "빈자리를 찾은 새 종류가 모자란다: %d / 136" % placed)
+	_check(placed >= 125, "빈자리를 찾은 새 종류가 모자란다: %d / 140" % placed)
 	# 거리 규칙: 매립형 원자로는 거주 건물에 20 m까지, 100 kW 원자로는 60 m — 둘이 갈리는 자리가 있어야 한다
 	var core: Rect2 = plan.layout.rects["core"]
 	var split := false
@@ -576,7 +577,7 @@ func _types_check() -> void:
 			split = true
 			break
 	_check(split, "매립형 원자로를 거주구 가까이 놓을 자리를 찾지 못했다")
-	print("smoke: types %d mixed built, %d/136 placeable" % [mixed, placed])
+	print("smoke: types %d mixed built, %d/140 placeable" % [mixed, placed])
 
 
 ## 새 건물의 효과(지원 점수·들여오는 부품·건설 속도)와 도시 발전 모드: 방향 건물 착공, 땅 구역 사기·돌려주기, 저장 왕복
@@ -599,7 +600,7 @@ func _devmodes_check() -> void:
 		(b as CitySim).work_robots()
 	var done0 := 1000.0 - float(b0.queue[0]["rd"])
 	var done1 := 1000.0 - float(b1.queue[0]["rd"])
-	_check(done0 > 0.0 and is_equal_approx(done1, done0 * 1.08), "로버 차고지가 건설을 8% 빠르게 하지 않는다 (%.2f → %.2f)" % [done0, done1])
+	_check(done0 > 0.0 and is_equal_approx(done1, done0 * 1.08), "로버 차고지가 건설을 8%% 빠르게 하지 않는다 (%.2f → %.2f)" % [done0, done1])
 	# 발전 모드: 교통 중심 — 방향 건물을 대기열에 넣고, 교통 지구 땅을 사서 블록을 정하고, 빈 구역을 돌려준다
 	var home := CitySim.new(7, 40.0, "good")
 	var col := Colonies.new()
@@ -644,6 +645,67 @@ func _devmodes_check() -> void:
 		"목표를 채운 교통 중심 도시가 남는 자재로 교통 지구 건물을 (20일에 하나) 더 짓지 않는다")
 	print("smoke: dev modes — bank/trade/boost ok, transport queued %d, parcel bought+released" % (home.planned("transit_center")
 		+ home.planned("rover_depot")))
+
+
+## 구획 자동 확장과 재건축: 자동 운영은 땅을 사기 전에 가진 땅 안의 빈 블록부터 그 구획으로 정한다. 도시가 커지고 구획이
+## 붐비면 땅 넓이당 값이 낮은 건물을 헐고 그 자리에 고층 타워를 짓는다 — 공사 앞부분은 헐리는 헌 건물, 뒤는 공정만큼
+## 올라가는 높은 비계. 저장 왕복, 공사가 끝나면 그 자리에 타워가 선다
+func _redevelop_check() -> void:
+	var rs := CitySim.new(7, 40.0, "good")
+	var rp := CityPlan.create(rs, BaseLayout.new("ridge"))
+	var res: String = rp.layout.district_of["hab_module"]
+	var z0 := _zoned(rp, res)
+	var land0 := rp.land.size()
+	_check(rp._auto_expand("hab_module", rs) and rp.land.size() == land0, "자동 운영이 빈 블록보다 땅을 먼저 산다")
+	_check(_zoned(rp, res) == z0 + 1, "가진 땅 안의 빈 블록이 %s 구획이 되지 않았다" % res)
+	rs.techs["local_manufacturing"] = true
+	rs.stock["parts"] = 5000.0
+	rs.stock["metal_t"] = 100.0
+	rs.counts["apartment_block"] = 2          # 집이 넉넉해야 헌다
+	rs.refresh()
+	rp.sync(rs)
+	var rd := LayoutData.redevelop()
+	var p0: float = rd["pressure"]
+	rd["pressure"] = 0.0                      # 구획이 붐빈 것으로
+	var c := {"sim": rs, "plan": rp, "mode": ""}
+	var habs := int(rs.counts["hab_module"])
+	var started := CityDev.redevelop(c)
+	var twice := CityDev.redevelop(c)
+	rd["pressure"] = p0
+	_check(started and not twice, "붐비는 거주 구획에서 재건축을 (한 번에 한 곳) 시작하지 않았다")
+	var e := rp.entry_of_seq(int(c.get("redev", -1)))
+	var was: Array = e.get("was", [])
+	_check(String(e.get("id", "")) == "hab_tower" and not was.is_empty() and String(was[0][0]) == "hab_module"
+		and int(rs.counts["hab_module"]) == habs - was.size(), "거주 모듈을 헐고 그 자리에 고층 주거 타워를 짓지 않는다")
+	var demo := 0
+	var tall := 0
+	for it in BaseScene.collect(rs, rp):
+		demo += 1 if it.get("demolish", false) else 0
+		tall += 1 if String(it["sprite"]) == "scaffold_tower" else 0
+	_check(demo == was.size() and tall == 1, "재건축 현장에 헐리는 건물·높은 비계가 없다 (%d, %d)" % [demo, tall])
+	_check(String(CityDev.status(c)["redev"]).contains("철거 중"), "개척 탭에 재건축이 보이지 않는다")
+	var back := CityPlan.from_save(JSON.parse_string(JSON.stringify(rp.to_save())), rs, BaseLayout.new("ridge"))
+	_check((back.entry_of_seq(int(c["redev"])).get("was", []) as Array).size() == was.size(), "재건축 자리가 저장 왕복에서 헌 건물을 잊었다")
+	for item in rs.queue:
+		item["rd"] = 0.0
+		item["print_t"] = 0.0
+	rs.work_robots()
+	rp.sync(rs)
+	var at := rp.entry_of_seq(int(c["redev"]))
+	var tower := 0
+	for b in rp.buildings:
+		if String(b["id"]) == "hab_tower" and int(b["seq"]) < 0 and is_equal_approx(float(b["x"]), float(e["x"])):
+			tower += 1
+	_check(at.is_empty() and tower == 1 and int(rs.counts.get("hab_tower", 0)) == 1, "재건축이 끝났는데 그 자리에 타워가 서지 않았다")
+	print("smoke: redevelop %s, %d demolished, auto-zoned a free %s block" % [String(c["redev_txt"]), was.size(), res])
+
+
+func _zoned(plan: CityPlan, district: String) -> int:
+	var n := 0
+	for bl in plan.blocks():
+		if String(bl["district"]) == district:
+			n += 1
+	return n
 
 
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.
@@ -1331,17 +1393,23 @@ func _land_check() -> void:
 	tool.stop()
 	var nb := plan.blocks().filter(func(b): return rect.has_point(b["center"]))
 	_check(not nb.is_empty(), "산 구역 안에 블록이 없다")
-	# 자동 운영: 자리가 모자라면 구획 가까이의 구역을 사서 그 구획 블록으로
+	# 자동 운영: 자리가 모자라면 먼저 가진 땅 안의 빈 블록을 그 구획으로, 빈 블록을 다 쓰면 구획 가까이의 구역을 사서 그 구획 블록으로
 	var n_land := plan.land.size()
 	if sim.autopilot == null:
 		sim.autopilot = AutoPolicy.new("good")
 		sim.autopilot.configure(sim)
-	var ok := plan._auto_expand("hab_module", sim)
-	_check(ok and plan.land.size() == n_land + 1, "자동 운영이 땅을 넓히지 않았다")
+	var ok := false
+	var zoned := 0
+	for _i in 40:
+		ok = plan._auto_expand("hab_module", sim)
+		if not ok or plan.land.size() > n_land:
+			break
+		zoned += 1
+	_check(ok and plan.land.size() == n_land + 1, "자동 운영이 빈 블록(%d곳)을 다 쓴 뒤 땅을 넓히지 않았다" % zoned)
 	var back := CityPlan.from_save(JSON.parse_string(JSON.stringify(plan.to_save())), sim, plan.layout)
 	_check(back.land.size() == plan.land.size(), "산 땅 구역이 저장되지 않았다")
-	print("smoke: land %d parcels, %d candidates (%d open), roads %d" % [plan.land.size(), cands.size(),
-		cands.filter(func(x): return bool(x["ok"])).size(), plan.edges.size()])
+	print("smoke: land %d parcels, %d candidates (%d open), roads %d, %d free blocks zoned before buying" % [plan.land.size(),
+		cands.size(), cands.filter(func(x): return bool(x["ok"])).size(), plan.edges.size(), zoned])
 
 
 ## 시간: 최고 속도는 한 프레임에 여러 시간을 흘리고, 다음 사건 계속 넘기기는 사건을 지나서도 이어 간다

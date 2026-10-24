@@ -894,6 +894,25 @@ func enqueue_special(kind: String, reserve: float = 40.0) -> bool:
 	return false
 
 
+## 다 지은 건물 하나를 헌다 (재건축 — 시뮬레이션 밖의 규칙이 부른다. 두 시뮬레이터의 자동 운영은 헐지 않는다).
+## 성한 것을 헐고 (고장 수는 남은 수까지만), 지은 값의 부품·금속을 refund만큼 돌려받는다. 헐었으면 true
+func demolish(mid: String, refund: float = 0.3) -> bool:
+	var n := int(counts.get(mid, 0))
+	if n <= 0 or family(mid) == "solar_tower":
+		return false
+	counts[mid] = n - 1
+	if int(broken.get(mid, 0)) > n - 1:
+		broken[mid] = n - 1
+	if mid == "hab_module":
+		covered_habs = mini(covered_habs, n - 1)
+	var cost: Dictionary = M[mid]["cost"]
+	for key in ["parts", "metal_t"]:
+		if cost.has(key):
+			stock[key] = float(stock.get(key, 0.0)) + float(cost[key]) * refund
+	refresh()
+	return true
+
+
 func cancel_queued(index: int) -> void:
 	## 플레이어가 대기열에서 뺀다. 손대지 않은 일이면 자재를 모두, 시작한 일이면 절반을 돌려받는다.
 	if index < 0 or index >= queue.size():

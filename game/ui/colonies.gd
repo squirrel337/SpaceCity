@@ -438,7 +438,7 @@ func to_save() -> Dictionary:
 		cols.append({"name": c["name"], "site": c["site"], "founded": c["founded"],
 			"sim": (c["sim"] as CitySim).to_save(), "plan": (c["plan"] as CityPlan).to_save(),
 			"mode": String(c.get("mode", "")), "idle": c.get("idle", {}), "bought": int(c.get("bought", -100000)),
-			"extra": int(c.get("extra", -100000))})
+			"extra": int(c.get("extra", -100000)), "redev": int(c.get("redev", -1)), "redev_txt": String(c.get("redev_txt", ""))})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
 		"metro_fn": metro_fn.to_save()}
@@ -478,6 +478,8 @@ func load_save(data: Dictionary) -> bool:
 			entry["idle"] = cd["idle"]
 		entry["bought"] = int(cd.get("bought", -100000))
 		entry["extra"] = int(cd.get("extra", -100000))
+		entry["redev"] = int(cd.get("redev", -1))
+		entry["redev_txt"] = String(cd.get("redev_txt", ""))
 		list.append(entry)
 	expeditions = []
 	for e in data.get("expeditions", []):

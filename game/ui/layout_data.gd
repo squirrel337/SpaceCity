@@ -118,6 +118,12 @@ static func land() -> Dictionary:
 	return data["land"]
 
 
+## 재건축 규칙 (자동 운영 식민지)
+static func redevelop() -> Dictionary:
+	load_all()
+	return data.get("redevelop", {})
+
+
 ## 도시 발전 모드 (자동 운영 식민지): '' = 균형, 그다음 열 가지 (자료 순서)
 static func dev_modes() -> Dictionary:
 	load_all()

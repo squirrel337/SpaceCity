@@ -9,7 +9,7 @@
     python3 city_balance.py --policy naive       # 준비 없이 성장만 좇는 정책
     python3 city_balance.py --monte-carlo 200    # 두 정책을 각각 200회 돌려 비교
     python3 city_balance.py --module-table       # 문서용 모듈 표 (Markdown, 기본 29종)
-    python3 city_balance.py --module-catalog     # 전체 모듈 표 (34계열 170종)
+    python3 city_balance.py --module-catalog     # 전체 모듈 표 (34계열 174종)
     python3 city_balance.py --policy variety     # 계열의 여러 종류를 섞어 짓는 시험 정책
     python3 city_balance.py --csv daily.csv      # 일별 기록 (차트용)
     python3 city_balance.py --site mars_hellas   # 다른 부지 (../data/city_sites.json)
@@ -1261,7 +1261,7 @@ CATEGORY_KO = {"habitat": "거주", "life_support": "생명유지", "food": "식
 
 
 def module_table(families=False):
-    """문서용 모듈 표. families=True면 계열마다 기본 모듈 아래에 같은 계열의 다른 종류를 둔다 (170종)."""
+    """문서용 모듈 표. families=True면 계열마다 기본 모듈 아래에 같은 계열의 다른 종류를 둔다 (174종)."""
     names = CATEGORY_KO
     print("| 모듈 | 분류 | 절전 순위 | 필요 기술 | 시작 | 비용 | 건설 (로봇·일) | 전력 (kW) | 인원 | 고장 간격 (일) "
           "| 수리 (부품 · 로봇·일) | 기능 |")
@@ -1342,7 +1342,7 @@ def main():
     parser.add_argument("--site", choices=list(SITES), default=HOME_SITE, help="부지 (../data/city_sites.json)")
     parser.add_argument("--monte-carlo", type=int, metavar="N", help="두 정책을 N회씩 돌려 비교")
     parser.add_argument("--module-table", action="store_true", help="문서용 모듈 표 출력 (기본 모듈 29종)")
-    parser.add_argument("--module-catalog", action="store_true", help="문서용 전체 모듈 표 (34계열 170종)")
+    parser.add_argument("--module-catalog", action="store_true", help="문서용 전체 모듈 표 (34계열 174종)")
     parser.add_argument("--tech-table", action="store_true", help="문서용 기술 표 출력")
     parser.add_argument("--csv", metavar="PATH", help="일별 기록을 CSV로 저장")
     args = parser.parse_args()

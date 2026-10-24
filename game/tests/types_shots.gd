@@ -1,5 +1,5 @@
 extends SceneTree
-## 건물 170종 스크린숏 — 새 종류를 한 기씩 세운 기지를 3D로 찍는다 (디스플레이가 필요하다).
+## 건물 174종 스크린숏 — 새 종류를 한 기씩 세운 기지를 3D로 찍는다 (디스플레이가 필요하다).
 ##   xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 \
 ##     --script res://tests/types_shots.gd -- --out /tmp/shots
 

@@ -177,7 +177,9 @@ func _dev_section(i: int) -> Control:
 		for r in st["rows"]:
 			var q := " (+%d 짓는 중)" % int(r[2]) if int(r[2]) > 0 else ""
 			parts.append("%s %d/%d%s" % [GameData.module_name(r[0]), int(r[1]), int(r[3]), q])
-		goal.text = ("목표: " + " · ".join(parts)) if not parts.is_empty() else "목표 건물 없음 — 살림에 필요한 것만 짓는다")
+		goal.text = ("목표: " + " · ".join(parts)) if not parts.is_empty() else "목표 건물 없음 — 살림에 필요한 것만 짓는다"
+		if String(st["redev"]) != "":
+			goal.text += "\n재건축 중: %s" % String(st["redev"]))
 	return card
 
 
