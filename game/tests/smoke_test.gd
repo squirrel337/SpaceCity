@@ -63,6 +63,7 @@ func _process(_delta: float) -> bool:
 		_runway_check()
 		_raised_check()
 		_speed_check()
+		_sound_check()
 		main._on_module_tapped("hab_module")
 		main._show_help()
 		main._show_report()
@@ -1834,6 +1835,60 @@ func _fleet_check(col: Colonies) -> void:
 	_check(_texts(tp).any(func(x): return x.begins_with("함대 · 배")), "교통 탭에 함대 칸이 없다")
 	print("smoke: fleet %d ships, %d orders, mars Δv %.1f/%.1f, best %s" % [(st["ships"] as Array).size(), (st["orders"] as Array).size(),
 		Fleet.route_dv("moon", "mars"), Fleet.route_dv("mars", "moon"), ", ".join(PackedStringArray(routes.map(func(r): return "%s:%s" % [r, Fleet.best_class(col, r)])))])
+
+
+## 소리: 효과음·환경음을 모두 만든다 (길이·고리·크기), 단추를 누르면 딸깍, 기록 글에 맞는 소리(연구 완료)와 알림 종류의 소리,
+## 결정 카드(대피소 경보), 음량 설정이 버스에, 항로 지도에서는 우주의 울림
+func _sound_check() -> void:
+	var snd: Sound = Sound.inst
+	_check(snd != null, "소리가 없다")
+	if snd == null:
+		return
+	snd.finish_all()
+	for k in Sound.SFX:
+		var st: AudioStreamWAV = snd._streams.get(k)
+		_check(st != null and st.data.size() == int(float(Sound.SFX[k]) * Sound.RATE) * 2, "효과음 %s의 길이가 맞지 않다" % k)
+		if st != null:
+			var peak := 0
+			for i in range(0, st.data.size(), 2):
+				peak = maxi(peak, absi(st.data.decode_s16(i)))
+			_check(peak > 2000 and peak <= 26000, "효과음 %s의 크기가 맞지 않다 (%d)" % [k, peak])
+	for a in Sound.AMBIENT:
+		var st2: AudioStreamWAV = snd._streams.get("amb_" + String(a))
+		_check(st2 != null and st2.loop_mode == AudioStreamWAV.LOOP_FORWARD and st2.loop_end == int(Sound.AMB_SECONDS * Sound.AMB_RATE),
+			"환경음 %s가 고리가 아니다" % a)
+	var b := Button.new()
+	main.add_child(b)
+	snd._last_ms.clear()
+	var n0 := int(snd.played.get("click", 0))
+	b.pressed.emit()
+	_check(int(snd.played.get("click", 0)) == n0 + 1, "단추를 눌러도 딸깍 소리가 나지 않았다")
+	b.queue_free()
+	snd._last_ms.clear()
+	var r0 := int(snd.played.get("research", 0))
+	var g0 := int(snd.played.get("good", 0))
+	main._on_note(0, "연구 완료 — 시험", "good")
+	_check(int(snd.played.get("research", 0)) == r0 + 1 and int(snd.played.get("good", 0)) == g0, "연구 완료에 연구 소리만 나지 않았다")
+	snd._last_ms.clear()
+	var w0 := int(snd.played.get("warn", 0))
+	main._on_note(0, "시험 경고", "warn")
+	_check(int(snd.played.get("warn", 0)) == w0 + 1, "경고 알림에 경고 소리가 나지 않았다")
+	snd._last_ms.clear()
+	var a0 := int(snd.played.get("alarm", 0))
+	main.modal.open("storm", "시험", "시험", "", [["ok", "확인", ""]])
+	main.modal.visible = false
+	_check(int(snd.played.get("alarm", 0)) == a0 + 1, "대피소 결정 카드에 경보가 울리지 않았다")
+	var old_sfx: Variant = Settings.value("audio/sfx", 0.8)
+	Settings.set_value("audio/sfx", 0.5)
+	Sound.apply_volumes()
+	_check(absf(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("SFX")) - linear_to_db(0.5)) < 0.01, "효과음 음량이 버스에 맞지 않다")
+	Settings.set_value("audio/sfx", old_sfx)
+	Sound.apply_volumes()
+	main._set_view("map")
+	main._update_ambient()
+	_check(snd._want_amb == "space" and snd._amb_name == "space", "항로 지도에서 우주의 울림이 아니다 (%s)" % snd._amb_name)
+	main._set_view("world")
+	print("smoke: sound %d streams, played %s" % [snd.ready_count(), str(snd.played)])
 
 
 ## 그 노드 아래 글(라벨·단추)

@@ -41,6 +41,8 @@ var _dirty := true
 var city_view: CityView
 var world: WorldView
 var dv_map: DvMapView                # 항로 지도 (왼쪽 큰 화면의 '항로')
+var sound: Sound                     # 효과음·환경음 (코드로 합성)
+var _amb_wait := 0.0
 var plan: CityPlan
 var tool := PlaceTool.new()
 var place_bar: PanelContainer
@@ -102,6 +104,8 @@ func _fit_window() -> void:
 # ── 화면 구성 ───────────────────────────────────────────────────
 func _build() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	sound = Sound.new()                  # 먼저 — 뒤에 만드는 단추마다 딸깍 소리가 붙는다
+	add_child(sound)
 	var bg := ColorRect.new()
 	bg.color = Palette.BG
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -182,12 +186,14 @@ func _build() -> void:
 	tool.changed.connect(_update_place_bar)
 	tool.placed.connect(_on_placed)
 	tool.bought.connect(func(ok: bool, text: String):
-		_toast(text, "good" if ok else "warn")
+		Sound.fx("build" if ok else "deny")
+		_toast(text, "good" if ok else "warn", true)
 		if ok:
 			_refresh_tab()
 		_dirty = true)
 	tool.acted.connect(func(ok: bool, text: String):
-		_toast(text, "good" if ok else "warn")
+		Sound.fx(("demolish" if tool.mode == "demolish" else "build") if ok else "deny")
+		_toast(text, "good" if ok else "warn", true)
 		if ok:
 			_refresh_tab()
 		_dirty = true)
@@ -552,10 +558,12 @@ func _on_placed(kind: String, ok: bool, text: String) -> void:
 		msg = "%s — 고른 자리에 공사를 시작한다" % GameData.module_name(kind)
 		if sim.stock["parts"] < 40:
 			msg += ". 부품 비축이 40 아래다 — 고장 수리가 막힐 수 있다"
-		_toast(msg, "good")
+		Sound.fx("build")
+		_toast(msg, "good", true)
 	else:
 		msg = "%s — 지을 수 없다 (%s)" % [GameData.module_name(kind), text]
-		_toast(msg, "warn")
+		Sound.fx("deny")
+		_toast(msg, "warn", true)
 	tabs["build"].message.text = msg
 	_refresh_tab()
 	_dirty = true
@@ -1063,6 +1071,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 
+## 환경음: 기지 가까이면 그 천체의 소리, 항로 지도나 멀리 우주로 물러나면 우주의 낮은 울림
+func _update_ambient() -> void:
+	if sim == null or active < 0 or active >= colonies.list.size():
+		return
+	var body := String(colonies.list[active]["body"])
+	var far := view_mode == "map" or (view_mode == "world" and world.cam != null
+		and (world.cam.focus != body or world.cam.dist > 400.0))
+	Sound.ambient("space" if far else body)
+	var cap := sim.bat_cap + sim.rfc_cap
+	Sound.level(-9.0 if not far and cap > 0.0 and (sim.battery + sim.rfc) / cap < 0.2 else 0.0)
+
+
 func _start_jump() -> void:
 	if sim == null or modal.visible:
 		return
@@ -1072,6 +1092,10 @@ func _start_jump() -> void:
 
 
 func _process(delta: float) -> void:
+	_amb_wait -= delta
+	if _amb_wait <= 0.0:
+		_amb_wait = 0.5
+		_update_ambient()
 	if anchor_bar:
 		anchor_bar.visible = view_mode == "world" and not tool.active()
 		if anchor_bar.visible:
@@ -1486,7 +1510,9 @@ func _on_player_change() -> void:
 	_refresh_live()
 
 
-func _toast(text: String, kind: String) -> void:
+func _toast(text: String, kind: String, quiet := false) -> void:
+	if not quiet:
+		Sound.note(kind)
 	var color: Color = LogPanel.KIND_COLOR.get(kind, Palette.TEXT)
 	var p := PanelContainer.new()
 	p.add_theme_stylebox_override("panel", Palette.box(Color(Palette.PANEL_2, 0.94), color.darkened(0.2), 8, 8))
@@ -1509,6 +1535,19 @@ func _toast(text: String, kind: String) -> void:
 	tween.tween_callback(p.queue_free)
 
 
+## 기록 글에 맞는 효과음 (없으면 알림 종류의 소리)
+static func _note_fx(text: String) -> String:
+	if text.begins_with("행성간 수송선 출발") or text.begins_with("함대 — 새 배"):
+		return "launch"
+	if text.begins_with("행성간 수송선 도착") or text.begins_with("정기 교역 도착"):
+		return "arrive"
+	if text.begins_with("연구 완료") or text.begins_with("연구 동맹"):
+		return "research"
+	if text.begins_with("이정표") or text.begins_with("새 시대"):
+		return "milestone"
+	return ""
+
+
 ## 식민지의 기록: 고른 식민지는 평소처럼, 다른 식민지는 위급한 일만 이름을 붙여 알린다
 func _on_colony_note(hour: int, text: String, kind: String, sim_id: int) -> void:
 	if sim != null and sim.get_instance_id() == sim_id:
@@ -1523,8 +1562,11 @@ func _on_colony_note(hour: int, text: String, kind: String, sim_id: int) -> void
 
 
 func _on_note(_hour: int, text: String, kind: String) -> void:
+	var fx := _note_fx(text)
+	if fx != "":
+		Sound.fx(fx)
 	if kind in ["good", "warn", "critical", "death"]:
-		_toast(text, kind)
+		_toast(text, kind, fx != "")
 	if _jumping and kind in ["good", "warn", "critical", "death"]:
 		_jumping = false
 		_auto_wait = AUTO_JUMP_PAUSE          # 계속 넘기는 중이면 알림을 잠깐 보여 주고 다음으로

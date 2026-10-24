@@ -1,6 +1,7 @@
 class_name SettingsPanel
 extends Control
-## 설정 카드 — 그래픽 품질(자동·단계와 감지한 GPU), 지도에 보일 것, 성능 표시. 바꾸면 바로 적용하고 저장한다.
+## 설정 카드 — 그래픽 품질(자동·단계와 감지한 GPU), 지도에 보일 것, 성능 표시, 소리(전체·효과음·환경음 음량, 끄기).
+## 바꾸면 바로 적용하고 저장한다.
 
 signal changed
 
@@ -8,6 +9,7 @@ var _level_buttons := {}
 var _gpu_label: Label
 var _now_label: Label
 var _checks := {}
+var _sliders := {}
 
 
 func _init() -> void:
@@ -69,6 +71,36 @@ func _init() -> void:
 			changed.emit())
 		v.add_child(c)
 		_checks[spec[0]] = [c, spec[2]]
+	v.add_child(_section("소리"))
+	for spec in [["audio/master", "전체", 0.8], ["audio/sfx", "효과음", 0.8], ["audio/ambient", "환경음", 0.5]]:
+		var row2 := HBoxContainer.new()
+		row2.add_theme_constant_override("separation", 10)
+		var lab := Label.new()
+		lab.text = spec[1]
+		lab.custom_minimum_size.x = 80
+		row2.add_child(lab)
+		var sl := HSlider.new()
+		sl.min_value = 0.0
+		sl.max_value = 1.0
+		sl.step = 0.05
+		sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sl.custom_minimum_size.y = 36
+		var key: String = spec[0]
+		sl.value_changed.connect(func(x: float):
+			Settings.set_value(key, x)
+			Sound.apply_volumes())
+		sl.drag_ended.connect(func(_changed: bool): Sound.fx("click"))
+		row2.add_child(sl)
+		v.add_child(row2)
+		_sliders[key] = [sl, spec[2]]
+	var mute := CheckButton.new()
+	mute.text = "소리 끄기"
+	mute.custom_minimum_size.y = 40
+	mute.toggled.connect(func(on: bool):
+		Settings.set_value("audio/mute", on)
+		Sound.apply_volumes())
+	v.add_child(mute)
+	_checks["audio/mute"] = [mute, false]
 	var close_b := Button.new()
 	close_b.text = "닫기"
 	close_b.custom_minimum_size.y = 46
@@ -116,3 +148,6 @@ func _refresh() -> void:
 	for key in _checks:
 		var c: CheckButton = _checks[key][0]
 		c.set_pressed_no_signal(bool(Settings.value(key, _checks[key][1])))
+	for key2 in _sliders:
+		var sl: HSlider = _sliders[key2][0]
+		sl.set_value_no_signal(float(Settings.value(key2, _sliders[key2][1])))
