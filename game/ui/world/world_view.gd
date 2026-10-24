@@ -1339,11 +1339,9 @@ func _tool_on() -> bool:
 	return tool != null and tool.active() and city != null and city.visible_now()
 
 
-## 오른쪽 클릭: 길을 잇던 중이면 그 줄을 끝내고, 아니면 도구를 끈다
+## 오른쪽 클릭: 길을 잇던 중이면 그 줄을 끝내고, 집어 든·고른 건물이 있으면 내려놓고, 아니면 도구를 끈다
 func _tool_back() -> void:
-	if tool.mode == "road" and tool.road_from != null:
-		tool.end_chain()
-	else:
+	if not tool.back():
 		tool.stop()
 
 

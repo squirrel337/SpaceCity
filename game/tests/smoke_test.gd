@@ -56,6 +56,7 @@ func _process(_delta: float) -> bool:
 		_trade_check()
 		_delegate_check()
 		_scenario_check()
+		_demolish_move_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -1173,6 +1174,83 @@ func _scenario_check() -> void:
 	Scenario.records_path = "user://records.json"
 	print("smoke: scenario — %s (점수 %d), exporter lost by deadline, disaster_year lost on trust" % [Scenario.summary(col),
 		int(col.scenario["score"])])
+
+
+## 철거·옮기기: 고르고 한 번 더 누르면 헌다 (수가 줄고 부품·금속의 절반, 배치에서 그 건물만 빠진다), 마지막 생명유지·집이
+## 모자라게 되는 철거는 막는다, 짓는 중이면 공사 취소 (자재를 다 돌려받는다). 옮기면 새 자리·새 번호, 로봇이 다시 세울 때까지 고장 하나
+func _demolish_move_check() -> void:
+	var ms := CitySim.new(7, 40.0, "")
+	ms.stock["parts"] = 2000.0
+	var mp := CityPlan.create(ms, BaseLayout.new("ridge"))
+	var t := PlaceTool.new()
+	t.bind(ms, mp)
+	var count_built := func(kind: String) -> int:
+		return mp.buildings.filter(func(e): return String(e["id"]) == kind and int(e["seq"]) < 0).size()
+	# 헐어도 되는 건물 하나 (생명유지 마지막 하나·집이 아닌 것)
+	var target := {}
+	for e in mp.buildings:
+		var mid := String(e["id"])
+		if int(e["seq"]) < 0 and not CityPlan.fam(mid) in PlaceTool.KEEP_ONE and CityPlan.fam(mid) != "solar_tower" \
+				and float(ms.prov(mid, "housing")) <= 0.0 and GameData.MODULES[mid]["cost"].has("parts"):
+			target = e
+			break
+	_check(not target.is_empty(), "헐어 볼 건물이 없다")
+	if target.is_empty():
+		return
+	var kind := String(target["id"])
+	var pos := Vector2(float(target["x"]), float(target["y"]))
+	var n0 := int(ms.counts[kind])
+	var parts0 := float(ms.stock["parts"])
+	t.start_demolish()
+	t.click(pos)
+	_check(t.armed == int(target["uid"]) and int(ms.counts[kind]) == n0, "처음 누르면 고르기만 해야 한다")
+	t.click(pos)
+	_check(int(ms.counts[kind]) == n0 - 1 and float(ms.stock["parts"]) > parts0 and not mp.buildings.has(target),
+		"두 번째 누르기에 헐리지 않았다")
+	mp.sync(ms)
+	_check(count_built.call(kind) == int(ms.counts.get(kind, 0)), "헌 뒤 배치와 시뮬레이션의 수가 다르다")
+	# 막는 철거: 집이 모자라게 되는 거주 모듈
+	for e in mp.buildings:
+		if String(e["id"]) == "hab_module" and int(e["seq"]) < 0 and ms.housing_cap - float(ms.prov("hab_module", "housing")) < ms.population():
+			_check(t.demolish_reason(e).contains("살 곳"), "집이 모자라게 되는 철거를 막지 않았다")
+			break
+	# 공사 취소
+	var sp := mp.suggest("research_lab", "")
+	t.start_build("research_lab")
+	t.hover(sp["at"])
+	_check(t.commit(false), "시험용 공사를 시작하지 못했다: " + t.reason)
+	var q0 := ms.queue.size()
+	var parts1 := float(ms.stock["parts"])
+	var site: Dictionary = mp.buildings[-1]
+	t.start_demolish()
+	t._select(site)
+	_check(t.demolish_pick() and ms.queue.size() == q0 - 1 and float(ms.stock["parts"]) > parts1 and not mp.buildings.has(site),
+		"짓는 중인 건물의 공사를 취소하지 못했다")
+	# 옮기기
+	var mv := {}
+	for e in mp.buildings:
+		if int(e["seq"]) < 0 and String(e["id"]) != kind and CityPlan.fam(String(e["id"])) != "solar_tower":
+			mv = e
+			break
+	var mkind := String(mv["id"])
+	var broken0 := int(ms.broken.get(mkind, 0))
+	var mcount := int(ms.counts[mkind])
+	var to: Dictionary = mp.suggest(mkind, "")
+	t.start_move()
+	t.click(Vector2(float(mv["x"]), float(mv["y"])))
+	_check(not t.carry.is_empty() and t.kind == mkind, "옮길 건물을 집어 들지 못했다")
+	t.hover(to["at"])
+	var want: Vector2 = t.at                   # 격자에 맞춘 자리
+	t.click(to["at"])
+	var moved: Dictionary = mp.buildings[-1]
+	_check(String(moved["id"]) == mkind and Vector2(float(moved["x"]), float(moved["y"])).distance_to(want) < 0.01
+		and int(ms.counts[mkind]) == mcount and int(ms.broken.get(mkind, 0)) == mini(broken0 + 1, mcount) and t.carry.is_empty(),
+		"옮긴 건물이 새 자리에 없거나 멈추지 않았다: %s" % t.reason)
+	mp.sync(ms)
+	_check(count_built.call(mkind) == int(ms.counts[mkind]), "옮긴 뒤 배치와 시뮬레이션의 수가 다르다")
+	print("smoke: demolish %s (+%d parts), cancelled a lab, moved %s %.0f m" % [GameData.module_name(kind),
+		int(float(ms.stock["parts"]) - parts0), GameData.module_name(mkind),
+		Vector2(float(mv["x"]), float(mv["y"])).distance_to(to["at"])])
 
 
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.

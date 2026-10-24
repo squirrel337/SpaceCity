@@ -1343,6 +1343,39 @@ func where_text(p: Vector2) -> String:
 	return "%s쪽 %d m" % [dir, int(round(rel.length() / 10.0)) * 10]
 
 
+## 플레이어가 헌 건물: 배치에서 뺀다 (시뮬레이션의 수는 부른 쪽이 줄인다 — 맞추기가 다른 건물을 빼지 않게)
+func remove_entry(uid: int) -> bool:
+	for i in buildings.size():
+		if int(buildings[i]["uid"]) == uid:
+			buildings.remove_at(i)
+			_bidx_n = -1
+			_bgen += 1
+			_touch()
+			return true
+	return false
+
+
+## 플레이어가 옮긴 건물: 새 자리·방향으로, 새 번호를 받아 맨 뒤에 (3D의 앉는 자리를 새로 잰다 — 고장 표지가 그 건물에 붙는다).
+## 새 번호
+func relocate(uid: int, at: Vector2, rot: int, tile: String) -> int:
+	for i in buildings.size():
+		if int(buildings[i]["uid"]) == uid:
+			var e: Dictionary = buildings[i]
+			buildings.remove_at(i)
+			e["x"] = at.x
+			e["y"] = at.y
+			e["rot"] = rot
+			e["tile"] = tile
+			e["uid"] = _next_uid
+			_next_uid += 1
+			buildings.append(e)
+			_bidx_n = -1
+			_bgen += 1
+			_touch()
+			return int(e["uid"])
+	return -1
+
+
 ## 스스로 한 일을 운영 기록으로 (on_auto가 있으면)
 func _rec(domain: String, text: String) -> void:
 	if on_auto.is_valid():

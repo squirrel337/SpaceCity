@@ -1,23 +1,27 @@
 class_name PlaceTool
 extends RefCounted
-## 자리 고르기 도구 — 건물을 놓을 자리, 길 내기(종류·곡선·각도 맞춤), 길 지우기, 블록의 구획 정하기, 땅 고치기.
+## 자리 고르기 도구 — 건물을 놓을 자리, 길 내기(종류·곡선·각도 맞춤), 길 지우기, 블록의 구획 정하기, 땅 고치기,
+## 건물 철거(지어진 건물은 부품·금속의 절반을 돌려받는다, 짓는 중이면 공사 취소)·옮기기(옮긴 건물은 로봇이 다시 세울 때까지 멈춘다).
 ## 화면의 점을 땅 위의 점(모형 좌표, m)으로 바꾸는 일은 3D 보기가 하고, 도구는 그 점으로 판단한다.
 ## 마우스는 누르는 곳에 바로 짓고, 터치는 누른 곳으로 유령 건물을 옮긴 뒤 '여기에 짓기'로 짓는다.
 
 signal changed
 signal placed(kind: String, ok: bool, text: String)
 signal bought(ok: bool, text: String)          # 땅 구역을 샀다 (또는 살 수 없었다)
+signal acted(ok: bool, text: String)           # 건물을 헐었다·옮겼다 (또는 할 수 없었다)
 
 const TERRAIN_OPS := ["dig", "raise", "flatten", "restore"]
 const OP_NAMES := {"dig": "파기", "raise": "쌓기", "flatten": "평탄화", "restore": "되돌리기"}
 const SNAP_DEG := 15.0             # 길 방향 맞춤 (기본 격자의 축 45°도 그 배수다)
 const CURVE_PIECE_M := 10.0        # 굽은 길을 나누는 길이
 const MAX_SWEEP_DEG := 200.0       # 한 번에 굽을 수 있는 각
+const DEMOLISH_REFUND := 0.5       # 헌 건물에서 돌려받는 부품·금속의 몫 (재건축은 0.3 — 플레이어는 조심해서 뜯는다)
+const KEEP_ONE := ["co2_scrubber", "electrolyzer", "water_recycler", "landing_pad"]   # 마지막 하나는 헐 수 없는 계열
 
 var sim: CitySim
 var plan: CityPlan
 var ground: SiteGround             # 땅 높이·해수면 (평탄화·침수 안내)
-var mode := ""                     # "" | "build" | "road" | "erase" | "zone" | "terrain" | "land"
+var mode := ""                     # "" | "build" | "road" | "erase" | "zone" | "terrain" | "land" | "demolish" | "move"
 var kind := ""
 var rot := 0
 var variant := 0
@@ -41,6 +45,9 @@ var terrain_op := "dig"
 var brush := 12.0
 var hover_parcel := Vector2i.ZERO      # 확장: 가리키는 땅 구역
 var parcel_info := {}
+var pick := {}                     # 철거·옮기기: 가리키는(고른) 건물 — 배치 계획의 항목
+var armed := -1                    # 철거: 고른 건물의 번호 (한 번 더 누르거나 '헐기'로 헌다)
+var carry := {}                    # 옮기기: 집어 든 건물 (놓을 자리를 고르는 중)
 
 
 func bind(p_sim: CitySim, p_plan: CityPlan) -> void:
@@ -66,6 +73,9 @@ func _reset(p_mode: String) -> void:
 	hover_edge = -1
 	hover_block = {}
 	parcel_info = {}
+	pick = {}
+	armed = -1
+	carry = {}
 	reason = ""
 	note = ""
 
@@ -113,6 +123,18 @@ func start_terrain(op: String = "") -> void:
 
 func start_land() -> void:
 	_reset("land")
+	kind = ""
+	changed.emit()
+
+
+func start_demolish() -> void:
+	_reset("demolish")
+	kind = ""
+	changed.emit()
+
+
+func start_move() -> void:
+	_reset("move")
 	kind = ""
 	changed.emit()
 
@@ -185,6 +207,22 @@ func hover(p: Vector2) -> void:
 			has_at = true
 			hover_parcel = plan.parcel_of(p)
 			_recheck_land()
+		"demolish":
+			at = p
+			has_at = true
+			if armed < 0:
+				pick = plan.entry_at(p)
+			reason = demolish_reason(pick)
+		"move":
+			if carry.is_empty():
+				at = p
+				has_at = true
+				pick = plan.entry_at(p)
+				reason = move_reason(pick)
+			else:
+				at = CityPlan.snap_center(kind, p, rot)
+				has_at = true
+				_recheck_move()
 		_:
 			return
 	changed.emit()
@@ -206,6 +244,17 @@ func click(p: Vector2, keep: bool = false) -> void:
 			edit_ground()
 		"land":
 			buy_land()
+		"demolish":
+			var e := plan.entry_at(p)
+			if not e.is_empty() and int(e["uid"]) == armed:
+				demolish_pick()                    # 고른 건물을 한 번 더 눌렀다
+			else:
+				_select(e)
+		"move":
+			if carry.is_empty():
+				lift(plan.entry_at(p))
+			else:
+				commit_move()
 
 
 ## 터치 누르기: 건물은 유령만 옮기고, 길은 점을 찍고, 구획·땅은 바로 고친다
@@ -222,6 +271,11 @@ func tap(p: Vector2) -> void:
 			edit_ground()
 		"land":
 			buy_land()
+		"demolish":
+			_select(plan.entry_at(p))               # 고르기만 — '헐기' 단추로 헌다
+		"move":
+			if carry.is_empty():
+				lift(plan.entry_at(p))             # 집어 든다 — 누른 곳으로 유령이 따라오고 '여기로'로 놓는다
 
 
 func commit(keep: bool = false) -> bool:
@@ -263,12 +317,15 @@ func auto_place() -> bool:
 
 
 func rotate() -> void:
-	if mode != "build":
+	if not (mode == "build" or (mode == "move" and not carry.is_empty())):
 		return
 	rot = (rot + 1) % 4
 	if has_at:
 		at = CityPlan.snap_center(kind, at, rot)
-		_recheck()
+		if mode == "move":
+			_recheck_move()
+		else:
+			_recheck()
 	changed.emit()
 
 
@@ -277,6 +334,20 @@ func next_variant() -> void:
 		return
 	variant = (variant + 1) % maxi(1, ArtLib.variants(kind))
 	changed.emit()
+
+
+## 한 걸음 물리기 (오른쪽 클릭·Esc): 잇던 길을 끝내거나, 집어 든·고른 건물을 내려놓는다. 물렸으면 true (아니면 부른 쪽이 도구를 끈다)
+func back() -> bool:
+	if mode == "road" and road_from != null:
+		end_chain()
+		return true
+	if mode == "move" and not carry.is_empty():
+		start_move()
+		return true
+	if mode == "demolish" and armed >= 0:
+		start_demolish()
+		return true
+	return false
 
 
 ## 길: 이어 가던 줄을 끝낸다 (도구는 그대로)
@@ -292,6 +363,167 @@ func erase_hovered() -> void:
 		plan.remove_edge(hover_edge)
 		hover_edge = -1
 		changed.emit()
+
+
+# ── 철거·옮기기 ─────────────────────────────────────────────────
+func _select(e: Dictionary) -> void:
+	pick = e
+	armed = int(e["uid"]) if not e.is_empty() else -1
+	reason = demolish_reason(pick)
+	changed.emit()
+
+
+func _fam_count(fam_id: String) -> int:
+	var n := 0
+	for mid in sim.counts:
+		if CityPlan.fam(String(mid)) == fam_id:
+			n += int(sim.counts[mid])
+	return n
+
+
+## 헐 수 없으면 까닭 (짓는 중인 건물은 공사 취소라 늘 된다)
+func demolish_reason(e: Dictionary) -> String:
+	if e.is_empty():
+		return "헐 건물을 누른다"
+	var mid := String(e["id"])
+	if int(e["seq"]) >= 0:
+		return ""
+	var f := CityPlan.fam(mid)
+	if f in KEEP_ONE and _fam_count(f) <= 1:
+		return "마지막 %s은(는) 헐 수 없다 — 살림이 멈춘다" % GameData.module_name(mid)
+	var h := float(sim.prov(mid, "housing"))
+	if h > 0.0 and sim.housing_cap - h < sim.population():
+		return "헐면 정착민이 살 곳이 모자란다 (집 %d · 정착민 %d)" % [int(sim.housing_cap - h), int(sim.population())]
+	return ""
+
+
+## 헐면 돌려받는 것 (지어진 건물 — 부품·금속의 DEMOLISH_REFUND)
+static func refund_of(mid: String) -> Dictionary:
+	var cost: Dictionary = GameData.MODULES[mid]["cost"]
+	var back := {}
+	for key in ["parts", "metal_t"]:
+		if cost.has(key):
+			back[key] = snappedf(float(cost[key]) * DEMOLISH_REFUND, 0.1)
+	return back
+
+
+## 고른 건물을 헌다: 짓는 중이면 공사를 취소하고 (손대지 않은 일은 자재를 모두, 시작한 일은 절반), 지어진 건물이면 시뮬레이션에서
+## 하나를 빼고 부품·금속의 절반을 돌려받는다. 헐었으면 true
+func demolish_pick() -> bool:
+	if mode != "demolish" or pick.is_empty():
+		return false
+	var why := demolish_reason(pick)
+	if why != "":
+		acted.emit(false, why)
+		return false
+	var e := pick
+	var mid := String(e["id"])
+	var text := ""
+	if int(e["seq"]) >= 0:
+		for i in sim.queue.size():
+			if int(sim.queue[i]["seq"]) == int(e["seq"]):
+				sim.cancel_queued(i)
+				break
+		plan.remove_entry(int(e["uid"]))
+		text = "공사 취소 — %s (자재를 돌려받았다)" % GameData.module_name(mid)
+	else:
+		var back := refund_of(mid)
+		if CityPlan.fam(mid) == "solar_tower":
+			# 시뮬레이션의 철거는 타워를 빼지 않는다 (일조 칸) — 수와 칸을 함께 줄인다
+			var n := int(sim.counts.get(mid, 0))
+			if n <= 0:
+				acted.emit(false, "헐 수 없다")
+				return false
+			sim.counts[mid] = n - 1
+			sim.broken[mid] = mini(int(sim.broken.get(mid, 0)), n - 1)
+			var t := String(e.get("tile", ""))
+			if t != "" and int(sim.tiles.get(t, 0)) > 0:
+				sim.tiles[t] = int(sim.tiles[t]) - 1
+			for key in back:
+				sim.stock[key] = float(sim.stock.get(key, 0.0)) + float(back[key])
+			sim.refresh()
+		elif not sim.demolish(mid, DEMOLISH_REFUND):
+			acted.emit(false, "헐 수 없다")
+			return false
+		plan.remove_entry(int(e["uid"]))
+		text = "철거 — %s (%s 돌려받음)" % [GameData.module_name(mid), CityPlan.cost_text(back)]
+	sim.note(text, "build")
+	pick = {}
+	armed = -1
+	reason = demolish_reason(pick)
+	acted.emit(true, text)
+	changed.emit()
+	return true
+
+
+## 옮길 수 없으면 까닭
+func move_reason(e: Dictionary) -> String:
+	if e.is_empty():
+		return "옮길 건물을 누른다"
+	return ""
+
+
+## 건물을 집어 든다: 같은 종류·방향·모양의 유령이 새 자리를 따라온다
+func lift(e: Dictionary) -> bool:
+	if mode != "move" or move_reason(e) != "":
+		return false
+	carry = e
+	pick = e
+	kind = String(e["id"])
+	rot = int(e["rot"])
+	variant = int(e["variant"])
+	at = Vector2(float(e["x"]), float(e["y"]))
+	has_at = true
+	_recheck_move()
+	changed.emit()
+	return true
+
+
+func _recheck_move() -> void:
+	note = ""
+	reason = plan.check_spot(kind, at, rot, int(carry["uid"]))
+	tile = plan.zone_of(at) if CityPlan.fam(kind) == "solar_tower" else ""
+	if reason == "" and tile != "" and tile != String(carry.get("tile", "")) \
+			and int(sim.tiles.get(tile, 0)) >= int(sim.C["illumination"]["tiles"][tile]):
+		reason = "%s 구역이 다 찼다" % plan.layout.tile_name(tile)
+
+
+## 집어 든 건물을 고른 자리에 놓는다. 지어진 건물은 로봇이 다시 세울 때까지 멈춘다 (고장 하나 — 로봇이 부품을 들여 고친다).
+## 일조 구역이 바뀐 타워는 시뮬레이션의 칸도 옮긴다. 옮겼으면 true (도구는 그대로 — 다음 건물을 고른다)
+func commit_move() -> bool:
+	if mode != "move" or carry.is_empty() or not has_at:
+		return false
+	_recheck_move()
+	if reason != "":
+		acted.emit(false, reason)
+		return false
+	var e := carry
+	var mid := String(e["id"])
+	var built := int(e["seq"]) < 0
+	var old_tile := String(e.get("tile", ""))
+	if CityPlan.fam(mid) == "solar_tower" and old_tile != tile:
+		if old_tile != "" and int(sim.tiles.get(old_tile, 0)) > 0:
+			sim.tiles[old_tile] = int(sim.tiles[old_tile]) - 1
+		if tile != "":
+			sim.tiles[tile] = int(sim.tiles.get(tile, 0)) + 1
+		if not built:
+			for q in sim.queue:
+				if int(q["seq"]) == int(e["seq"]):
+					q["tile"] = tile
+	plan.relocate(int(e["uid"]), at, rot, tile)
+	if built:
+		if int(sim.broken.get(mid, 0)) < int(sim.counts.get(mid, 0)):
+			sim.broken[mid] = int(sim.broken.get(mid, 0)) + 1
+		sim.refresh()
+	var text := "옮기기 — %s을(를) 옮겼다%s" % [GameData.module_name(mid), " (로봇이 다시 세울 때까지 멈춘다)" if built else ""]
+	sim.note(text, "build")
+	carry = {}
+	pick = {}
+	kind = ""
+	reason = move_reason(pick)
+	acted.emit(true, text)
+	changed.emit()
+	return true
 
 
 # ── 길 ──────────────────────────────────────────────────────────
@@ -631,6 +863,20 @@ func status() -> String:
 				return "%s\n이 구역: %s · 길 %d m · 비탈 %d%%" % [head, CityPlan.cost_text(parcel_info["cost"]),
 					int(float(parcel_info["road_m"])), int(float(parcel_info["slope"]) * 100.0)]
 			return head
+		"demolish":
+			if pick.is_empty():
+				return "철거 — 헐 건물을 누른다 · 지어진 건물은 부품·금속의 절반을 돌려받고, 짓는 중이면 공사를 취소한다"
+			var mid := String(pick["id"])
+			if int(pick["seq"]) >= 0:
+				return "철거 — %s: 짓는 중 — 공사를 취소한다%s" % [GameData.module_name(mid), " (한 번 더 누르거나 '헐기')" if armed >= 0 else ""]
+			return "철거 — %s: %s 돌려받는다%s" % [GameData.module_name(mid), CityPlan.cost_text(refund_of(mid)),
+				" (한 번 더 누르거나 '헐기')" if armed >= 0 else ""]
+		"move":
+			if carry.is_empty():
+				if pick.is_empty():
+					return "옮기기 — 옮길 건물을 누른다 · 옮긴 건물은 로봇이 다시 세울 때까지 멈춘다"
+				return "옮기기 — %s: 눌러서 집어 든다" % GameData.module_name(String(pick["id"]))
+			return "옮기기 — %s: 새 자리를 고른다 (돌리기 R)" % GameData.module_name(kind)
 		"terrain":
 			var vol := plan.terrain_volume() if plan else Vector2.ZERO
 			var here := plan.terrain_delta(at) if plan and has_at else 0.0

@@ -174,6 +174,11 @@ func _build() -> void:
 		if ok:
 			_refresh_tab()
 		_dirty = true)
+	tool.acted.connect(func(ok: bool, text: String):
+		_toast(text, "good" if ok else "warn")
+		if ok:
+			_refresh_tab()
+		_dirty = true)
 	forecast = ForecastBar.new()
 	forecast.custom_minimum_size.y = 46
 	left.add_child(forecast)
@@ -214,7 +219,9 @@ func _build_view_switch() -> Control:
 	for spec in [["road", "도로", "길 내기 — 종류(흙길·도로·대로·고속도로·통로·철도)를 고르고 점을 차례로 눌러 잇는다. 곡선도 된다 (G)"],
 			["zone", "구획", "구획 — 길로 둘러싸인 블록을 눌러 용도(거주·산업·농업 …)를 정한다 (Z)"],
 			["terrain", "땅", "땅 고치기 — 파기·쌓기·평탄화·되돌리기 (T). 바다가 있는 천체에서 해수면 아래로 파면 물이 찬다"],
-			["land", "확장", "기지 넓히기 — 기지에 붙은 땅 구역(대로로 둘러싸인 블록 2×2)을 부품·지구 지원으로 산다 (X). 산 구역에는 길이 깔리고 빈 블록이 생긴다"]]:
+			["land", "확장", "기지 넓히기 — 기지에 붙은 땅 구역(대로로 둘러싸인 블록 2×2)을 부품·지구 지원으로 산다 (X). 산 구역에는 길이 깔리고 빈 블록이 생긴다"],
+			["demolish", "철거", "건물 헐기 — 건물을 눌러 고르고 한 번 더 누르거나 '헐기' (Del). 지어진 건물은 부품·금속의 절반을 돌려받고, 짓는 중이면 공사를 취소한다"],
+			["move", "옮기기", "건물 옮기기 — 건물을 눌러 집어 들고 새 자리를 누른다 (N). 옮긴 건물은 로봇이 다시 세울 때까지 멈춘다"]]:
 		var pb := Button.new()
 		pb.text = spec[1]
 		pb.toggle_mode = true
@@ -289,6 +296,7 @@ func _build_place_bar() -> Control:
 	for spec in [["here", "여기에 짓기", "고른 자리에 짓는다 (Enter). 마우스는 누르는 곳에 바로 짓는다 — Shift를 누르고 있으면 계속 놓는다"],
 			["rotate", "돌리기", "90° 돌린다 (R)"], ["variant", "모양", "같은 기능의 다른 설계 (V)"],
 			["auto", "빈자리에", "기본 배치의 빈자리에 바로 짓는다"], ["end", "끝", "이어 가던 길을 끝낸다 (오른쪽 클릭)"],
+			["demolish", "헐기", "고른 건물을 헌다 (Del)"], ["drop", "여기로 옮기기", "집어 든 건물을 고른 자리에 놓는다 (Enter)"],
 			["erase", "지우기", "길을 눌러 지운다"], ["close", "닫기", "그만둔다 (Esc)"]]:
 		var b := Button.new()
 		b.text = spec[1]
@@ -317,6 +325,10 @@ func _on_place_button(which: String) -> void:
 			tool.auto_place()
 		"end":
 			tool.end_chain()
+		"demolish":
+			tool.demolish_pick()
+		"drop":
+			tool.commit_move()
 		"erase":
 			if tool.mode == "erase":
 				tool.start_road()
@@ -335,6 +347,7 @@ func _update_place_bar() -> void:
 	if not tool.active():
 		return
 	var building := tool.mode == "build"
+	var carrying := tool.mode == "move" and not tool.carry.is_empty()
 	place_text.text = tool.status()
 	place_reason.text = tool.reason if tool.has_at else ""
 	place_reason.visible = place_reason.text != ""
@@ -343,8 +356,12 @@ func _update_place_bar() -> void:
 	_update_place_opts()
 	place_buttons["here"].visible = building
 	place_buttons["here"].disabled = not tool.has_at or tool.reason != ""
-	place_buttons["rotate"].visible = building
+	place_buttons["rotate"].visible = building or carrying
 	place_buttons["variant"].visible = building
+	place_buttons["demolish"].visible = tool.mode == "demolish"
+	place_buttons["demolish"].disabled = tool.pick.is_empty() or tool.reason != ""
+	place_buttons["drop"].visible = carrying
+	place_buttons["drop"].disabled = not tool.has_at or tool.reason != ""
 	place_buttons["auto"].visible = building
 	place_buttons["end"].visible = tool.mode == "road"
 	place_buttons["end"].disabled = tool.road_from == null
@@ -510,6 +527,10 @@ func _begin_tool(which: String) -> void:
 			tool.start_terrain()
 		"land":
 			tool.start_land()
+		"demolish":
+			tool.start_demolish()
+		"move":
+			tool.start_move()
 
 
 func _on_placed(kind: String, ok: bool, text: String) -> void:
@@ -913,9 +934,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_ESCAPE and tool.active() and not modal.visible:
-		if tool.mode == "road" and tool.road_from != null:
-			tool.end_chain()
-		else:
+		if not tool.back():
 			tool.stop()
 		get_viewport().set_input_as_handled()
 		return
@@ -941,10 +960,19 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ENTER, KEY_KP_ENTER:
 				if tool.mode == "build":
 					tool.commit(event.shift_pressed)
+				elif tool.mode == "move":
+					tool.commit_move()
+				elif tool.mode == "demolish":
+					tool.demolish_pick()
 				else:
 					tool.end_chain()
 				get_viewport().set_input_as_handled()
 				return
+			KEY_DELETE:
+				if tool.mode == "demolish":
+					tool.demolish_pick()
+					get_viewport().set_input_as_handled()
+					return
 	match event.keycode:
 		KEY_G:
 			if tool.mode in ["road", "erase"]:
@@ -966,6 +994,16 @@ func _unhandled_input(event: InputEvent) -> void:
 				tool.stop()
 			else:
 				_begin_tool("land")
+		KEY_DELETE:
+			if tool.mode == "demolish":
+				tool.stop()
+			else:
+				_begin_tool("demolish")
+		KEY_N:
+			if tool.mode == "move":
+				tool.stop()
+			else:
+				_begin_tool("move")
 		KEY_SPACE:
 			var was := _auto_jump or _jumping
 			_stop_auto_jump()

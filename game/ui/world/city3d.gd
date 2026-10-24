@@ -690,7 +690,7 @@ func _zone_mesh() -> ArrayMesh:
 
 
 func _update_tool() -> void:
-	var building := tool != null and tool.mode == "build" and tool.has_at
+	var building := tool != null and tool.has_at and (tool.mode == "build" or (tool.mode == "move" and not tool.carry.is_empty()))
 	_ghost.visible = building
 	_pad.visible = building
 	_zones.visible = tool != null and tool.mode == "build" and CityPlan.fam(tool.kind) == "solar_tower"
@@ -713,6 +713,9 @@ func _update_tool() -> void:
 	if tool != null and tool.mode == "land":
 		psig = "land|%s|%s|%d|%d|%d|%s" % [str(tool.hover_parcel), str(ok), plan.land_rev, plan.road_rev, plan.terrain_rev,
 			str(tool.has_at)]
+	elif tool != null and tool.mode in ["demolish", "move"]:
+		psig = "%s|%d|%d|%d|%s|%d" % [tool.mode, int(tool.pick.get("uid", -1)), tool.armed, int(tool.carry.get("uid", -1)), str(ok),
+			plan.revision]
 	elif tool != null and tool.has_at:
 		psig = "%s|%s|%s|%d|%s|%s|%s|%s|%d|%d|%s" % [tool.mode, str(tool.at), str(ok), tool.hover_edge, tool.road_type,
 			tool.zone_kind, tool.terrain_op, str(tool.brush), plan.road_rev, plan.terrain_rev, str(tool.preview)]
@@ -724,6 +727,25 @@ func _update_tool() -> void:
 	_pen_mesh.clear_surfaces()
 	if tool != null and tool.mode == "land":
 		_draw_land(ok, good, bad)
+		return
+	if tool != null and tool.mode in ["demolish", "move"]:
+		# 고른 건물: 철거는 빨강(고르면 진하게), 옮기기는 호박색 (집어 든 건물의 옛 자리도)
+		var e: Dictionary = tool.carry if not tool.carry.is_empty() else tool.pick
+		if e.is_empty():
+			return
+		var col := Color(1.0, 0.32, 0.22) if tool.mode == "demolish" else Palette.AMBER
+		if tool.mode == "demolish" and not ok:
+			col = Color(0.75, 0.75, 0.78)
+		var r := plan.entry_rect(e).grow(1.2)
+		var poly := PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)])
+		_pen_mat.set_shader_parameter("tint", Color(1, 1, 1, 1))
+		_pen_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+		_pen_mesh.surface_set_color(Color(col, 0.38 if tool.armed >= 0 or not tool.carry.is_empty() else 0.22))
+		_fill_poly(poly)
+		_pen_mesh.surface_set_color(Color(col, 0.95))
+		for i in 4:
+			_strip(poly[i], poly[(i + 1) % 4], 0.6)
+		_pen_mesh.surface_end()
 		return
 	if tool == null or not tool.has_at:
 		return
