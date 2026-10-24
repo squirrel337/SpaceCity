@@ -1,0 +1,32 @@
+{
+  "_meta": {
+    "about": "시나리오·도전 모드 (Scenario — 시뮬레이션 밖의 규칙). 새 게임에서 고른다. 기한(days) 안에 목표(goals)를 다 이루면 이기고, 지킬 목표를 어기거나 기한이 지나면 진다. 이기면 점수와 날수를 기록에 남긴다 (도전 모드는 가장 좋은 기록)",
+    "goals": "type — pop(고향 정착민), city_pop(그 부지 도시의 정착민 — site), total_pop(모든 도시), era(고향의 시대), contracts(고향이 보낸 수출 계약), finds(고향의 둘레 탐사 발견 — 빈 땅 빼고), mega(고향의 메가프로젝트 id를 다 지었다), cities(도시 수), techs(기술 수) · value(이만큼 이루면) / deaths(모든 도시의 사망 — max 넘으면 진다), trust(고향의 신뢰 — min 아래로 떨어지면 진다)",
+    "rules": "hazard_k(재난 횟수 배), no_auto(자동 운영·위임을 쓸 수 없다), start_parts_k·start_support_k(고향의 처음 부품·지원 점수 배)",
+    "score": "이긴 점수 = base + 남은 날 × per_day_left + 고향 정착민 × per_pop + 고향 신뢰 × per_trust − 사망 × per_death"
+  },
+  "score": {"base": 1000, "per_day_left": 2, "per_pop": 1, "per_trust": 3, "per_death": 150},
+  "scenarios": [
+    {"id": "first_year", "name": "첫 해", "kind": "scenario", "seed": 2061, "days": 365,
+      "text": "섀클턴의 첫 한 해. 41일째의 태양 폭풍과 남극 겨울을 넘기며 정착민을 200명으로 늘리고, 아무도 잃지 않는다.",
+      "goals": [{"type": "pop", "value": 200}, {"type": "deaths", "max": 0}]},
+    {"id": "exporter", "name": "수출 강국", "kind": "scenario", "seed": 2061, "days": 730,
+      "text": "섀클턴이 만드는 물·금속·부품을 지구와 다른 도시에 판다. 2년 안에 수출 계약 12건을 보낸다.",
+      "goals": [{"type": "contracts", "value": 12}]},
+    {"id": "self_reliant", "name": "자립 도시", "kind": "scenario", "seed": 2061, "days": 1095,
+      "text": "3년 안에 섀클턴을 시대 2 · 자립 도시로 — 정착민 250명, 부품 공장 둘, 땅 구역 다섯.",
+      "goals": [{"type": "era", "value": 2}]},
+    {"id": "explorer", "name": "탐사의 시대", "kind": "scenario", "seed": 4242, "days": 1095,
+      "text": "기지 둘레를 샅샅이 뒤지고 하늘을 듣는다. 3년 안에 둘레 탐사에서 발견 다섯을 찾고 심우주 전파 접시를 다 짓는다.",
+      "goals": [{"type": "finds", "value": 5}, {"type": "mega", "id": "deep_array"}]},
+    {"id": "red_planet", "name": "붉은 행성", "kind": "scenario", "seed": 2061, "days": 1460,
+      "text": "화성 헬라스 분지 기지를 넘겨받아 키운다. 4년 안에 헬라스의 정착민을 150명으로.",
+      "goals": [{"type": "city_pop", "site": "mars_hellas", "value": 150}]},
+    {"id": "disaster_year", "name": "도전 — 재난의 해", "kind": "challenge", "seed": 3001, "days": 730,
+      "text": "운석과 월진이 네 배로 잦다. 2년 동안 정착민을 300명으로 늘리되 신뢰가 50 아래로 떨어지면 진다.",
+      "goals": [{"type": "pop", "value": 300}, {"type": "trust", "min": 50}], "rules": {"hazard_k": 4.0}},
+    {"id": "bare_hands", "name": "도전 — 맨손", "kind": "challenge", "seed": 7777, "days": 1095,
+      "text": "자동 운영도 위임도 없이, 부품과 지원 점수를 절반만 가지고 시작한다. 3년 안에 정착민 400명, 사망은 셋까지.",
+      "goals": [{"type": "pop", "value": 400}, {"type": "deaths", "max": 3}], "rules": {"no_auto": true, "start_parts_k": 0.5, "start_support_k": 0.5}}
+  ]
+}

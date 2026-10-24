@@ -22,6 +22,7 @@ var hovered_pos := Vector3.ZERO
 var title := "섀클턴 시드 시티"     # 왼쪽 위 이름 (식민지 이름)
 var era_text := ""                 # 이름 옆의 시대 (CityProgress)
 var colony: Dictionary = {}        # 이 도시의 식민지 항목 (Colonies.list — 둘레 탐사 상태). main이 정한다
+var goal_text := ""                # 시나리오 목표 한 줄 (Scenario.summary — 없으면 그리지 않는다)
 
 var _items: Array = []
 var _sig := ""
@@ -1045,13 +1046,17 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 				ov.draw_rect(Rect2(r.position, Vector2(44.0 * _progress_of(it), 5)), Palette.AMBER)
 	_draw_district_labels(view, ov, font, bold)
 	_events.draw_overlay(view, ov, font, plan, colony, _local)
+	var ly := 140.0
+	if goal_text != "":
+		_shadow_text(ov, bold, Vector2(16, 142), "목표 · " + goal_text, 13, Palette.GREEN.lightened(0.25))
+		ly += 22.0
 	if cover_on:
 		var cv: Dictionary = CityServices.data().get("cover", {})
 		var x := 16.0
 		for key in COVER_COLORS:
 			var text := "%s %d m" % [COVER_NAMES[key], int(cv.get(key, {}).get("radius_m", 0))]
-			ov.draw_rect(Rect2(Vector2(x, 140), Vector2(10, 10)), COVER_COLORS[key])
-			_shadow_text(ov, font, Vector2(x + 14, 150), text, 12, Palette.TEXT)
+			ov.draw_rect(Rect2(Vector2(x, ly), Vector2(10, 10)), COVER_COLORS[key])
+			_shadow_text(ov, font, Vector2(x + 14, ly + 10), text, 12, Palette.TEXT)
 			x += font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 30.0
 	_draw_way_signs(view, ov, font, bold)
 	_draw_tool_overlay(view, ov, font, bold)

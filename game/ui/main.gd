@@ -1208,6 +1208,13 @@ func _after_metro_ops() -> void:
 func _step() -> void:
 	for i in colonies.step():
 		_on_founded(i)
+	if colonies.scenario_news != "":
+		var result := colonies.scenario_news
+		colonies.scenario_news = ""
+		_jumping = false
+		_set_speed(0)
+		_show_scenario_end(result)
+		return
 	if not sim.pending_storm.is_empty():
 		if CityAuto.full(sim) and _fast():
 			# 빠르게 흐르는 중이고 자동 운영이면: 시드가 추첨으로 정한다 (다른 식민지와 같은 규칙)
@@ -1357,6 +1364,7 @@ func _refresh_live() -> void:
 	_set_chip("trust", str(int(round(sim.trust))), "신뢰", Palette.level_color(sim.trust, 40, 30))
 	if world.city != null and active >= 0 and active < colonies.list.size():
 		world.city.era_text = String(CityProgress.data()["eras"][CityProgress.era_of(colonies.list[active])].get("short", ""))
+		world.city.goal_text = Scenario.summary(colonies)
 	city_view.queue_redraw()
 	forecast.queue_redraw()
 	tabs[current_tab].update_view()
@@ -1467,11 +1475,56 @@ func _show_start() -> void:
 	choices.append(["new", "새로 시작 — 시드 2061", "디자인 문서·밸런스 시뮬레이터와 같은 운으로 시작한다"])
 	choices.append(["random", "다른 운으로 시작", "그림자·고장·폭풍·화물선의 운이 달라진다"])
 	choices.append(["auto", "시드 자동 운영으로 보기", "추천 운영대로 3년을 돌려 본다. 언제든 '자동 운영'을 꺼서 넘겨받는다"])
+	choices.append(["scenario", "시나리오·도전", "목표와 기한이 있는 판 %d가지 — 도전은 규칙이 더 까다롭고 가장 좋은 기록이 남는다" %
+		(Scenario.data()["scenarios"] as Array).size()])
 	modal.open("start", "시대 0 · 씨앗 — 프로토타입", "섀클턴 시드 시티, 2061년 1월 1일",
 		"당신은 달 남극 기지를 돌보도록 만들어진 관리 AI, 시드다. 정착민 120명의 공기와 전력, 식량과 방사선을 책임진다.\n\n" +
 		"첫날의 숙제: CO₂ 제거기는 1기뿐이라 농장이 꺼지면 여유가 없다. 41일째에 대형 태양 양성자 폭풍이 오는데 대피소는 80석이다. " +
 		"남극 겨울(150~240일째)에는 그림자가 최대 90시간 이어진다. 건설 탭에서 짓고, 연구 탭에서 연구를 고르고, 1×로 시간을 흘린다.",
 		choices)
+
+
+## 시나리오 고르기: 이름·기한·목표·규칙·가장 좋은 기록
+func _show_scenarios() -> void:
+	var choices := []
+	for s in Scenario.data()["scenarios"]:
+		var goals := PackedStringArray()
+		for g in s["goals"]:
+			goals.append(Scenario.goal_text(g))
+		var desc := "%s\n목표: %s" % [String(s.get("text", "")), " · ".join(goals)]
+		var rec := Scenario.record_text(String(s["id"]))
+		if rec != "":
+			desc += "\n" + rec
+		choices.append([String(s["id"]), "%s — %d일" % [String(s["name"]), int(s["days"])], desc])
+	choices.append(["back", "돌아가기", ""])
+	modal.open("scenarios", "시나리오·도전", "어떤 판을 할까",
+		"기한 안에 목표를 다 이루면 이긴다. 지킬 목표(사망·신뢰)를 어기거나 기한이 지나면 진다. 이기면 점수가 기록에 남는다 — " +
+		"남은 날, 정착민, 신뢰가 많고 사망이 적을수록 높다. 끝난 뒤에도 그 도시로 계속할 수 있다.", choices)
+
+
+func _start_scenario(id: String) -> void:
+	var s := Scenario.find(id)
+	if s.is_empty():
+		_show_start()
+		return
+	_new_game(int(s.get("seed", 2061)), false)
+	Scenario.begin(colonies, id)
+	_toast("시나리오 — %s (%d일)" % [String(s["name"]), int(s["days"])], "good")
+	_dirty = true
+
+
+func _show_scenario_end(result: String) -> void:
+	var s := Scenario.active(colonies)
+	var won := result == "won"
+	var lines := PackedStringArray()
+	for l in Scenario.lines(colonies):
+		lines.append("%s %s (%s)" % ["✓" if l[1] == true else ("✗" if l[1] == false else "·"), String(l[0]), String(l[2])])
+	var body := "%s\n\n%s" % [String(colonies.scenario.get("why", "")), "\n".join(lines)]
+	if won:
+		body += "\n\n점수 %d · %s" % [int(colonies.scenario.get("score", 0)), Scenario.record_text(String(s.get("id", "")))]
+	modal.open("scenario_end", "시나리오 · " + String(s.get("name", "")), "이겼다" if won else "졌다", body,
+		[["continue", "이 도시로 계속", "목표 없이 자유롭게 이어 간다"], ["scenarios", "다른 시나리오", ""], ["restart", "처음 화면으로", ""]],
+		Palette.GREEN if won else Palette.RED)
 
 
 func _show_menu() -> void:
@@ -1584,6 +1637,22 @@ func _on_modal_choice(context: String, choice: String) -> void:
 				"auto":
 					_new_game(2061, true)
 					_set_speed(3)
+				"scenario":
+					_show_scenarios()
+					return
+		"scenarios":
+			if choice == "back":
+				_show_start()
+				return
+			_start_scenario(choice)
+		"scenario_end":
+			match choice:
+				"scenarios":
+					_show_scenarios()
+					return
+				"restart":
+					_show_start()
+					return
 		"storm":
 			sim.resolve_storm(choice)
 			_dirty = true
@@ -1620,7 +1689,7 @@ func _on_dev_mode(index: int, mode: String) -> void:
 	var c: Dictionary = colonies.list[index]
 	var s: CitySim = c["sim"]
 	c["mode"] = mode
-	if not CityAuto.full(s):
+	if not CityAuto.full(s) and not bool(Scenario.rule(colonies, "no_auto", false)):
 		s.autopilot = AutoPolicy.new("good")
 		s.autopilot.configure(s)
 		if s == sim:
@@ -1635,6 +1704,10 @@ func _on_dev_mode(index: int, mode: String) -> void:
 
 func _on_auto(on: bool) -> void:
 	if sim == null:
+		return
+	if on and bool(Scenario.rule(colonies, "no_auto", false)):
+		auto_button.set_pressed_no_signal(false)
+		_toast("이 도전에서는 자동 운영을 쓸 수 없다", "warn")
 		return
 	if on:
 		sim.autopilot = AutoPolicy.new("good")

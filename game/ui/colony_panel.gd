@@ -51,6 +51,7 @@ func _shape_sig() -> String:
 		parts.append(String(e["site"]))
 	parts.append("|")
 	parts.append_array(PackedStringArray(mgr.candidates()))
+	parts.append("|" + String(mgr.scenario.get("id", "")))
 	return ",".join(parts)
 
 
@@ -95,6 +96,8 @@ func rebuild() -> void:
 	_cards.clear()
 	_clear(body_box)
 	var here := mgr.index_of_sim(sim) if sim != null else -1
+	if not mgr.scenario.is_empty():
+		body_box.add_child(_scenario_section())
 	if here >= 0:
 		body_box.add_child(_dev_section(here))
 		body_box.add_child(_delegate_section(here))
@@ -192,6 +195,48 @@ func _dev_section(i: int) -> Control:
 	return card
 
 
+## 시나리오 (Scenario): 이름·설명, 목표마다 ✓(이뤘다)·✗(어겼다)·진행, 남은 날·결과
+func _scenario_section() -> Control:
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.GREEN.darkened(0.4), 8, 10))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	card.add_child(v)
+	var s := Scenario.active(mgr)
+	v.add_child(ThemeFactory.heading("시나리오 — %s" % String(s.get("name", "")), 16))
+	var text := ThemeFactory.muted(String(s.get("text", "")), 12)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(text)
+	var goals := Label.new()
+	goals.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	goals.add_theme_font_size_override("font_size", 13)
+	v.add_child(goals)
+	var foot := ThemeFactory.muted("", 12)
+	foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(foot)
+	_live.append(func():
+		var rows := PackedStringArray()
+		for l in Scenario.lines(mgr):
+			rows.append("%s %s — %s" % ["✓" if l[1] == true else ("✗" if l[1] == false else "·"), String(l[0]), String(l[2])])
+		goals.text = "\n".join(rows)
+		var r := String(mgr.scenario.get("result", ""))
+		var rules: Dictionary = s.get("rules", {})
+		var rule_txt := PackedStringArray()
+		if rules.has("hazard_k"):
+			rule_txt.append("재난 ×%s" % str(rules["hazard_k"]))
+		if bool(rules.get("no_auto", false)):
+			rule_txt.append("자동 운영·위임 없음")
+		if rules.has("start_parts_k"):
+			rule_txt.append("처음 부품 ×%s" % str(rules["start_parts_k"]))
+		var rule_line := (" · 규칙: " + ", ".join(rule_txt)) if not rule_txt.is_empty() else ""
+		if r == "":
+			foot.text = "남은 날 %d일 / %d일%s" % [Scenario.days_left(mgr), int(s.get("days", 0)), rule_line]
+		else:
+			foot.text = ("이겼다 — 점수 %d" % int(mgr.scenario.get("score", 0)) if r == "won" else "졌다 — " + String(mgr.scenario.get("why", ""))) + \
+				" · 목표 없이 계속하는 중")
+	return card
+
+
 ## 위임: 직접 운영하면서 분야를 골라 시드에게 맡긴다 (CityAuto). 맡긴 분야에서 시드가 한 일은 '기록' 탭의 운영 기록에 남는다
 func _delegate_section(i: int) -> Control:
 	var c: Dictionary = mgr.list[i]
@@ -213,6 +258,9 @@ func _delegate_section(i: int) -> Control:
 		cb.text = d[1]
 		cb.custom_minimum_size = Vector2(170, 36)
 		cb.button_pressed = bool((c.get("delegate", {}) as Dictionary).get(d[0], false))
+		cb.disabled = bool(Scenario.rule(mgr, "no_auto", false))
+		if cb.disabled:
+			cb.tooltip_text = "이 도전에서는 위임을 쓸 수 없다"
 		var dom: String = d[0]
 		cb.toggled.connect(func(on: bool):
 			CityAuto.set_delegate(c, dom, on)

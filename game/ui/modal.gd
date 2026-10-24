@@ -10,6 +10,7 @@ var _title := Label.new()
 var _tag := Label.new()
 var _body := Label.new()
 var _choices := VBoxContainer.new()
+var _scroll := ScrollContainer.new()   # 고를 것이 많으면 (시나리오 고르기) 화면 높이 안에서 굴린다
 
 
 func _init() -> void:
@@ -39,7 +40,10 @@ func _init() -> void:
 	_body.custom_minimum_size.x = 600
 	v.add_child(_body)
 	_choices.add_theme_constant_override("separation", 8)
-	v.add_child(_choices)
+	_choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.add_child(_choices)
+	v.add_child(_scroll)
 
 
 ## choices: [[id, 버튼 문구, 설명(없으면 "")], ...]
@@ -66,6 +70,14 @@ func open(p_context: String, tag: String, title: String, body: String, choices: 
 			row.add_child(ThemeFactory.muted(ch[2], 13))
 		_choices.add_child(row)
 	visible = true
+	_fit.call_deferred()
+
+
+## 고를 것의 높이만큼 (화면 아래·위 여백을 남기고 그보다 길면 굴린다)
+func _fit() -> void:
+	var need := _choices.get_combined_minimum_size().y
+	var room := get_viewport_rect().size.y - (_panel.get_combined_minimum_size().y - _scroll.custom_minimum_size.y) - 60.0
+	_scroll.custom_minimum_size.y = clampf(need, 0.0, maxf(room, 160.0))
 
 
 func _pick(choice: String) -> void:

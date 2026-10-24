@@ -55,6 +55,7 @@ func _process(_delta: float) -> bool:
 		_explore_check()
 		_trade_check()
 		_delegate_check()
+		_scenario_check()
 		_runway_check()
 		_raised_check()
 		_speed_check()
@@ -1118,6 +1119,60 @@ func _delegate_check() -> void:
 	_check(lp.list.get_child_count() == 2, "운영 기록을 분야로 거르지 못했다 (%d — 맡긴 일과 보낸 일)" % lp.list.get_child_count())
 	lp.free()
 	print("smoke: delegate — %d entries, first build %s" % [(c["oplog"] as Array).size(), String(builds[0][2]) if not builds.is_empty() else "-"])
+
+
+## 시나리오: 목표를 이루면 이기고 (점수·기록), 기한이 지나면 지고, 지킬 목표(신뢰)를 어기면 진다. 재난 규칙은 걸렸다 끝나면 풀린다.
+## 맨손 도전은 자동 운영을 막고 처음 부품을 반으로. 저장 왕복. 시나리오 고르기 창
+func _scenario_check() -> void:
+	Scenario.records_path = "user://records_smoke.json"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Scenario.records_path))
+	var mk := func() -> Colonies:
+		var s := CitySim.new(7, 40.0, "")
+		var col := Colonies.new()
+		col.list = [{"sim": s, "plan": CityPlan.create(s, BaseLayout.new("ridge")), "site": s.site_id, "name": "시험 고향", "mode": ""}]
+		col.hour = s.hour
+		return col
+	# 이기기: 첫 해 — 정착민 200명, 사망 없이
+	var col: Colonies = mk.call()
+	Scenario.begin(col, "first_year")
+	var home: CitySim = col.list[0]["sim"]
+	col.hour += 24
+	_check(Scenario.step(col) == "" and String(col.scenario["result"]) == "", "목표를 이루지 않았는데 끝났다")
+	home.cohorts = [[210.0, 0.0, false]]
+	col.hour += 24
+	_check(Scenario.step(col) == "won" and int(col.scenario["score"]) > 1000 and Scenario.record_text("first_year") != "",
+		"목표를 다 이뤘는데 이기지 않았다: %s" % str(col.scenario))
+	_check(Scenario.summary(col).contains("이겼다") and Scenario.step(col) == "", "이긴 뒤의 요약·상태가 맞지 않다")
+	var saved: Variant = JSON.parse_string(JSON.stringify(col.scenario))
+	_check(saved is Dictionary and String(saved["result"]) == "won" and (saved["done"] as Dictionary).has("0"), "시나리오가 저장 왕복에서 달라졌다")
+	# 지기: 기한
+	var col2: Colonies = mk.call()
+	Scenario.begin(col2, "exporter")
+	col2.hour += int(Scenario.find("exporter")["days"]) * 24
+	_check(Scenario.step(col2) == "lost" and String(col2.scenario["why"]).contains("기한"), "기한이 지났는데 지지 않았다")
+	# 지기: 지킬 목표 (신뢰) · 재난 규칙
+	var col3: Colonies = mk.call()
+	Scenario.begin(col3, "disaster_year")
+	_check(is_equal_approx(CityHazards.rate_k, 4.0), "재난의 해에 재난이 잦아지지 않았다")
+	(col3.list[0]["sim"] as CitySim).trust = 40.0
+	col3.hour += 24
+	_check(Scenario.step(col3) == "lost" and is_equal_approx(CityHazards.rate_k, 1.0), "신뢰가 떨어졌는데 지지 않았거나 재난 규칙이 남았다")
+	# 맨손: 자동 운영 금지, 처음 부품 반
+	var col4: Colonies = mk.call()
+	var parts0 := float((col4.list[0]["sim"] as CitySim).stock["parts"])
+	Scenario.begin(col4, "bare_hands")
+	_check(bool(Scenario.rule(col4, "no_auto", false)) and absf(float((col4.list[0]["sim"] as CitySim).stock["parts"]) - parts0 * 0.5) < 0.01,
+		"맨손 도전의 규칙이 걸리지 않았다")
+	_check(not bool(Scenario.rule(col, "no_auto", false)) and Scenario.rule(Colonies.new(), "hazard_k", 1.0) == 1.0, "시나리오 없는 판에 규칙이 있다")
+	Scenario.apply_rules(Colonies.new())
+	# 고르기 창
+	main._show_scenarios()
+	_check(main.modal.visible and main.modal.context == "scenarios", "시나리오 고르기 창이 뜨지 않았다")
+	main.modal.visible = false
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Scenario.records_path))
+	Scenario.records_path = "user://records.json"
+	print("smoke: scenario — %s (점수 %d), exporter lost by deadline, disaster_year lost on trust" % [Scenario.summary(col),
+		int(col.scenario["score"])])
 
 
 ## 활주로·우주항이 길 격자와 나란하다 (지구·화성): 활주로는 격자 축을 따라 땅 구역 한 줄에, 그 줄은 살 수 없다.

@@ -9,6 +9,8 @@ extends RefCounted
 
 const KEEP_SCARS := 12
 
+static var rate_k := 1.0           # 재난 횟수 배 (시나리오 규칙 hazard_k — Scenario.apply_rules)
+
 
 static var _data: Dictionary = {}
 
@@ -38,7 +40,7 @@ static func step(c: Dictionary, day: int) -> Array:
 		var bodies: Array = h.get("bodies", ["*"])
 		if not ("*" in bodies or body in bodies):
 			continue
-		if rng.randf() < float(h["per_year"]) / 365.0:
+		if rng.randf() < float(h["per_year"]) / 365.0 * rate_k:
 			if strike(c, String(h["id"]), rng):
 				out.append(String(h["id"]))
 	return out

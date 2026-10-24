@@ -28,10 +28,15 @@ var seed_value := 2061
 var _windows := {}                 # 부지 → {best, start, end} (게임 일) — 창이 지나면 다시 셈한다
 var transport := Transport.new()   # 도시 사이 교통
 var metro_fn := MetroFunctions.new()   # 지구 대도시의 우주 시설 (도시 기능)
+var scenario := {}                 # 진행 중인 시나리오 (Scenario — 없으면 자유 놀이)
+var scenario_news := ""            # 이번 시간에 시나리오가 끝났으면 won·lost (main이 결과 창을 띄우고 비운다)
 
 
 ## 새 게임: 고향 도시와 천체마다의 기본 도시로 시작한다
 func start(sim: CitySim, plan: CityPlan) -> void:
+	scenario = {}
+	scenario_news = ""
+	Scenario.apply_rules(self)
 	list = [_entry(sim, plan, 0)]
 	expeditions = []
 	hour = sim.hour
@@ -174,6 +179,9 @@ func step() -> Array:
 	if hour % 24 == 0:
 		share_techs()
 		metro_fn.step_day(self)
+		var r := Scenario.step(self)               # 시나리오 목표 (이기거나 지면 main이 결과 창을 띄운다)
+		if r != "":
+			scenario_news = r
 	return arrived
 
 
@@ -455,7 +463,7 @@ func to_save() -> Dictionary:
 			"oplog": (c.get("oplog", []) as Array).slice(-120)})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
-		"metro_fn": metro_fn.to_save()}
+		"metro_fn": metro_fn.to_save(), "scenario": scenario}
 
 
 ## 저장을 읽는다 (판 1 = 도시 하나뿐이던 저장, 판 2 = 교통이 없던 저장). 기본 도시가 없던 저장이면 지금 시각에 세운다.
@@ -475,6 +483,9 @@ func load_save(data: Dictionary) -> bool:
 		metro_fn.reset()
 		metro_fn.econ.seed_value = seed_value
 		transport.load_save({}, self)
+		scenario = {}
+		scenario_news = ""
+		Scenario.apply_rules(self)
 		return true
 	if (v != SAVE_VERSION and v != 2) or not data.get("colonies") is Array or (data["colonies"] as Array).is_empty():
 		return false
@@ -534,6 +545,13 @@ func load_save(data: Dictionary) -> bool:
 	metro_fn.load_save(data.get("metro_fn", {}) if data.get("metro_fn") is Dictionary else {})
 	metro_fn.econ.seed_value = seed_value
 	transport.load_save(data.get("transport", {}) if data.get("transport") is Dictionary else {}, self)
+	scenario = data.get("scenario", {}) if data.get("scenario") is Dictionary else {}
+	if not scenario.is_empty():
+		scenario["start"] = int(scenario.get("start", 0))
+		scenario["end"] = int(scenario.get("end", -1))
+		scenario["done"] = scenario.get("done", {}) if scenario.get("done") is Dictionary else {}
+	scenario_news = ""
+	Scenario.apply_rules(self)
 	return true
 
 
