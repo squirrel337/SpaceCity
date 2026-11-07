@@ -34,6 +34,7 @@ var site_id := GameData.HOME_SITE
 var site := {}
 var sun_k := 1.0                 # 태양광 출력
 var ice_k := 1.0                 # 얼음 채굴
+var dig_k := 1.0                 # 레골리스 굴착 (궤도 도시는 팔 땅이 없다 — 0)
 var heat_k := 1.0                # 방열 능력
 var build_k := 1.0               # 로봇 작업량
 var contact_k := 1.0             # 지구 교신의 사기
@@ -143,6 +144,7 @@ func _init(p_seed: int = 2061, years: float = 3.0, policy_name: String = "", p_s
 	PER = C["per_person_day"]
 	sun_k = float(rules.get("sun_k", 1.0))
 	ice_k = float(rules.get("ice_k", 1.0))
+	dig_k = float(rules.get("dig_k", 1.0))
 	heat_k = float(rules.get("heat_k", 1.0))
 	build_k = float(rules.get("build_k", 1.0))
 	contact_k = float(rules.get("contact_k", 1.0))
@@ -629,7 +631,7 @@ func step_hour(pop: float) -> void:
 		for m in active["ice_miner"]:
 			s["water_kg"] += wk[m] * recipe(m, "out", "water_kg") * mining * k3
 		for m in active["excavator"]:
-			s["regolith_t"] += wk[m] * recipe(m, "out", "regolith_t") * k3
+			s["regolith_t"] += wk[m] * recipe(m, "out", "regolith_t") * k3 * dig_k
 		for m in active["mre_plant"]:
 			var n_m := minf(wk[m] * k3, s["regolith_t"] / recipe(m, "in", "regolith_t"))
 			s["regolith_t"] -= n_m * recipe(m, "in", "regolith_t")

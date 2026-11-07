@@ -187,9 +187,10 @@ func _contracts_section() -> void:
 	_live.append(func():
 		head.text = "항로 계약 · 평판 %d · 마침 %d건 · 놓침 %d건 · 번 지원 %s" % [int(st["rep"]), int(st["done"]), int(st["failed"]),
 			Fmt.n(float(st["earned"]))])
-	box.add_child(ThemeFactory.muted("지구 우주청과 행성 쪽 회사가 행성간 수송선으로 옮길 물건을 맡긴다. 받으면 그 방향의 수송선이 떠날 때 " +
-		"보내는 도시의 남는 몫에서 더 싣고, 마감까지 다 닿으면 보내는 도시가 보수를 받는다 (평판이 높을수록 많다 — 못 마치면 위약금과 평판). " +
-		"함대 자동 운영은 남는 몫이 넉넉하고 배가 있는 계약을 둘까지 받는다. 지구 협상은 결정 카드로 온다.", 12))
+	box.add_child(ThemeFactory.muted("지구 우주청과 행성 쪽 회사가 행성간 수송선으로 옮길 물건을 맡긴다. 받으면 그 방향의 수송선이 실은 그 물건을 셈하고 " +
+		"모자라면 보내는 도시의 남는 몫에서 더 싣는다 — 마감까지 다 닿으면 보내는 도시가 보수를 받는다 (평판이 높을수록 많다 — 못 마치면 " +
+		"위약금과 평판). 함대 자동 운영은 한 번에 다 실을 수 있고 보내는 부두에 배가 있으며 마감이 1,000일 안인 계약을 둘까지 받는다. " +
+		"지구 협상은 결정 카드로 온다.", 12))
 	for ct in st["active"]:
 		var lab := ThemeFactory.muted("", 13)
 		lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

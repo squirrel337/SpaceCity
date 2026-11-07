@@ -1714,6 +1714,7 @@ func _transport_check(col: Colonies) -> void:
 	_fleet_check(col)
 	_depot_check(col)
 	_contracts_check(col)
+	_orbital_check(col)
 
 
 ## 함대·항로 지도: 로켓 방정식(문서의 예), 저궤도 사이 Δv, 3년 동안 항로마다 배가 있다, 부두에 배가 있어야 떠나고 보내는 도시가
@@ -2116,6 +2117,126 @@ func _contracts_check(col: Colonies) -> void:
 	col.contracts = keep
 	Contracts._apply_deals(col)
 	print("smoke: contracts %s, 제안 %d건 (%s)" % [years, offers.size(), Contracts.offer_text(col, offers[0]) if not offers.is_empty() else ""])
+
+
+## L5 궤도 도시: 잠금(기술·질량 투사기), 단계의 값, 매스 드라이버(포획기 뒤에 쏜다 · 남길 몫 · 남은 단계가 쓸 만큼까지),
+## 다 지으면 도시(밤이 없다 · 팔 땅이 없다 · 물 공급) · 고향 ↔ L5 셔틀 · 레골리스를 그 도시에, 3D(원통 안쪽 땅 — 위로 휜다, 단면),
+## 저장 왕복, 개척 탭·항로 지도 칸. 세운 L5 도시는 남겨 두어 뒤의 저장 왕복이 함께 읽는다
+func _orbital_check(col: Colonies) -> void:
+	var hi := col.index_of_site(GameData.HOME_SITE)
+	var hc: Dictionary = col.list[hi]
+	var home: CitySim = hc["sim"]
+	var st := Orbital.state(col)
+	_check(int(st["stage"]) == 0 and Orbital.city_index(col) < 0, "3년 만에 L5 사업이 시작됐다 (단계 %d)" % int(st["stage"]))
+	Orbital.start(col)
+	st = Orbital.state(col)
+	var known := col.known_techs()
+	var missing := (Orbital.data()["project"]["requires"] as Array).filter(func(t): return not known.has(String(t)))
+	if not missing.is_empty():
+		_check(Orbital.lock_reason(col).contains("기술"), "기술이 없는데 L5 사업이 열렸다")
+	for t in Orbital.data()["project"]["requires"]:
+		home.techs[String(t)] = true
+	var built: Array = CityProgress.state(hc)["built"]
+	if not built.has("mass_driver"):
+		_check(Orbital.lock_reason(col).contains("질량 투사기"), "질량 투사기가 없는데 L5 사업이 열렸다: " + Orbital.lock_reason(col))
+		built.append("mass_driver")
+	_check(Orbital.lock_reason(col) == "", "조건을 채웠는데 L5 사업이 잠겼다: " + Orbital.lock_reason(col))
+	home.support = 9000.0
+	home.stock["parts"] = maxf(float(home.stock["parts"]), 3000.0)
+	home.stock["metal_t"] = maxf(float(home.stock["metal_t"]), 300.0)
+	home.stock["regolith_t"] = 40000.0
+	var s0 := home.support
+	var p0 := float(home.stock["parts"])
+	_check(Orbital.build(col) == "" and bool(st["building"]) and absf(s0 - home.support - 1500.0) < 0.5
+		and absf(p0 - float(home.stock["parts"]) - 300.0) < 0.5, "1단계(질량 포획기)를 값 내고 시작하지 못했다")
+	_check(Orbital.build_reason(col).contains("짓는 중"), "짓는 중에 또 시작할 수 있다")
+	Orbital._fire(col, home)
+	_check(float(st["last_t"]) == 0.0 and String(st["why"]).contains("포획기"), "포획기 없이 매스 드라이버가 쐈다")
+	st["ready"] = col.hour
+	Orbital.step_day(col)
+	_check(int(st["stage"]) == 1 and not bool(st["building"]), "1단계가 끝나지 않았다")
+	var r0 := float(home.stock["regolith_t"])
+	Orbital._fire(col, home)
+	_check(float(st["last_t"]) == 300.0 and absf(r0 - float(home.stock["regolith_t"]) - 300.0) < 0.01
+		and absf(float(st["stock_t"]) - 294.0) < 0.01, "매스 드라이버가 300 t을 쏘아 98%%를 잡지 않았다 (%.1f t, 더미 %.1f t)" % [
+		float(st["last_t"]), float(st["stock_t"])])
+	home.stock["regolith_t"] = 600.0
+	Orbital._fire(col, home)
+	_check(float(st["last_t"]) == 100.0, "고향에 남길 레골리스 500 t을 지키지 않았다 (%.1f t)" % float(st["last_t"]))
+	_check(Orbital.build_reason(col).contains("레골리스"), "레골리스가 모자란데 2단계를 시작할 수 있다")
+	st["stock_t"] = 15000.0 + 18000.0
+	home.stock["regolith_t"] = 40000.0
+	_check(Orbital.build(col) == "" and absf(float(st["stock_t"]) - 18000.0) < 0.01, "2단계(차폐 껍질)가 모은 레골리스를 쓰지 않았다")
+	Orbital._fire(col, home)
+	_check(float(st["last_t"]) == 0.0 and String(st["why"]).contains("다 모았다"), "남은 단계가 쓸 만큼 모았는데 또 쐈다")
+	# 끝까지: 마지막 단계가 끝나면 도시가 선다
+	st["stage"] = Orbital.stages().size() - 1
+	st["building"] = true
+	st["ready"] = col.hour
+	var n_lines := col.transport.lines.size()
+	Orbital.step_day(col)
+	var ci := Orbital.city_index(col)
+	_check(Orbital.done(col) and ci >= 0, "L5 사업을 다 지었는데 도시가 서지 않았다")
+	if ci < 0:
+		return
+	var l5: CitySim = col.list[ci]["sim"]
+	var dark := 0
+	for hh in mini(l5.dark.size(), 24 * 400):
+		dark += l5.dark[hh]
+	_check(String(col.list[ci]["body"]) == "l5" and l5.dig_k == 0.0 and l5.ice_k == 0.0 and l5.supply.has("water_kg") and dark == 0
+		and l5.population() > 0.0, "L5 도시의 부지 규칙이 맞지 않다 (어두운 시간 %d)" % dark)
+	var shuttle: Array = []
+	for l in col.transport.lines:
+		if String(l["role"]) == "shuttle" and (String(l["a"]) == Orbital.site_id() or String(l["b"]) == Orbital.site_id()):
+			shuttle.append(l)
+	_check(col.transport.lines.size() == n_lines + 1 and shuttle.size() == 1, "고향 ↔ L5 셔틀 노선이 생기지 않았다")
+	l5.stock["regolith_t"] = 1000.0
+	home.stock["regolith_t"] = 40000.0
+	Orbital._fire(col, home)
+	_check(float(st["last_t"]) == 300.0 and absf(float(l5.stock["regolith_t"]) - 1294.0) < 0.01, "매스 드라이버가 L5 도시에 레골리스를 보내지 않았다")
+	# 저장 왕복 (숫자는 저장하면 모두 실수)
+	var before := JSON.stringify(JSON.parse_string(JSON.stringify(col.orbital)))
+	Orbital.load_state(col, JSON.parse_string(before))
+	_check(JSON.stringify(JSON.parse_string(JSON.stringify(col.orbital))) == before, "L5 사업이 저장 왕복에서 달라졌다")
+	# 3D: 원통 안쪽 땅 — 도시를 고르면 땅이 HabitatGround, 가로로 위로 휜다, 카메라는 축 가운데를 본다
+	main._on_colony_view(ci)
+	var wv: WorldView = main.world
+	_check(wv.ground is HabitatGround and wv.ground.body == "l5" and wv.city != null and wv.city.get_parent() == wv.ground.city_root,
+		"L5 도시의 3D 땅이 원통 안쪽이 아니다")
+	if wv.ground is HabitatGround:
+		var g: HabitatGround = wv.ground
+		_check(g.drop_m(Vector2(0, 0)) == 0.0 and g.drop_m(Vector2(0, 600)) < -55.0 and absf(g.drop_m(Vector2(600, 0))) < 1e-6,
+			"원통 바닥이 가로로 위로 휘지 않는다 (%.1f m)" % g.drop_m(Vector2(0, 600)))
+	var info := wv._info("l5")
+	_check(info.has("pivot") and not info.get("surface", true), "L5의 카메라 정보에 원통 축 가운데가 없다")
+	var jd := wv.jd                                   # 한 시각으로 (그리기 캐시는 지난 프레임의 시각일 수 있다)
+	var hub := Astro.habitat_hub("l5", jd)
+	_check(absf(Astro.len3(Astro.sub3(hub, Astro.position("l5", jd))) - 6.0) < 1e-6, "L5의 카메라 가상 구가 맞지 않다")
+	var me := Astro.len3(Astro.sub3(Astro.position("moon", jd), Astro.position("earth", jd)))
+	var le := Astro.len3(Astro.sub3(hub, Astro.position("earth", jd)))
+	var lm := Astro.len3(Astro.sub3(hub, Astro.position("moon", jd)))
+	_check(absf(le - me) < 1.0 and absf(lm - me) < me * 0.02, "L5가 지구–달과 정삼각형이 아니다 (%.0f / %.0f / %.0f km)" % [le, lm, me])
+	wv._place_all()
+	var hv: HabitatView = wv._bodies["l5"]["hab"]
+	_check(hv.visible and hv.hull_done(), "다 지은 L5 원통이 보이지 않는다")
+	# 개척 탭 · 항로 지도
+	main._select_tab("colony")
+	main.tabs["colony"].rebuild()
+	main.tabs["colony"].update_view()
+	_check(_texts(main.tabs["colony"]).any(func(x): return String(x).begins_with("L5 궤도 도시 · 다 지었다")), "개척 탭에 L5 사업 칸이 없다")
+	var m: DvMapView = main.dv_map
+	m.selected = "n:l5"
+	m._sig = ""
+	m._build_card()
+	for f in m._live:
+		(f as Callable).call()
+	_check(_texts(m).any(func(x): return String(x).begins_with("L5 궤도 도시 · ")), "항로 지도에 L5 카드가 없다")
+	main._on_colony_view(hi)
+	var rise := 0.0
+	if wv.grounds.has(Orbital.site_id()):
+		rise = -(wv.grounds[Orbital.site_id()] as SiteGround).drop_m(Vector2(0, 600))
+	print("smoke: orbital — L5 %s, 주민 %d명, 셔틀 %s, 바닥 600 m 옆이 %.0f m 위" % [String(col.list[ci]["name"]), int(l5.population()),
+		String(shuttle[0]["id"]) if not shuttle.is_empty() else "-", rise])
 
 
 ## 소리: 효과음·환경음을 모두 만든다 (길이·고리·크기), 단추를 누르면 딸깍, 기록 글에 맞는 소리(연구 완료)와 알림 종류의 소리,

@@ -209,6 +209,12 @@ func ground_for(site_id: String) -> SiteGround:
 	var body := String(site.get("body", "moon"))
 	if site_id == GameData.HOME_SITE or site.is_empty() or not _bodies.has(body):
 		return moon
+	if _bodies[body].has("hab"):
+		var hg := HabitatGround.new()
+		_space.add_child(hg)
+		hg.setup(body, site, float(_bodies[body]["radius"]), _bodies[body]["hab"])
+		grounds[site_id] = hg
+		return hg
 	var node: MeshInstance3D = _bodies[body]["node"]
 	if not _fine_sphere.has(body) and body != "moon":
 		node.mesh = SkyBuilder.sphere(256, 128)          # 지형 조각과 맞닿게 구를 곱게
@@ -328,6 +334,15 @@ func _make_body(id: String) -> void:
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var look: String = String(b.get("look", b.get("kind", "rock")))
 	var mat: ShaderMaterial
+	if String(b.get("kind", "")) == "habitat":
+		# 궤도 도시: 구 대신 회전 원통 (짓기 전에는 보이지 않는다 — Orbital)
+		var hv := HabitatView.new()
+		hv.transform = Transform3D(Basis(Vector3(1, 0, 0), Vector3(0, 0, -1), Vector3(0, 1, 0)), Vector3.ZERO)   # 몸체 (x, y, z) → 메시 (x, z, −y)
+		mi.add_child(hv)
+		hv.setup(float(b.get("length_km", 15.0)) / float(b["radius_km"]))
+		_space.add_child(mi)
+		_bodies[id] = {"node": mi, "mat": null, "radius": float(b["radius_km"]), "look": "habitat", "hab": hv}
+		return
 	if id == "sun":
 		mi.mesh = SkyBuilder.sphere(48, 24)
 		mat = PlanetLook.sun_material()
@@ -369,6 +384,10 @@ func _info(id: String) -> Dictionary:
 			"radius": float(b["radius_km"]), "surface": id != "sun", "chain": _chain(id)}
 		if id == "moon":
 			info["frame"] = Astro.frame("moon", jd)
+		elif String(b.get("kind", "")) == "habitat":
+			# 궤도 도시: 카메라의 가상 구 (꼭대기가 원통 안쪽 바닥) — 멀리서는 원통 축 가운데를 본다, 저절로 내려앉지 않는다
+			info["pivot"] = Astro.habitat_hub(id, jd)
+			info["surface"] = false
 		_frame[id] = info
 		return info
 	for s in Astro.systems:
@@ -525,6 +544,8 @@ func _process(delta: float) -> void:
 	_place_all()
 	var t1 := Time.get_ticks_usec()
 	if city and sim:
+		city.driver_on = mgr != null and ground != null and ground.body == "moon" and city.sim == mgr.home().get("sim") \
+			and float(Orbital.state(mgr)["last_t"]) > 0.0
 		city.update(delta, speed_level)
 	_queue_overlay()
 	_auto_quality(delta)
@@ -644,6 +665,8 @@ func _place_all() -> void:
 		var node: MeshInstance3D = e["node"]
 		var rad: float = info["radius"]
 		node.global_transform = Transform3D(g_basis(info["frame"]).scaled(Vector3.ONE * rad * s), to_render(c))
+		if e.has("hab"):
+			_sync_habitat(e["hab"])
 		var mat: ShaderMaterial = e["mat"]
 		if mat and (id == "sun" or id == near_id or _apparent_px(c, rad) >= 0.75):
 			# (화면에서 1화소도 안 되는 천체는 빛 방향·자전을 고치지 않는다 — 점은 이름표가 그린다)
@@ -679,6 +702,37 @@ func _place_all() -> void:
 	orbits.update()
 	_galaxy_k = galaxy.place(self)
 	_place_ship_model()
+
+
+## 궤도 도시의 단계 (Orbital) — 짓기 전에는 감추고, 짓는 동안 자란다. 카메라 쪽 벽을 걷어 낸다
+func _sync_habitat(hv: HabitatView) -> void:
+	if mgr == null:
+		hv.sync(0, false, 0.0)
+		return
+	var st := Orbital.state(mgr)
+	var done := int(st["stage"])
+	var p := 0.0
+	if bool(st["building"]) and done < Orbital.stages().size():
+		var sg: Dictionary = Orbital.stages()[done]
+		p = 1.0 - float(int(st["ready"]) - mgr.hour) / maxf(float(sg.get("days", 30)) * 24.0, 1.0)
+	hv.sync(done, bool(st["building"]), p)
+	hv.update_frame()
+
+
+## 카메라가 다 지은 궤도 도시의 원통 안에 있나
+func _inside_habitat() -> bool:
+	if not _bodies.has(cam.focus) or not _bodies[cam.focus].has("hab"):
+		return false
+	var hv: HabitatView = _bodies[cam.focus]["hab"]
+	if not hv.visible or not hv.hull_done():
+		return false
+	var c := hv.global_transform.affine_inverse() * Vector3.ZERO
+	return absf(c.x) < hv.half_len and Vector2(c.y - hv.hub.y, c.z - hv.hub.z).length() < 1.0
+
+
+## 궤도 도시가 보이나 (지은 단계가 있거나 짓는 중) — 이름표·고정점 목록
+func habitat_shown(id: String) -> bool:
+	return _bodies.has(id) and _bodies[id].has("hab") and (_bodies[id]["hab"] as HabitatView).visible
 
 
 static func g_basis_cam(b: Basis) -> Basis:
@@ -1450,12 +1504,14 @@ func _draw_overlay() -> void:
 	routes.draw_metros(font, placed)
 	routes.draw_regions(font, placed)
 	_label_metro_facilities(font, placed)
-	var order := ["sun", "earth", "moon", "mars", "venus", "mercury", "jupiter", "saturn", "uranus", "neptune",
+	var order := ["sun", "earth", "moon", "l5", "mars", "venus", "mercury", "jupiter", "saturn", "uranus", "neptune",
 		"pluto", "ceres", "io", "europa", "ganymede", "callisto", "titan", "triton", "phobos", "deimos", "charon"]
+	var inside := _inside_habitat()                 # 궤도 도시 안에서는 벽 너머 천체·별 이름을 감춘다
 	for id in order:
-		_label_body(id, font, placed)
+		if not inside:
+			_label_body(id, font, placed)
 	# 이웃 별 (은하 전체를 볼 때는 해 둘레에 겹치므로 감춘다)
-	if (cam.dist > 2.0e9 or not Astro.bodies.has(cam.focus)) and _galaxy_k < 0.3:
+	if not inside and (cam.dist > 2.0e9 or not Astro.bodies.has(cam.focus)) and _galaxy_k < 0.3:
 		for s in Astro.systems:
 			_label_star(s, font, placed)
 	if _galaxy_k > 0.3:
@@ -1541,9 +1597,11 @@ func _occluded(p: PackedFloat64Array) -> bool:
 
 
 func _label_body(id: String, font: Font, placed: Array) -> void:
+	if _bodies.has(id) and _bodies[id].has("hab") and not (_bodies[id]["hab"] as HabitatView).visible:
+		return                                     # 아직 짓지 않은 궤도 도시
 	var info := _info(id)
 	var b: Dictionary = Astro.bodies[id]
-	var c: PackedFloat64Array = info["center"]
+	var c: PackedFloat64Array = info.get("pivot", info["center"])
 	if id != cam.focus and _occluded(c):
 		return
 	var sp: Variant = screen_of(to_render(c))

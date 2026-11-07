@@ -98,6 +98,7 @@ func rebuild() -> void:
 	var here := mgr.index_of_sim(sim) if sim != null else -1
 	if not mgr.scenario.is_empty():
 		body_box.add_child(_scenario_section())
+	body_box.add_child(_l5_section())
 	if here >= 0:
 		body_box.add_child(_dev_section(here))
 		body_box.add_child(_delegate_section(here))
@@ -199,6 +200,68 @@ func _dev_section(i: int) -> Control:
 
 
 ## 시나리오 (Scenario): 이름·설명, 목표마다 ✓(이뤘다)·✗(어겼다)·진행, 남은 날·결과
+## L5 궤도 도시 (Orbital): 매스 드라이버, 네 단계, 다음 단계 짓기 — 다 지으면 그 도시로 가기
+func _l5_section() -> Control:
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 10))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	card.add_child(v)
+	var head := ThemeFactory.heading("", 16)
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(head)
+	var text := ThemeFactory.muted("달의 매스 드라이버가 레골리스를 추진제 없이 L5로 쏘아 올려, 첫 궤도 도시를 네 단계로 짓는다. " +
+		"다 지으면 천체 밖의 첫 도시가 선다 — 지름 6 km의 원통이 돌아 바닥에 1 g를 만들고, 거울이 햇빛을 늘 들인다. " +
+		"값은 고향이 내고, 고향의 메가프로젝트를 시드가 맡으면 넉넉할 때 스스로 시작한다.", 12)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(text)
+	var drv := ThemeFactory.muted("", 12)
+	drv.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	drv.add_theme_color_override("font_color", Palette.TEXT.darkened(0.05))
+	v.add_child(drv)
+	var lines := Label.new()
+	lines.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lines.add_theme_font_size_override("font_size", 13)
+	v.add_child(lines)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var why := ThemeFactory.muted("", 12)
+	why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	why.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(why)
+	var b := Button.new()
+	b.text = "다음 단계 짓기"
+	b.custom_minimum_size = Vector2(120, 34)
+	b.pressed.connect(func():
+		if Orbital.build(mgr) == "":
+			changed.emit()
+			update_view())
+	row.add_child(b)
+	var go := Button.new()
+	go.text = "L5로 가기"
+	go.custom_minimum_size = Vector2(100, 34)
+	go.pressed.connect(func():
+		var ci := Orbital.city_index(mgr)
+		if ci >= 0:
+			view_requested.emit(ci))
+	row.add_child(go)
+	v.add_child(row)
+	_live.append(func():
+		head.text = "L5 궤도 도시 · %s" % Orbital.status_text(mgr)
+		drv.text = Orbital.driver_text(mgr) if Orbital.driver_built(mgr) else Orbital.lock_reason(mgr)
+		var rows := PackedStringArray()
+		for i in Orbital.stages().size():
+			rows.append(Orbital.stage_line(mgr, i))
+		lines.text = "\n".join(rows)
+		var reason := Orbital.build_reason(mgr)
+		var done := Orbital.done(mgr)
+		b.visible = not done
+		b.disabled = reason != ""
+		why.text = "" if done else (reason if reason != "" else "지금 지을 수 있다 — " + Orbital.cost_text(Orbital.stages()[int(Orbital.state(mgr)["stage"])].get("cost", {})))
+		go.visible = Orbital.city_index(mgr) >= 0)
+	return card
+
+
 func _scenario_section() -> Control:
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.GREEN.darkened(0.4), 8, 10))

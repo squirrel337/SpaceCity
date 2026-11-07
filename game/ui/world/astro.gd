@@ -174,11 +174,38 @@ static func _position(id: String, jd: float) -> PackedFloat64Array:
 			var emb2 := _kepler(bodies["earth"]["elements"], bodies["earth"]["rates"], t)
 			var m := moon_geo(jd)
 			return add3(sub3(emb2, scale3(m, MOON_MU)), m)
+	if String(b.get("kind", "")) == "habitat":
+		return habitat_center(id, jd)
 	if b.has("elements"):
 		return _kepler(b["elements"], b["rates"], t)
 	if b.has("parent"):
 		return add3(position(b["parent"], jd), satellite_offset(id, jd))
 	return v3(0, 0, 0)
+
+
+## 궤도 도시(kind habitat — 지구–달 L5)의 원통 축 가운데: 달보다 trail_deg(60°) 뒤, 달 궤도면에서 지구를 돈다
+static func habitat_hub(id: String, jd: float) -> PackedFloat64Array:
+	var b: Dictionary = bodies[id]
+	var m := moon_geo(jd)
+	var m2 := moon_geo(jd + 0.05)
+	var v := sub3(m2, m)
+	var n := norm3(v3(m[1] * v[2] - m[2] * v[1], m[2] * v[0] - m[0] * v[2], m[0] * v[1] - m[1] * v[0]))   # 달 궤도의 북극
+	var ang := -deg_to_rad(float(b.get("trail_deg", 60.0)))
+	var c := cos(ang)
+	var sn := sin(ang)
+	var kd := dot3(n, m)
+	var kv := v3(n[1] * m[2] - n[2] * m[1], n[2] * m[0] - n[0] * m[2], n[0] * m[1] - n[1] * m[0])
+	var p := v3(m[0] * c + kv[0] * sn + n[0] * kd * (1.0 - c), m[1] * c + kv[1] * sn + n[1] * kd * (1.0 - c),
+		m[2] * c + kv[2] * sn + n[2] * kd * (1.0 - c))
+	return add3(position("earth", jd), p)
+
+
+## 카메라가 쓰는 가상 구의 중심 (궤도 도시): 원통 축 가운데에서 몸체 z 쪽 아래로 반지름의 두 배 — 구의 꼭대기(몸체 z)가
+## 원통 안쪽 바닥이고, 거기서 '위'(몸체 z)가 축 쪽이다. 카메라의 목표가 멀리서 옮겨 가는 곳은 축 가운데(pivot)다
+static func habitat_center(id: String, jd: float) -> PackedFloat64Array:
+	var r := float(bodies[id]["radius_km"])
+	var f := frame(id, jd)
+	return sub3(habitat_hub(id, jd), scale3(dvec(f.z), 2.0 * r))
 
 
 ## 모행성 중심에서 위성까지 (원 궤도, 모행성 적도면)
@@ -268,6 +295,11 @@ static func frame(id: String, jd: float, spin_h: float = NAN) -> Basis:
 			var prime := vec(eq_to_ecl(v3(cos(gmst), sin(gmst), 0.0)))
 			return _frame_from(pole_e, prime)
 	var b: Dictionary = bodies.get(id, {})
+	if String(b.get("kind", "")) == "habitat":
+		# 궤도 도시: z = 황도 북극 (안쪽 바닥에서 축 쪽), x = 해 쪽 (원통 축이 해를 본다 — 거울이 햇빛을 들인다)
+		var hub := habitat_hub(id, jd)
+		var to_sun := Vector3(-hub[0], -hub[1], 0.0)
+		return _frame_from(Vector3(0, 0, 1), to_sun.normalized() if to_sun.length_squared() > 1e-6 else Vector3(1, 0, 0))
 	var pole_v := vec(b.get("pole_ecl", v3(0, 0, 1)))
 	var hours := (jd - J2000) * 24.0 if is_nan(spin_h) else spin_h
 	var rot: float = float(b.get("rot_h", 0.0))
@@ -317,7 +349,7 @@ static func orbit_points(id: String, jd: float, n: int = 192) -> PackedFloat64Ar
 			var a := TAU * k / n
 			out.append_array(add3(scale3(u, r * cos(a)), scale3(w, r * sin(a))))
 		return out
-	if b.has("orbit_km"):
+	if b.has("orbit_km") and b.has("period_d"):
 		var period: float = float(b["period_d"])
 		for k in n:
 			out.append_array(satellite_offset(id, jd + absf(period) * k / n))

@@ -15,6 +15,9 @@ const GLOW := Color(1.0, 0.85, 0.5)
 
 var _sig := ""
 var _mats := {}
+var _rail := {}                  # 다 지은 질량 투사기의 레일 {root, dir, L, rise} — 쏠 때 덩이가 지나간다
+var _shots: Array[MeshInstance3D] = []
+var _shot_t := 0.0
 
 
 func refresh(plan: CityPlan, local: Callable) -> void:
@@ -25,6 +28,8 @@ func refresh(plan: CityPlan, local: Callable) -> void:
 	if sig == _sig:
 		return
 	_sig = sig
+	_rail = {}
+	_shots.clear()
 	for ch in get_children():
 		ch.queue_free()
 	for w in plan.mega_done:
@@ -166,6 +171,8 @@ func _driver(root: Node3D, size: float, k: Callable) -> void:
 	var rise := deg_to_rad(9.0)
 	var yaw := PI * 0.25
 	var dir := Vector3(cos(yaw), 0, -sin(yaw))
+	if k2 >= 1.0:
+		_rail = {"root": root, "dir": dir, "L": L, "rise": rise}
 	var n := 14
 	for i in n:
 		var f := (float(i) + 0.5) / n
@@ -225,3 +232,41 @@ func _tether(root: Node3D, size: float, k: Callable) -> void:
 		var line := 3000.0 * k2
 		_cyl(root, Vector3(0, 6.0 + tower + line * 0.5, 0), 0.35, 0.35, line, GLOW)
 		_box(root, Vector3(0, 6.0 + tower + minf(line, 300.0) * 0.4, 0), Vector3(4, 6, 4), STEEL)
+
+
+## 매 프레임 (City3D): 질량 투사기가 오늘 쏘았으면 빛나는 레골리스 덩이가 레일을 달려 하늘로 (1.6초마다 넷)
+func animate(delta: float, on: bool) -> void:
+	if _rail.is_empty() or not is_instance_valid(_rail["root"]):
+		return
+	if _shots.is_empty():
+		var mesh := SphereMesh.new()
+		mesh.radius = 1.6
+		mesh.height = 3.2
+		mesh.radial_segments = 8
+		mesh.rings = 4
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = GLOW
+		for i in 4:
+			var m := MeshInstance3D.new()
+			m.mesh = mesh
+			m.material_override = mat
+			m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			(_rail["root"] as Node3D).add_child(m)
+			_shots.append(m)
+	_shot_t = fposmod(_shot_t + delta / 1.6, 1.0)
+	var dir: Vector3 = _rail["dir"]
+	var L: float = _rail["L"]
+	var rise: float = _rail["rise"]
+	var up := (dir * cos(rise) + Vector3.UP * sin(rise)).normalized()
+	for i in _shots.size():
+		var m := _shots[i]
+		m.visible = on
+		if not on:
+			continue
+		var f := fposmod(_shot_t + i / float(_shots.size()), 1.0) * 2.0          # 0~1 레일 위, 1~2 하늘로
+		var s := minf(f, 1.0)
+		var at := dir * ((s - 0.5) * L) + Vector3(0, s * L * tan(rise) + 3.6, 0)
+		if f > 1.0:
+			at += up * ((f - 1.0) * L * 3.0)
+		m.position = at

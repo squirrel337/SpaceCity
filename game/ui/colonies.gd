@@ -16,7 +16,7 @@ extends RefCounted
 const SAVE_VERSION := 3
 const ORIGIN := "earth"            # 행성 사이 원정이 떠나는 행성 (고향 달 기지는 지구 곁)
 ## 개척 탭과 도시 고르기에서 천체를 늘어놓는 순서
-const BODY_ORDER := ["moon", "earth", "mars", "mercury", "ceres", "callisto", "titan"]
+const BODY_ORDER := ["moon", "earth", "l5", "mars", "mercury", "ceres", "callisto", "titan"]
 
 var list: Array = []               # 도시 [{name, short, site, body, sim, plan, founded}] — founded: 게임 시각(시)
 var expeditions: Array = []        # 이동 중 [{site, depart, arrive, seed, mode, from}] — 게임 시각(시), from: 떠난 부지
@@ -33,6 +33,7 @@ var scenario_news := ""            # 이번 시간에 시나리오가 끝났으�
 var routes: Array = []             # 정기 교역 (CityRoutes — 플레이어가 정한 도시 사이의 정기 화물)
 var fleet := {}                    # 함대 (Fleet — 행성간 항로를 오가는 배)
 var contracts := {}                # 항로 계약과 지구 협상 (Contracts)
+var orbital := {}                  # 매스 드라이버와 L5 궤도 도시 (Orbital)
 
 
 ## 새 게임: 고향 도시와 천체마다의 기본 도시로 시작한다
@@ -54,6 +55,7 @@ func start(sim: CitySim, plan: CityPlan) -> void:
 	transport.rebuild(self)
 	Fleet.start(self)
 	Contracts.start(self)
+	Orbital.start(self)
 
 
 ## 아직 없는 기본 도시를 세운다 (새 게임, 기본 도시가 없던 옛 저장). 도시마다 몇 시간씩 앞서 세운 것으로 해
@@ -189,6 +191,7 @@ func step() -> Array:
 		CityRoutes.step(self)                      # 정기 교역 — 날이 된 것을 그 노선의 특별편으로
 		Fleet.step_day(self)                       # 함대 — 다 지은 배, 자동 운영
 		Contracts.step_day(self)                   # 항로 계약 · 지구 협상
+		Orbital.step_day(self)                     # 매스 드라이버 · L5 궤도 도시
 		share_techs()
 		metro_fn.step_day(self)
 		var r := Scenario.step(self)               # 시나리오 목표 (이기거나 지면 main이 결과 창을 띄운다)
@@ -486,7 +489,7 @@ func to_save() -> Dictionary:
 			"oplog": (c.get("oplog", []) as Array).slice(-120)})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
-		"metro_fn": metro_fn.to_save(), "scenario": scenario, "routes": routes, "fleet": fleet, "contracts": contracts}
+		"metro_fn": metro_fn.to_save(), "scenario": scenario, "routes": routes, "fleet": fleet, "contracts": contracts, "orbital": orbital}
 
 
 ## 저장을 읽는다 (판 1 = 도시 하나뿐이던 저장, 판 2 = 교통이 없던 저장). 기본 도시가 없던 저장이면 지금 시각에 세운다.
@@ -509,6 +512,7 @@ func load_save(data: Dictionary) -> bool:
 		transport.load_save({}, self)
 		Fleet.start(self)
 		Contracts.start(self)
+		Orbital.start(self)
 		scenario = {}
 		scenario_news = ""
 		Scenario.apply_rules(self)
@@ -592,6 +596,7 @@ func load_save(data: Dictionary) -> bool:
 	transport.load_save(data.get("transport", {}) if data.get("transport") is Dictionary else {}, self)
 	Fleet.load_state(self, data.get("fleet"))
 	Contracts.load_state(self, data.get("contracts"))
+	Orbital.load_state(self, data.get("orbital"))
 	routes = []
 	for r in (data["routes"] if data.get("routes") is Array else []):
 		if r is Dictionary and r.has("from") and r.has("to") and r.has("key"):

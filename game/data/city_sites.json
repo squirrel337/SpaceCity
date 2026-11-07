@@ -458,6 +458,35 @@
             "excavator": 1, "parts_fab": 0, "robot_bay": 1, "propellant_plant": 1, "landing_pad": 2, "medical_bay": 1,
             "research_lab": 1, "green_commons": 1, "comms_center": 1}}
       }
+    },
+    {
+      "id": "l5_island",
+      "body": "l5",
+      "name": "L5 아일랜드",
+      "short": "L5",
+      "lat": 90.0,
+      "lon": 0.0,
+      "gravity_g": 1.0,
+      "layout": "open",
+      "summary": "달보다 60° 뒤에서 지구를 도는 평형점 L5에 떠 있는 첫 궤도 도시 — 천체 밖의 첫 도시다. 달의 매스 드라이버가 추진제 없이 쏘아 올린 레골리스로 차폐 껍질을 두르고, 지름 6 km의 원통이 2분에 한 바퀴 돌아 안쪽 바닥에 1 g를 만든다. 거울이 햇빛을 늘 들인다.",
+      "env": {"sun": "늘 낮 — 거울이 햇빛을 들인다 (지구 궤도의 100%)", "day": "밤이 없다", "dose": "하루 약 0.1 mSv — 레골리스 차폐 껍질 (1 m²에 4.5 t)", "resources": "달에서 쏘아 올린 레골리스(금속·산소), 지구–달 물류망의 물", "rule": "팔 땅이 없다 — 레골리스는 매스 드라이버로만 오고, 물 20일치를 물류망이 늘 채운다. 회전 중력 1 g, 태양광에 밤이 없다"},
+      "rules": {"sun_k": 1.0, "ice_k": 0.0, "dig_k": 0.0, "heat_k": 1.2, "build_k": 0.9, "contact_k": 0.95, "supply_days": {"water_kg": 20}},
+      "constants": {
+        "illumination": {"model": "rotation", "day_h": 24.0, "light_frac": 1.0, "tiles": {"A": 40, "B": 0, "C": 0}, "tile_factor": {"A": 1.0}},
+        "dose_msv_day": {"bare_hab": 0.15, "covered_hab": 0.1, "dome": 0.08},
+        "spe": {"major_rate_per_year": {"solar_min": 0.05, "added_at_solar_max": 0.3}, "minor_rate_per_year": {"solar_min": 0.6, "added_at_solar_max": 2.4},
+          "major_dose_msv": 20, "minor_dose_msv": 2, "scripted_major_day": -1},
+        "earth": {"cargo_first_day": 20, "cargo_interval_days": 45, "cargo_capacity_units": 300, "cargo_cost_support": 150,
+          "crewed_first_day": 60, "crewed_interval_days": 90, "crewed_seats": 40, "crewed_cost_support": 200,
+          "support_start": 800, "support_per_month": 90, "earth_rp_day": 10, "express_cost_support": 300, "express_days": 4},
+        "robots": {"start": 10},
+        "start": {"population": 80, "morale": 78, "trust": 65,
+          "stocks": {"o2_kg": 4000, "water_kg": 30000, "food_kg": 16000, "h2_kg": 200, "ch4_kg": 0, "regolith_t": 2000, "metal_t": 20, "parts": 1500},
+          "solar_tiles_used": {"A": 10},
+          "counts": {"hab_module": 8, "electrolyzer": 1, "co2_scrubber": 2, "water_recycler": 2, "tank_farm": 2, "hydroponics": 4, "food_store": 2,
+            "solar_tower": 10, "battery_bank": 2, "radiator": 3, "mre_plant": 1, "parts_fab": 1, "robot_bay": 1, "landing_pad": 1,
+            "storm_shelter": 1, "medical_bay": 1, "research_lab": 1, "comms_center": 1}}
+      }
     }
   ]
 }

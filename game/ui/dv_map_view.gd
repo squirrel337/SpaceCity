@@ -74,8 +74,10 @@ func refresh(force := false) -> void:
 	for n in st["depots"]:
 		dsig += "%s:%s," % [n, String(st["depots"][n].get("state", ""))]
 	var nc := (Contracts.state(mgr)["active"] as Array).size() if not mgr.contracts.is_empty() else 0
-	var sig := "%s|%d|%d|%d|%d|%d|%s|%d" % [selected, (st["ships"] as Array).size(), (st["orders"] as Array).size(),
-		mgr.known_techs().size(), mgr.list.size(), mgr.transport.lines.size(), dsig, nc]
+	var ost := Orbital.state(mgr)
+	var osig := "%d:%s:%s" % [int(ost["stage"]), str(ost["building"]), str(Orbital.driver_built(mgr))]
+	var sig := "%s|%d|%d|%d|%d|%d|%s|%d|%s" % [selected, (st["ships"] as Array).size(), (st["orders"] as Array).size(),
+		mgr.known_techs().size(), mgr.list.size(), mgr.transport.lines.size(), dsig, nc, osig]
 	if sig != _sig:
 		_sig = sig
 		_build_card()
@@ -102,8 +104,8 @@ func _layout() -> void:
 	_pos.clear()
 	for n in nodes:
 		var id := String(n["id"])
-		if String(n["kind"]) == "transfer":
-			_pos[id] = Vector2(_x(float(n["col"]), cols), y_tr)
+		if String(n["kind"]) == "transfer" or String(n["kind"]) == "habitat":
+			_pos[id] = Vector2(_x(float(n["col"]), cols), y_tr)       # L5 궤도 도시 터는 전이 줄의 빈자리 (L1 위)
 		elif id == "l1":
 			_pos[id] = Vector2(_x(float(n["col"]), cols), y_l1)
 	var edges: Array = Fleet.data().get("edges", [])
@@ -243,6 +245,14 @@ func _draw() -> void:
 			else:
 				draw_line(pts[i - 1], pts[i], col, w, true)
 		_edge_label(e, pts, font)
+	# 매스 드라이버: 오늘 쏘았으면 달 표면 → L5에 레골리스 덩이가 줄지어 간다 (추진제 없이)
+	var ms: Vector2 = _pos.get("moon_s", Vector2.INF)
+	var l5p: Vector2 = _pos.get("l5", Vector2.INF)
+	if ms != Vector2.INF and l5p != Vector2.INF and float(Orbital.state(mgr)["last_t"]) > 0.0:
+		draw_dashed_line(ms, l5p, Color(Palette.AMBER, 0.55), 2.0, 5.0)
+		var ph := fposmod(Time.get_ticks_msec() / 1400.0, 1.0)
+		for i in 6:
+			draw_circle(ms.lerp(l5p, fposmod(ph + i / 6.0, 1.0)), 2.6, Palette.AMBER)
 	# 가는 중인 배
 	var st := Fleet.state(mgr)
 	var pb := Fleet.port_body(mgr)
@@ -270,6 +280,23 @@ func _draw() -> void:
 		var c2: Color = BODY_COLOR.get(body, Palette.TEXT)
 		var picked := selected == "n:" + id or (sel_route != "" and body == sel_route and kind != "surface")
 		match kind:
+			"habitat":
+				# 궤도 도시 터: 누운 원통 — 지은 만큼 채운다
+				var ost := Orbital.state(mgr)
+				var k5 := float(int(ost["stage"])) / maxf(float(Orbital.stages().size()), 1.0)
+				var rr := Rect2(p2 - Vector2(16, 7), Vector2(32, 14))
+				draw_rect(rr, Palette.PANEL_2)
+				if k5 > 0.0:
+					draw_rect(Rect2(rr.position, Vector2(rr.size.x * k5, rr.size.y)), Color(Palette.TEAL, 0.85))
+				draw_rect(rr, Palette.TEAL if Orbital.city_index(mgr) >= 0 else Palette.MUTED, false, 2.0)
+				draw_string(font, p2 + Vector2(-40, 26), I18n.t(String(n["name"])), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Palette.TEXT)
+				var stt := "궤도 도시 — 매스 드라이버 시대" if not Orbital.driver_built(mgr) and int(ost["stage"]) == 0 and not bool(ost["building"]) \
+					else Orbital.short_text(mgr)
+				draw_string(font, p2 + Vector2(-40, 40), I18n.t(stt), HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+					Palette.TEAL if bool(ost["building"]) or Orbital.city_index(mgr) >= 0 else Palette.DIM)
+				if picked:
+					draw_arc(p2, 20.0, 0.0, TAU, 24, Palette.AMBER, 2.0, true)
+				continue
 			"hub":
 				_diamond(p2, 10.0, Palette.AMBER)
 			"transfer":
@@ -587,6 +614,35 @@ func _node_card(id: String) -> void:
 	var body := String(n.get("body", ""))
 	_box.add_child(ThemeFactory.heading(String(n.get("name", id)), 17))
 	match String(n.get("kind", "")):
+		"habitat":
+			_label("달보다 60° 뒤에서 지구를 도는 평형점 — 지구와 달이 함께 끌어 물건이 머문다. 달의 매스 드라이버가 레골리스를 " +
+				"추진제 없이 여기로 쏘아 올려 첫 궤도 도시(지름 6 km의 회전 원통)를 짓는다 — 개척 탭에서 단계마다 짓는다.", 13, Palette.MUTED)
+			_label("", 13)
+			var hd: Label = _box.get_child(_box.get_child_count() - 1)
+			_label("", 12, Palette.MUTED)
+			var dr: Label = _box.get_child(_box.get_child_count() - 1)
+			_label("", 13)
+			var sl: Label = _box.get_child(_box.get_child_count() - 1)
+			var bb := Button.new()
+			bb.text = "다음 단계 짓기"
+			bb.custom_minimum_size = Vector2(0, 40 if ThemeFactory.touch() else 32)
+			bb.pressed.connect(func():
+				if Orbital.build(mgr) == "":
+					changed.emit()
+					_sig = ""
+					refresh(true))
+			_box.add_child(bb)
+			_live.append(func():
+				hd.text = "L5 궤도 도시 · %s" % Orbital.status_text(mgr)
+				dr.text = Orbital.driver_text(mgr) if Orbital.driver_built(mgr) else Orbital.lock_reason(mgr)
+				var rows := PackedStringArray()
+				for i in Orbital.stages().size():
+					rows.append(Orbital.stage_line(mgr, i))
+				sl.text = "\n".join(rows)
+				var why := Orbital.build_reason(mgr)
+				bb.visible = not Orbital.done(mgr)
+				bb.disabled = why != ""
+				bb.tooltip_text = I18n.t(why))
 		"hub":
 			_label("지구와 달 사이의 균형점. 행성으로 가는 전이가 여기서 갈라진다 — 지구 가까이 내려가 엔진을 켜면 (오베르트 효과) 화성 전이까지 1.0 km/s. " +
 				"시대 1에 달의 물로 만든 추진제를 쌓는 연료 기지가 들어선다.", 13, Palette.MUTED)

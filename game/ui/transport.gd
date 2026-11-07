@@ -139,6 +139,11 @@ func rebuild(col: Colonies) -> void:
 	var port := _port(col)
 	if e_hub != "" and port != "" and node_body(port) == "moon":
 		want.append(_line(e_hub, port, "shuttle", "shuttle", "", 384400.0))
+	# 달 고향 ↔ L5 궤도 도시 (Orbital — 다 지은 뒤)
+	var l5_hub := _hub(col, "l5")
+	if l5_hub != "" and port != "":
+		var ld: Dictionary = Orbital.data().get("line", {})
+		want.append(_line(port, l5_hub, String(ld.get("mode", "shuttle")), "shuttle", "", float(ld.get("km", 384400.0))))
 	# 행성 사이: 고향 ↔ 다른 천체의 가장 큰 도시
 	if port == "":
 		port = e_hub

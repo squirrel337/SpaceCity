@@ -149,6 +149,8 @@ func children(a: Dictionary) -> Array:
 			var id := String(a["id"])
 			for mid in Astro.order:
 				if String(Astro.bodies[mid].get("parent", "")) == id:
+					if String(Astro.bodies[mid].get("kind", "")) == "habitat" and not view.habitat_shown(mid):
+						continue                       # 아직 짓지 않은 궤도 도시
 					out.append(body(mid))
 			out.append_array(cities_on(id))
 	return out

@@ -78,6 +78,11 @@ func local_height_m(_p: Vector2) -> float:
 	return 0.0
 
 
+## 천체의 곡률로 땅이 기지 평면 아래로 떨어지는 몫 (m) — 3D 도시가 건물·길을 놓을 때 뺀다 (궤도 도시는 위로 휘어 음수)
+func drop_m(p: Vector2) -> float:
+	return p.length_squared() / (2.0 * radius_m())
+
+
 ## 고치기 전 땅 높이 (m, 기지 평지 기준) — 평탄화·침수 안내가 쓴다
 func base_height_m(p: Vector2) -> float:
 	if _hbase.is_empty():

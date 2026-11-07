@@ -17,6 +17,7 @@ var layout: BaseLayout
 var plan: CityPlan
 var tool: PlaceTool
 var traffic: BaseTraffic
+var driver_on := false              # 매스 드라이버가 오늘 L5로 쏘았나 (WorldView가 넣는다 — 질량 투사기에 덩이가 날아간다)
 var hovered := ""
 var hovered_pos := Vector3.ZERO
 var title := "섀클턴 시드 시티"     # 왼쪽 위 이름 (식민지 이름)
@@ -158,7 +159,7 @@ func visible_now() -> bool:
 
 ## 모형 좌표 (x, y)와 땅 위 높이 → 부모 로컬 좌표. 땅 높이와 달의 곡률을 넣는다
 func _local(p: Vector2, above: float = 0.0) -> Vector3:
-	var z := ground.local_height_m(p) - p.length_squared() / (2.0 * ground.radius_m()) + above
+	var z := ground.local_height_m(p) - ground.drop_m(p) + above
 	return Vector3(p.x, z, -p.y)
 
 
@@ -216,6 +217,7 @@ func update(delta: float, speed_level: int) -> void:
 			_mega.refresh(plan, _local)
 	if cover_on and heights_ok:
 		_update_cover()
+	_mega.animate(delta, driver_on)
 	if heights_ok:
 		_trains.refresh(plan)
 		_trains.step(plan, _local, delta * VIS_SPEED[clampi(speed_level, 0, 3)])

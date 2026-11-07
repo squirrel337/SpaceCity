@@ -10,7 +10,8 @@
    "pole": "자전축 북극의 [적경°, 적위°] (J2000 적도)",
    "rot_h": "항성 자전 주기 (시간, 음수는 역행)",
    "orbit_km/period_d": "모행성 적도면의 원 궤도 (위성)",
-   "bright_stars": "[이름, 적경°, 적위°, 겉보기 등급, 표면 온도 K]"
+   "bright_stars": "[이름, 적경°, 적위°, 겉보기 등급, 표면 온도 K]",
+   "habitat": "kind habitat — 지구–달 L5 궤도 도시 (game/ui/orbital.gd로 짓는다): radius_km(원통 반지름 — 카메라가 쓰는 가상 구의 반지름이기도 하다), length_km(원통 길이), trail_deg(달보다 뒤인 각 — L5는 60°), orbit_km(지구에서 — 카메라 축척 사슬). 짓기 전에는 보이지 않는다"
   }
  },
  "bodies": [
@@ -63,6 +64,17 @@
    "parent": "earth",
    "radius_km": 1737.4,
    "look": "moon"
+  },
+  {
+   "id": "l5",
+   "name": "지구–달 L5",
+   "kind": "habitat",
+   "parent": "earth",
+   "radius_km": 3.0,
+   "orbit_km": 384400,
+   "trail_deg": 60.0,
+   "length_km": 15.0,
+   "look": "habitat"
   },
   {
    "id": "mars",

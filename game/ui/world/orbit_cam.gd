@@ -252,7 +252,7 @@ func _pose_body(b: Dictionary) -> void:
 		h = terrain.call(focus, up_b)
 	var w := _center_weight(dist, r)
 	var s := Astro.add3(c, Astro.bmul(f, Astro.scale3(t_dir, r + h)))
-	target = Astro.lerp3(s, c, w)
+	target = Astro.lerp3(s, b.get("pivot", c), w)          # 궤도 도시는 멀어지면 원통 축 가운데(pivot)로
 	var up := f * up_b
 	# 멀어지면 화면 위를 황도 북쪽 쪽으로 서서히 맞춘다 (space 모드로 넘어갈 때 돌지 않게)
 	var fw := f * fwd
@@ -280,7 +280,7 @@ func _anchor(d: float) -> PackedFloat64Array:
 	if track.is_valid():
 		return track.call()
 	var b := _body(focus)
-	var a: PackedFloat64Array = b["center"]
+	var a: PackedFloat64Array = b.get("pivot", b["center"])
 	if lock:
 		return a
 	for step in b.get("chain", []):
@@ -345,7 +345,7 @@ func _step_fly(delta: float) -> void:
 	var t: float = clampf(_fly["t"], 0.0, 1.0)
 	var e := t * t * (3.0 - 2.0 * t)
 	var b := _body(_fly["id"])
-	var c: PackedFloat64Array = b["center"]
+	var c: PackedFloat64Array = b.get("pivot", b["center"])
 	if _fly.has("track"):
 		c = (_fly["track"] as Callable).call()
 	var a0: PackedFloat64Array = _fly["a0"]

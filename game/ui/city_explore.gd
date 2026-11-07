@@ -30,6 +30,8 @@ static func _make_sites(c: Dictionary) -> Array:
 	var plan: CityPlan = c["plan"]
 	var ex := data()
 	var body := String(GameData.site(sim.site_id).get("body", "moon"))
+	if float(GameData.site(sim.site_id).get("rules", {}).get("dig_k", 1.0)) <= 0.0:
+		return []                                        # 궤도 도시: 둘레에 탐사할 땅이 없다
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([sim.seed_value, sim.site_id, "explore"])
 	var finds: Array = []

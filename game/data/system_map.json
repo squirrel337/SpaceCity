@@ -1,7 +1,7 @@
 {
   "_meta": {
     "about": "항성계 레이어 — Δv 항로 지도와 함대 (game/ui/fleet.gd, game/ui/dv_map_view.gd). 시뮬레이션 밖의 규칙이다",
-    "nodes": "id, name, body(그 천체 — 표면·궤도), kind(surface 표면 · orbit 저궤도 · hub 지구–달 L1 · transfer 태양 궤도의 전이), col(지도의 세로줄 — 태양에서 먼 차례)",
+    "nodes": "id, name, body(그 천체 — 표면·궤도), kind(surface 표면 · orbit 저궤도 · hub 지구–달 L1 · transfer 태양 궤도의 전이 · habitat 지구–달 L5의 궤도 도시 터 — Orbital), col(지도의 세로줄 — 태양에서 먼 차례)",
     "edges": "a → b의 Δv(km/s) dv, b → a는 back (없으면 dv와 같다). aero: 대기 제동·대기 포획을 쓰는 쪽(a→b면 'b', b→a면 'a'). 표면 ↔ 저궤도는 착륙선이 오가고, 행성간 함선은 저궤도 ↔ 저궤도만 간다",
     "dock": "천체 → 함선이 머무는 궤도 노드",
     "classes": "함선 등급: isp(비추력 s), dry_t(빈 배 질량), cap_t(화물 한도), seats(정착민 자리), time_k(전이 기간 배수), prop(추진제), order(지구 조선소 주문 — 고향이 낸다), requires(만들 수 있게 하는 기술)",
@@ -22,6 +22,7 @@
     {"id": "earth_s", "name": "지구 표면", "body": "earth", "kind": "surface", "col": 1},
     {"id": "llo", "name": "달 저궤도", "body": "moon", "kind": "orbit", "col": 2},
     {"id": "moon_s", "name": "달 표면", "body": "moon", "kind": "surface", "col": 2},
+    {"id": "l5", "name": "지구–달 L5", "body": "l5", "kind": "habitat", "col": 2.2},
     {"id": "mars_tr", "name": "화성 전이", "body": "mars", "kind": "transfer", "col": 3},
     {"id": "lmo", "name": "화성 저궤도", "body": "mars", "kind": "orbit", "col": 3},
     {"id": "mars_s", "name": "화성 표면", "body": "mars", "kind": "surface", "col": 3},
@@ -39,6 +40,7 @@
     {"a": "l1", "b": "leo", "dv": 3.8, "note": "지구 저궤도 ↔ L1"},
     {"a": "leo", "b": "earth_s", "dv": 0.0, "back": 9.4, "aero": "b", "note": "오를 때 9.4 · 내릴 때 대기 제동 (열 차폐)"},
     {"a": "l1", "b": "llo", "dv": 0.7},
+    {"a": "l1", "b": "l5", "dv": 0.3, "note": "달 궤도를 따라 60° 뒤 — 매스 드라이버의 레골리스는 추진제 없이 온다"},
     {"a": "llo", "b": "moon_s", "dv": 1.9, "note": "공기가 없어 내릴 때도 엔진으로"},
     {"a": "l1", "b": "mars_tr", "dv": 1.0, "note": "지구 가까이 내려가 엔진을 켠다 (오베르트 효과)"},
     {"a": "mars_tr", "b": "lmo", "dv": 0.0, "back": 2.1, "aero": "b", "note": "도착은 대기 포획 · 떠날 때 2.1"},

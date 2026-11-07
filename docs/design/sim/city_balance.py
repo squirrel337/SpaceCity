@@ -195,6 +195,7 @@ class City:
         self.C = site_constants(site)
         self.sun_k = rules.get("sun_k", 1.0)          # 태양광 출력
         self.ice_k = rules.get("ice_k", 1.0)          # 얼음 채굴
+        self.dig_k = rules.get("dig_k", 1.0)          # 레골리스 굴착 (궤도 도시는 팔 땅이 없다 — 0)
         self.heat_k = rules.get("heat_k", 1.0)        # 방열 능력
         self.build_k = rules.get("build_k", 1.0)      # 로봇 작업량
         self.contact_k = rules.get("contact_k", 1.0)  # 지구 교신의 사기
@@ -529,7 +530,7 @@ class City:
             for m in self.active["ice_miner"]:
                 s["water_kg"] += wk[m] * recipe(m, "out", "water_kg") * self.mining * k3
             for m in self.active["excavator"]:
-                s["regolith_t"] += wk[m] * recipe(m, "out", "regolith_t") * k3
+                s["regolith_t"] += wk[m] * recipe(m, "out", "regolith_t") * k3 * self.dig_k
             for m in self.active["mre_plant"]:
                 n = min(wk[m] * k3, s["regolith_t"] / recipe(m, "in", "regolith_t"))
                 s["regolith_t"] -= n * recipe(m, "in", "regolith_t")
@@ -826,7 +827,7 @@ class City:
             build("green_commons")
         if cap(lambda m: provided(m, "care"), lambda m: provided(m, "care")) < pop_next:
             build("medical_bay")
-        if p("excavator") < 1 + (self.fam_queued("regolith_dome") + self.fam_queued("storm_shelter")) // 2:
+        if self.dig_k > 0 and p("excavator") < 1 + (self.fam_queued("regolith_dome") + self.fam_queued("storm_shelter")) // 2:
             build("excavator")
         if "molten_regolith_electrolysis" in self.techs and p("mre_plant") < 1:
             build("mre_plant")

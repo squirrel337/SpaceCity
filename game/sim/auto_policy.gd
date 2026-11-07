@@ -163,7 +163,7 @@ func decide(sim: CitySim, day: int) -> void:
 	if care < pop_next:
 		build(sim, "medical_bay")
 	@warning_ignore("integer_division")
-	if fam_planned(sim, "excavator") < 1 + (fam_queued(sim, "regolith_dome") + fam_queued(sim, "storm_shelter")) / 2:
+	if sim.dig_k > 0.0 and fam_planned(sim, "excavator") < 1 + (fam_queued(sim, "regolith_dome") + fam_queued(sim, "storm_shelter")) / 2:
 		build(sim, "excavator")
 	if sim.techs.has("molten_regolith_electrolysis") and fam_planned(sim, "mre_plant") < 1:
 		build(sim, "mre_plant")
