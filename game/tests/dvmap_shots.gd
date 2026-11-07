@@ -1,6 +1,7 @@
 extends SceneTree
 ## 항로 지도 스크린숏 — 기본 도시로 시작해 며칠 흐른 뒤: 화성 항로를 고른 항로 지도, 달 표면, 칼리스토 항로, 교통 탭의 함대,
-## 그리고 연료 기지 (L1을 열고 1,240 t을 쌓고 화성 궤도 기지를 짓는 중으로 놓은 뒤 L1 카드와 화성 항로) (디스플레이가 필요하다).
+## 그리고 연료 기지 (L1을 열고 1,240 t을 쌓고 화성 궤도 기지를 짓는 중으로 놓은 뒤 L1 카드와 화성 항로), 교통 탭의 항로 계약,
+## 지구 협상 카드 (디스플레이가 필요하다).
 ##   xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 \
 ##     --script res://tests/dvmap_shots.gd -- --out /tmp/shots [--days 40]
 
@@ -75,6 +76,27 @@ func _process(_delta: float) -> bool:
 				m.selected = "mars"
 				m._sig = ""
 				m.refresh(true)],
+			["contracts_prep", func():
+				var col: Colonies = main.colonies
+				var st := Contracts.state(col)
+				st["next"] = col.hour / 24
+				Contracts.step_day(col)
+				if not (st["offers"] as Array).is_empty():
+					Contracts.accept(col, int(st["offers"][0]["id"]))
+				main._set_view("world")
+				main._select_tab("transport")
+				main.tabs["transport"].rebuild()],
+			["contracts_tab", func():                        # 앞 단계에서 다시 만든 칸이 자리를 잡은 뒤에 내린다
+				var l := _find_label(main, "항로 계약 · 평판", true)
+				if l != null:
+					main.panel_scroll.scroll_vertical = int(l.global_position.y - main.panel_scroll.global_position.y) \
+						+ main.panel_scroll.scroll_vertical - 8],
+			["deal_card", func():
+				var st2 := Contracts.state(main.colonies)
+				var dd: Dictionary = Contracts.data()["deals"]["list"][0]
+				st2["pending"] = {"id": String(dd["id"]), "client": String(dd["client"]), "title": String(dd["title"]),
+					"text": String(dd["text"]), "choices": (dd["choices"] as Array).duplicate(true)}
+				main._show_deal()],
 		]
 		_wait = 10
 		return false

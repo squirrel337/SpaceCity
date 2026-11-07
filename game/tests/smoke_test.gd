@@ -1713,6 +1713,7 @@ func _transport_check(col: Colonies) -> void:
 	_routes_check(col)
 	_fleet_check(col)
 	_depot_check(col)
+	_contracts_check(col)
 
 
 ## 함대·항로 지도: 로켓 방정식(문서의 예), 저궤도 사이 Δv, 3년 동안 항로마다 배가 있다, 부두에 배가 있어야 떠나고 보내는 도시가
@@ -1938,6 +1939,183 @@ func _depot_check(col: Colonies) -> void:
 		return "%s:%s %.0f t (쌓음 %.0f · 넣음 %.0f%s)" % [n, String(keep_dep[n].get("state", "")), float(keep_dep[n].get("stock", 0.0)),
 			float(keep_dep[n].get("made", 0.0)), float(keep_dep[n].get("used", 0.0)),
 			(" · " + String(keep_dep[n].get("why", ""))) if String(keep_dep[n].get("why", "")) != "" else ""])))])
+
+
+## 항로 계약: 제안이 들어오고 (항로·방향·마감·보수), 받으면 그 방향의 수송선이 계약 물건을 더 싣고 닿으면 마친다 (보수·평판),
+## 마감이 지나면 위약금·평판, 받은 한도, 자동 운영. 지구 협상: 예산 증액(보정 몫, 조건을 못 지키면 평판·신뢰), 흥정(평판),
+## 투자(보수 떼기), 결정 카드, 저장 왕복, 교통 탭 칸
+func _contracts_check(col: Colonies) -> void:
+	var st := Contracts.state(col)
+	var keep: Dictionary = (col.contracts as Dictionary).duplicate(true)
+	var hi := col.index_of_site(GameData.HOME_SITE)
+	var home: CitySim = col.list[hi]["sim"]
+	_check((Contracts.data().get("goods", []) as Array).size() == 5 and (Contracts.data()["deals"]["list"] as Array).size() == 5,
+		"계약 물건·협상 자료가 맞지 않다")
+	_check(int(st["done"]) + int(st["failed"]) + (st["active"] as Array).size() + (st["offers"] as Array).size() > 0,
+		"3년 동안 항로 계약이 하나도 들어오지 않았다")
+	var years := "3년 뒤 평판 %d · 마침 %d · 놓침 %d · 번 지원 %s · 협상 %d" % [int(st["rep"]), int(st["done"]), int(st["failed"]),
+		Fmt.n(float(st["earned"])), (st["log"] as Array).filter(func(e): return String(e[1]).contains("지구 협상")).size()]
+	# 제안 (협상·자동 운영·지난 거래는 잠시 끈다)
+	var auto0: bool = Fleet.state(col)["auto"]
+	Fleet.state(col)["auto"] = false
+	st["deals"] = []
+	st["pending"] = {}
+	st["deal_next"] = col.hour / 24 + 100000
+	Contracts._apply_deals(col)
+	st["offers"] = []
+	st["active"] = []
+	st["next"] = col.hour / 24
+	Contracts.step_day(col)
+	st["next"] = col.hour / 24 + 100000
+	var offers: Array = st["offers"]
+	_check(offers.size() >= 1 and offers.size() <= int(Contracts.data()["offers"]["max_open"]), "계약 제안이 들어오지 않았다 (%d)" % offers.size())
+	for o in offers:
+		_check(Fleet.routes(col).has(String(o["route"])) and int(o["deadline"]) > col.hour and float(o["reward"]) > 0.0
+			and (String(o["from"]) == Fleet.port_body(col)) != (String(o["to"]) == Fleet.port_body(col)), "계약 제안이 이상하다 %s" % str(o))
+	# 실어 나르기: 고향 → 화성 물 5 t
+	var l := Fleet.line_of(col, "mars")
+	var hel: CitySim = col.list[col.index_of_site(String(l["b"]))]["sim"]
+	var ct := {"id": 9001, "client": "지구 우주청", "route": "mars", "from": Fleet.port_body(col), "to": "mars", "good": "water_kg",
+		"amount": 5.0, "reward": 300.0, "penalty": 120.0, "deadline": col.hour + 24 * 900, "expires": 0, "delivered": 0.0, "sent": 0.0,
+		"windows": 1}
+	(st["active"] as Array).append(ct)
+	var wspec := Contracts._cargo_spec("water_kg")
+	home.stock["water_kg"] = Transport._need(home, wspec) * 1.5 + 20000.0
+	hel.stock["water_kg"] = Transport._need(hel, wspec) + 1000.0
+	hel.caps["water_kg"] = maxf(float(hel.caps.get("water_kg", 0.0)), float(hel.stock["water_kg"]) + 20000.0)
+	_check(absf(Contracts.spare(home, "water_kg") - 20.0) < 0.01, "보내는 도시의 남는 몫이 맞지 않다 (%.2f t)" % Contracts.spare(home, "water_kg"))
+	var mars_ships := Fleet.ships_of(col, "mars")
+	if mars_ships.is_empty():
+		mars_ships.append(Fleet._add_ship(col, "chem", "mars", Fleet.port_body(col)))
+	for t0 in col.transport.trips.duplicate():
+		if t0.has("ship") and mars_ships.any(func(x): return int(x["id"]) == int(t0["ship"])):
+			col.transport.trips.erase(t0)
+	for sh in mars_ships:
+		sh["at"] = Fleet.port_body(col)
+		sh["to"] = ""
+	home.support = maxf(home.support, 5000.0)
+	var rep0 := float(st["rep"])
+	var n0 := col.transport.trips.size()
+	col.transport._depart_ship(col, l, 0)
+	var trip: Dictionary = col.transport.trips[-1] if col.transport.trips.size() > n0 else {}
+	_check(not trip.is_empty() and trip.get("contract") is Dictionary and absf(float(trip["contract"].get(9001, 0.0)) - 5.0) < 0.01
+		and float(ct["sent"]) == 5.0, "수송선이 계약 물건을 싣지 않았다 %s" % str(trip.get("contract", {})))
+	if not trip.is_empty():
+		var sup0 := home.support
+		trip["arrive"] = col.hour + 1
+		col.step()
+		_check(not (st["active"] as Array).has(ct) and int(st["done"]) > 0 and home.support - sup0 >= 299.5
+			and float(st["rep"]) > rep0, "닿은 계약을 마치지 않았다 (보수 %.1f)" % (home.support - sup0))
+	# 이미 실은 짐을 먼저 셈한다: 교통이 물 3 t을 실었으면 2 t만 더 싣는다
+	var ct4 := ct.duplicate()
+	ct4["id"] = 9300
+	ct4["delivered"] = 0.0
+	ct4["sent"] = 0.0
+	st["active"] = [ct4]
+	home.stock["water_kg"] = Transport._need(home, wspec) * 1.5 + 20000.0
+	var cg := {"water_kg": 3000.0}
+	var al := Contracts.add_cargo(col, Fleet.port_body(col), "mars", home, hel, {}, cg, 300.0)
+	_check(absf(float(al.get(9300, 0.0)) - 5.0) < 0.01 and absf(float(cg["water_kg"]) - 5000.0) < 1.0,
+		"이미 실은 물을 계약에 셈하지 않았다 %s %s" % [str(al), str(cg)])
+	st["active"] = []
+	# 마감이 지났다 — 위약금 · 평판
+	var ct2 := ct.duplicate()
+	ct2["id"] = 9002
+	ct2["deadline"] = col.hour - 1
+	ct2["delivered"] = 0.0
+	ct2["sent"] = 0.0
+	(st["active"] as Array).append(ct2)
+	var f0 := int(st["failed"])
+	var r1 := float(st["rep"])
+	var s1 := home.support
+	Contracts.step_day(col)
+	_check(int(st["failed"]) == f0 + 1 and float(st["rep"]) < r1 and absf(s1 - home.support - 120.0) < 0.5, "마감이 지난 계약을 놓치지 않았다")
+	# 받은 한도
+	st["active"] = []
+	var maxa := int(Contracts.data()["offers"]["max_active"])
+	for i in maxa:
+		var c3 := ct.duplicate()
+		c3["id"] = 9100 + i
+		(st["active"] as Array).append(c3)
+	if not (st["offers"] as Array).is_empty():
+		_check(Contracts.accept_reason(col, int(st["offers"][0]["id"])) != "", "받은 계약이 한도인데 또 받는다")
+	st["active"] = []
+	# 지구 협상: 예산 증액 — 받으면 보정 몫, 날이 다 가도 계약 2건을 못 마치면 평판 · 신뢰
+	var budget: Dictionary = {}
+	for dd in Contracts.data()["deals"]["list"]:
+		if String(dd["id"]) == "budget":
+			budget = {"id": "budget", "client": String(dd["client"]), "title": String(dd["title"]), "text": String(dd["text"]),
+				"choices": (dd["choices"] as Array).duplicate(true)}
+	st["pending"] = budget
+	_check(Contracts.resolve(col, 0) and (st["deals"] as Array).size() >= 1, "예산 증액을 받지 못했다")
+	var home_c: Dictionary = col.list[hi]
+	_check(float(home.ext.get("support_day", 0.0)) >= 6.0 and float(home_c["ext_parts"]["deals"]["support_day"]) == 6.0,
+		"예산 증액이 고향 보정에 없다 (%s)" % str(home_c.get("ext_parts", {}).get("deals", {})))
+	var r2 := float(st["rep"])
+	var tr2 := home.trust
+	(st["deals"][-1] as Dictionary)["until"] = col.hour
+	Contracts.step_day(col)
+	_check(float(st["rep"]) <= r2 - 9.9 and home.trust <= tr2 - 2.9 and float(home_c["ext_parts"]["deals"]["support_day"]) == 0.0,
+		"조건을 못 지킨 거래의 평판·신뢰가 그대로다")
+	# 흥정: 평판이 되면 더 받는다
+	st["rep"] = 70.0
+	st["pending"] = budget.duplicate(true)
+	Contracts.resolve(col, 1)
+	_check(float((st["deals"][-1] as Dictionary)["support_day"]) == 9.0, "평판 70인데 흥정이 먹히지 않았다")
+	st["deals"] = []
+	Contracts._apply_deals(col)
+	# 투자: 보수의 25%를 뗀다
+	for dd in Contracts.data()["deals"]["list"]:
+		if String(dd["id"]) == "investor":
+			st["pending"] = {"id": "investor", "client": String(dd["client"]), "title": String(dd["title"]), "text": "",
+				"choices": (dd["choices"] as Array).duplicate(true)}
+	var s2 := home.support
+	Contracts.resolve(col, 0)
+	_check(absf(home.support - s2 - 1500.0) < 0.5 and absf(Contracts.cut(col, "water_kg") - 0.25) < 0.001, "투자의 돈이나 보수 떼기가 맞지 않다")
+	# 결정 카드
+	st["pending"] = budget.duplicate(true)
+	main._show_deal()
+	_check(main.modal.visible and main.modal.context == "deal", "지구 협상 결정 카드가 뜨지 않았다")
+	main._on_modal_choice("deal", "2")
+	_check((st["pending"] as Dictionary).is_empty(), "협상 카드를 골랐는데 남았다")
+	main.modal.visible = false
+	# 자동 운영: 남는 몫이 넉넉하고, 보내는 부두에 배가 있고, 마감이 1,000일 안이면 받는다 (한 시간 흐르며 물이 저장 한도로 잘렸을 수 있다)
+	home.caps["water_kg"] = maxf(float(home.caps.get("water_kg", 0.0)), Transport._need(home, wspec) * 1.5 + 30000.0)
+	home.stock["water_kg"] = Transport._need(home, wspec) * 1.5 + 20000.0
+	var ms: Array = Fleet.ships_of(col, "mars")
+	for t1 in col.transport.trips.duplicate():
+		if t1.has("ship") and ms.any(func(x): return int(x["id"]) == int(t1["ship"])):
+			col.transport.trips.erase(t1)
+	for sh in ms:
+		sh["at"] = "mars"
+		sh["to"] = ""
+	st["active"] = []
+	st["offers"] = [ct.duplicate()]
+	st["offers"][0]["id"] = 9200
+	st["offers"][0]["expires"] = col.hour + 240
+	Contracts._auto(col)
+	_check((st["active"] as Array).is_empty(), "보내는 부두에 배가 없는데 자동 운영이 계약을 받았다")
+	ms[0]["at"] = Fleet.port_body(col)
+	st["offers"][0]["deadline"] = col.hour + 24 * 1500
+	Contracts._auto(col)
+	_check((st["active"] as Array).is_empty(), "마감이 1,500일 뒤인 계약을 자동 운영이 받았다")
+	st["offers"][0]["deadline"] = col.hour + 24 * 900
+	Contracts._auto(col)
+	_check((st["active"] as Array).size() == 1, "함대 자동 운영이 넉넉한 계약을 받지 않았다 (남는 물 %.1f t, 배 %d척)" % [
+		Contracts.spare(home, "water_kg"), Fleet.ships_of(col, "mars").size()])
+	Fleet.state(col)["auto"] = auto0
+	# 저장 왕복
+	var before := JSON.stringify(JSON.parse_string(JSON.stringify(col.contracts)))      # 숫자는 저장하면 모두 실수
+	Contracts.load_state(col, JSON.parse_string(before))
+	var after := JSON.stringify(JSON.parse_string(JSON.stringify(col.contracts)))
+	_check(after == before, "항로 계약이 저장 왕복에서 달라졌다\n%s\n%s" % [before.left(400), after.left(400)])
+	# 교통 탭
+	var tp: TransportPanel = main.tabs["transport"]
+	tp.rebuild()
+	_check(_texts(tp).any(func(x): return String(x).begins_with("항로 계약 · 평판")), "교통 탭에 항로 계약 칸이 없다")
+	col.contracts = keep
+	Contracts._apply_deals(col)
+	print("smoke: contracts %s, 제안 %d건 (%s)" % [years, offers.size(), Contracts.offer_text(col, offers[0]) if not offers.is_empty() else ""])
 
 
 ## 소리: 효과음·환경음을 모두 만든다 (길이·고리·크기), 단추를 누르면 딸깍, 기록 글에 맞는 소리(연구 완료)와 알림 종류의 소리,

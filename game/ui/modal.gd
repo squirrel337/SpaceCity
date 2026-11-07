@@ -3,7 +3,7 @@ extends Control
 ## 게임을 멈추고 결정을 받는 카드 (대피소 추첨, 보고서, 메뉴 등)
 
 ## 결정 카드마다 효과음 (없으면 정보 소리)
-const CONTEXT_FX := {"storm": "alarm", "event": "event", "report": "milestone", "scenario_end": "milestone", "death": "death",
+const CONTEXT_FX := {"storm": "alarm", "event": "event", "deal": "event", "report": "milestone", "scenario_end": "milestone", "death": "death",
 	"over": "death", "start": "info", "menu": "click", "help": "click", "module": "click"}
 
 signal chosen(context: String, choice: String)

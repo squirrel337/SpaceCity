@@ -1,0 +1,67 @@
+{
+  "_meta": {
+    "about": "항성계 레이어 — 항로 계약과 지구 협상 (game/ui/contracts.gd). 시뮬레이션 밖의 규칙이다",
+    "offers": "항로 계약 제안: every_days(다음 제안까지 날 — 그 사이에서 난수), max_open(열린 제안 한도), valid_days(제안이 남는 날), max_active(받은 계약 한도), auto_active(함대 자동 운영이 받는 한도), auto_spare(자동 운영이 받는 조건: 보내는 도시의 남는 양이 계약 양의 이만큼, 받는 도시에 다 들일 자리, 보내는 부두에 그 항로의 배), auto_days(자동 운영은 마감이 이 날수 안인 계약만), out_share(고향 → 그 천체 쪽 계약의 몫 — 나머지는 그 천체 → 고향, 보내는 쪽에 남는 물건이 있는 방향은 네 배)",
+    "clients": "계약을 내는 쪽: id, name, routes(그 항로만 — 없으면 모든 항로)",
+    "goods": "계약 물건: key(비축 키 — 교통의 싣는 물건), name, unit(보이는 단위), per_unit(보이는 단위 하나가 비축 몇), t_per_unit(t), lots(양 범위, 보이는 단위), step, price(보이는 단위 하나의 보수 — 지원 점수)",
+    "reward": "보수 = 양 × price × (1 + 그 항로 Δv × dv_k) × 평판 배율, windows(마감: 그 방향의 발사 창 몇 번째에 떠나 닿을 때까지 — 그 사이에서 난수, 전이는 가장 느린 등급의 slow_k배 + margin_days), penalty_k(못 마치면 보수의 이만큼을 보내는 도시가 낸다), rep_done·rep_fail(평판), trust_fail(보내는 도시의 신뢰)",
+    "rep": "지구와의 평판 0~100: start, 보수 배율 = lo + (hi − lo) × 평판/100",
+    "deals": "지구 협상: every_days(다음 협상까지 날), list — id, client, title, text, weight, needs(routes 그 항로가 있어야 · min_rep 평판), choices [{label, text, effect}]. effect: support(고향 지원 점수 지금) · support_day·rp_day + days(그 날수 동안 고향 보정) · rep · trust · morale(고향) · cut + days(그동안 항로 계약 보수에서 떼는 몫, cut_good이면 그 물건만) · need_contracts + fail(그 날수 안에 계약 몇 건을 마쳐야 — 못 마치면 fail 효과) · haggle {min_rep, then(평판이 되면), else}"
+  },
+  "offers": {"every_days": [30, 50], "max_open": 3, "valid_days": 45, "max_active": 4, "auto_active": 2, "auto_spare": 1.0, "auto_days": 1000, "out_share": 0.6},
+  "clients": [
+    {"id": "agency", "name": "지구 우주청"},
+    {"id": "mars_dev", "name": "화성 개발 공사", "routes": ["mars"]},
+    {"id": "sun_power", "name": "수성 태양 발전 회사", "routes": ["mercury"]},
+    {"id": "belt", "name": "소행성대 광업 조합", "routes": ["ceres"]},
+    {"id": "jovian", "name": "목성계 연구 연합", "routes": ["callisto"]},
+    {"id": "saturn", "name": "토성계 탐사 재단", "routes": ["titan"]}
+  ],
+  "goods": [
+    {"key": "water_kg", "name": "물", "unit": "t", "per_unit": 1000, "t_per_unit": 1.0, "lots": [10, 60], "step": 5, "price": 8},
+    {"key": "food_kg", "name": "식량", "unit": "t", "per_unit": 1000, "t_per_unit": 1.0, "lots": [4, 24], "step": 2, "price": 20},
+    {"key": "o2_kg", "name": "산소", "unit": "t", "per_unit": 1000, "t_per_unit": 1.0, "lots": [2, 12], "step": 1, "price": 25},
+    {"key": "parts", "name": "부품", "unit": "개", "per_unit": 1, "t_per_unit": 0.1, "lots": [40, 240], "step": 10, "price": 2},
+    {"key": "metal_t", "name": "금속", "unit": "t", "per_unit": 1, "t_per_unit": 1.0, "lots": [10, 60], "step": 5, "price": 12}
+  ],
+  "reward": {"dv_k": 0.25, "windows": [1, 2], "slow_k": 1.5, "margin_days": 30, "penalty_k": 0.4, "rep_done": 4, "rep_fail": -6, "trust_fail": -2},
+  "rep": {"start": 50, "lo": 0.8, "hi": 1.3},
+  "deals": {
+    "every_days": [100, 160],
+    "list": [
+      {"id": "budget", "client": "지구 우주청", "title": "우주청 예산 증액", "weight": 1.0,
+        "text": "지구 우주청이 내년 예산을 늘리겠다고 한다. 대신 그 돈이 행성 사이를 오가는 계약으로 돌아오기를 바란다.",
+        "choices": [
+          {"label": "받아들인다", "text": "1년 동안 고향 지원 점수 하루 +6 — 그동안 항로 계약 2건을 마쳐야 한다 (못 마치면 평판 −10 · 신뢰 −3)",
+            "effect": {"support_day": 6, "days": 365, "need_contracts": 2, "fail": {"rep": -10, "trust": -3}}},
+          {"label": "더 달라고 한다", "text": "평판이 60을 넘으면 하루 +9로 (조건은 같다), 아니면 거절당하고 평판 −2",
+            "effect": {"haggle": {"min_rep": 60, "then": {"support_day": 9, "days": 365, "need_contracts": 2, "fail": {"rep": -10, "trust": -3}}, "else": {"rep": -2}}}},
+          {"label": "사양한다", "text": "아무것도 바뀌지 않는다", "effect": {}}
+        ]},
+      {"id": "investor", "client": "궤도 물류 회사", "title": "민간 투자 제안", "weight": 1.0,
+        "text": "궤도 물류 회사가 함대에 투자하고 싶어 한다. 돈은 지금 주고, 2년 동안 항로 계약 보수의 일부를 가져가겠다고 한다.",
+        "choices": [
+          {"label": "투자를 받는다", "text": "고향 지원 점수 +1,500 — 2년 동안 항로 계약 보수의 25%가 회사로", "effect": {"support": 1500, "cut": 0.25, "days": 730}},
+          {"label": "거절한다", "text": "보수는 그대로 다 받는다", "effect": {}}
+        ]},
+      {"id": "research", "client": "지구 대학 연합", "title": "공동 연구 제안", "weight": 1.0,
+        "text": "지구의 대학 연합이 달의 실험 시설을 함께 쓰자고 한다. 결과는 지구와 나눈다.",
+        "choices": [
+          {"label": "함께 한다", "text": "반년 동안 고향 연구 하루 +6 · 평판 +3", "effect": {"rp_day": 6, "days": 180, "rep": 3}},
+          {"label": "우리 연구를 지킨다", "text": "평판 −1", "effect": {"rep": -1}}
+        ]},
+      {"id": "mining", "client": "소행성대 광업 조합", "title": "물 독점권 요구", "weight": 1.0, "needs": {"routes": ["ceres"]},
+        "text": "광업 조합이 세레스의 물을 저들만 사고팔게 해 달라고 한다. 지금 큰돈을 내겠다고 한다.",
+        "choices": [
+          {"label": "독점권을 준다", "text": "고향 지원 점수 +2,000 — 2년 동안 물 계약의 보수 30%가 조합으로", "effect": {"support": 2000, "cut": 0.3, "cut_good": "water_kg", "days": 730}},
+          {"label": "거절한다", "text": "평판 −4 — 정착민은 반긴다 (신뢰 +2)", "effect": {"rep": -4, "trust": 2}}
+        ]},
+      {"id": "autonomy", "client": "지구 우주청", "title": "자치 요구와 지구의 압력", "weight": 0.8,
+        "text": "정착민 사이에서 '우리 일은 우리가 정한다'는 목소리가 커졌다. 지구 우주청은 운영권이 지구에 있음을 분명히 하라고 한다.",
+        "choices": [
+          {"label": "지구 편에 선다", "text": "평판 +6 · 사기 −3", "effect": {"rep": 6, "morale": -3}},
+          {"label": "도시 편에 선다", "text": "평판 −8 · 사기 +4 · 신뢰 +3", "effect": {"rep": -8, "morale": 4, "trust": 3}}
+        ]}
+    ]
+  }
+}

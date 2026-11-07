@@ -630,6 +630,7 @@ static func launch(col: Colonies, l: Dictionary, dir: int, s_sim: CitySim, d_sim
 		var c := cls(String(sh["cls"]))
 		var cap := minf(float(md.get("cap_t", 300.0)), float(c.get("cap_t", 300.0)))
 		var cargo := tr._plan_cargo(s_sim, d_sim, cap, 0.0, inc)
+		var deal := Contracts.add_cargo(col, from_b, to_b, s_sim, d_sim, inc, cargo, cap)     # 받은 항로 계약의 물건
 		var n := tr._plan_people(s_sim, d_sim, int(c.get("seats", 0)), int(inc.get("people", 0)))
 		var load_t := Transport.cargo_t(cargo)
 		var empty := load_t < 0.05 and n <= 0
@@ -641,7 +642,7 @@ static func launch(col: Colonies, l: Dictionary, dir: int, s_sim: CitySim, d_sim
 			continue
 		if best.is_empty() or n > int(best["people"]) or (n == int(best["people"]) and float(tp["cost"]) < float(best["cost"])):
 			best = {"ship": sh, "cargo": cargo, "people": n, "cost": float(tp["cost"]), "prop_t": float(tp["prop_t"]),
-				"local": bool(tp["local"]), "time_k": float(c.get("time_k", 1.0))}
+				"local": bool(tp["local"]), "time_k": float(c.get("time_k", 1.0)), "contract": deal}
 	if best.is_empty():
 		return {"why": why}
 	return best

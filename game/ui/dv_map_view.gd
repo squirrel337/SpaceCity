@@ -73,8 +73,9 @@ func refresh(force := false) -> void:
 	var dsig := ""
 	for n in st["depots"]:
 		dsig += "%s:%s," % [n, String(st["depots"][n].get("state", ""))]
-	var sig := "%s|%d|%d|%d|%d|%d|%s" % [selected, (st["ships"] as Array).size(), (st["orders"] as Array).size(),
-		mgr.known_techs().size(), mgr.list.size(), mgr.transport.lines.size(), dsig]
+	var nc := (Contracts.state(mgr)["active"] as Array).size() if not mgr.contracts.is_empty() else 0
+	var sig := "%s|%d|%d|%d|%d|%d|%s|%d" % [selected, (st["ships"] as Array).size(), (st["orders"] as Array).size(),
+		mgr.known_techs().size(), mgr.list.size(), mgr.transport.lines.size(), dsig, nc]
 	if sig != _sig:
 		_sig = sig
 		_build_card()
@@ -511,6 +512,16 @@ func _route_card(r: String) -> void:
 		_box.add_child(btn)
 		if why != "" and why.ends_with("있어야 한다"):
 			_label(why, 11, Palette.AMBER)
+	# 이 항로의 받은 계약 (Contracts)
+	var deals: Array = (Contracts.state(mgr)["active"] as Array).filter(func(ct): return String(ct["route"]) == r) \
+		if not mgr.contracts.is_empty() else []
+	if not deals.is_empty():
+		_box.add_child(HSeparator.new())
+		_box.add_child(ThemeFactory.heading("항로 계약 %d건" % deals.size(), 14))
+		for ct in deals:
+			var cl := _label("", 12)
+			var cref: Dictionary = ct
+			_live.append(func(): cl.text = "▸ " + Contracts.active_text(mgr, cref))
 	if not Fleet.depot_site(Fleet.dock(r)).is_empty():
 		_depot_section(Fleet.dock(r))
 	_box.add_child(HSeparator.new())

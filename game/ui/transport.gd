@@ -521,6 +521,10 @@ func _depart_ship(col: Colonies, l: Dictionary, dir: int) -> void:
 	var t := {"line": l["id"], "from": src, "to": dst, "depart": col.hour,
 		"arrive": col.hour + maxi(1, int(round(float(l["trip_h"]) * float(go["time_k"])))), "cargo": cargo, "people": people,
 		"pax": settlers, "mode": l["mode"], "kind": l["kind"], "ship": int(sh["id"])}
+	var deal: Dictionary = go.get("contract", {})
+	if not deal.is_empty():
+		t["contract"] = deal                    # 항로 계약 몫 (Contracts — 닿으면 셈한다)
+		Contracts.mark_sent(col, deal)
 	trips.append(t)
 	trip_rev += 1
 	Fleet.depart(sh, node_body(dst))
@@ -534,6 +538,8 @@ func _depart_ship(col: Colonies, l: Dictionary, dir: int) -> void:
 		" (현지 생산)" if bool(go["local"]) and ((fin["legs"] as Array).is_empty() or String(fin["legs"][0][5]) == "") else "",
 		(" — " + refuel) if refuel != "" else ""]
 	var what := load_text(cargo, settlers) if tons > 0.0 or settlers > 0 else "빈 배 — 저쪽 부두에 배를 둔다"
+	if not deal.is_empty():
+		what += " · 계약 몫 %d건" % deal.size()
 	s_sim.note("행성간 수송선 출발 — %s(%s) %s행 (%s). %s · %s 도착 예정" % [String(sh["name"]), Fleet.cls_short(String(sh["cls"])),
 		node_name(dst), what, fuel, col.date_text(float(t["arrive"]))], "info")
 	Fleet.set_status(col, route, "%s → %s: %s 떠남 — %s · %s" % [node_name(src), node_name(dst), String(sh["name"]), what, fuel])
@@ -576,6 +582,7 @@ func _arrive(col: Colonies, t: Dictionary) -> void:
 		if t["kind"] == "ship":
 			d_sim.note("행성간 수송선 도착 — %s에서 (%s)" % [node_name(String(t["from"])), load_text(cargo, settlers)], "good")
 	Fleet.arrive(col, t, dst)
+	Contracts.on_arrive(col, t, dst)
 	if Metros.is_metro(String(t["to"])) and int(t.get("pax", 0)) > 0:
 		col.metro_fn.econ.note_pax(String(t["to"]), int(t["pax"]))
 	var l := line_by_id(String(t["line"]))
@@ -901,6 +908,11 @@ func load_save(data_in: Dictionary, col: Colonies) -> void:
 				tr["tag"] = String(t["tag"])
 			if t.has("ship"):
 				tr["ship"] = int(t["ship"])                 # 그 편을 탄 배 (Fleet)
+			if t.get("contract") is Dictionary:
+				var dc := {}
+				for k in t["contract"]:
+					dc[int(k)] = float(t["contract"][k])     # 항로 계약 몫 (Contracts)
+				tr["contract"] = dc
 			trips.append(tr)
 			trip_rev += 1
 		var fl: Dictionary = data_in.get("flow", {})

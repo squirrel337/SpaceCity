@@ -85,7 +85,7 @@ func _shape_sig() -> String:
 	var fn := mgr.metro_fn
 	return "%d|%d|%s|%s|%d|%d|%d|%d" % [mgr.transport.lines.size(), mgr.transport.rev, str(_open),
 		",".join(PackedStringArray(fn.keys_with_ops())), fn.active_keys().size(), fn.modes.metros.size(), mgr.routes.size(),
-		mgr.list.size()] + "|" + _fleet_sig()
+		mgr.list.size()] + "|" + _fleet_sig() + "|" + _contracts_sig()
 
 
 ## 탭을 고를 때·날마다: 모양이 그대로면 글만 고친다 (다시 만들면 노선이 많을 때 수십 ms)
@@ -119,6 +119,7 @@ func rebuild() -> void:
 	by_group["local"].sort_custom(func(a, b): return Colonies.BODY_ORDER.find(a["body"]) < Colonies.BODY_ORDER.find(b["body"]))
 	_routes_section()
 	_fleet_section()
+	_contracts_section()
 	_metro_section()
 	for g in GROUPS:
 		var ls: Array = by_group[g[0]]
@@ -161,6 +162,92 @@ func _fleet_sig() -> String:
 	for n in st["depots"]:
 		bits.append("%s:%s" % [n, String(st["depots"][n].get("state", ""))])
 	return "%s|%d|%d|%s" % [",".join(bits), (st["orders"] as Array).size(), mgr.known_techs().size(), str(st.get("auto", true))]
+
+
+func _contracts_sig() -> String:
+	if mgr.contracts.is_empty():
+		return ""
+	var st := Contracts.state(mgr)
+	var bits := PackedStringArray()
+	for key in ["offers", "active"]:
+		for c in st[key]:
+			bits.append("%s%d" % [key[0], int(c["id"])])
+	for dl in st["deals"]:
+		bits.append("d" + String(dl["id"]))
+	return ",".join(bits)
+
+
+## 항로 계약 (Contracts): 받은 계약(가는 중·마감), 들어온 제안(받기·사양), 지구 협상의 거래, 최근 기록
+func _contracts_section() -> void:
+	var st := Contracts.state(mgr)
+	box.add_child(HSeparator.new())
+	var head := ThemeFactory.heading("", 15)
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(head)
+	_live.append(func():
+		head.text = "항로 계약 · 평판 %d · 마침 %d건 · 놓침 %d건 · 번 지원 %s" % [int(st["rep"]), int(st["done"]), int(st["failed"]),
+			Fmt.n(float(st["earned"]))])
+	box.add_child(ThemeFactory.muted("지구 우주청과 행성 쪽 회사가 행성간 수송선으로 옮길 물건을 맡긴다. 받으면 그 방향의 수송선이 떠날 때 " +
+		"보내는 도시의 남는 몫에서 더 싣고, 마감까지 다 닿으면 보내는 도시가 보수를 받는다 (평판이 높을수록 많다 — 못 마치면 위약금과 평판). " +
+		"함대 자동 운영은 남는 몫이 넉넉하고 배가 있는 계약을 둘까지 받는다. 지구 협상은 결정 카드로 온다.", 12))
+	for ct in st["active"]:
+		var lab := ThemeFactory.muted("", 13)
+		lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lab.add_theme_color_override("font_color", Palette.TEXT)
+		box.add_child(lab)
+		var cref: Dictionary = ct
+		_live.append(func(): lab.text = "▸ " + Contracts.active_text(mgr, cref))
+	for ct in st["offers"]:
+		var card := PanelContainer.new()
+		card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 9))
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", 4)
+		card.add_child(v)
+		var t := ThemeFactory.muted("제안 — " + Contracts.offer_text(mgr, ct), 12)
+		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		t.add_theme_color_override("font_color", Palette.TEXT)
+		v.add_child(t)
+		var row := HFlowContainer.new()
+		row.add_theme_constant_override("h_separation", 6)
+		var id := int(ct["id"])
+		var why := Contracts.accept_reason(mgr, id)
+		var ok := Button.new()
+		ok.text = "받기"
+		ok.disabled = why != ""
+		ok.tooltip_text = why if why != "" else "그 방향의 다음 수송선부터 싣는다"
+		ok.custom_minimum_size = Vector2(72, 44 if ThemeFactory.touch() else 32)
+		ok.pressed.connect(func():
+			Contracts.accept(mgr, id)
+			changed.emit()
+			rebuild())
+		row.add_child(ok)
+		var no := Button.new()
+		no.text = "사양"
+		no.custom_minimum_size = Vector2(72, 44 if ThemeFactory.touch() else 32)
+		no.pressed.connect(func():
+			Contracts.decline(mgr, id)
+			rebuild())
+		row.add_child(no)
+		v.add_child(row)
+		if why != "":
+			var w := ThemeFactory.muted(why, 11)
+			w.add_theme_color_override("font_color", Palette.AMBER)
+			v.add_child(w)
+		box.add_child(card)
+	if (st["active"] as Array).is_empty() and (st["offers"] as Array).is_empty():
+		box.add_child(ThemeFactory.muted("받은 계약도 들어온 제안도 없다 — 30~50일마다 제안이 온다", 12))
+	for dl in st["deals"]:
+		var dlab := ThemeFactory.muted("", 12)
+		dlab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(dlab)
+		var dref: Dictionary = dl
+		_live.append(func(): dlab.text = "🤝 " + Contracts.deal_text(mgr, dref))
+	var lg: Array = st["log"]
+	for i in range(maxi(0, lg.size() - 3), lg.size()):
+		var e: Array = lg[i]
+		var l2 := ThemeFactory.muted("%s · %s" % [mgr.date_text(float(e[0])), String(e[1])], 11)
+		l2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(l2)
 
 
 ## 함대 (Fleet): 항로마다 배와 지난 창, 노는 배, 주문 중인 배, 주문 칸, 자동 운영, 최근 기록
