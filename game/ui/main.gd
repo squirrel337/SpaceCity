@@ -67,6 +67,7 @@ var region_card: RegionCard        # 3D: 반도체·AI 데이터센터 지역 �
 var view_mode := "world"
 var forecast: ForecastBar
 var modal: Modal
+var cross: CrossSection                # 건물 단면도 (건물 카드의 '단면 보기')
 var settings_panel: SettingsPanel
 var toasts: VBoxContainer
 var speed_buttons: Array[Button] = []
@@ -236,6 +237,8 @@ func _build() -> void:
 	modal = Modal.new()
 	modal.chosen.connect(_on_modal_choice)
 	add_child(modal)
+	cross = CrossSection.new()
+	add_child(cross)
 	settings_panel = SettingsPanel.new()
 	settings_panel.changed.connect(func(): world.apply_settings())
 	settings_panel.lang_changed.connect(_on_lang_changed)
@@ -1879,6 +1882,7 @@ func _on_module_tapped(mid: String) -> void:
 		Fmt.n(float(m["repair"]["rd"]), 1), String(m.get("note", "")), ", ".join(kin)]
 	var reason := sim.build_block_reason(mid, 0.0)
 	var choices := [["close", "닫기", ""]]
+	choices.push_front(["section:" + mid, "단면 보기", "방마다 사람 · 들고 나는 공기·물·전력 (1970년대 우주 식민지 그림풍)"])
 	choices.push_front(["build:" + mid, "1기 더 짓기 — 자리 고르기", reason if reason != "" else BuildPanel._cost_text(m["cost"])])
 	modal.open("module", Palette.CATEGORY_KO[m["category"]], m["name"], body, choices, Palette.CATEGORY[m["category"]])
 
@@ -1959,6 +1963,8 @@ func _on_modal_choice(context: String, choice: String) -> void:
 		"module":
 			if choice.begins_with("build:"):
 				_begin_place(choice.trim_prefix("build:"))
+			elif choice.begins_with("section:"):
+				cross.open(sim, colonies.list[active] if active >= 0 and active < colonies.list.size() else {}, choice.trim_prefix("section:"))
 	_dirty = true
 	_refresh_live()
 

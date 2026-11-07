@@ -68,6 +68,7 @@ func _process(_delta: float) -> bool:
 		_i18n_check()
 		_layout_check()
 		main._on_module_tapped("hab_module")
+		_section_check()
 		main._show_help()
 		main._show_report()
 		print("smoke: day %d, pop %d, built %d, notes %d" % [main.sim.current_day(), int(main.sim.population()), built, main.sim.notes.size()])
@@ -2305,6 +2306,23 @@ func _probe_check(col: Colonies) -> void:
 		"개척 탭에 성간 탐사 칸이 없다")
 	print("smoke: probes — 이웃 별 %d곳, 프록시마 %.2f년 + 소식 %.2f년, 행성 %d (%s)" % [tg.size(), fly_h / Probes.HOURS_PER_YEAR, 4.25, planets.size(),
 		Probes.planet_text(planets[0]) if not planets.is_empty() else ""])
+
+
+## 건물 단면도: 모든 계열에 모양·방이 있고, 건물 카드의 '단면 보기'로 열리고 닫힌다
+func _section_check() -> void:
+	var shapes := {}
+	for mid in main.sim.M:
+		var t := CrossSection.template(String(mid))
+		_check(not (t.get("rooms", []) as Array).is_empty() and String(t.get("shape", "")) != "", "%s의 단면도 틀이 없다" % mid)
+		shapes[String(t["shape"])] = true
+	_check(CrossSection.template("hab_tower")["shape"] == "tower" and CrossSection.template("solar_tower")["shape"] == "mast",
+		"고층 거주·태양광 타워의 단면 모양이 맞지 않다")
+	_check(main.modal.visible and main.modal.context == "module", "건물 카드가 뜨지 않았다")
+	main._on_modal_choice("module", "section:hab_module")
+	_check(main.cross.visible and main.cross.mid == "hab_module", "단면 보기가 열리지 않았다")
+	main.cross._close.pressed.emit()
+	_check(not main.cross.visible, "단면도가 닫히지 않았다")
+	print("smoke: sections — 계열 %d, 모양 %d %s" % [(CrossSection.data()["families"] as Dictionary).size(), shapes.size(), str(shapes.keys())])
 
 
 ## 소리: 효과음·환경음을 모두 만든다 (길이·고리·크기), 단추를 누르면 딸깍, 기록 글에 맞는 소리(연구 완료)와 알림 종류의 소리,
