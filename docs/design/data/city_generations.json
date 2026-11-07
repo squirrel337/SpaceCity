@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "about": "정착민의 세대 (game/ui/city_gens.gd) — 시뮬레이션 밖의 규칙이다 (모든 도시). 아이가 태어나면 그 도시의 정착민에 더한다",
+    "births": "start_era(이 시대부터 — 전초기지에는 가족이 아직 없다), min_pop, rate(한 해에 정착민 한 명당), morale_k(사기 50에서 멀어지는 만큼 1점마다 더하고 뺀다), care_k(의료실이 있으면 곱한다), crowded_k(정착민이 집의 95%를 넘으면 곱한다), room(집에 이만큼 빈자리가 있어야)",
+    "ages": "school(학생이 되는 나이), adult(어른 — 2세대 어른이 된다)",
+    "school": "학교 자리: per_lab(연구동 계열 1기마다), per_teacher(이름 있는 교사마다), per_commons(녹지 공원 계열 1기마다). 학생이 자리를 넘으면 short_morale",
+    "effects": "2세대 어른 몫(어른 가운데) 10%마다: morale(사기 더하기 — max_morale까지), work_k(일하는 효율 곱하기 — 손에 익은 사람들). 학생 한 명마다 rp_day",
+    "politics": "2세대 몫에 곱해 모임 지지 목표에 더한다 (city_politics.json의 terms.native — 공유지 연합은 오르고 지구 우호회는 내린다)",
+    "names": "아이 이름은 city_people.json의 성·이름 차례로 (도시마다 정해진다)"
+  },
+  "births": {"start_era": 1, "min_pop": 50, "rate": 0.014, "morale_k": 0.012, "care_k": 1.15, "crowded_k": 0.4, "room": 1},
+  "ages": {"school": 6, "adult": 18},
+  "school": {"per_lab": 30, "per_teacher": 20, "per_commons": 15, "short_morale": -3.0},
+  "effects": {"morale": 1.2, "max_morale": 4.0, "work_k": 1.006, "rp_day": 0.03}
+}

@@ -3552,5 +3552,16 @@
  "실내": "Interior",
  "단면 보기": "Cutaway view",
  "방마다 사람 · 들고 나는 공기·물·전력 (1970년대 우주 식민지 그림풍)": "People in every room · air, water and power flowing in and out (in the style of 1970s space colony art)",
- "음악": "Music"
+ "음악": "Music",
+ "시대 1, 정착민 50명, 집의 빈자리가 있어야 태어난다": "children are born from Era 1, with 50 settlers and room in the homes",
+ "아기·유아 %d · 학생 %d (학교 자리 %d) · 2세대 어른 %d명 (%d%%) · 이 도시에서 태어난 사람 %d": "Babies and toddlers %d · students %d (school places %d) · second-generation adults %d (%d%%) · born in this city %d",
+ "아직 이 도시에서 태어난 아이가 없다 — %s": "No child has been born in this city yet — %s",
+ "첫 2세대 어른 — %s에서 태어난 %s이(가) 열여덟 살이 되었다. 이 도시에서 나고 자란 사람들이 일터와 평의회에 들어선다": "First second-generation adult — {2}, born in {1}, has turned eighteen. People born and raised in this city are taking their places at work and on the council",
+ "첫 아이 — %s이(가) %s에서 태어났다. 지구 밖에서 태어난 이 도시의 첫 사람이다": "First child — %s was born in %s, the first of this city's people born off Earth",
+ "첫 아이 — %s이(가) %s에서 태어났다. 이 도시에서 태어난 첫 사람이다": "First child — %s was born in %s, the first person born in this city",
+ "한 해에 %s명쯤 태어날 것이다": "about %s births a year",
+ " (토박이)": " (native)",
+ "세대": "Generations",
+ "세대 — ": "Generations — ",
+ "토박이)": "native)"
 }

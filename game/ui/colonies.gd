@@ -178,6 +178,7 @@ func step() -> Array:
 			CityExplore.step(list[i], s.current_day())       # 둘레 탐사 (모든 도시)
 			CityTrade.step(list[i], s.current_day(), self)   # 수출 계약 (모든 도시)
 			CityPeople.step(list[i], s.current_day(), self)  # 이름 있는 정착민·이야기 (모든 도시)
+			CityGens.step(list[i], s.current_day())          # 세대 — 태어나고 자라 2세대 어른이 된다 (모든 도시)
 			CityPolitics.step(list[i], s.current_day())      # 모임의 지지·평의회 정책·회기 (모든 도시)
 			_record_hist(list[i])                            # 통계: 날마다 지원 점수
 	var arrived := []
@@ -488,7 +489,7 @@ func to_save() -> Dictionary:
 			"extra": int(c.get("extra", -100000)), "redev": int(c.get("redev", -1)), "redev_txt": String(c.get("redev_txt", "")),
 			"progress": c.get("progress", {}), "research": c.get("research", {}), "explore": c.get("explore", {}),
 			"trade": c.get("trade", {}), "delegate": c.get("delegate", {}), "hist": c.get("hist", {}),
-			"people": c.get("people", {}), "politics": c.get("politics", {}), "probes_sent": int(c.get("probes_sent", 0)),
+			"people": c.get("people", {}), "politics": c.get("politics", {}), "probes_sent": int(c.get("probes_sent", 0)), "gens": c.get("gens", {}),
 			"oplog": (c.get("oplog", []) as Array).slice(-120)})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
@@ -565,6 +566,8 @@ func load_save(data: Dictionary) -> bool:
 				"boosts": pd.get("boosts", []) if pd.get("boosts") is Array else [], "seen": pd.get("seen", {}) if pd.get("seen") is Dictionary else {},
 				"pending": pd.get("pending", {}) if pd.get("pending") is Dictionary else {}, "story": pd.get("story", []) if pd.get("story") is Array else []}
 			CityPeople.apply(entry)
+		if cd.get("gens") is Dictionary:
+			CityGens.load_state(entry, cd["gens"])
 		if cd.get("politics") is Dictionary and cd["politics"].get("policy") is Dictionary:
 			var pl: Dictionary = cd["politics"]
 			var pol := {}

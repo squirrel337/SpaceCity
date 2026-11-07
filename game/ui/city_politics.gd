@@ -81,6 +81,7 @@ static func target(c: Dictionary, fid: String, day: int) -> float:
 		t += float(terms.get("queue", 0.0))
 	if sim.housing_cap > 0.0 and sim.population() > sim.housing_cap * 0.95:
 		t += float(terms.get("crowded", 0.0))
+	t += float(terms.get("native", 0.0)) * CityGens.native_share(c)       # 이 도시에서 나고 자란 2세대 어른의 몫
 	t += float(terms.get("tech", 0.0)) * _recent(st, "tech", day, 180)
 	t += float(terms.get("contract", 0.0)) * mini(_recent(st, "contract", day, 180), 10)
 	t += float(terms.get("death", 0.0)) * _recent(st, "death", day, 365)

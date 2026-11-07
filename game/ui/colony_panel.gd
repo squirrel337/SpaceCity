@@ -707,10 +707,10 @@ func _people_section(i: int) -> Control:
 		var sim2: CitySim = c["sim"]
 		var rows := PackedStringArray()
 		for p in st["people"]:
-			rows.append("%s · %s %s — %s" % [String(p["name"]), String(p["trait"]), CityPeople.role_name(p),
-				CityPeople.effect_text(CityPeople.role(String(p["role"])).get("effect", {}))])
+			rows.append("%s%s · %s %s — %s" % [String(p["name"]), " (토박이)" if bool(p.get("native", false)) else "", String(p["trait"]),
+				CityPeople.role_name(p), CityPeople.effect_text(CityPeople.role(String(p["role"])).get("effect", {}))])
 		who.text = "\n".join(rows) if not rows.is_empty() else "아직 없다"
-		var lines := PackedStringArray()
+		var lines := PackedStringArray(["세대 — " + CityGens.summary(c)])
 		for b in st["boosts"]:
 			var left := "늘" if int(b["until"]) < 0 else "남은 %d일" % maxi(0, int(b["until"]) - sim2.current_day())
 			var ef := {String(b["key"]): float(b["k"]) if b.has("k") else float(b.get("add", 0.0))}

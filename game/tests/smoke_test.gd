@@ -1717,6 +1717,7 @@ func _transport_check(col: Colonies) -> void:
 	_contracts_check(col)
 	_orbital_check(col)
 	_probe_check(col)
+	_gens_check(col)
 
 
 ## 함대·항로 지도: 로켓 방정식(문서의 예), 저궤도 사이 Δv, 3년 동안 항로마다 배가 있다, 부두에 배가 있어야 떠나고 보내는 도시가
@@ -2306,6 +2307,60 @@ func _probe_check(col: Colonies) -> void:
 		"개척 탭에 성간 탐사 칸이 없다")
 	print("smoke: probes — 이웃 별 %d곳, 프록시마 %.2f년 + 소식 %.2f년, 행성 %d (%s)" % [tg.size(), fly_h / Probes.HOURS_PER_YEAR, 4.25, planets.size(),
 		Probes.planet_text(planets[0]) if not planets.is_empty() else ""])
+
+
+## 세대: 3년 동안 고향에 아이가 태어났다 (시대 1부터, 정착민에 더한다), 열여덟 살이 되면 2세대 어른 — 첫 2세대 알림,
+## 2세대 몫이 사기·일하는 효율을 올리고 공유지 연합 지지는 올리고 지구 우호회는 내린다, 학교 자리가 모자라면 사기, 저장 왕복, 개척 탭
+func _gens_check(col: Colonies) -> void:
+	var hi := col.index_of_site(GameData.HOME_SITE)
+	var hc: Dictionary = col.list[hi]
+	var home: CitySim = hc["sim"]
+	var st := CityGens.state(hc)
+	var day := home.current_day()
+	var born3 := int(st["total"])
+	_check(born3 > 0 and float(CityGens.children(hc, day)["kids"]) > 0.0 and not (st["first"] as Array).is_empty(),
+		"3년 동안 고향에 아이가 태어나지 않았다 (%s)" % CityGens.summary(hc))
+	var keep: Dictionary = (st as Dictionary).duplicate(true)
+	var com0 := CityPolitics.target(hc, "commons", day)
+	var ear0 := CityPolitics.target(hc, "earth", day)
+	# 열아홉 해 전에 태어난 아이들 — 오늘 어른이 된다
+	var n_adult := home.population() * 0.2
+	(st["born"] as Array).append([day - 19 * 365, n_adult])
+	st["first_adult"] = []
+	var notes0 := home.notes.size()
+	CityGens.step(hc, day)
+	var share := CityGens.native_share(hc)
+	_check(absf(float(st["adults"]) - float(keep["adults"]) - n_adult) < n_adult * 0.05 + 1.0 and share > 0.15
+		and not (st["first_adult"] as Array).is_empty(), "열여덟 살이 넘은 아이가 2세대 어른이 되지 않았다 (%.2f)" % share)
+	_check(home.notes.slice(notes0).any(func(x): return String(x[1]).begins_with("첫 2세대 어른")), "첫 2세대 어른을 알리지 않았다")
+	var part: Dictionary = hc["ext_parts"]["gens"]
+	_check(float(part["morale"]) > 1.5 and float(part["work_k"]) > 1.005, "2세대 몫의 사기·효율 보정이 없다 %s" % str(part))
+	var com1 := CityPolitics.target(hc, "commons", day)
+	var ear1 := CityPolitics.target(hc, "earth", day)
+	_check((com1 > com0 + share * 30.0 or com1 >= 99.9) and (ear1 < ear0 - share * 20.0 or ear1 <= 0.1),
+		"2세대가 늘어도 공유지 연합·지구 우호회 지지가 그대로다 (%.1f → %.1f, %.1f → %.1f)" % [com0, com1, ear0, ear1])
+	var summary := CityGens.summary(hc)
+	# 학교가 모자라면 사기 (같은 2세대 몫에서 보정 −3)
+	(st["born"] as Array).append([day - 8 * 365, CityGens.school_cap(hc) + 50.0])
+	CityGens.apply(hc)
+	var ef: Dictionary = CityGens.data()["effects"]
+	var want := minf(CityGens.native_share(hc) * 10.0 * float(ef["morale"]), float(ef["max_morale"])) \
+		+ float(CityGens.data()["school"]["short_morale"])
+	_check(absf(float(hc["ext_parts"]["gens"]["morale"]) - want) < 0.01, "학교 자리가 모자란데 사기 보정이 맞지 않다 (%.2f / %.2f)" % [
+		float(hc["ext_parts"]["gens"]["morale"]), want])
+	# 저장 왕복
+	var before := JSON.stringify(JSON.parse_string(JSON.stringify(st)))
+	CityGens.load_state(hc, JSON.parse_string(before))
+	_check(JSON.stringify(JSON.parse_string(JSON.stringify(hc["gens"]))) == before, "세대가 저장 왕복에서 달라졌다")
+	main._select_tab("colony")
+	main._on_colony_view(hi)
+	main.tabs["colony"].rebuild()
+	main.tabs["colony"].update_view()
+	_check(_texts(main.tabs["colony"]).any(func(x): return String(x).contains("세대 — 아기·유아")), "개척 탭에 세대 줄이 없다")
+	hc["gens"] = keep
+	CityGens.apply(hc)
+	print("smoke: generations — 3년에 %d명 태어남 (첫 아이 %s), 2세대 %d%%이면 공유지 %.0f → %.0f · 지구 %.0f → %.0f — %s" % [born3,
+		String(keep["first"][0]) if not (keep["first"] as Array).is_empty() else "-", int(share * 100.0), com0, com1, ear0, ear1, summary])
 
 
 ## 건물 단면도: 모든 계열에 모양·방이 있고, 건물 카드의 '단면 보기'로 열리고 닫힌다

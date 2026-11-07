@@ -70,8 +70,11 @@ static func _make(c: Dictionary, st: Dictionary) -> Dictionary:
 	var roles: Array = (d["roles"] as Array).map(func(r): return String(r["id"]))
 	var free := roles.filter(func(r): return not have.has(r))
 	var pool: Array = free if not free.is_empty() else roles
-	return {"id": n, "name": name, "role": String(pool[rng.randi() % pool.size()]),
+	var p := {"id": n, "name": name, "role": String(pool[rng.randi() % pool.size()]),
 		"trait": String(d["traits"][rng.randi() % (d["traits"] as Array).size()]), "since": sim.current_day()}
+	if rng.randf() < CityGens.native_share(c):
+		p["native"] = true                        # 이 도시에서 나고 자란 2세대 (CityGens)
+	return p
 
 
 ## 정착민 수에 맞춰 사람을 더한다 (처음이 아니면 알린다)
