@@ -5,10 +5,33 @@ extends VBoxContainer
 ##   운영 기록: 시드가 한 일 (자동 운영이든 맡긴 분야든 — CityAuto) 과 그 까닭. 분야로 거른다
 ##   통계: 날마다 기록의 그래프 (StatsView)
 
-const KIND_COLOR := {"info": Palette.MUTED, "build": Palette.MUTED, "good": Palette.GREEN, "warn": Palette.AMBER,
-	"critical": Palette.RED, "death": Palette.RED}
-const DOMAIN_COLOR := {"build": Palette.AMBER, "research": Palette.BLUE, "land": Palette.GREEN, "explore": Palette.TEXT,
-	"trade": Palette.AMBER, "mega": Palette.GREEN, "politics": Palette.PURPLE}
+## 기록의 종류 · 운영 기록의 분야 → 색 (색각 팔레트를 따르게 그때그때)
+static func kind_color(kind: String) -> Color:
+	match kind:
+		"good":
+			return Palette.GREEN
+		"warn":
+			return Palette.AMBER
+		"critical", "death":
+			return Palette.RED
+		"info", "build":
+			return Palette.MUTED
+	return Palette.TEXT
+
+
+static func domain_color(domain: String) -> Color:
+	match domain:
+		"build", "trade":
+			return Palette.AMBER
+		"research":
+			return Palette.BLUE
+		"land", "mega":
+			return Palette.GREEN
+		"explore":
+			return Palette.TEXT
+		"politics":
+			return Palette.PURPLE
+	return Palette.MUTED
 
 const SHOW := 120
 
@@ -134,9 +157,9 @@ func update_view() -> void:
 func _label(n: Array) -> Label:
 	var label := Label.new()
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_font_size_override("font_size", Access.fs(14))
 	label.text = "%s  %s" % [sim.date_text(n[0]), n[1]]
-	label.add_theme_color_override("font_color", KIND_COLOR.get(n[2], Palette.TEXT))
+	label.add_theme_color_override("font_color", kind_color(String(n[2])))
 	return label
 
 
@@ -193,13 +216,13 @@ func _update_ops() -> void:
 		var tag := Label.new()
 		tag.text = CityAuto.domain_name(String(e[1]))
 		tag.custom_minimum_size = Vector2(92, 0)
-		tag.add_theme_font_size_override("font_size", 13)
-		tag.add_theme_color_override("font_color", DOMAIN_COLOR.get(String(e[1]), Palette.MUTED))
+		tag.add_theme_font_size_override("font_size", Access.fs(13))
+		tag.add_theme_color_override("font_color", domain_color(String(e[1])))
 		row.add_child(tag)
 		var label := Label.new()
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		label.add_theme_font_size_override("font_size", 14)
+		label.add_theme_font_size_override("font_size", Access.fs(14))
 		label.text = "%s  %s" % [CityAuto.when_text(sim, int(e[0])), String(e[2])]
 		row.add_child(label)
 		list.add_child(row)

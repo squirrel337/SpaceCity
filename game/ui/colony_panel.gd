@@ -24,7 +24,7 @@ func _init() -> void:
 	add_theme_constant_override("separation", 10)
 	add_child(ThemeFactory.heading("개척"))
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status.add_theme_font_size_override("font_size", 14)
+	status.add_theme_font_size_override("font_size", Access.fs(14))
 	add_child(status)
 	var help := ThemeFactory.muted("천체마다 기본 도시가 있고, 후보 부지에 원정대를 보내 도시를 더 세운다. 같은 천체의 도시에서는 " +
 		"로버 행렬(지구는 비행편)로 며칠~몇 주 만에 닿고, 도시가 없는 천체로는 고향에서 발사 창을 기다려 건너간다. " +
@@ -151,7 +151,7 @@ func _dev_section(i: int) -> Control:
 	v.add_child(ThemeFactory.heading("도시 발전 모드 · %s" % c["name"], 16))
 	var now := Label.new()
 	now.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	now.add_theme_font_size_override("font_size", 13)
+	now.add_theme_font_size_override("font_size", Access.fs(13))
 	v.add_child(now)
 	var grid := GridContainer.new()
 	grid.columns = 3
@@ -168,7 +168,7 @@ func _dev_section(i: int) -> Control:
 		b.custom_minimum_size = Vector2(0, 44)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART      # 긴 이름("Tourism & culture focus")은 두 줄로
-		b.add_theme_font_size_override("font_size", 13)
+		b.add_theme_font_size_override("font_size", Access.fs(13))
 		b.add_theme_color_override("font_pressed_color", Color(String(m.get("color", "aab3c8"))).lightened(0.3))
 		b.tooltip_text = String(m.get("text", ""))
 		var mode_id := String(id)
@@ -243,7 +243,7 @@ func _probe_section() -> Control:
 	v.add_child(why)
 	var lines := Label.new()
 	lines.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lines.add_theme_font_size_override("font_size", 13)
+	lines.add_theme_font_size_override("font_size", Access.fs(13))
 	v.add_child(lines)
 	var found := ThemeFactory.muted("", 12)
 	found.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -296,7 +296,7 @@ func _l5_section() -> Control:
 	v.add_child(drv)
 	var lines := Label.new()
 	lines.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lines.add_theme_font_size_override("font_size", 13)
+	lines.add_theme_font_size_override("font_size", Access.fs(13))
 	v.add_child(lines)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -350,7 +350,7 @@ func _scenario_section() -> Control:
 	v.add_child(text)
 	var goals := Label.new()
 	goals.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	goals.add_theme_font_size_override("font_size", 13)
+	goals.add_theme_font_size_override("font_size", Access.fs(13))
 	v.add_child(goals)
 	var foot := ThemeFactory.muted("", 12)
 	foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -622,7 +622,7 @@ func _politics_section(i: int) -> Control:
 		var name := Label.new()
 		name.text = String(p["name"])
 		name.custom_minimum_size = Vector2(84, 0)
-		name.add_theme_font_size_override("font_size", 13)
+		name.add_theme_font_size_override("font_size", Access.fs(13))
 		row.add_child(name)
 		var g := ButtonGroup.new()
 		var buttons: Array = []
@@ -697,7 +697,7 @@ func _people_section(i: int) -> Control:
 	v.add_child(ThemeFactory.heading("사람들 — 이름 있는 정착민", 16))
 	var who := Label.new()
 	who.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	who.add_theme_font_size_override("font_size", 13)
+	who.add_theme_font_size_override("font_size", Access.fs(13))
 	v.add_child(who)
 	var more := ThemeFactory.muted("", 12)
 	more.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -879,14 +879,14 @@ func _site_card(id: String) -> Control:
 	var title := Label.new()
 	title.text = "후보 · %s" % site["name"]
 	title.add_theme_font_override("font", ThemeFactory.bold)
-	title.add_theme_font_size_override("font_size", 15)
+	title.add_theme_font_size_override("font_size", Access.fs(15))
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	top.add_child(title)
 	var more := Button.new()
 	more.text = "접기" if _open.get(id, false) else "자세히"
 	more.custom_minimum_size = Vector2(0, 32)
-	more.add_theme_font_size_override("font_size", 12)
+	more.add_theme_font_size_override("font_size", Access.fs(12))
 	top.add_child(more)
 	var detail := VBoxContainer.new()
 	detail.add_theme_constant_override("separation", 3)
@@ -910,11 +910,11 @@ func _site_card(id: String) -> Control:
 	v.add_child(detail)
 	var way := Label.new()
 	way.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	way.add_theme_font_size_override("font_size", 13)
+	way.add_theme_font_size_override("font_size", Access.fs(13))
 	v.add_child(way)
 	var cost := Label.new()
 	cost.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	cost.add_theme_font_size_override("font_size", 13)
+	cost.add_theme_font_size_override("font_size", Access.fs(13))
 	v.add_child(cost)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)

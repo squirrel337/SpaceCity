@@ -39,7 +39,7 @@ func _init() -> void:
 			rebuild())
 	add_child(master)
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status.add_theme_font_size_override("font_size", 14)
+	status.add_theme_font_size_override("font_size", Access.fs(14))
 	add_child(status)
 	var help := ThemeFactory.muted("같은 천체의 도시는 로버 화물 열차·로켓 호퍼·비행기로, 지구 우주항과 달의 고향은 셔틀로, 행성 사이는 " +
 		"발사 창마다 수송선으로 잇는다. 떠날 때 받는 도시에 모자란 식량·산소·물·부품·금속을 보내는 도시의 넉넉한 몫에서 싣고, " +
@@ -134,7 +134,7 @@ func rebuild() -> void:
 		var fold := Button.new()
 		fold.text = "접기" if _open[g[0]] else "펼치기"
 		fold.custom_minimum_size = Vector2(0, 32)
-		fold.add_theme_font_size_override("font_size", 12)
+		fold.add_theme_font_size_override("font_size", Access.fs(12))
 		var key: String = g[0]
 		fold.pressed.connect(func():
 			_open[key] = not _open[key]
@@ -267,7 +267,7 @@ func _fleet_section() -> void:
 	see.text = "항로 지도"
 	see.tooltip_text = "Δv 항로 지도를 연다 (J)"
 	see.custom_minimum_size = Vector2(0, 32)
-	see.add_theme_font_size_override("font_size", 12)
+	see.add_theme_font_size_override("font_size", Access.fs(12))
 	see.pressed.connect(func(): show_map.emit())
 	head.add_child(see)
 	box.add_child(head)
@@ -307,7 +307,7 @@ func _fleet_section() -> void:
 		t.text = "%s 항로 — Δv %s / %s km/s · 배 %d척" % [Fleet.body_name(r), Fmt.n(Fleet.route_dv(pb, r), 1),
 			Fmt.n(Fleet.route_dv(r, pb), 1), ships.size()]
 		t.add_theme_font_override("font", ThemeFactory.bold)
-		t.add_theme_font_size_override("font_size", 13)
+		t.add_theme_font_size_override("font_size", Access.fs(13))
 		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(t)
 		for sh in ships:
@@ -336,7 +336,7 @@ func _fleet_section() -> void:
 	form.add_theme_constant_override("v_separation", 6)
 	var cls_ids: Array = Fleet.data().get("classes", {}).keys()
 	var cpick := OptionButton.new()
-	cpick.add_theme_font_size_override("font_size", 13)
+	cpick.add_theme_font_size_override("font_size", Access.fs(13))
 	cpick.custom_minimum_size = Vector2(0, 44 if ThemeFactory.touch() else 32)
 	for i in cls_ids.size():
 		cpick.add_item(Fleet.cls_name(String(cls_ids[i])), i)
@@ -348,7 +348,7 @@ func _fleet_section() -> void:
 		rebuild())
 	form.add_child(cpick)
 	var rpick := OptionButton.new()
-	rpick.add_theme_font_size_override("font_size", 13)
+	rpick.add_theme_font_size_override("font_size", Access.fs(13))
 	rpick.custom_minimum_size = Vector2(0, 44 if ThemeFactory.touch() else 32)
 	var r_opts: Array = [""] + route_ids
 	if not String(_ship_form["route"]) in r_opts:
@@ -393,14 +393,14 @@ func _ship_row(sh: Dictionary, route_ids: Array) -> Control:
 	var lab := Label.new()
 	lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	lab.add_theme_font_size_override("font_size", 12)
+	lab.add_theme_font_size_override("font_size", Access.fs(12))
 	row.add_child(lab)
 	_live.append(func(): lab.text = "◆ " + Fleet.ship_text(mgr, sh))
 	if String(sh["at"]) != Fleet.port_body(mgr):
 		return row
 	var id := int(sh["id"])
 	var move := OptionButton.new()
-	move.add_theme_font_size_override("font_size", 12)
+	move.add_theme_font_size_override("font_size", Access.fs(12))
 	move.custom_minimum_size = Vector2(0, 40 if ThemeFactory.touch() else 30)
 	move.tooltip_text = "이 배의 항로를 바꾼다 (고향 부두에 있을 때만)"
 	var opts: Array = [""] + route_ids
@@ -417,7 +417,7 @@ func _ship_row(sh: Dictionary, route_ids: Array) -> Control:
 	ret.text = "퇴역"
 	ret.tooltip_text = "해체한다 — 주문 부품의 30%를 돌려받는다"
 	ret.custom_minimum_size = Vector2(52, 40 if ThemeFactory.touch() else 30)
-	ret.add_theme_font_size_override("font_size", 12)
+	ret.add_theme_font_size_override("font_size", Access.fs(12))
 	ret.pressed.connect(func():
 		Fleet.retire(mgr, id)
 		changed.emit()
@@ -454,7 +454,7 @@ func _routes_section() -> void:
 	form.add_theme_constant_override("v_separation", 6)
 	var pick := func(ids: Array, names: Array, cur: String, field: String) -> OptionButton:
 		var ob := OptionButton.new()
-		ob.add_theme_font_size_override("font_size", 13)
+		ob.add_theme_font_size_override("font_size", Access.fs(13))
 		ob.custom_minimum_size = Vector2(0, 44 if ThemeFactory.touch() else 32)
 		ob.fit_to_longest_item = false
 		for i in ids.size():
@@ -547,14 +547,14 @@ func _route_row(r: Dictionary) -> Control:
 	var title := Label.new()
 	title.text = CityRoutes.text(r)
 	title.add_theme_font_override("font", ThemeFactory.bold)
-	title.add_theme_font_size_override("font_size", 13)
+	title.add_theme_font_size_override("font_size", Access.fs(13))
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
 	var del := Button.new()
 	del.text = "지우기"
 	del.custom_minimum_size = Vector2(56, 34)
-	del.add_theme_font_size_override("font_size", 12)
+	del.add_theme_font_size_override("font_size", Access.fs(12))
 	var id := int(r["id"])
 	del.pressed.connect(func():
 		CityRoutes.remove(mgr, id)
@@ -597,7 +597,7 @@ func _metro_section() -> void:
 		var lab := Label.new()
 		lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		lab.add_theme_font_size_override("font_size", 13)
+		lab.add_theme_font_size_override("font_size", Access.fs(13))
 		var k: String = key
 		var update := func():
 			var bits := PackedStringArray()
@@ -660,7 +660,7 @@ func _metro_section() -> void:
 		b.tooltip_text = "%s · %s · 강점: %s%s" % [String(m["country"]), Metros.pop_text(m), Metros.strength_name(m),
 			(" · 운영: " + Metros.mode_name(fn.modes.mode_of(mk))) if fn.modes.mode_of(mk) != "" else ""]
 		b.custom_minimum_size = Vector2(0, 30)
-		b.add_theme_font_size_override("font_size", 12)
+		b.add_theme_font_size_override("font_size", Access.fs(12))
 		b.pressed.connect(func(): show_metro.emit(mk))
 		flow.add_child(b)
 	box.add_child(flow)
@@ -766,7 +766,7 @@ func _line_card(l: Dictionary) -> Control:
 	var title := Label.new()
 	title.text = _line_title(l)
 	title.add_theme_font_override("font", ThemeFactory.bold)
-	title.add_theme_font_size_override("font_size", 14)
+	title.add_theme_font_size_override("font_size", Access.fs(14))
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
@@ -774,7 +774,7 @@ func _line_card(l: Dictionary) -> Control:
 	see.text = "보기"
 	see.tooltip_text = "3D 지도에서 이 노선을 본다"
 	see.custom_minimum_size = Vector2(56, 34)
-	see.add_theme_font_size_override("font_size", 12)
+	see.add_theme_font_size_override("font_size", Access.fs(12))
 	see.pressed.connect(func(): show_line.emit(id))
 	top.add_child(see)
 	var plan := ThemeFactory.muted("", 12)
@@ -849,13 +849,13 @@ func _compact_row(l: Dictionary) -> Control:
 	var text := Label.new()
 	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_theme_font_size_override("font_size", 12)
+	text.add_theme_font_size_override("font_size", Access.fs(12))
 	row.add_child(text)
 	var see := Button.new()
 	see.text = "보기"
 	see.tooltip_text = "3D 지도에서 이 노선을 본다"
 	see.custom_minimum_size = Vector2(48, 30)
-	see.add_theme_font_size_override("font_size", 11)
+	see.add_theme_font_size_override("font_size", Access.fs(11))
 	see.pressed.connect(func(): show_line.emit(id))
 	row.add_child(see)
 	if l["role"] == "feeder" and Metros.is_metro(String(l["a"])):
@@ -863,7 +863,7 @@ func _compact_row(l: Dictionary) -> Control:
 		go.text = "도시"
 		go.tooltip_text = "%s 위로 날아가 시가지를 본다" % Transport.node_name(l["a"])
 		go.custom_minimum_size = Vector2(48, 30)
-		go.add_theme_font_size_override("font_size", 11)
+		go.add_theme_font_size_override("font_size", Access.fs(11))
 		var key := String(l["a"])
 		go.pressed.connect(func(): show_metro.emit(key))
 		row.add_child(go)

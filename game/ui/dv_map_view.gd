@@ -205,9 +205,9 @@ func _draw() -> void:
 		return
 	var font: Font = ThemeFactory.regular if ThemeFactory.regular else get_theme_default_font()
 	var bold: Font = ThemeFactory.bold if ThemeFactory.bold else font
-	draw_string(bold, Vector2(18, 30), I18n.t("항로 지도 — Δv (km/s)"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Palette.TEXT)
+	draw_string(bold, Vector2(18, 30), I18n.t("항로 지도 — Δv (km/s)"), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(18), Palette.TEXT)
 	draw_string(font, Vector2(18, 50), I18n.t("깊을수록 중력 우물이 깊다 · 선 곁의 숫자는 그 구간의 Δv · 점선은 대기 제동 · 청록 = 발사 창이 열린 항로"),
-		HORIZONTAL_ALIGNMENT_LEFT, maxf(_map.size.x, 200.0), 12, Palette.MUTED)
+		HORIZONTAL_ALIGNMENT_LEFT, maxf(_map.size.x, 200.0), Access.fs(12), Palette.MUTED)
 	var routes := Fleet.routes(mgr)
 	var sel_route := selected if not selected.begins_with("n:") else ""
 	var open := {}
@@ -268,7 +268,7 @@ func _draw() -> void:
 		var outbound := Transport.node_body(String(t["from"])) == pb
 		var p := _along(path, kk if outbound else 1.0 - kk)
 		_diamond(p, 7.0, Palette.BLUE)
-		draw_string(font, p + Vector2(10, -8), I18n.t(String(sh["name"])), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.TEXT)
+		draw_string(font, p + Vector2(10, -8), I18n.t(String(sh["name"])), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11), Palette.TEXT)
 	# 노드
 	for n in Fleet.data().get("nodes", []):
 		var id := String(n["id"])
@@ -289,10 +289,10 @@ func _draw() -> void:
 				if k5 > 0.0:
 					draw_rect(Rect2(rr.position, Vector2(rr.size.x * k5, rr.size.y)), Color(Palette.TEAL, 0.85))
 				draw_rect(rr, Palette.TEAL if Orbital.city_index(mgr) >= 0 else Palette.MUTED, false, 2.0)
-				draw_string(font, p2 + Vector2(-40, 26), I18n.t(String(n["name"])), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Palette.TEXT)
+				draw_string(font, p2 + Vector2(-40, 26), I18n.t(String(n["name"])), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(12), Palette.TEXT)
 				var stt := "궤도 도시 — 매스 드라이버 시대" if not Orbital.driver_built(mgr) and int(ost["stage"]) == 0 and not bool(ost["building"]) \
 					else Orbital.short_text(mgr)
-				draw_string(font, p2 + Vector2(-40, 40), I18n.t(stt), HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+				draw_string(font, p2 + Vector2(-40, 40), I18n.t(stt), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11),
 					Palette.TEAL if bool(ost["building"]) or Orbital.city_index(mgr) >= 0 else Palette.DIM)
 				if picked:
 					draw_arc(p2, 20.0, 0.0, TAU, 24, Palette.AMBER, 2.0, true)
@@ -312,30 +312,30 @@ func _draw() -> void:
 			draw_arc(p2, 13.0, 0.0, TAU, 24, Palette.AMBER, 2.0, true)
 		var label := String(n["name"])
 		if kind == "hub":
-			draw_string(font, p2 + Vector2(-40, 26), I18n.t(label), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Palette.TEXT)
+			draw_string(font, p2 + Vector2(-40, 26), I18n.t(label), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(12), Palette.TEXT)
 			var dl := _depot_label(id)
 			draw_string(font, p2 + Vector2(-40, 40), I18n.t(String(dl[0]) if String(dl[0]) != "" else "연료 기지 — 시대 1"),
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, dl[1] if String(dl[0]) != "" else Palette.DIM)
+				HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11), dl[1] if String(dl[0]) != "" else Palette.DIM)
 			continue
-		draw_string(font, p2 + Vector2(12, 4), I18n.t(label), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Palette.TEXT if kind != "transfer" else Palette.MUTED)
+		draw_string(font, p2 + Vector2(12, 4), I18n.t(label), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(12), Palette.TEXT if kind != "transfer" else Palette.MUTED)
 		if kind == "transfer":
 			var w2 := _window(body)
 			if not w2.is_empty():
 				var left := int(ceil(float(w2["start"]) - mgr.hour / 24.0))
 				var txt := "발사 창 열림" if bool(w2["open"]) else "창 D-%d" % maxi(left, 0)
-				draw_string(font, p2 + Vector2(10, -9), I18n.t(txt), HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+				draw_string(font, p2 + Vector2(10, -9), I18n.t(txt), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11),
 					Palette.TEAL if bool(w2["open"]) else Palette.DIM)
 		elif kind == "orbit":
 			# 부두에 머무는 배 — 이름 뒤에 작은 마름모 (그린 글 — 영어면 영어 — 의 폭 뒤에)
 			var here := (st["ships"] as Array).filter(func(sh): return String(sh["at"]) == body)
-			var x0 := p2.x + 12.0 + font.get_string_size(I18n.t(label), HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 9.0
+			var x0 := p2.x + 12.0 + font.get_string_size(I18n.t(label), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(12)).x + 9.0
 			var dl2 := _depot_label(id)
 			if String(dl2[0]) != "":
-				draw_string(font, p2 + Vector2(12, 18), I18n.t(String(dl2[0])), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, dl2[1])
+				draw_string(font, p2 + Vector2(12, 18), I18n.t(String(dl2[0])), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11), dl2[1])
 			for i in mini(here.size(), 4):
 				_diamond(Vector2(x0 + 11.0 * i, p2.y), 4.5, Palette.BLUE if String(here[i]["route"]) != "" else Palette.MUTED)
 			if here.size() > 4:
-				draw_string(font, Vector2(x0 + 44.0, p2.y + 4.0), I18n.t("+%d" % (here.size() - 4)), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.MUTED)
+				draw_string(font, Vector2(x0 + 44.0, p2.y + 4.0), I18n.t("+%d" % (here.size() - 4)), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11), Palette.MUTED)
 		elif kind == "surface":
 			# 그 천체의 도시들
 			var y := p2.y + 24.0
@@ -345,11 +345,11 @@ func _draw() -> void:
 				if String(c["body"]) != body:
 					continue
 				if shown >= 3:
-					draw_string(font, Vector2(p2.x - 40, y), I18n.t("…"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.MUTED)
+					draw_string(font, Vector2(p2.x - 40, y), I18n.t("…"), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11), Palette.MUTED)
 					break
 				var pop := int((c["sim"] as CitySim).population())
 				draw_string(font, Vector2(p2.x - 40, y), I18n.t("%s %s명" % [String(c.get("short", c["name"])), Fmt.n(float(pop))]),
-					HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.TEXT if i == active else Palette.MUTED)
+					HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11), Palette.TEXT if i == active else Palette.MUTED)
 				y += 14.0
 				shown += 1
 
@@ -380,14 +380,14 @@ func _edge_label(e: Dictionary, pts: PackedVector2Array, font: Font) -> void:
 	var col := Palette.AMBER.lerp(Palette.TEXT, 0.35)
 	if _is_lane(e):
 		var right := pts[2].x >= pts[1].x
-		var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+		var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11)).x
 		var x := pts[2].x - w - 6.0 if right else pts[2].x + 6.0
-		draw_string(font, Vector2(x, pts[2].y - 4.0), I18n.t(txt), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
+		draw_string(font, Vector2(x, pts[2].y - 4.0), I18n.t(txt), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11), col)
 		return
 	var a := pts[-2]
 	var b := pts[-1]
 	var y := a.y + clampf((b.y - a.y) * 0.5, 12.0, 60.0)          # 긴 선(지구 우물)은 위쪽에 — 옆 줄의 이름과 겹치지 않게
-	draw_string(font, Vector2(b.x - 78.0, y + 4.0), I18n.t(txt), HORIZONTAL_ALIGNMENT_RIGHT, 70, 11, col)
+	draw_string(font, Vector2(b.x - 78.0, y + 4.0), I18n.t(txt), HORIZONTAL_ALIGNMENT_RIGHT, 70, Access.fs(11), col)
 
 
 ## 그 천체로 가는 발사 창 (고향 쪽에서) — {} = 없다
@@ -460,7 +460,7 @@ func _label(text: String, size_px := 13, color := Palette.TEXT) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.add_theme_font_size_override("font_size", size_px)
+	l.add_theme_font_size_override("font_size", Access.fs(size_px))
 	l.add_theme_color_override("font_color", color)
 	_box.add_child(l)
 	return l
@@ -525,7 +525,7 @@ func _route_card(r: String) -> void:
 		var btn := Button.new()
 		btn.text = "주문 — %s" % Fleet.cost_text(Fleet.order_cost(mgr, String(c_id), known))
 		btn.custom_minimum_size = Vector2(0, 40 if ThemeFactory.touch() else 32)
-		btn.add_theme_font_size_override("font_size", 12)
+		btn.add_theme_font_size_override("font_size", Access.fs(12))
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART      # 값이 길면 (영어) 카드를 넓히지 않고 두 줄로
 		btn.disabled = why != ""
 		btn.tooltip_text = why if why != "" else String(c.get("text", ""))
@@ -595,7 +595,7 @@ func _depot_section(n: String) -> void:
 		var btn := Button.new()
 		btn.text = "짓기 — %s" % Fleet.depot_cost_text()
 		btn.custom_minimum_size = Vector2(0, 40 if ThemeFactory.touch() else 32)
-		btn.add_theme_font_size_override("font_size", 12)
+		btn.add_theme_font_size_override("font_size", Access.fs(12))
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		btn.disabled = why != ""
 		btn.tooltip_text = why if why != "" else String(Fleet.depot_site(n).get("text", ""))
@@ -671,7 +671,7 @@ func _node_card(id: String) -> void:
 			lab.text = "%s · %s명" % [String(c["name"]), Fmt.n((c["sim"] as CitySim).population())]
 			lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			lab.add_theme_font_size_override("font_size", 13)
+			lab.add_theme_font_size_override("font_size", Access.fs(13))
 			row.add_child(lab)
 			var go := Button.new()
 			go.text = "그 도시로"

@@ -98,7 +98,8 @@ func _notification(what: int) -> void:
 
 func _process(delta: float) -> void:
 	if visible:
-		_t += delta
+		if not Access.calm:                       # 움직임 줄이기 — 작물·기계·흐름이 멈춘 그림으로
+			_t += delta
 		queue_redraw()
 
 
@@ -115,7 +116,7 @@ func _font(bold := false) -> Font:
 
 
 func _text(p: Vector2, s: String, px: int, col: Color, bold := false, width := -1.0) -> void:
-	draw_string(_font(bold), p, I18n.t(s), HORIZONTAL_ALIGNMENT_LEFT, width, px, col)
+	draw_string(_font(bold), p, I18n.t(s), HORIZONTAL_ALIGNMENT_LEFT, width, Access.fs(px), col)
 
 
 func _draw() -> void:

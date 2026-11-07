@@ -47,7 +47,7 @@ func _on_express_threshold(v: float) -> void:
 
 
 func _slider_row(slider: HSlider, label: Label, lo: float, hi: float, step: float) -> void:
-	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_font_size_override("font_size", Access.fs(14))
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART      # 영어가 길면 줄을 바꾼다 (옆 패널을 넓히지 않게)
 	add_child(label)
 	slider.min_value = lo

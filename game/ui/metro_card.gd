@@ -67,7 +67,7 @@ func _init() -> void:
 	_fold = Button.new()
 	_fold.text = "접기"
 	_fold.flat = true
-	_fold.add_theme_font_size_override("font_size", 13)
+	_fold.add_theme_font_size_override("font_size", Access.fs(13))
 	_fold.pressed.connect(func():
 		_folded = not _folded
 		_sig = ""
@@ -98,7 +98,7 @@ func _init() -> void:
 		b.button_group = grp
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size.y = 44 if ThemeFactory.touch() else 32
-		b.add_theme_font_size_override("font_size", 14)
+		b.add_theme_font_size_override("font_size", Access.fs(14))
 		var id := String(t[0])
 		b.pressed.connect(func(): set_tab(id))
 		_tab_row.add_child(b)
@@ -124,7 +124,7 @@ func _init() -> void:
 		b2.text = String(mb[1])
 		b2.toggle_mode = true
 		b2.custom_minimum_size = Vector2(76, 44 if ThemeFactory.touch() else 30)
-		b2.add_theme_font_size_override("font_size", 13)
+		b2.add_theme_font_size_override("font_size", Access.fs(13))
 		var mode := String(mb[0])
 		b2.tooltip_text = Metros.mode_name(mode) + (" — " + String(Metros.mode_def(mode).get("text", "")) if mode != "" else
 			" — 운영 방식 없이 플레이어가 시설을 짓는다")
@@ -140,7 +140,7 @@ func _init() -> void:
 	_partner_label = ThemeFactory.muted("", 12)
 	_pick_box.add_child(_partner_label)
 	_partner_pick = OptionButton.new()
-	_partner_pick.add_theme_font_size_override("font_size", 13)
+	_partner_pick.add_theme_font_size_override("font_size", Access.fs(13))
 	_partner_pick.custom_minimum_size.y = 44 if ThemeFactory.touch() else 30
 	_partner_pick.fit_to_longest_item = false
 	_partner_pick.item_selected.connect(func(i: int):
@@ -150,7 +150,7 @@ func _init() -> void:
 	_project_label = ThemeFactory.muted("", 12)
 	_pick_box.add_child(_project_label)
 	_project_pick = OptionButton.new()
-	_project_pick.add_theme_font_size_override("font_size", 13)
+	_project_pick.add_theme_font_size_override("font_size", Access.fs(13))
 	_project_pick.custom_minimum_size.y = 44 if ThemeFactory.touch() else 30
 	_project_pick.fit_to_longest_item = false
 	_project_pick.item_selected.connect(func(i: int):
@@ -282,7 +282,7 @@ func _fac_row(fn: MetroFunctions, fac: String, ps: CitySim) -> Control:
 	var lvl := fn.level(key, fac)
 	var name := Label.new()
 	name.text = MetroFunctions.fac_name(fac)
-	name.add_theme_font_size_override("font_size", 15)
+	name.add_theme_font_size_override("font_size", Access.fs(15))
 	name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if String(Metros.of(key).get("strength", "")) == fac:
 		name.text += " ★"
@@ -291,7 +291,7 @@ func _fac_row(fn: MetroFunctions, fac: String, ps: CitySim) -> Control:
 	var dots := Label.new()
 	dots.text = "●".repeat(lvl) + "○".repeat(MetroFunctions.MAX_LEVEL - lvl)
 	dots.add_theme_color_override("font_color", MetroFunctions.fac_color(fac))
-	dots.add_theme_font_size_override("font_size", 13)
+	dots.add_theme_font_size_override("font_size", Access.fs(13))
 	h.add_child(dots)
 	var b := _button("", 118)
 	var cost := fn.next_cost(key, fac)
@@ -342,7 +342,7 @@ func _button(text: String, w: float) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.custom_minimum_size = Vector2(w, 44 if ThemeFactory.touch() else 32)
-	b.add_theme_font_size_override("font_size", 13)
+	b.add_theme_font_size_override("font_size", Access.fs(13))
 	return b
 
 
@@ -404,7 +404,7 @@ func _ops_view(fn: MetroFunctions, ps: CitySim) -> void:
 		row.add_child(db)
 	var af := CheckButton.new()
 	af.text = "자동 채움"
-	af.add_theme_font_size_override("font_size", 13)
+	af.add_theme_font_size_override("font_size", Access.fs(13))
 	af.button_pressed = bool(e.get("auto_fill", false))
 	var afr: Dictionary = MetroModes.rule("auto_fill", {})
 	af.tooltip_text = "후원 식민지의 지원이 화물선·유인선 비용 + %s를 넘으면 날마다 %s까지 채운다 (운영비 %s까지)" % [

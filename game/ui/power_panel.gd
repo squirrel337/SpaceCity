@@ -17,7 +17,7 @@ var heat := ThemeFactory.muted("")
 func _init() -> void:
 	add_theme_constant_override("separation", 10)
 	add_child(ThemeFactory.heading("전력과 열"))
-	summary.add_theme_font_size_override("font_size", 15)
+	summary.add_theme_font_size_override("font_size", Access.fs(15))
 	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(summary)
 	add_child(battery)
@@ -43,7 +43,7 @@ func _init() -> void:
 	add_child(policy)
 	for p in [4, 3, 2]:
 		var label := Label.new()
-		label.add_theme_font_size_override("font_size", 14)
+		label.add_theme_font_size_override("font_size", Access.fs(14))
 		add_child(label)
 		var slider := HSlider.new()
 		slider.min_value = 0

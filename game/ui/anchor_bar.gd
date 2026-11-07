@@ -21,7 +21,7 @@ func _init() -> void:
 	_row.add_theme_constant_override("separation", 0)
 	add_child(_row)
 	_popup = PopupMenu.new()
-	_popup.add_theme_font_size_override("font_size", 15)
+	_popup.add_theme_font_size_override("font_size", Access.fs(15))
 	_popup.id_pressed.connect(_on_pick)
 	add_child(_popup)
 
@@ -54,7 +54,7 @@ func refresh() -> void:
 		b.text = String(a["name"])
 		b.flat = true
 		b.custom_minimum_size = Vector2(44, 44)          # 누르는 곳은 최소 44 px ("달")
-		b.add_theme_font_size_override("font_size", 14)
+		b.add_theme_font_size_override("font_size", Access.fs(14))
 		var last := i == path.size() - 1
 		b.add_theme_color_override("font_color", Palette.AMBER if last else Color(0.86, 0.88, 0.92))
 		b.tooltip_text = "%s — 여기를 고정점으로" % a["name"]
@@ -67,7 +67,7 @@ func refresh() -> void:
 		ch.text = "▾" if last else "›"
 		ch.flat = true
 		ch.custom_minimum_size = Vector2(44, 44)
-		ch.add_theme_font_size_override("font_size", 15)
+		ch.add_theme_font_size_override("font_size", Access.fs(15))
 		ch.add_theme_color_override("font_color", Color(0.7, 0.74, 0.8))
 		ch.tooltip_text = "%s 안에서 고르기" % a["name"]
 		ch.disabled = kids.is_empty()

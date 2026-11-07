@@ -69,16 +69,16 @@ func _init() -> void:
 	v.add_theme_constant_override("separation", 8)
 	_card.add_child(v)
 	_count = Label.new()
-	_count.add_theme_font_size_override("font_size", 12)
+	_count.add_theme_font_size_override("font_size", Access.fs(12))
 	_count.add_theme_color_override("font_color", Palette.AMBER)
 	v.add_child(_count)
 	_title = Label.new()
 	_title.add_theme_font_override("font", ThemeFactory.bold)
-	_title.add_theme_font_size_override("font_size", 18)
+	_title.add_theme_font_size_override("font_size", Access.fs(18))
 	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_title)
 	_text = Label.new()
-	_text.add_theme_font_size_override("font_size", 14)
+	_text.add_theme_font_size_override("font_size", Access.fs(14))
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_text.add_theme_color_override("font_color", Palette.TEXT.darkened(0.08))
 	v.add_child(_text)
@@ -252,7 +252,7 @@ func _place() -> void:
 func _draw() -> void:
 	if _rect.size == Vector2.ZERO:
 		return
-	var a := 0.55 + 0.45 * sin(_t * 4.0)
+	var a := 1.0 if Access.calm else 0.55 + 0.45 * sin(_t * 4.0)   # 움직임 줄이기 — 테두리가 깜박이지 않게
 	var r := Rect2(_rect.position - global_position, _rect.size).grow(5.0)
 	draw_rect(r, Color(Palette.AMBER, a), false, 3.0)
 	draw_rect(r.grow(4.0), Color(Palette.AMBER, a * 0.35), false, 2.0)

@@ -75,6 +75,9 @@ var toasts: VBoxContainer
 var speed_buttons: Array[Button] = []
 var auto_button: Button
 var date_label: Label
+var top_row2: HBoxContainer            # 위 막대의 둘째 줄 — 한 줄에 다 들어가지 않으면 지표가 내려온다 (_fit_top_bar)
+var menu_button: Button
+var _two_rows := false
 var colony_button: OptionButton
 var chips := {}
 var chip_row: HBoxContainer
@@ -89,7 +92,10 @@ var panel_scroll: ScrollContainer
 
 func _ready() -> void:
 	I18n.apply()                         # 설정의 언어 (한국어 · English) — 화면을 만들기 전에
+	Access.load_settings()               # 글자 크기 · 색각 팔레트 · 움직임 줄이기 — 테마를 만들기 전에
 	theme = ThemeFactory.build()
+	Access.apply_scale(get_window())     # UI 배율 (창 크기가 바뀌면 다시 — 남는 UI 좌표를 지킨다)
+	get_window().size_changed.connect(func(): Access.apply_scale(get_window()))
 	if ThemeFactory.touch():
 		get_tree().node_added.connect(_touch_size)
 	get_tree().auto_accept_quit = false
@@ -246,6 +252,7 @@ func _build() -> void:
 	settings_panel = SettingsPanel.new()
 	settings_panel.changed.connect(func(): world.apply_settings())
 	settings_panel.lang_changed.connect(_on_lang_changed)
+	settings_panel.access_changed.connect(_on_access_changed)
 	add_child(settings_panel)
 
 
@@ -328,15 +335,15 @@ func _build_place_bar() -> Control:
 	v.add_theme_constant_override("separation", 4)
 	place_bar.add_child(v)
 	place_text = Label.new()
-	place_text.add_theme_font_size_override("font_size", 15)
+	place_text.add_theme_font_size_override("font_size", Access.fs(15))
 	place_text.add_theme_color_override("font_color", Palette.TEXT)
 	v.add_child(place_text)
 	place_reason = Label.new()
-	place_reason.add_theme_font_size_override("font_size", 13)
+	place_reason.add_theme_font_size_override("font_size", Access.fs(13))
 	place_reason.add_theme_color_override("font_color", Color(1.0, 0.62, 0.5))
 	v.add_child(place_reason)
 	place_note = Label.new()
-	place_note.add_theme_font_size_override("font_size", 13)
+	place_note.add_theme_font_size_override("font_size", Access.fs(13))
 	place_note.add_theme_color_override("font_color", Palette.AMBER)
 	v.add_child(place_note)
 	place_opts = HFlowContainer.new()
@@ -525,7 +532,7 @@ func _opt(key: String, text: String, tip: String, group: ButtonGroup, on_press: 
 	if group != null:
 		b.button_group = group
 	b.custom_minimum_size = Vector2(0, 36)
-	b.add_theme_font_size_override("font_size", 13)
+	b.add_theme_font_size_override("font_size", Access.fs(13))
 	b.pressed.connect(on_press)
 	place_opts.add_child(b)
 	_opt_buttons[key] = b
@@ -634,11 +641,20 @@ func _place_toasts() -> void:
 func _build_top_bar() -> Control:
 	var bar := PanelContainer.new()
 	bar.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL, Palette.LINE, 10, 6))
+	bar.resized.connect(_fit_top_bar)
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 4)
+	bar.add_child(rows)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 4)
-	bar.add_child(row)
+	rows.add_child(row)
 	top_row = row
+	top_row2 = HBoxContainer.new()
+	top_row2.add_theme_constant_override("separation", 4)
+	top_row2.visible = false
+	rows.add_child(top_row2)
 	date_label = ThemeFactory.heading("", 16)
+	date_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	row.add_child(date_label)
 	colony_button = OptionButton.new()
 	colony_button.custom_minimum_size = Vector2(88, 44)
@@ -703,7 +719,37 @@ func _build_top_bar() -> Control:
 	menu.custom_minimum_size = Vector2(58, 44)
 	menu.pressed.connect(_show_menu)
 	row.add_child(menu)
+	menu_button = menu
 	return bar
+
+
+## 위 막대: 한 줄에 다 들어가지 않으면 (큰 글자 · UI 배율 · 영어) 지표 일곱 칸을 둘째 줄로 내린다. 되돌릴 때는 24 px 여유를 두어
+## 날짜 글의 폭이 조금 바뀔 때마다 오가지 않게
+func _fit_top_bar() -> void:
+	if top_row == null or chip_row == null or menu_button == null:
+		return
+	var bar := top_row.get_parent().get_parent() as Control
+	# 막대가 넘치면 제 크기도 커지니 화면 폭에서 바깥 여백(양쪽)과 막대의 안쪽 여백을 뺀다
+	var room := get_viewport_rect().size.x - 2.0 * bar.get_global_rect().position.x - 12.0
+	if room <= 0.0:
+		return
+	var sep := float(top_row.get_theme_constant("separation"))
+	var need := chip_row.get_combined_minimum_size().x
+	for ch in top_row.get_children():
+		if ch != chip_row and ch is Control and (ch as Control).visible:
+			need += (ch as Control).get_combined_minimum_size().x + sep
+	var two := need > room - 24.0 if _two_rows else need > room
+	if two == _two_rows:
+		return
+	_two_rows = two
+	chip_row.get_parent().remove_child(chip_row)
+	if two:
+		top_row2.add_child(chip_row)
+	else:
+		top_row.add_child(chip_row)
+		top_row.move_child(chip_row, menu_button.get_index())
+	top_row2.visible = two
+	_fit_chips.call_deferred()
 
 
 func _chip() -> Dictionary:
@@ -714,10 +760,10 @@ func _chip() -> Dictionary:
 	box.mouse_filter = Control.MOUSE_FILTER_STOP      # 도움말(줄이지 않은 설명)
 	var value := Label.new()
 	value.add_theme_font_override("font", ThemeFactory.bold)
-	value.add_theme_font_size_override("font_size", 16)
+	value.add_theme_font_size_override("font_size", Access.fs(16))
 	value.clip_text = true
 	var caption := Label.new()
-	caption.add_theme_font_size_override("font_size", 11)
+	caption.add_theme_font_size_override("font_size", Access.fs(11))
 	caption.add_theme_color_override("font_color", Palette.MUTED)
 	caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	caption.clip_text = true
@@ -757,17 +803,45 @@ func _fit_tab_fonts() -> void:
 		var room := b.size.x - 4.0
 		var t := I18n.t(b.text)
 		var font := b.get_theme_font("font")
-		var fs := 13
-		while fs > 11 and font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room:
+		var fs := Access.fs(13)                       # 글자 크기 설정을 따라 13에서 (크게면 16에서) 11까지
+		while fs > mini(11, Access.fs(11)) and font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room:
 			fs -= 1
 		var wrap := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > room and t.contains(" ")
 		if wrap:
-			fs = 12
+			fs = Access.fs(12)
 		if b.get_theme_font_size("font_size") != fs:
 			b.add_theme_font_size_override("font_size", fs)
 		var mode := TextServer.AUTOWRAP_WORD if wrap else TextServer.AUTOWRAP_OFF
 		if b.autowrap_mode != mode:
 			b.autowrap_mode = mode
+
+
+## 탭 단추: 테마의 단추 모양에서 안쪽 여백만 좁힌다 (테마를 다시 만들면 — 색각 팔레트 — 다시)
+func _style_tab(b: Button) -> void:
+	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+		var sb := (theme.get_stylebox(state, "Button") as StyleBoxFlat).duplicate() as StyleBoxFlat
+		sb.content_margin_left = 2
+		sb.content_margin_right = 2
+		sb.content_margin_top = 6            # 두 줄 이름도 44 px 안에
+		sb.content_margin_bottom = 6
+		b.add_theme_stylebox_override(state, sb)
+
+
+## 보기·접근성을 바꿨다 (설정 카드): UI 배율은 창에, 글자 크기·색은 테마를 다시 만들고 패널·직접 그리는 화면을 다시 그린다
+func _on_access_changed(kind: String, value: String) -> void:
+	match kind:
+		"scale":
+			Access.set_scale(value, get_window())
+		"font":
+			Access.set_font(value, self)
+		"cvd":
+			Access.set_cvd(value, self)
+	if kind in ["font", "cvd"]:
+		for k in tab_buttons:
+			_style_tab(tab_buttons[k])
+		_on_lang_changed()                   # 탭 글자·지표 폭을 다시 맞추고 패널을 다시 만든다
+	if settings_panel.visible:
+		settings_panel.open()                # 눌린 단추 · 지금 배율 글
 
 
 func _build_side() -> Control:
@@ -787,14 +861,8 @@ func _build_side() -> Control:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, 44)
 		b.clip_text = true
-		b.add_theme_font_size_override("font_size", 13)
-		for state in ["normal", "hover", "pressed", "disabled", "focus"]:
-			var sb := (theme.get_stylebox(state, "Button") as StyleBoxFlat).duplicate() as StyleBoxFlat
-			sb.content_margin_left = 2
-			sb.content_margin_right = 2
-			sb.content_margin_top = 6            # 두 줄 이름도 44 px 안에
-			sb.content_margin_bottom = 6
-			b.add_theme_stylebox_override(state, sb)
+		b.add_theme_font_size_override("font_size", Access.fs(13))
+		_style_tab(b)
 		b.pressed.connect(_select_tab.bind(t[0]))
 		tab_row.add_child(b)
 		tab_buttons[t[0]] = b
@@ -1598,6 +1666,9 @@ func _refresh_live() -> void:
 
 func _set_chip(key: String, value: String, caption: String, color: Color) -> void:
 	var c: Dictionary = chips[key]
+	# 상태를 색만으로 알리지 않는다 (08 접근성): 경고는 "! ", 위험은 "!! "를 값 앞에 — 색각 팔레트와 함께
+	var mark := "!! " if color == Palette.RED else ("! " if color == Palette.AMBER else "")
+	value = mark + value
 	var changed: bool = c["caption"].text != caption or c["value"].text.length() != value.length()
 	c["value"].text = value
 	c["value"].add_theme_color_override("font_color", color if color != Palette.TEAL else Palette.TEXT)
@@ -1649,7 +1720,7 @@ func _on_player_change() -> void:
 func _toast(text: String, kind: String, quiet := false) -> void:
 	if not quiet:
 		Sound.note(kind)
-	var color: Color = LogPanel.KIND_COLOR.get(kind, Palette.TEXT)
+	var color: Color = LogPanel.kind_color(kind)
 	var p := PanelContainer.new()
 	p.add_theme_stylebox_override("panel", Palette.box(Color(Palette.PANEL_2, 0.94), color.darkened(0.2), 8, 8))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1657,7 +1728,7 @@ func _toast(text: String, kind: String, quiet := false) -> void:
 	l.text = text
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size.x = 400
-	l.add_theme_font_size_override("font_size", 14)
+	l.add_theme_font_size_override("font_size", Access.fs(14))
 	l.add_theme_color_override("font_color", color.lightened(0.15))
 	p.add_child(l)
 	toasts.add_child(p)
@@ -1674,6 +1745,7 @@ func _toast(text: String, kind: String, quiet := false) -> void:
 ## 언어를 바꿨다: 라벨·단추는 저절로 다시 번역된다 — 직접 그리는 화면과 숫자 글을 다시 그린다
 func _on_lang_changed() -> void:
 	_fit_tab_fonts()
+	_fit_top_bar()
 	_fit_chips.call_deferred()
 	_tab_sim.clear()
 	for k in tabs:

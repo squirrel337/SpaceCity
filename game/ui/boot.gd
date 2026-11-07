@@ -30,7 +30,7 @@ func _ready() -> void:
 	var title := Label.new()
 	title.text = "SpaceCity"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 30)
+	title.add_theme_font_size_override("font_size", Access.fs(30))
 	title.add_theme_color_override("font_color", Color("e8e4da"))
 	box.add_child(title)
 	_bar = ProgressBar.new()
@@ -50,7 +50,7 @@ func _ready() -> void:
 	_note = Label.new()
 	_note.text = "불러오는 중"
 	_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_note.add_theme_font_size_override("font_size", 14)
+	_note.add_theme_font_size_override("font_size", Access.fs(14))
 	_note.add_theme_color_override("font_color", Color("8a909c"))
 	box.add_child(_note)
 	ResourceLoader.load_threaded_request(MAIN)

@@ -92,6 +92,7 @@ func _process(_delta: float) -> bool:
 			main.modal.visible = false
 			_colony_check()
 			_layout_check()                   # 3년 뒤 (시대·메가프로젝트·도시 여덟) 화면 폭도
+			_access_check()                   # 접근성 — 큰 글자·UI 배율에서도 (3년 뒤 화면으로)
 			if failures.is_empty():
 				print("smoke: OK")
 				quit(0)
@@ -2696,6 +2697,139 @@ func _layout_check() -> void:
 	_check(b.custom_minimum_size == Vector2(44, 44), "터치 크기가 44 px로 늘지 않았다 (%s)" % b.custom_minimum_size)
 	b.free()
 	print("smoke: layout %s" % ", ".join(widths))
+
+
+## 접근성: 색각 팔레트 셋 (상태 넷이 그 색각에서 OKLab ΔE×100 12 넘게 — Machado 2009 · 기본 팔레트는 녹색약에서 8 아래), 팔레트를
+## 바꾸면 테마와 지표 색이 따른다, 지표의 경고·위험 표시(! · !!), 글자 크기 (테마·덮어쓴 크기 — 크게에서 한국어·영어 모두 위 막대가
+## 1280 폭에 · 옆 패널이 440에, 넘치면 지표가 둘째 줄로 — 보통으로 돌아오면 처음 크기), UI 배율 (창에 맞춘 상한 · 작은 쪽은 그대로),
+## 움직임 줄이기 (카메라가 곧바로), 설정 카드의 단추
+func _access_check() -> void:
+	var worst := PackedStringArray()
+	for kind in ["protan", "deutan", "tritan"]:
+		var c: Array = Palette.CVD[kind]
+		var w := INF
+		for i in 4:
+			for j in range(i + 1, 4):
+				w = minf(w, _cvd_de(Color(c[i]), Color(c[j]), kind))
+		_check(w >= 12.0, "%s 팔레트의 상태 색이 그 색각에서 가깝다 (ΔE %.1f)" % [kind, w])
+		worst.append("%s %.1f" % [kind, w])
+	var d0: Array = Palette.CVD[""]
+	var base_deutan := _cvd_de(Color(d0[1]), Color(d0[3]), "deutan")
+	_check(base_deutan < 8.0, "기본 팔레트의 녹색약 GREEN↔RED가 멀다 (%.1f) — 색각 시뮬레이션이 맞지 않다" % base_deutan)
+	# 팔레트를 바꾸면 테마·지표가 따른다
+	var theme0: Theme = main.theme
+	main._on_access_changed("cvd", "deutan")
+	_check(Palette.kind == "deutan" and Palette.RED == Color(Palette.CVD["deutan"][3]) and main.theme != theme0
+		and Palette.level_color(1.0, 5.0, 2.0) == Palette.RED and String(Settings.value("ui/cvd", "")) == "deutan",
+		"녹색약 팔레트가 걸리지 않았다")
+	main._set_chip("o2", "2일", "산소 비축", Palette.RED)
+	var red_txt := String(main.chips["o2"]["value"].text)
+	main._set_chip("o2", "9일", "산소 비축", Palette.AMBER)
+	var amber_txt := String(main.chips["o2"]["value"].text)
+	main._set_chip("o2", "30일", "산소 비축", Palette.TEAL)
+	_check(red_txt == "!! 2일" and amber_txt == "! 9일" and String(main.chips["o2"]["value"].text) == "30일",
+		"지표가 위험·경고를 색으로만 알린다 (%s / %s)" % [red_txt, amber_txt])
+	I18n.apply("en")
+	var red_en := I18n.t(red_txt)
+	I18n.apply("ko")
+	_check(red_en.begins_with("!! ") and not RegEx.create_from_string("[가-힣]").search(red_en), "위험 표시가 붙은 지표가 번역되지 않는다 (%s)" % red_en)
+	main._on_access_changed("cvd", "")
+	_check(Palette.kind == "" and Palette.TEAL == Color("3fb8af"), "기본 팔레트로 돌아오지 않았다")
+	main._refresh_live()
+	# 글자 크기
+	var cap: Label = main.chips["o2"]["caption"]
+	var cap0 := cap.get_theme_font_size("font_size")
+	main._on_access_changed("font", "large")
+	_check(is_equal_approx(Access.font_k, 1.2) and main.theme.default_font_size == 19 and Access.fs(13) == 16
+		and cap.get_theme_font_size("font_size") == int(round(cap0 * 1.2)), "크게가 걸리지 않았다 (%d → %d)" % [cap0, cap.get_theme_font_size("font_size")])
+	var side: Control = (main.tab_buttons.values()[0] as Control).get_parent().get_parent().get_parent()
+	var bar: Control = main.top_row.get_parent()
+	var lay := PackedStringArray()
+	for lang in ["ko", "en"]:
+		I18n.apply(lang)
+		main._on_lang_changed()
+		main._refresh_live()
+		var bar_w := bar.get_combined_minimum_size().x
+		_check(bar_w <= 1260.0, "크게 · %s: 위 막대가 1280 폭에 들어가지 않는다 (%d)" % [lang, int(bar_w)])
+		var widest := 0.0
+		for tab in ["life", "power", "build", "research", "colony", "transport", "log"]:
+			main._select_tab(tab)
+			var w := side.get_combined_minimum_size().x
+			widest = maxf(widest, w)
+			_check(w <= 441.0, "크게 · %s: '%s' 탭의 글이 옆 패널을 넓힌다 (%d — %s)" % [lang, tab, int(w), _widest(side)])
+		lay.append("%s 막대 %d%s · 패널 %d" % [lang, int(bar_w), " (두 줄)" if main._two_rows else "", int(widest)])
+	I18n.apply("ko")
+	main._on_access_changed("font", "normal")
+	_check(is_equal_approx(Access.font_k, 1.0) and main.theme.default_font_size == 16 and cap.get_theme_font_size("font_size") == cap0
+		and not main._two_rows, "보통으로 돌아오지 않았다 (%d · 두 줄 %s)" % [cap.get_theme_font_size("font_size"), str(main._two_rows)])
+	main._select_tab("life")
+	# UI 배율: 고른 배율을 창이 허락하는 만큼 (16:9 PC는 UI 좌표 1100×540까지 — 116%, 20:9 휴대폰은 130% 그대로)
+	Settings.set_value("ui/scale", "1.3")
+	var k_pc := Access.scale_for(Vector2(1920, 1080))
+	var k_phone := Access.scale_for(Vector2(2400, 1080))
+	Settings.set_value("ui/scale", "0.9")
+	var k_small := Access.scale_for(Vector2(1920, 1080))
+	Settings.set_value("ui/scale", "auto")
+	var k_auto := Access.scale_for(Vector2(1920, 1080))
+	_check(absf(k_pc - 1280.0 / 1100.0) < 0.01 and is_equal_approx(k_phone, 1.3) and is_equal_approx(k_small, 0.9) and is_equal_approx(k_auto, 1.0),
+		"UI 배율의 상한이 맞지 않다 (PC %.3f · 휴대폰 %.3f · 90%% %.3f · 자동 %.3f)" % [k_pc, k_phone, k_small, k_auto])
+	main._on_access_changed("scale", "1.15")
+	var applied := main.get_window().content_scale_factor
+	main._on_access_changed("scale", "auto")
+	_check(is_equal_approx(applied, 1.15) and is_equal_approx(main.get_window().content_scale_factor, 1.0),
+		"UI 배율이 창에 걸리지 않았다 (%.3f → %.3f)" % [applied, main.get_window().content_scale_factor])
+	# 움직임 줄이기
+	Access.set_calm(true)
+	main._on_access_changed("calm", "1")
+	var wv: WorldView = main.world
+	wv.cam.fly_to("moon", 3000.0, 2.6)
+	var fly_dur := float(wv.cam._fly.get("dur", -1.0))
+	Access.set_calm(false)
+	_check(is_equal_approx(fly_dur, Access.FLY_CALM_S) and is_equal_approx(Access.fly_s(2.6), 2.6), "움직임 줄이기에서 카메라가 날아간다 (%.2f s)" % fly_dur)
+	for _i in 4:
+		wv.cam.update(0.05, wv.cam.jd)          # 곧바로 다 닿는다
+	# 설정 카드: 보기·접근성 단추가 있고 누르면 걸린다
+	main.settings_panel.open()
+	var btn: Button = main.settings_panel._access_buttons.get("font:large")
+	_check(btn != null and main.settings_panel._access_buttons.size() == Access.SCALES.size() + Access.FONTS.size() + Palette.CVD.size(),
+		"설정 카드에 보기·접근성 단추가 없다")
+	if btn != null:
+		btn.pressed.emit()
+		_check(is_equal_approx(Access.font_k, 1.2) and btn.button_pressed, "설정 카드의 글자 크기 단추가 걸리지 않는다")
+		(main.settings_panel._access_buttons["font:normal"] as Button).pressed.emit()
+	main.settings_panel.close()
+	_check(is_equal_approx(Access.font_k, 1.0) and String(Settings.value("ui/font", "")) == "normal", "글자 크기가 보통으로 돌아오지 않았다")
+	print("smoke: access — 상태 넷 최소 ΔE %s (기본 녹색약 %.1f), 크게: %s, UI 배율 PC %.2f · 휴대폰 %.2f, 지표 %s" % [", ".join(worst),
+		base_deutan, ", ".join(lay), k_pc, k_phone, red_txt])
+
+
+## 색각 시뮬레이션 (Machado, Oliveira & Fernandes 2009 · 심도 1, 선형 RGB) 뒤 OKLab 거리 ×100
+static func _cvd_de(a: Color, b: Color, kind: String) -> float:
+	var m: Array = {"protan": [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
+		"deutan": [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]],
+		"tritan": [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.303900]]}[kind]
+	var la := _sim_lab(a, m)
+	var lb := _sim_lab(b, m)
+	return 100.0 * la.distance_to(lb)
+
+
+static func _sim_lab(c: Color, m: Array) -> Vector3:
+	var l := [_s2l(c.r), _s2l(c.g), _s2l(c.b)]
+	var s := []
+	for row in m:
+		s.append(clampf(float(row[0]) * l[0] + float(row[1]) * l[1] + float(row[2]) * l[2], 0.0, 1.0))
+	var r: float = s[0]
+	var g: float = s[1]
+	var bl: float = s[2]
+	var l_ := pow(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * bl, 1.0 / 3.0)
+	var m_ := pow(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * bl, 1.0 / 3.0)
+	var s_ := pow(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * bl, 1.0 / 3.0)
+	return Vector3(0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_, 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+		0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_)
+
+
+static func _s2l(c: float) -> float:
+	return c / 12.92 if c <= 0.04045 else pow((c + 0.055) / 1.055, 2.4)
 
 
 ## 가장 넓은 자식을 끝까지 따라가 만난 마지막 글 (옆 패널을 넓힌 것)

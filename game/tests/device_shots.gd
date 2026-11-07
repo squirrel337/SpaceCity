@@ -5,7 +5,8 @@ extends SceneTree
 ## PC 1280×720·1366×768·1920×1080, 폰 2400×1080·2340×1080·1600×720, 태블릿 2048×1536·2560×1600:
 ##   for s in 1280x720 1366x768 1920x1080 2400x1080 2340x1080 1600x720 2048x1536 2560x1600; do
 ##     xvfb-run -a -s "-screen 0 2560x1600x24" godot --path game --rendering-driver opengl3 --resolution $s \
-##       --script res://tests/device_shots.gd -- --out /tmp/device --touch [--langs ko,en] [--days 30]; done
+##       --script res://tests/device_shots.gd -- --out /tmp/device --touch [--langs ko,en] [--days 30] [--scale 1.3] [--font large]; done
+## --scale · --font는 보기·접근성의 UI 배율(auto · 0.9 · 1.0 · 1.15 · 1.3)과 글자 크기(small · normal · large) — 끝나면 기본으로 돌린다
 ## 결과: 언어마다 한 줄 (UI 크기 · 막대 폭 · 잘린 탭 · 작은 단추 수 · 넘친 패널 · 아래 단추 줄 수 · 옆 패널 폭), 작은 단추 목록은
 ## report_<크기>.txt에. 문제가 있으면 끝에 "문제 N".
 
@@ -35,6 +36,12 @@ func _initialize() -> void:
 	i = args.find("--days")
 	if i >= 0 and i + 1 < args.size():
 		days = int(args[i + 1])
+	i = args.find("--scale")
+	if i >= 0 and i + 1 < args.size():
+		Settings.set_value("ui/scale", args[i + 1])
+	i = args.find("--font")
+	if i >= 0 and i + 1 < args.size():
+		Settings.set_value("ui/font", args[i + 1])
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	main = load("res://ui/main.tscn").instantiate()
 	root.add_child(main)
@@ -59,6 +66,10 @@ func _process(_delta: float) -> bool:
 			main.modal.visible = false])
 		var ws := DisplayServer.window_get_size()
 		size_tag = "%dx%d" % [ws.x, ws.y]
+		var sk := String(Settings.value("ui/scale", "auto"))
+		var fk := String(Settings.value("ui/font", "normal"))
+		if sk != "auto" or fk != "normal":
+			size_tag += "_%s_%s" % [sk, fk]
 		for lang in langs:
 			var lg: String = lang
 			var sz := size_tag
@@ -93,8 +104,10 @@ func _process(_delta: float) -> bool:
 		var f := FileAccess.open(out_dir.path_join("report_%s.txt" % size_tag), FileAccess.WRITE)
 		f.store_string("\n".join(_report) + "\n")
 		f.close()
-		print("device: %s · 문제 %d → %s" % [size_tag, failures, out_dir])
+		print("device: %s · 문제 %d → %s (UI 배율 %.2f)" % [size_tag, failures, out_dir, main.get_window().content_scale_factor])
 		I18n.apply("ko")
+		Settings.set_value("ui/scale", "auto")
+		Settings.set_value("ui/font", "normal")
 		quit(0)
 		return true
 	(_steps[_step][1] as Callable).call()

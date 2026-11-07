@@ -20,7 +20,7 @@ static func build() -> Theme:
 	bold = load("res://fonts/Pretendard-Bold.otf")
 	var theme := Theme.new()
 	theme.default_font = regular
-	theme.default_font_size = 16
+	theme.default_font_size = Access.fs(16)          # 글자 크기 설정 (Access)
 
 	theme.set_color("font_color", "Label", Palette.TEXT)
 
@@ -89,11 +89,13 @@ static func _dot(size: int, color: Color) -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
+## 제목 글 — 줄을 바꾼다 (긴 도시 이름·영어·큰 글자에서도 패널 폭 안에). 가로 줄에 홀로 놓는 것(위 막대의 날짜)은 끈다
 static func heading(text: String, size: int = 18) -> Label:
 	var l := Label.new()
 	l.text = text
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.add_theme_font_override("font", bold)
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", Access.fs(size))
 	return l
 
 
@@ -101,6 +103,6 @@ static func muted(text: String, size: int = 13) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_color_override("font_color", Palette.MUTED)
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", Access.fs(size))
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return l

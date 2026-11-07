@@ -1,11 +1,12 @@
 class_name SettingsPanel
 extends Control
-## 설정 카드 — 언어(한국어 · English), 그래픽 품질(자동·단계와 감지한 GPU), 지도에 보일 것, 성능 표시,
-## 소리(전체·효과음·환경음 음량, 끄기).
-## 바꾸면 바로 적용하고 저장한다.
+## 설정 카드 — 언어(한국어 · English), 보기·접근성(UI 배율 · 글자 크기 · 색각 팔레트 · 움직임 줄이기 — Access),
+## 그래픽 품질(자동·단계와 감지한 GPU), 지도에 보일 것, 성능 표시, 소리(전체·효과음·환경음·음악 음량, 끄기).
+## 바꾸면 바로 적용하고 저장한다. 화면보다 길면 굴린다.
 
 signal changed
 signal lang_changed
+signal access_changed(kind: String, value: String)   # scale · font · cvd · calm — main이 테마·패널을 다시 만든다
 
 var _level_buttons := {}
 var _gpu_label: Label
@@ -13,6 +14,10 @@ var _now_label: Label
 var _checks := {}
 var _sliders := {}
 var _lang_buttons := {}
+var _access_buttons := {}           # "scale:1.15" · "font:large" · "cvd:deutan" → 단추
+var _scale_label: Label
+var _scroll := ScrollContainer.new()
+var _panel: PanelContainer
 
 
 func _init() -> void:
@@ -34,13 +39,17 @@ func _init() -> void:
 	panel.custom_minimum_size = Vector2(620, 0)
 	panel.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL, Palette.TEAL.darkened(0.25), 12, 22))
 	center.add_child(panel)
+	_panel = panel
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(_scroll)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
-	panel.add_child(v)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(v)
 	var title := Label.new()
 	title.text = "설정"
 	title.add_theme_font_override("font", ThemeFactory.bold)
-	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_font_size_override("font_size", Access.fs(24))
 	v.add_child(title)
 	v.add_child(_section("언어 · Language"))
 	var lrow := HBoxContainer.new()
@@ -61,6 +70,21 @@ func _init() -> void:
 		lrow.add_child(lb)
 		_lang_buttons[code] = lb
 	v.add_child(lrow)
+	v.add_child(_section("보기 · 접근성"))
+	v.add_child(_choice_row("UI 배율", "scale", Access.SCALES, Access.SCALE_NAMES, 84))
+	_scale_label = ThemeFactory.muted("", 13)
+	v.add_child(_scale_label)
+	v.add_child(_choice_row("글자 크기", "font", Access.FONTS.keys(), Access.FONT_NAMES, 96))
+	v.add_child(_choice_row("색", "cvd", Palette.CVD.keys(), Palette.CVD_NAMES, 104))
+	var calm := CheckButton.new()
+	calm.text = "움직임 줄이기 — 카메라가 날아가지 않고 곧바로 옮겨 가고, 깜박이는 불빛·흔들리는 작물·도는 기계가 멈춘다"
+	calm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	calm.custom_minimum_size.y = 40
+	calm.toggled.connect(func(on: bool):
+		Access.set_calm(on)
+		access_changed.emit("calm", "1" if on else ""))
+	v.add_child(calm)
+	_checks["ui/calm"] = [calm, false]
 	v.add_child(_section("그래픽 품질"))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
@@ -130,11 +154,33 @@ func _init() -> void:
 	v.add_child(close_b)
 
 
+## 고르는 단추 줄: 이름표 + 단추들 (하나만 눌린다)
+func _choice_row(title: String, kind: String, keys: Array, names: Dictionary, width: float) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var lab := Label.new()
+	lab.text = title
+	lab.custom_minimum_size.x = 84
+	row.add_child(lab)
+	var group := ButtonGroup.new()
+	for key in keys:
+		var b := Button.new()
+		b.text = String(names.get(key, key))
+		b.toggle_mode = true
+		b.button_group = group
+		b.custom_minimum_size = Vector2(width, 44)
+		var k: String = key
+		b.pressed.connect(func(): access_changed.emit(kind, k))
+		row.add_child(b)
+		_access_buttons["%s:%s" % [kind, k]] = b
+	return row
+
+
 func _section(text: String) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_override("font", ThemeFactory.bold)
-	l.add_theme_font_size_override("font_size", 16)
+	l.add_theme_font_size_override("font_size", Access.fs(16))
 	l.add_theme_color_override("font_color", Palette.AMBER)
 	return l
 
@@ -142,6 +188,14 @@ func _section(text: String) -> Label:
 func open() -> void:
 	_refresh()
 	visible = true
+	_fit.call_deferred()
+
+
+## 화면 높이 안에 (넘치면 굴린다)
+func _fit() -> void:
+	var content := (_scroll.get_child(0) as Control).get_combined_minimum_size().y
+	var room := get_viewport_rect().size.y - 44.0 - 60.0
+	_scroll.custom_minimum_size.y = clampf(content, 160.0, maxf(room, 160.0))
 
 
 func close() -> void:
@@ -172,6 +226,15 @@ func _refresh() -> void:
 		c.set_pressed_no_signal(bool(Settings.value(key, _checks[key][1])))
 	for code in _lang_buttons:
 		(_lang_buttons[code] as Button).set_pressed_no_signal(code == I18n.lang)
+	var now := {"scale": String(Settings.value("ui/scale", "auto")), "font": String(Settings.value("ui/font", "normal")),
+		"cvd": Palette.kind}
+	for key3 in _access_buttons:
+		var parts := String(key3).split(":", true, 1)
+		(_access_buttons[key3] as Button).set_pressed_no_signal(String(now.get(parts[0], "")) == parts[1])
+	var win := get_window()
+	var k := win.content_scale_factor if win != null else 1.0
+	_scale_label.text = "지금 UI 배율 %d%% — 고른 배율 %d%%%s" % [int(round(k * 100.0)), int(round(Access.chosen_scale() * 100.0)),
+		" (화면이 허락하는 만큼 — 위 막대와 옆 패널이 들어가게)" if Access.chosen_scale() - k > 0.005 else ""]
 	for key2 in _sliders:
 		var sl: HSlider = _sliders[key2][0]
 		sl.set_value_no_signal(float(Settings.value(key2, _sliders[key2][1])))

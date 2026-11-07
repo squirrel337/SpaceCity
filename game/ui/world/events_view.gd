@@ -219,7 +219,7 @@ func _animate(l: Dictionary, w: Dictionary, k: float, local: Callable) -> void:
 				var s := 3.0 + ph * 11.0
 				var drift := Vector2(cos(seed), sin(seed)) * ph * 14.0
 				_place(parts[i], local.call(a + drift, 5.0 + ph * 42.0), Vector3.ONE * s, 0.5 * (1.0 - ph) * minf(ph * 6.0, 1.0) * fade)
-			var flick := 0.8 + 0.2 * sin(_t * 23.0 + seed) * sin(_t * 7.0)
+			var flick := 0.9 if Access.calm else 0.8 + 0.2 * sin(_t * 23.0 + seed) * sin(_t * 7.0)   # 움직임 줄이기 — 불빛이 깜박이지 않게
 			var g: Array = parts[n]
 			_place(g, local.call(a, 1.5), Vector3.ONE * r * 0.35 * flick * fade, 0.75 * fade)
 			var light: OmniLight3D = l["light"]
@@ -229,7 +229,7 @@ func _animate(l: Dictionary, w: Dictionary, k: float, local: Callable) -> void:
 			# 벽의 틈에서 비스듬히 뿜는 하얀 기둥 — 반나절이면 막힌다
 			var fade := 1.0 - minf(k * 2.5, 1.0)
 			var tilt := Basis(Vector3(cos(seed), 0, sin(seed)), 0.55)
-			var h := 16.0 * (0.9 + 0.1 * sin(_t * 17.0))
+			var h := 16.0 * (0.95 if Access.calm else 0.9 + 0.1 * sin(_t * 17.0))
 			var mi: MeshInstance3D = parts[0][0]
 			mi.visible = fade > 0.0
 			mi.transform = Transform3D(tilt * Basis().scaled(Vector3(4.0, h, 4.0)), local.call(a, 3.0) + tilt * Vector3(0, h * 0.5, 0))
@@ -364,7 +364,7 @@ func _update_explore(plan: CityPlan, colony: Dictionary, local: Callable, delta:
 		_build_beacons(st, local)
 	_beacons.visible = true
 	for l in _lamps:
-		var blink := 0.35 + 0.65 * absf(sin(_t * 3.0)) if String(l[1]) == "going" else 1.0
+		var blink := 0.35 + 0.65 * absf(sin(_t * 3.0)) if String(l[1]) == "going" and not Access.calm else 1.0
 		var col: Color = SITE_COLORS.get(String(l[1]), SITE_COLORS["unknown"])
 		(l[0] as StandardMaterial3D).albedo_color = Color(col, blink)
 	var r := CityExplore.rover_at(colony)
@@ -511,10 +511,10 @@ func draw_overlay(view: WorldView, ov: Control, font: Font, plan: CityPlan, colo
 
 
 static func _tag(ov: Control, font: Font, at: Vector2, text: String, col: Color) -> void:
-	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
+	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(12)).x
 	var r := Rect2(at + Vector2(-w * 0.5 - 7.0, -22.0), Vector2(w + 14.0, 19.0))
 	if not Rect2(Vector2.ZERO, ov.size).intersects(r):
 		return
 	ov.draw_rect(r, Color(0.05, 0.06, 0.09, 0.8))
 	ov.draw_rect(Rect2(r.position, Vector2(3.0, r.size.y)), col)
-	ov.draw_string(font, r.position + Vector2(8.0, 14.0), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col.lightened(0.35))
+	ov.draw_string(font, r.position + Vector2(8.0, 14.0), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(12), col.lightened(0.35))

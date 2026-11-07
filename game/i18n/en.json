@@ -3610,5 +3610,22 @@
  "시나리오)": "scenario)",
  "·  지금": "·  current",
  "·  지난번": "·  last time",
- "난이도 · %s": "Difficulty · %s"
+ "난이도 · %s": "Difficulty · %s",
+ "작게": "Small",
+ "크게": "Large",
+ "UI 배율 %s(%d%%) · 글자 %s · 색 %s · 움직임 %s": "UI scale %s (%d%%) · text %s · colors %s · motion %s",
+ "줄임": "reduced",
+ "그대로": "as is",
+ "기본": "Default",
+ "적색약": "Red-weak",
+ "녹색약": "Green-weak",
+ "청색약": "Blue-weak",
+ "보기 · 접근성": "Display · Accessibility",
+ "UI 배율": "UI scale",
+ "글자 크기": "Text size",
+ "색": "Colors",
+ "움직임 줄이기 — 카메라가 날아가지 않고 곧바로 옮겨 가고, 깜박이는 불빛·흔들리는 작물·도는 기계가 멈춘다": "Reduce motion — the camera jumps instead of flying, and blinking lights, swaying crops and turning machines stand still",
+ "지금 UI 배율 %d%% — 고른 배율 %d%%%s": "UI scale now %d%% — chosen %d%%%s",
+ " (화면이 허락하는 만큼 — 위 막대와 옆 패널이 들어가게)": " (as far as the screen allows — so the top bar and side panel still fit)",
+ "화면이 허락하는 만큼 — 위 막대와 옆 패널이 들어가게)": "as far as the screen allows — so the top bar and side panel still fit)"
 }

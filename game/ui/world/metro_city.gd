@@ -870,7 +870,7 @@ func _beacon(at: Vector3, col: Color, busy: bool) -> void:
 	mat.shader = load("res://ui/world/shaders/beacon.gdshader")
 	mat.set_shader_parameter("color", Color(1.0, 0.62, 0.25) if busy else col)
 	mat.set_shader_parameter("height", 900.0)
-	mat.set_shader_parameter("blink", 1.0 if busy else 0.0)
+	mat.set_shader_parameter("blink", 1.0 if busy and not Access.calm else 0.0)   # 움직임 줄이기 — 바쁜 공항 불빛이 깜박이지 않게
 	var mi := MeshInstance3D.new()
 	mi.mesh = cm
 	mi.material_override = mat

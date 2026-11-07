@@ -19,7 +19,7 @@ func _init() -> void:
 	add_theme_constant_override("separation", 10)
 	add_child(ThemeFactory.heading("연구"))
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status.add_theme_font_size_override("font_size", 14)
+	status.add_theme_font_size_override("font_size", Access.fs(14))
 	add_child(status)
 	add_child(progress)
 	paths.add_theme_constant_override("separation", 6)

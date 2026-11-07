@@ -33,14 +33,14 @@ func _init() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	_panel.add_child(v)
-	_tag.add_theme_font_size_override("font_size", 13)
+	_tag.add_theme_font_size_override("font_size", Access.fs(13))
 	v.add_child(_tag)
 	_title.add_theme_font_override("font", ThemeFactory.bold)
-	_title.add_theme_font_size_override("font_size", 24)
+	_title.add_theme_font_size_override("font_size", Access.fs(24))
 	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_title)
 	_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_body.add_theme_font_size_override("font_size", 16)
+	_body.add_theme_font_size_override("font_size", Access.fs(16))
 	_body.custom_minimum_size.x = 600
 	v.add_child(_body)
 	_choices.add_theme_constant_override("separation", 8)
@@ -68,7 +68,7 @@ func open(p_context: String, tag: String, title: String, body: String, choices: 
 		var b := Button.new()
 		b.text = ch[1]
 		b.custom_minimum_size.y = 48
-		b.add_theme_font_size_override("font_size", 17)
+		b.add_theme_font_size_override("font_size", Access.fs(17))
 		b.pressed.connect(_pick.bind(ch[0]))
 		row.add_child(b)
 		if ch.size() > 2 and ch[2] != "":

@@ -32,7 +32,7 @@ func _init(name_text: String) -> void:
 	row.add_child(value)
 	add_child(row)
 	detail.add_theme_color_override("font_color", Palette.MUTED)
-	detail.add_theme_font_size_override("font_size", 13)
+	detail.add_theme_font_size_override("font_size", Access.fs(13))
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(detail)
 

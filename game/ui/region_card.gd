@@ -39,7 +39,7 @@ func _init() -> void:
 	_fold = Button.new()
 	_fold.text = "접기"
 	_fold.flat = true
-	_fold.add_theme_font_size_override("font_size", 13)
+	_fold.add_theme_font_size_override("font_size", Access.fs(13))
 	_fold.pressed.connect(func():
 		_folded = not _folded
 		_sig = ""
@@ -87,7 +87,7 @@ func refresh() -> void:
 	for kd in r.get("kinds", []):
 		var chip := Label.new()
 		chip.text = Metros.kind_name(String(kd))
-		chip.add_theme_font_size_override("font_size", 13)
+		chip.add_theme_font_size_override("font_size", Access.fs(13))
 		chip.add_theme_color_override("font_color", Color(String(Metros.tech_kinds.get(String(kd), {}).get("color", "aab3c8"))))
 		_kinds.add_child(chip)
 	_text.text = "%s — %s" % [String(r.get("country", "")), String(r.get("text", ""))]
@@ -139,7 +139,7 @@ func refresh() -> void:
 		var b := Button.new()
 		b.text = "협력 · 운영비 %s" % Fmt.n(cost)
 		b.custom_minimum_size = Vector2(120, 44 if ThemeFactory.touch() else 30)
-		b.add_theme_font_size_override("font_size", 13)
+		b.add_theme_font_size_override("font_size", Access.fs(13))
 		b.disabled = fn.modes.budget(mk3) < cost or bt2 == ""
 		if bt2 == "":
 			b.tooltip_text = "이 지역은 그 운영 방식에 주는 몫이 없다"
@@ -155,7 +155,7 @@ func refresh() -> void:
 		var go := Button.new()
 		go.text = "%s(으)로 가기" % String(near.get("name", ""))
 		go.custom_minimum_size.y = 44 if ThemeFactory.touch() else 30
-		go.add_theme_font_size_override("font_size", 13)
+		go.add_theme_font_size_override("font_size", Access.fs(13))
 		go.pressed.connect(func(): region_ops.emit(key, "go", String(near["key"])))
 		_rows.add_child(go)
 	reset_size()

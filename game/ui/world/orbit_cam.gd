@@ -89,6 +89,7 @@ func flying() -> bool:
 ## land_dir(천체 고정 방향)을 주면 그 지점을 똑바로 내려다보며 도착한다 — 식민지로 갈 때
 func fly_to(id: String, end_dist_km: float, seconds: float = 2.6, land_dir: Vector3 = Vector3.ZERO,
 		view_dir: Vector3 = Vector3.ZERO) -> void:
+	seconds = Access.fly_s(seconds)          # 움직임 줄이기 — 날아가지 않고 곧바로
 	var b := _body(id)
 	if b.is_empty():
 		return

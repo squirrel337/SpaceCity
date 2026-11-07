@@ -568,7 +568,7 @@ func _sync_agents(delta: float) -> void:
 		var plume: MeshInstance3D = e["plume"]
 		plume.visible = thrust
 		if thrust:
-			var flick := 0.85 + 0.15 * sin(_t * 40.0 + float(uid))
+			var flick := 0.92 if Access.calm else 0.85 + 0.15 * sin(_t * 40.0 + float(uid))   # 움직임 줄이기 — 깜박이지 않게
 			plume.transform = Transform3D(Basis().scaled(Vector3.ONE * 3.2 * flick), pos + Vector3(0, -0.6, 0))
 	for uid in _agent_nodes.keys():
 		if not seen.has(uid):
@@ -706,7 +706,7 @@ func _update_tool() -> void:
 			_ghost.mesh = ModelLib.mesh("buildings", tool.kind, tool.variant)
 			_ghost_key = key
 		var c := good if ok else bad
-		var pulse := 0.5 + 0.5 * sin(_t * 5.0)
+		var pulse := 0.5 if Access.calm else 0.5 + 0.5 * sin(_t * 5.0)
 		_ghost_mat.set_shader_parameter("tint", Color(c, 0.62 + 0.18 * pulse))
 		_ghost.transform = Transform3D(_yaw(tool.rot), _local(tool.at, 0.04))
 		var f := CityPlan.foot_of(tool.kind, tool.rot)
@@ -1062,9 +1062,9 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 				continue
 			var s2: Vector2 = sp
 			if it["broken"]:
-				var blink := 0.55 + 0.45 * sin(_t * 6.0)
+				var blink := 1.0 if Access.calm else 0.55 + 0.45 * sin(_t * 6.0)
 				ov.draw_circle(s2, 10.0, Color(0.89, 0.34, 0.18, blink))
-				ov.draw_string(bold, s2 + Vector2(-3.5, 6), I18n.t("!"), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
+				ov.draw_string(bold, s2 + Vector2(-3.5, 6), I18n.t("!"), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(15), Color.WHITE)
 			elif it["building"]:
 				var r := Rect2(s2 - Vector2(22, 0), Vector2(44, 5))
 				ov.draw_rect(r, Color(0, 0, 0, 0.6))
@@ -1082,7 +1082,7 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 			var text := "%s %d m" % [COVER_NAMES[key], int(cv.get(key, {}).get("radius_m", 0))]
 			ov.draw_rect(Rect2(Vector2(x, ly), Vector2(10, 10)), COVER_COLORS[key])
 			_shadow_text(ov, font, Vector2(x + 14, ly + 10), text, 12, Palette.TEXT)
-			x += font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 30.0
+			x += font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(12)).x + 30.0
 	_draw_way_signs(view, ov, font, bold)
 	_draw_tool_overlay(view, ov, font, bold)
 	# 상태 (왼쪽 위)
@@ -1097,7 +1097,7 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 			state += " — 태양광 0 kW, 축전 %s" % Fmt.pct((sim.battery + sim.rfc) / maxf(1.0, sim.bat_cap + sim.rfc_cap))
 	_shadow_text(ov, bold, Vector2(16, 76), title, 17, Palette.TEXT)        # 위쪽은 고정점 경로 막대
 	if era_text != "":
-		_shadow_text(ov, font, Vector2(26 + bold.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x, 76), era_text, 13,
+		_shadow_text(ov, font, Vector2(26 + bold.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(17)).x, 76), era_text, 13,
 			Palette.AMBER.lightened(0.2))
 	_shadow_text(ov, font, Vector2(16, 96), state, 13, Palette.AMBER if lit else Palette.BLUE)
 	var warn := ""
@@ -1115,9 +1115,9 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 	if hovered != "":
 		var label := String(sim.M[hovered]["name"]) if sim.M.has(hovered) else hovered
 		var mp := view.get_local_mouse_position()
-		var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+		var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(13)).x
 		ov.draw_rect(Rect2(mp + Vector2(14, 6), Vector2(w + 14, 22)), Color(0.06, 0.07, 0.1, 0.88))
-		ov.draw_string(font, mp + Vector2(21, 22), I18n.t(label), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Palette.TEXT)
+		ov.draw_string(font, mp + Vector2(21, 22), I18n.t(label), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(13), Palette.TEXT)
 
 
 func _progress_of(it: Dictionary) -> float:
@@ -1146,19 +1146,19 @@ func _draw_tool_overlay(view: WorldView, ov: Control, font: Font, bold: Font) ->
 		if sp1 != null:
 			var c := Color(0.35, 0.95, 0.55) if tool.reason == "" else Color(1.0, 0.32, 0.22)
 			ov.draw_arc(sp1, 16.0, 0.0, TAU, 32, Color(c, 0.9), 2.0)
-			ov.draw_arc(sp1, 24.0 + 4.0 * sin(_t * 5.0), 0.0, TAU, 32, Color(c, 0.45), 1.5)
+			ov.draw_arc(sp1, 24.0 + (0.0 if Access.calm else 4.0 * sin(_t * 5.0)), 0.0, TAU, 32, Color(c, 0.45), 1.5)
 	if tool.has_at and tool.reason != "" and tool.mode in ["build", "road"]:
 		var sp2: Variant = view.screen_of(global_transform * _local(tool.at, 2.0))
 		if sp2 != null:
-			var w := font.get_string_size(tool.reason, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+			var w := font.get_string_size(tool.reason, HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(13)).x
 			var at2 := (sp2 as Vector2) + Vector2(16, 10)
 			ov.draw_rect(Rect2(at2 - Vector2(6, 16), Vector2(w + 12, 22)), Color(0.12, 0.03, 0.02, 0.85))
-			ov.draw_string(font, at2, I18n.t(tool.reason), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1.0, 0.62, 0.5))
+			ov.draw_string(font, at2, I18n.t(tool.reason), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(13), Color(1.0, 0.62, 0.5))
 
 
 static func _shadow_text(ov: Control, font: Font, pos: Vector2, text: String, font_size: int, color: Color) -> void:
-	ov.draw_string(font, pos + Vector2(1, 1), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.7))
-	ov.draw_string(font, pos, I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+	ov.draw_string(font, pos + Vector2(1, 1), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(font_size), Color(0, 0, 0, 0.7))
+	ov.draw_string(font, pos, I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(font_size), color)
 
 
 # ── 구역 판 ─────────────────────────────────────────────────────
@@ -1392,8 +1392,8 @@ func _draw_district_labels(view: WorldView, ov: Control, font: Font, bold: Font)
 		if nblocks.has(name):
 			sub = "건물 %d · 블록 %d · 필지 %d" % [int(_district_n.get(name, 0)), int(nblocks[name]),
 				(layout.lots.get(name, []) as Array).size()]
-		var w := maxf(bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x,
-			font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x) + 22.0
+		var w := maxf(bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(12)).x,
+			font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(10)).x) + 22.0
 		var rect := Rect2(s2 - Vector2(w * 0.5, 16.0), Vector2(w, 32.0))
 		if not Rect2(Vector2.ZERO, view.size).intersects(rect):
 			continue
@@ -1407,9 +1407,9 @@ func _draw_district_labels(view: WorldView, ov: Control, font: Font, bold: Font)
 		placed.append(rect)
 		ov.draw_rect(rect, Color(0.04, 0.05, 0.08, 0.45 * a))
 		ov.draw_rect(Rect2(rect.position, Vector2(3.0, rect.size.y)), Color(col, 0.95 * a))
-		ov.draw_string(bold, rect.position + Vector2(10, 14), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 12,
+		ov.draw_string(bold, rect.position + Vector2(10, 14), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(12),
 			Color(col.lightened(0.45), a))
-		ov.draw_string(font, rect.position + Vector2(10, 27), I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+		ov.draw_string(font, rect.position + Vector2(10, 27), I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(10),
 			Color(0.82, 0.84, 0.88, 0.85 * a))
 
 
@@ -1487,11 +1487,11 @@ func _draw_way_signs(view: WorldView, ov: Control, font: Font, bold: Font) -> vo
 			continue
 		var text := "→ %s · %s km" % [Transport.node_name(h["other"]), Fmt.n(float(h["km"]))]
 		var sub := Transport.mode_name(h["mode"])
-		var w := maxf(bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x,
-			font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x) + 18.0
+		var w := maxf(bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(13)).x,
+			font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11)).x) + 18.0
 		var p: Vector2 = sp
 		var rect := Rect2(p - Vector2(w * 0.5, 18), Vector2(w, 36))
 		ov.draw_rect(rect, Color(0.12, 0.09, 0.03, 0.72 * a))
 		ov.draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2.0)), Color(1.0, 0.72, 0.35, 0.9 * a))
-		ov.draw_string(bold, rect.position + Vector2(9, 16), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1.0, 0.82, 0.55, a))
-		ov.draw_string(font, rect.position + Vector2(9, 31), I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.86, 0.84, 0.8, 0.85 * a))
+		ov.draw_string(bold, rect.position + Vector2(9, 16), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(13), Color(1.0, 0.82, 0.55, a))
+		ov.draw_string(font, rect.position + Vector2(9, 31), I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11), Color(0.86, 0.84, 0.8, 0.85 * a))

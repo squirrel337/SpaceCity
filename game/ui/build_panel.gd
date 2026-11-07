@@ -28,7 +28,7 @@ func _init() -> void:
 	add_theme_constant_override("separation", 10)
 	add_child(ThemeFactory.heading("건설"))
 	res_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	res_label.add_theme_font_size_override("font_size", 14)
+	res_label.add_theme_font_size_override("font_size", Access.fs(14))
 	add_child(res_label)
 	add_child(ThemeFactory.heading("대기열", 16))
 	auto_sort.text = "생명유지 → 대피·주거 → 전력 → 식량 순으로 자동 정렬"
@@ -134,7 +134,7 @@ func rebuild() -> void:
 			toggle.flat = true
 			toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			toggle.custom_minimum_size.y = 34
-			toggle.add_theme_font_size_override("font_size", 13)
+			toggle.add_theme_font_size_override("font_size", Access.fs(13))
 			toggle.add_theme_color_override("font_color", Palette.CATEGORY[cat].lightened(0.2))
 			_toggles[fam] = toggle
 			_toggle_update(fam)
@@ -199,7 +199,8 @@ func _queue_row(i: int, item: Dictionary) -> Control:
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_constant_override("separation", 2)
 	var title := Label.new()
-	title.add_theme_font_size_override("font_size", 14)
+	title.add_theme_font_size_override("font_size", Access.fs(14))
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART     # 큰 글자·영어에서도 옆 패널 폭 안에
 	info.add_child(title)
 	var bar := ProgressBar.new()
 	bar.show_percentage = false
@@ -234,6 +235,7 @@ func _entry(mid: String) -> Control:
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_constant_override("separation", 1)
 	var title := Label.new()
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART     # "레골리스 차폐 돔 ×7 (+1 대기)" — 큰 글자·영어에서도 패널 폭 안에
 	info.add_child(title)
 	var cost := _cost_text(sim.cost_of(mid))                 # 난이도의 짓는 값
 	var power := float(m["power_kw"])

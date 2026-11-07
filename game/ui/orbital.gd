@@ -316,7 +316,7 @@ static func stage_line(col: Colonies, i: int) -> String:
 	var sg: Dictionary = stages()[i]
 	var mark := "✔" if i < int(st["stage"]) else ("▸" if i == int(st["stage"]) else "○")
 	if i < int(st["stage"]):
-		return "%s %d %s" % [mark, i + 1, String(sg["name"])]
+		return "%s %d · %s" % [mark, i + 1, String(sg["name"])]          # " · " — 번역기가 이름을 따로 옮긴다
 	var bits := PackedStringArray()
 	if float(sg.get("regolith_t", 0.0)) > 0.0:
 		bits.append("레골리스 %s t" % Fmt.n(float(sg["regolith_t"])))
@@ -324,4 +324,4 @@ static func stage_line(col: Colonies, i: int) -> String:
 	if ct != "":
 		bits.append(ct)
 	bits.append("%d일" % int(sg.get("days", 30)))
-	return "%s %d %s — %s" % [mark, i + 1, String(sg["name"]), " · ".join(bits)]
+	return "%s %d · %s — %s" % [mark, i + 1, String(sg["name"]), " · ".join(bits)]
