@@ -10,12 +10,12 @@ const GOOD_RESEARCH := ["sintered_construction", "regenerative_fuel_cell", "spac
 	"sunlight_piping", "molten_regolith_electrolysis", "local_manufacturing",
 	"robot_fabrication", "tall_towers", "algae_bioreactor", "cryogenic_propellant",
 	"low_g_medicine", "megawatt_fission", "seed_distributed", "orbital_assembly",
-	"mass_driver", "rotating_habitat"]
+	"mass_driver", "rotating_habitat", "laser_sail"]
 const NAIVE_RESEARCH := ["algae_bioreactor", "sunlight_piping", "autonomous_robots_2", "closed_loop_ls2",
 	"tall_towers", "polar_prospecting", "sintered_construction", "regenerative_fuel_cell",
 	"molten_regolith_electrolysis", "local_manufacturing", "robot_fabrication",
 	"cryogenic_propellant", "space_weather_forecast", "shielding_2", "low_g_medicine",
-	"megawatt_fission", "seed_distributed", "orbital_assembly", "mass_driver", "rotating_habitat"]
+	"megawatt_fission", "seed_distributed", "orbital_assembly", "mass_driver", "rotating_habitat", "laser_sail"]
 
 var name: String
 var prepared: bool

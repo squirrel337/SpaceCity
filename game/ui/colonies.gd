@@ -34,6 +34,7 @@ var routes: Array = []             # 정기 교역 (CityRoutes — 플레이어�
 var fleet := {}                    # 함대 (Fleet — 행성간 항로를 오가는 배)
 var contracts := {}                # 항로 계약과 지구 협상 (Contracts)
 var orbital := {}                  # 매스 드라이버와 L5 궤도 도시 (Orbital)
+var probes := {}                   # 성간 탐사선 (Probes)
 
 
 ## 새 게임: 고향 도시와 천체마다의 기본 도시로 시작한다
@@ -56,6 +57,7 @@ func start(sim: CitySim, plan: CityPlan) -> void:
 	Fleet.start(self)
 	Contracts.start(self)
 	Orbital.start(self)
+	Probes.start(self)
 
 
 ## 아직 없는 기본 도시를 세운다 (새 게임, 기본 도시가 없던 옛 저장). 도시마다 몇 시간씩 앞서 세운 것으로 해
@@ -192,6 +194,7 @@ func step() -> Array:
 		Fleet.step_day(self)                       # 함대 — 다 지은 배, 자동 운영
 		Contracts.step_day(self)                   # 항로 계약 · 지구 협상
 		Orbital.step_day(self)                     # 매스 드라이버 · L5 궤도 도시
+		Probes.step_day(self)                      # 성간 탐사선
 		share_techs()
 		metro_fn.step_day(self)
 		var r := Scenario.step(self)               # 시나리오 목표 (이기거나 지면 main이 결과 창을 띄운다)
@@ -485,11 +488,11 @@ func to_save() -> Dictionary:
 			"extra": int(c.get("extra", -100000)), "redev": int(c.get("redev", -1)), "redev_txt": String(c.get("redev_txt", "")),
 			"progress": c.get("progress", {}), "research": c.get("research", {}), "explore": c.get("explore", {}),
 			"trade": c.get("trade", {}), "delegate": c.get("delegate", {}), "hist": c.get("hist", {}),
-			"people": c.get("people", {}), "politics": c.get("politics", {}),
+			"people": c.get("people", {}), "politics": c.get("politics", {}), "probes_sent": int(c.get("probes_sent", 0)),
 			"oplog": (c.get("oplog", []) as Array).slice(-120)})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
-		"metro_fn": metro_fn.to_save(), "scenario": scenario, "routes": routes, "fleet": fleet, "contracts": contracts, "orbital": orbital}
+		"metro_fn": metro_fn.to_save(), "scenario": scenario, "routes": routes, "fleet": fleet, "contracts": contracts, "orbital": orbital, "probes": probes}
 
 
 ## 저장을 읽는다 (판 1 = 도시 하나뿐이던 저장, 판 2 = 교통이 없던 저장). 기본 도시가 없던 저장이면 지금 시각에 세운다.
@@ -513,6 +516,7 @@ func load_save(data: Dictionary) -> bool:
 		Fleet.start(self)
 		Contracts.start(self)
 		Orbital.start(self)
+		Probes.start(self)
 		scenario = {}
 		scenario_news = ""
 		Scenario.apply_rules(self)
@@ -532,6 +536,8 @@ func load_save(data: Dictionary) -> bool:
 		if cd.get("idle") is Dictionary:
 			entry["idle"] = cd["idle"]
 		entry["bought"] = int(cd.get("bought", -100000))
+		if int(cd.get("probes_sent", 0)) > 0:
+			entry["probes_sent"] = int(cd["probes_sent"])
 		entry["extra"] = int(cd.get("extra", -100000))
 		entry["redev"] = int(cd.get("redev", -1))
 		entry["redev_txt"] = String(cd.get("redev_txt", ""))
@@ -597,6 +603,7 @@ func load_save(data: Dictionary) -> bool:
 	Fleet.load_state(self, data.get("fleet"))
 	Contracts.load_state(self, data.get("contracts"))
 	Orbital.load_state(self, data.get("orbital"))
+	Probes.load_state(self, data.get("probes"))
 	routes = []
 	for r in (data["routes"] if data.get("routes") is Array else []):
 		if r is Dictionary and r.has("from") and r.has("to") and r.has("key"):

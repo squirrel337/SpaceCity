@@ -1,9 +1,9 @@
 {
   "_meta": {
     "about": "도시의 시대·이정표·메가프로젝트 (CityProgress — 시뮬레이션 밖의 규칙). 이정표는 도시마다 한 번 이루고 상(지원 점수)을 받는다. 시대는 이룬 이정표로 오른다. 메가프로젝트는 시대·기술이 되면 빈 땅 구역 하나에 단계마다 값을 내며 짓고, 다 지으면 그 도시에 효과가 남는다",
-    "milestones": "id, name, text, when(조건: pop 정착민 · techs 연구 수 · land 산 땅 구역 · built {종류|계열: 수} · roads [길 종류 …] 가운데 하나라도 · days 날수와 deaths 0 · mega 지은 메가프로젝트 수), reward(support)",
+    "milestones": "id, name, text, when(조건: pop 정착민 · techs 연구 수 · land 산 땅 구역 · built {종류|계열: 수} · roads [길 종류 …] 가운데 하나라도 · days 날수와 deaths 0 · mega 지은 메가프로젝트 수 · probes 그 도시가 보낸 성간 탐사선 수), reward(support)",
     "eras": "차례대로: name, short, text, needs(이룬 이정표 id들)",
-    "megaprojects": "id, name, text, era(그 시대부터), tech(필요 기술 — 없으면 null), stages [{name, cost{parts, metal_t}, days}], effect(housing 집 · morale 사기 · support_day 지원 점수/일 · rp_day 연구/일 · build_k 로봇 작업량 배율), look(3D 모양: driver 질량 투사기 · ring 회전 거주 고리 · dome 대형 돔 · dish 전파 접시 · tether 궤도 승강기)"
+    "megaprojects": "id, name, text, era(그 시대부터), tech(필요 기술 — 없으면 null), stages [{name, cost{parts, metal_t}, days}], effect(housing 집 · morale 사기 · support_day 지원 점수/일 · rp_day 연구/일 · build_k 로봇 작업량 배율), look(3D 모양: driver 질량 투사기 · ring 회전 거주 고리 · dome 대형 돔 · dish 전파 접시 · tether 궤도 승강기 · laser 레이저 돛 발사 시설)"
   },
   "milestones": [
     {"id": "pop100", "name": "백 명의 도시", "text": "정착민 100명", "when": {"pop": 100}, "reward": {"support": 80}},
@@ -19,7 +19,8 @@
     {"id": "viaduct", "name": "첫 고가 노선", "text": "고가 대로·고가 고속도로", "when": {"roads": ["elevated_avenue", "elevated_highway", "elevated_street"]}, "reward": {"support": 120}},
     {"id": "train", "name": "궤도 열차", "text": "모노레일·자기부상 궤도", "when": {"roads": ["monorail", "maglev"]}, "reward": {"support": 200}},
     {"id": "safe_year", "name": "무사고 한 해", "text": "사망자 없이 365일", "when": {"days": 365, "deaths": 0}, "reward": {"support": 200}},
-    {"id": "mega1", "name": "첫 메가프로젝트", "text": "메가프로젝트 하나를 다 짓는다", "when": {"mega": 1}, "reward": {"support": 400}}
+    {"id": "mega1", "name": "첫 메가프로젝트", "text": "메가프로젝트 하나를 다 짓는다", "when": {"mega": 1}, "reward": {"support": 400}},
+    {"id": "probe1", "name": "별로 가는 첫 돛", "text": "성간 탐사선 하나를 이웃 별로 보낸다", "when": {"probes": 1}, "reward": {"support": 500}}
   ],
   "eras": [
     {"name": "시대 0 · 전초기지", "short": "전초기지", "text": "살아남는 것이 먼저다", "needs": []},
@@ -57,6 +58,12 @@
       "stages": [{"name": "닻 기초", "cost": {"parts": 260, "metal_t": 18}, "days": 35},
         {"name": "승강 탑", "cost": {"parts": 300, "metal_t": 20}, "days": 40},
         {"name": "줄 잇기", "cost": {"parts": 120, "metal_t": 6}, "days": 20}],
-      "effect": {"support_day": 18, "build_k": 1.1}}
+      "effect": {"support_day": 18, "build_k": 1.1}},
+    {"id": "laser_array", "name": "레이저 돛 발사 시설", "era": 2, "tech": "laser_sail", "look": "laser",
+      "text": "레이저 발사기 수천 개의 빛을 한 점에 모으는 위상 배열 — 그램급 돛을 광속의 20%로 민다 (성간 탐사선)",
+      "stages": [{"name": "발사기 밭", "cost": {"parts": 240, "metal_t": 14}, "days": 30},
+        {"name": "위상 맞춤 광학", "cost": {"parts": 280, "metal_t": 10}, "days": 35},
+        {"name": "축전 단지와 시험 발사", "cost": {"parts": 120, "metal_t": 8}, "days": 15}],
+      "effect": {"rp_day": 15}}
   ]
 }

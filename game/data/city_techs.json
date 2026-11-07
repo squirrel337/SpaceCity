@@ -220,6 +220,19 @@
       ],
       "effect": "아일랜드 원(버날 구) 메가프로젝트 해금 — 시대 1 진입 조건",
       "science_note": "지름 약 500 m의 구를 분당 약 1.9회 돌리면 적도에서 1g가 된다."
+    },
+    {
+      "id": "laser_sail",
+      "name": "레이저 돛",
+      "category": "탐사",
+      "plausibility": "engineering",
+      "cost": 45000,
+      "requires": [
+        "megawatt_fission",
+        "space_weather_forecast"
+      ],
+      "effect": "레이저 돛 발사 시설 메가프로젝트 해금 — 그램급 탐사선을 이웃 별로 (성간 시대의 입문)",
+      "science_note": "브레이크스루 스타샷(2016)은 100 GW 레이저 배열로 그램급 돛을 광속의 20%까지 밀어 약 20년 만에 프록시마 센타우리에 닿게 하는 계획이다."
     }
   ]
 }

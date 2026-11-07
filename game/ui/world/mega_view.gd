@@ -16,6 +16,7 @@ const GLOW := Color(1.0, 0.85, 0.5)
 var _sig := ""
 var _mats := {}
 var _rail := {}                  # 다 지은 질량 투사기의 레일 {root, dir, L, rise} — 쏠 때 덩이가 지나간다
+var _beam: MeshInstance3D        # 다 지은 레이저 돛 발사 시설의 빛줄기 (탐사선을 쏜 날)
 var _shots: Array[MeshInstance3D] = []
 var _shot_t := 0.0
 
@@ -30,6 +31,7 @@ func refresh(plan: CityPlan, local: Callable) -> void:
 	_sig = sig
 	_rail = {}
 	_shots.clear()
+	_beam = null
 	for ch in get_children():
 		ch.queue_free()
 	for w in plan.mega_done:
@@ -62,6 +64,8 @@ func _build(plan: CityPlan, local: Callable, id: String, cell: Vector2i, stage: 
 			_ring(root, size, k)
 		"tether":
 			_tether(root, size, k)
+		"laser":
+			_laser(root, size, k, stage >= 99)
 	if stage < 99:
 		for corner: Vector2 in [Vector2(-0.45, -0.45), Vector2(0.45, 0.45)]:
 			_crane(root, Vector3(corner.x * size, 0, corner.y * size), 34.0)
@@ -234,8 +238,62 @@ func _tether(root: Node3D, size: float, k: Callable) -> void:
 		_box(root, Vector3(0, 6.0 + tower + minf(line, 300.0) * 0.4, 0), Vector3(4, 6, 4), STEEL)
 
 
-## 매 프레임 (City3D): 질량 투사기가 오늘 쏘았으면 빛나는 레골리스 덩이가 레일을 달려 하늘로 (1.6초마다 넷)
-func animate(delta: float, on: bool) -> void:
+## 레이저 돛 발사 시설: 발사기 밭(육각 격자로 차례로) → 위상 맞춤 광학(발사기마다 렌즈, 가운데 빛 모으는 탑) → 축전 단지
+func _laser(root: Node3D, size: float, k: Callable, done: bool) -> void:
+	var k0: float = k.call(0)
+	var k1: float = k.call(1)
+	var k2: float = k.call(2)
+	var n := 7
+	var gap := size * 0.78 / n
+	var total := 0
+	var cells: Array = []
+	for i in n:
+		for j in n:
+			var x := (i - (n - 1) * 0.5) * gap + (gap * 0.5 if j % 2 == 1 else 0.0)
+			var z := (j - (n - 1) * 0.5) * gap * 0.87
+			if Vector2(x, z).length() > size * 0.4 or Vector2(x, z).length() < gap * 1.2:
+				continue
+			cells.append(Vector3(x, 0, z))
+			total += 1
+	for idx in cells.size():
+		var c: Vector3 = cells[idx]
+		if float(idx) / maxf(total, 1) >= k0 and k0 < 1.0:
+			break
+		_cyl(root, c + Vector3(0, 1.6, 0), gap * 0.22, gap * 0.28, 3.2, STEEL)
+		if k1 > float(idx) / maxf(total, 1):
+			_cyl(root, c + Vector3(0, 3.6, 0), gap * 0.26, gap * 0.18, 0.8, GLOW if done else WHITE)
+	if k1 > 0.0:
+		var th := 46.0 * k1
+		_cyl(root, Vector3(0, th * 0.5, 0), 3.2, 5.0, th, CONCRETE)
+		_cyl(root, Vector3(0, th + 1.5, 0), 5.5, 4.0, 3.0, WHITE)
+	if k2 > 0.0:
+		for b in 4:
+			_box(root, Vector3(-size * 0.42 + b * 9.0, 3.0 * k2, size * 0.42), Vector3(7.0, 6.0 * k2, 12.0), STEEL.darkened(0.2))
+	if done:
+		var beam := CylinderMesh.new()
+		beam.top_radius = 1.2
+		beam.bottom_radius = 2.4
+		beam.height = 2400.0
+		beam.radial_segments = 12
+		var bm := StandardMaterial3D.new()
+		bm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		bm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		bm.albedo_color = Color(0.7, 0.85, 1.0, 0.45)
+		bm.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_beam = MeshInstance3D.new()
+		_beam.mesh = beam
+		_beam.material_override = bm
+		_beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_beam.position = Vector3(0, 46.0 + 1200.0, 0)
+		_beam.visible = false
+		root.add_child(_beam)
+
+
+## 매 프레임 (City3D): 질량 투사기가 오늘 쏘았으면 빛나는 레골리스 덩이가 레일을 달려 하늘로 (1.6초마다 넷),
+## 레이저 돛 발사 시설이 탐사선을 쏜 날이면 빛줄기
+func animate(delta: float, on: bool, beam_on := false) -> void:
+	if _beam != null and is_instance_valid(_beam):
+		_beam.visible = beam_on
 	if _rail.is_empty() or not is_instance_valid(_rail["root"]):
 		return
 	if _shots.is_empty():

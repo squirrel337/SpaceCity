@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "about": "성간 탐사선 (game/ui/probes.gd) — 시뮬레이션 밖의 규칙이다. 메가프로젝트 '레이저 돛 발사 시설'(시대 2, 레이저 돛 기술)을 지은 도시가 그램급 돛 탐사선을 이웃 별로 쏜다",
+    "facility": "탐사선을 쏘는 메가프로젝트 id — 그것을 다 지은 도시가 쏘고 값을 낸다",
+    "probe": "cost(한 척 값 — 쏘는 도시가 낸다), speed_c(광속의 몇 배로 날아가나), max_flying(한꺼번에 날 수 있는 수), names(탐사선 이름 — 차례로)",
+    "targets": "max_ly(이 광년 안의 이웃 별 — nearby_stars.json의 neighbor), 한 별에 한 척씩 (보고가 온 별은 다시 보내지 않는다)",
+    "report": "닿은 뒤 그 별까지의 광년만큼 지나 소식이 온다 (빛의 속도). reward(소식이 오면 쏜 도시가 받는다 — 지원 점수·연구), per_planet(행성 하나마다 더)",
+    "auto": "자동 운영(그 도시의 메가프로젝트를 시드가 맡으면): 나는 탐사선이 없고 지원 점수가 값 + reserve_support, 부품이 값 + reserve_parts면 아직 모르는 가장 가까운 별로"
+  },
+  "facility": "laser_array",
+  "probe": {"cost": {"support": 1500, "parts": 120}, "speed_c": 0.2, "max_flying": 3,
+    "names": ["별빛 1호", "별빛 2호", "별빛 3호", "별빛 4호", "별빛 5호", "별빛 6호", "별빛 7호", "별빛 8호", "별빛 9호", "별빛 10호"]},
+  "targets": {"max_ly": 12.5},
+  "report": {"reward": {"support": 1200, "rp": 2500}, "per_planet": {"support": 300, "rp": 600}},
+  "auto": {"reserve_support": 1500, "reserve_parts": 200}
+}

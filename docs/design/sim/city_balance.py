@@ -172,13 +172,13 @@ class Policy:
              "sunlight_piping", "molten_regolith_electrolysis", "local_manufacturing",
              "robot_fabrication", "tall_towers", "algae_bioreactor", "cryogenic_propellant",
              "low_g_medicine", "megawatt_fission", "seed_distributed", "orbital_assembly",
-             "mass_driver", "rotating_habitat"]
+             "mass_driver", "rotating_habitat", "laser_sail"]
             if self.prepared else
             ["algae_bioreactor", "sunlight_piping", "autonomous_robots_2", "closed_loop_ls2",
              "tall_towers", "polar_prospecting", "sintered_construction", "regenerative_fuel_cell",
              "molten_regolith_electrolysis", "local_manufacturing", "robot_fabrication",
              "cryogenic_propellant", "space_weather_forecast", "shielding_2", "low_g_medicine",
-             "megawatt_fission", "seed_distributed", "orbital_assembly", "mass_driver", "rotating_habitat"])
+             "megawatt_fission", "seed_distributed", "orbital_assembly", "mass_driver", "rotating_habitat", "laser_sail"])
         # 1·2·3년차 식량 자급률 목표, 화물선 식량 비축 목표(일), 배급·긴급 보급을 시작하는 비축(일)
         self.food_targets = (0.5, 0.75, 1.0) if self.prepared else (0.6, 0.85, 1.0)
         self.food_buffer_days = 40 if self.prepared else 25

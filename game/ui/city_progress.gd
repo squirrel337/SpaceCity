@@ -134,6 +134,8 @@ static func _met(c: Dictionary, when: Dictionary) -> bool:
 		return false
 	if when.has("mega") and (state(c)["built"] as Array).size() < int(when["mega"]):
 		return false
+	if when.has("probes") and int(c.get("probes_sent", 0)) < int(when["probes"]):
+		return false                      # 그 도시가 쏜 성간 탐사선 (Probes)
 	if when.has("built"):
 		var any := false                  # 하나라도 (계열이면 그 계열 모두, 종류면 그 종류만)
 		var b: Dictionary = when["built"]

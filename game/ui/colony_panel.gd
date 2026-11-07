@@ -99,6 +99,7 @@ func rebuild() -> void:
 	if not mgr.scenario.is_empty():
 		body_box.add_child(_scenario_section())
 	body_box.add_child(_l5_section())
+	body_box.add_child(_probe_section())
 	if here >= 0:
 		body_box.add_child(_dev_section(here))
 		body_box.add_child(_delegate_section(here))
@@ -200,6 +201,80 @@ func _dev_section(i: int) -> Control:
 
 
 ## 시나리오 (Scenario): 이름·설명, 목표마다 ✓(이뤘다)·✗(어겼다)·진행, 남은 날·결과
+## 성간 탐사 (Probes): 레이저 돛 발사 시설, 별 고르기·쏘기, 날고 있는 탐사선, 소식이 온 별의 행성
+func _probe_section() -> Control:
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", Palette.box(Palette.PANEL_2, Palette.LINE, 8, 10))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	card.add_child(v)
+	var head := ThemeFactory.heading("", 16)
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(head)
+	var text := ThemeFactory.muted("레이저 돛 발사 시설(메가프로젝트, 시대 2)이 수천 개의 레이저를 한 점에 모아 그램급 돛 탐사선을 광속의 20%로 민다 — " +
+		"이웃 별까지 수십 년. 닿은 뒤 그 별까지의 광년만큼 더 지나 소식이 오면 그 별의 행성이 3D 별 지도와 여기에 열리고, " +
+		"쏜 도시가 지원 점수와 연구 점수를 받는다. 한꺼번에 셋까지, 한 별에 한 척.", 12)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(text)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var pick := OptionButton.new()
+	pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pick.custom_minimum_size = Vector2(120, 34)
+	pick.fit_to_longest_item = false                    # 긴 별 이름이 옆 패널을 넓히지 않게 (글은 잘린다)
+	pick.clip_text = true
+	var ids: Array = []
+	for s in Probes.targets():
+		pick.add_item(I18n.t("%s · %s광년 · %s년" % [String(s["name"]), Fmt.n(float(s["dist_ly"]), 2),
+			Fmt.n(Probes.years(float(s["dist_ly"])) + float(s["dist_ly"]), 0)]))
+		ids.append(String(s["id"]))
+	row.add_child(pick)
+	var b := Button.new()
+	b.text = "탐사선 쏘기"
+	b.custom_minimum_size = Vector2(110, 34)
+	b.pressed.connect(func():
+		if pick.selected >= 0 and Probes.launch(mgr, String(ids[pick.selected])) == "":
+			changed.emit()
+			update_view())
+	row.add_child(b)
+	v.add_child(row)
+	var why := ThemeFactory.muted("", 12)
+	why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(why)
+	var lines := Label.new()
+	lines.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lines.add_theme_font_size_override("font_size", 13)
+	v.add_child(lines)
+	var found := ThemeFactory.muted("", 12)
+	found.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	found.add_theme_color_override("font_color", Palette.TEXT.darkened(0.05))
+	v.add_child(found)
+	_live.append(func():
+		var st := Probes.state(mgr)
+		head.text = "성간 탐사 · 날고 있는 탐사선 %d척 · 소식이 온 별 %d곳" % [(st["probes"] as Array).size(), (st["known"] as Dictionary).size()]
+		var star := String(ids[pick.selected]) if pick.selected >= 0 and pick.selected < ids.size() else ""
+		var reason := Probes.launch_reason(mgr, star)
+		b.disabled = reason != ""
+		var cost: Dictionary = Probes.data().get("probe", {}).get("cost", {})
+		why.text = reason if reason != "" else "쏠 수 있다 — %s" % Orbital.cost_text(cost)
+		var rows := PackedStringArray()
+		for p in st["probes"]:
+			rows.append("✦ " + Probes.probe_text(mgr, p))
+		lines.text = "\n".join(rows)
+		lines.visible = not rows.is_empty()
+		var got := PackedStringArray()
+		for k in st["known"]:
+			var sy := Probes.system(String(k))
+			var pl: Array = sy.get("planets", [])
+			got.append("◉ %s (%s광년) — %s" % [String(sy.get("name", k)), Fmt.n(float(sy.get("dist_ly", 0.0)), 2),
+				("행성 %d" % pl.size()) if not pl.is_empty() else "알려진 행성 없음"])
+			for x in pl:
+				got.append("   · " + Probes.planet_text(x))
+		found.text = "\n".join(got)
+		found.visible = not got.is_empty())
+	return card
+
+
 ## L5 궤도 도시 (Orbital): 매스 드라이버, 네 단계, 다음 단계 짓기 — 다 지으면 그 도시로 가기
 func _l5_section() -> Control:
 	var card := PanelContainer.new()

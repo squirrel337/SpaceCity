@@ -1715,6 +1715,7 @@ func _transport_check(col: Colonies) -> void:
 	_depot_check(col)
 	_contracts_check(col)
 	_orbital_check(col)
+	_probe_check(col)
 
 
 ## 함대·항로 지도: 로켓 방정식(문서의 예), 저궤도 사이 Δv, 3년 동안 항로마다 배가 있다, 부두에 배가 있어야 떠나고 보내는 도시가
@@ -2237,6 +2238,73 @@ func _orbital_check(col: Colonies) -> void:
 		rise = -(wv.grounds[Orbital.site_id()] as SiteGround).drop_m(Vector2(0, 600))
 	print("smoke: orbital — L5 %s, 주민 %d명, 셔틀 %s, 바닥 600 m 옆이 %.0f m 위" % [String(col.list[ci]["name"]), int(l5.population()),
 		String(shuttle[0]["id"]) if not shuttle.is_empty() else "-", rise])
+
+
+## 성간 탐사선: 시설이 없으면 못 쏜다, 갈 수 있는 이웃 별(가까운 차례), 쏘면 값 · 도착(거리 ÷ 0.2년) · 소식(거리만큼 더),
+## 한 별에 한 척 · 셋까지, 날아가는 자리, 닿기 · 소식(행성이 열리고 보상, 이정표), 자동 운영, 저장 왕복, 개척 탭·별 이름표
+func _probe_check(col: Colonies) -> void:
+	var hi := col.index_of_site(GameData.HOME_SITE)
+	var hc: Dictionary = col.list[hi]
+	var home: CitySim = hc["sim"]
+	Probes.start(col)
+	var st := Probes.state(col)
+	_check(Probes.facility_city(col) < 0 and Probes.launch_reason(col, "proxima_centauri") != "", "레이저 돛 발사 시설 없이 탐사선을 쏠 수 있다")
+	var tg := Probes.targets()
+	_check(tg.size() >= 15 and String(tg[0]["id"]) == "proxima_centauri" and float(tg[-1]["dist_ly"]) <= 12.5,
+		"갈 수 있는 이웃 별이 맞지 않다 (%d곳)" % tg.size())
+	home.techs["laser_sail"] = true
+	(CityProgress.state(hc)["built"] as Array).append("laser_array")
+	_check(Probes.facility_city(col) == hi, "레이저 돛 발사 시설을 지은 도시가 고향이 아니다")
+	home.support = 20000.0
+	home.stock["parts"] = maxf(float(home.stock["parts"]), 2000.0)
+	var s0 := home.support
+	var p0 := float(home.stock["parts"])
+	var sent0 := int(hc.get("probes_sent", 0))
+	_check(Probes.launch(col, "proxima_centauri") == "", "프록시마로 탐사선을 쏘지 못했다: " + Probes.launch_reason(col, "proxima_centauri"))
+	var pr: Dictionary = st["probes"][0]
+	var fly_h := float(int(pr["arrive"]) - int(pr["launched"]))
+	_check(absf(s0 - home.support - 1500.0) < 0.5 and absf(p0 - float(home.stock["parts"]) - 120.0) < 0.5
+		and absf(fly_h / Probes.HOURS_PER_YEAR - 4.25 / 0.2) < 0.01
+		and absf(float(int(pr["report"]) - int(pr["arrive"])) / Probes.HOURS_PER_YEAR - 4.25) < 0.01
+		and int(hc.get("probes_sent", 0)) == sent0 + 1, "탐사선의 값·비행 시간·소식 시간이 맞지 않다 (%.2f년)" % (fly_h / Probes.HOURS_PER_YEAR))
+	_check(Probes.launch_reason(col, "proxima_centauri").contains("가는"), "같은 별로 두 번 쏠 수 있다")
+	_check(Probes.launch(col, "alpha_centauri") == "" and Probes.launch(col, "barnards_star") == "", "탐사선 셋을 쏘지 못했다")
+	_check(Probes.launch_reason(col, "wolf_359").contains("3척"), "탐사선이 셋을 넘게 날 수 있다")
+	var mid := float(pr["launched"]) + fly_h * 0.5
+	var star_p: PackedFloat64Array = Probes.system("proxima_centauri")["pos"]
+	_check(absf(Astro.len3(Probes.position(col, pr, mid)) / Astro.len3(star_p) - 0.5) < 0.01, "날아가는 탐사선의 자리가 길의 가운데가 아니다")
+	# 닿고, 소식이 온다
+	var h0 := col.hour
+	col.hour = int(pr["arrive"])
+	Probes.step_day(col)
+	_check(String(pr["state"]) == "arrived" and not Probes.known(col, "proxima_centauri"), "닿은 탐사선의 소식이 빛보다 빨리 왔다")
+	var s1 := home.support
+	var r1 := home.rp_bank
+	col.hour = int(pr["report"])
+	Probes.step_day(col)
+	var planets: Array = Probes.system("proxima_centauri")["planets"]
+	_check(Probes.known(col, "proxima_centauri") and planets.size() == 3 and absf(home.support - s1 - (1200.0 + 300.0 * 3)) < 0.5
+		and absf(home.rp_bank - r1 - (2500.0 + 600.0 * 3)) < 0.5 and Probes.launch_reason(col, "proxima_centauri").contains("소식"),
+		"프록시마의 소식이 와도 행성이 열리거나 보상을 받지 않았다")
+	col.hour = h0
+	var news := CityProgress.check(hc, home.current_day())
+	_check((CityProgress.state(hc)["done"] as Dictionary).has("probe1"), "첫 탐사선 이정표를 이루지 못했다 %s" % str(news))
+	# 자동 운영: 날고 있는 탐사선이 없고 넉넉하면 아직 모르는 가장 가까운 별로
+	st["probes"] = []
+	home.support = 20000.0
+	Probes._auto(col)
+	_check((st["probes"] as Array).size() == 1 and String(st["probes"][0]["target"]) == "alpha_centauri", "자동 운영이 탐사선을 쏘지 않았다")
+	# 저장 왕복
+	var before := JSON.stringify(JSON.parse_string(JSON.stringify(col.probes)))
+	Probes.load_state(col, JSON.parse_string(before))
+	_check(JSON.stringify(JSON.parse_string(JSON.stringify(col.probes))) == before, "성간 탐사가 저장 왕복에서 달라졌다")
+	main._select_tab("colony")
+	main.tabs["colony"].rebuild()
+	main.tabs["colony"].update_view()
+	_check(_texts(main.tabs["colony"]).any(func(x): return String(x).begins_with("성간 탐사 · 날고 있는 탐사선 1척 · 소식이 온 별 1곳")),
+		"개척 탭에 성간 탐사 칸이 없다")
+	print("smoke: probes — 이웃 별 %d곳, 프록시마 %.2f년 + 소식 %.2f년, 행성 %d (%s)" % [tg.size(), fly_h / Probes.HOURS_PER_YEAR, 4.25, planets.size(),
+		Probes.planet_text(planets[0]) if not planets.is_empty() else ""])
 
 
 ## 소리: 효과음·환경음을 모두 만든다 (길이·고리·크기), 단추를 누르면 딸깍, 기록 글에 맞는 소리(연구 완료)와 알림 종류의 소리,

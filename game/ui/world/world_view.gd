@@ -546,6 +546,7 @@ func _process(delta: float) -> void:
 	if city and sim:
 		city.driver_on = mgr != null and ground != null and ground.body == "moon" and city.sim == mgr.home().get("sim") \
 			and float(Orbital.state(mgr)["last_t"]) > 0.0
+		city.beam_on = mgr != null and city.colony != null and Probes.recent_launch(mgr, String(city.colony.get("site", "")))
 		city.update(delta, speed_level)
 	_queue_overlay()
 	_auto_quality(delta)
@@ -1512,6 +1513,7 @@ func _draw_overlay() -> void:
 			_label_body(id, font, placed)
 	# 이웃 별 (은하 전체를 볼 때는 해 둘레에 겹치므로 감춘다)
 	if not inside and (cam.dist > 2.0e9 or not Astro.bodies.has(cam.focus)) and _galaxy_k < 0.3:
+		_label_probes(font, placed)
 		for s in Astro.systems:
 			_label_star(s, font, placed)
 	if _galaxy_k > 0.3:
@@ -1785,6 +1787,12 @@ func _label_star(s: Dictionary, font: Font, placed: Array) -> void:
 	var text: String = String(s["name"])
 	if cam.dist > Astro.LY * 0.5:
 		text += "  %s" % Fmt.light_years(float(s["dist_ly"]))
+	if mgr != null:
+		if Probes.known(mgr, String(s["id"])):
+			var npl := (s.get("planets", []) as Array).size()
+			text += "  · 행성 %d" % npl if npl > 0 else "  · 탐사함"
+		elif not Probes.flying_to(mgr, String(s["id"])).is_empty():
+			text += "  · 탐사선 가는 중"
 	var off := Vector2(7, 4)
 	var tsize := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT - 1)
 	var rect := Rect2(pos2 + off - Vector2(0, tsize.y - 3), tsize)
@@ -1797,6 +1805,49 @@ func _label_star(s: Dictionary, font: Font, placed: Array) -> void:
 		col = Color(1.0, 0.8, 0.45, alpha)
 	_overlay.draw_string(font, pos2 + off, I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT - 1, col)
 	_labels.append([rect, s["id"]])
+
+
+## 성간 탐사선: 해 → 그 별의 길(점선)과 간 자리의 마름모·이름 (별 지도 축척에서)
+func _label_probes(font: Font, placed: Array) -> void:
+	if mgr == null:
+		return
+	var alpha := smoothstep(2.0e9, 3.0e10, cam.dist)
+	if alpha < 0.05:
+		return
+	for p in Probes.state(mgr)["probes"]:
+		var sy := Probes.system(String(p["target"]))
+		if sy.is_empty():
+			continue
+		var star_p: PackedFloat64Array = sy["pos"]
+		var prev: Variant = null
+		for i in 25:
+			var q: Variant = screen_of(to_render(Astro.scale3(star_p, i / 24.0)))
+			if q != null and prev != null and (i % 2 == 1):
+				_overlay.draw_line(prev, q, Color(0.55, 0.85, 1.0, 0.35 * alpha), 1.5, true)
+			prev = q
+		var at: Variant = screen_of(to_render(Probes.position(mgr, p, float(mgr.hour))))
+		if at == null:
+			continue
+		var pos2: Vector2 = at
+		if not Rect2(Vector2.ZERO, size).has_point(pos2):
+			continue
+		var pts := PackedVector2Array([pos2 + Vector2(0, -6), pos2 + Vector2(6, 0), pos2 + Vector2(0, 6), pos2 + Vector2(-6, 0)])
+		_overlay.draw_colored_polygon(pts, Color(0.6, 0.9, 1.0, alpha))
+		var k := clampf(float(mgr.hour - int(p["launched"])) / maxf(float(int(p["arrive"]) - int(p["launched"])), 1.0), 0.0, 1.0)
+		var text := "%s → %s · %d%%" % [String(p["name"]), String(sy["name"]), int(k * 100.0)] if String(p["state"]) == "flying" \
+			else "%s · 소식이 오는 중" % String(p["name"])
+		var tsize := font.get_string_size(I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT - 1)
+		var rect := Rect2(pos2 + Vector2(9, -6) - Vector2(0, tsize.y - 3), tsize)
+		var clash := false
+		for other in placed:
+			if (other as Rect2).intersects(rect):
+				clash = true
+				break
+		if clash:
+			continue
+		placed.append(rect)
+		_overlay.draw_string(font, pos2 + Vector2(9, -6), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT - 1,
+			Color(0.7, 0.92, 1.0, alpha))
 
 
 func _draw_readout(font: Font) -> void:
