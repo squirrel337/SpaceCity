@@ -40,6 +40,7 @@ func _process(_delta: float) -> bool:
 		7:
 			main.modal.visible = false
 			main._on_modal_choice("start", "new")
+			main._on_modal_choice("difficulty", "normal")   # 난이도 창 — 보통
 			main.sim.enqueue("co2_scrubber", "", 0.0)
 			main.sim.enqueue_special("regolith_cover", 0.0)
 			main.tabs["research"]._on_prioritize("sintered_construction")

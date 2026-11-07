@@ -26,6 +26,7 @@ func _process(_delta: float) -> bool:
 	frame += 1
 	if frame == 4:
 		main._on_modal_choice("start", "new")
+		main._on_modal_choice("difficulty", "normal")   # 난이도 창 — 보통
 		main.modal.visible = false
 		main._set_speed(0)
 		var c: Dictionary = main.colonies.list[main.active]

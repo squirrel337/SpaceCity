@@ -325,7 +325,7 @@ static func redevelop(c: Dictionary) -> bool:
 				lost += float(sim.prov(String(g), "housing"))
 			if lost > 0.0 and sim.housing_cap - lost < pop:
 				continue                  # 헐면 정착민이 다 살 수 없다
-			if not import_metal(sim, float(GameData.MODULES[to]["cost"].get("metal_t", 0.0)), keep) or not sim.enqueue(to, "", reserve):
+			if not import_metal(sim, float(sim.cost_of(to).get("metal_t", 0.0)), keep) or not sim.enqueue(to, "", reserve):
 				return false
 			for g in gone:
 				sim.demolish(String(g), refund)
@@ -345,7 +345,7 @@ static func buildable(sim: CitySim, mid: String, reserve: float, support_keep: f
 	var m: Dictionary = GameData.MODULES[mid]
 	if m["tech"] != null and not sim.techs.has(m["tech"]):
 		return false
-	var cost: Dictionary = (m["cost"] as Dictionary).duplicate()
+	var cost: Dictionary = sim.cost_of(mid).duplicate()
 	var short := float(cost.get("metal_t", 0.0)) - float(sim.stock["metal_t"])
 	if short > 0.0:
 		if sim.support - short * metal_price() < support_keep:

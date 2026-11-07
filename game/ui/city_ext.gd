@@ -2,10 +2,13 @@ class_name CityExt
 extends RefCounted
 ## 시뮬레이션 밖의 보정을 모아 그 도시의 CitySim.ext로 — 몫(part)마다 c["ext_parts"][몫]에 두고 (services 시설 자리 ·
 ## mega 메가프로젝트 · cards 연구 카드 …), 더하는 값(morale·housing_add·support_day·rp_day)은 더하고 배율(…_k)은 곱한다.
-## 몫이 없거나 기본값이면 시뮬레이션은 파이썬 밸런스 시뮬레이터와 같은 셈을 한다
+## 몫이 없거나 기본값이면 시뮬레이션은 파이썬 밸런스 시뮬레이터와 같은 셈을 한다.
+## break_k·storm_k·support_k·cost_k는 난이도(Difficulty)만 건다 — 고장·태양 폭풍 빈도, 지구의 달마다 지원, 짓는 값
 
 const ADD := ["morale", "housing_add", "support_day", "rp_day"]
-const MUL := ["work_k", "make_k", "build_k", "rp_k"]
+const MUL := ["work_k", "make_k", "build_k", "rp_k", "break_k", "storm_k", "support_k", "cost_k"]
+const MUL_NAMES := {"work_k": "일하는 효율", "make_k": "만드는 효율", "build_k": "로봇 작업량", "rp_k": "연구", "break_k": "고장",
+	"storm_k": "태양 폭풍", "support_k": "지구 지원", "cost_k": "짓는 값"}
 
 
 static func neutral() -> Dictionary:
@@ -39,10 +42,9 @@ static func text(ext: Dictionary) -> String:
 	var parts := PackedStringArray()
 	if absf(float(ext.get("morale", 0.0))) >= 0.05:
 		parts.append("사기 %+.1f" % float(ext["morale"]))
-	for k in ["work_k", "make_k", "build_k", "rp_k"]:
+	for k in MUL:
 		if absf(float(ext.get(k, 1.0)) - 1.0) >= 0.001:
-			parts.append("%s ×%.2f" % [{"work_k": "일하는 효율", "make_k": "만드는 효율", "build_k": "로봇 작업량", "rp_k": "연구"}[k],
-				float(ext[k])])
+			parts.append("%s ×%.2f" % [String(MUL_NAMES[k]), float(ext[k])])
 	if float(ext.get("housing_add", 0.0)) > 0.0:
 		parts.append("집 +%d" % int(ext["housing_add"]))
 	if float(ext.get("support_day", 0.0)) > 0.0:

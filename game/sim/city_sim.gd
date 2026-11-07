@@ -744,6 +744,7 @@ func step_day(d: int) -> void:
 
 
 func failures() -> void:
+	var bk := float(ext.get("break_k", 1.0))                 # 난이도 (기본 1 — 파이썬과 같다)
 	for mid in counts:
 		var working: int = int(counts[mid]) - int(broken.get(mid, 0))
 		var mtbf := float(M[mid].get("mtbf_days", 0.0))
@@ -751,7 +752,7 @@ func failures() -> void:
 			continue
 		var failed := 0
 		for _i in range(working):
-			if rng.random() < 1.0 / mtbf:
+			if rng.random() < bk / mtbf:
 				failed += 1
 		if failed:
 			broken[mid] = int(broken.get(mid, 0)) + failed
@@ -760,7 +761,7 @@ func failures() -> void:
 	var working_robots := robots - robots_broken
 	var robot_mtbf := float(C["robots"]["mtbf_days"])
 	for _i in range(working_robots):
-		if rng.random() < 1.0 / robot_mtbf:
+		if rng.random() < bk / robot_mtbf:
 			robots_broken += 1
 
 
@@ -848,6 +849,19 @@ func can_afford(cost: Dictionary, reserve: float = 40.0) -> bool:
 	return true
 
 
+## 짓는 값: 자료의 값에 난이도의 cost_k를 부품·금속에 곱한다 (기본 1이면 자료 그대로 — 파이썬과 같다)
+func cost_of(mid: String) -> Dictionary:
+	var base: Dictionary = M[mid]["cost"]
+	var k := float(ext.get("cost_k", 1.0))
+	if k == 1.0:
+		return base
+	var out := base.duplicate()
+	for key in ["parts", "metal_t"]:
+		if out.has(key):
+			out[key] = float(out[key]) * k
+	return out
+
+
 func build_block_reason(mid: String, reserve: float = 0.0) -> String:
 	## 지금 지을 수 없으면 이유, 지을 수 있으면 빈 문자열
 	var m: Dictionary = M[mid]
@@ -855,7 +869,7 @@ func build_block_reason(mid: String, reserve: float = 0.0) -> String:
 		return "연구 필요: " + T[m["tech"]]["name"]
 	if family(mid) == "solar_tower" and free_tile() == "":
 		return "타워를 세울 능선 자리가 없다"
-	if not can_afford(m["cost"], reserve):
+	if not can_afford(cost_of(mid), reserve):
 		return "자재 부족"
 	return ""
 
@@ -864,15 +878,16 @@ func enqueue(mid: String, tile: String = "", reserve: float = 40.0) -> bool:
 	var m: Dictionary = M[mid]
 	if m["tech"] != null and not techs.has(m["tech"]):
 		return false
-	if not can_afford(m["cost"], reserve):
+	var cost := cost_of(mid)
+	if not can_afford(cost, reserve):
 		today["short_parts"] = 1
 		return false
-	for key in m["cost"]:
-		stock[key] -= float(m["cost"][key])
-	var print_t: float = float(m["cost"].get("regolith_t", 0.0)) if m.get("printed", false) else 0.0
+	for key in cost:
+		stock[key] -= float(cost[key])
+	var print_t: float = float(cost.get("regolith_t", 0.0)) if m.get("printed", false) else 0.0
 	seq += 1
 	queue.append({"id": mid, "rd": float(m["build_rd"]), "rd_total": float(m["build_rd"]),
-		"print_t": print_t, "print_total": print_t, "seq": seq, "cost": m["cost"].duplicate(), "tile": tile})
+		"print_t": print_t, "print_total": print_t, "seq": seq, "cost": cost.duplicate(), "tile": tile})
 	if tile != "":
 		tiles[tile] = int(tiles.get(tile, 0)) + 1
 	return true
@@ -909,7 +924,7 @@ func demolish(mid: String, refund: float = 0.3) -> bool:
 		broken[mid] = n - 1
 	if mid == "hab_module":
 		covered_habs = mini(covered_habs, n - 1)
-	var cost: Dictionary = M[mid]["cost"]
+	var cost := cost_of(mid)
 	for key in ["parts", "metal_t"]:
 		if cost.has(key):
 			stock[key] = float(stock.get(key, 0.0)) + float(cost[key]) * refund
@@ -1001,7 +1016,7 @@ func commerce() -> void:
 
 func earth(d: int) -> void:
 	var e: Dictionary = C["earth"]
-	support += e["support_per_month"] / 30.0
+	support += e["support_per_month"] / 30.0 * float(ext.get("support_k", 1.0))   # 난이도 (기본 1)
 	food_emergency(d)
 	if d >= next_cargo:
 		if support < e["cargo_cost_support"]:
@@ -1139,9 +1154,10 @@ func space_weather(d: int) -> void:
 	var activity := solar_activity(year())
 	var major: float = spe["major_rate_per_year"]["solar_min"] + spe["major_rate_per_year"]["added_at_solar_max"] * activity
 	var minor: float = spe["minor_rate_per_year"]["solar_min"] + spe["minor_rate_per_year"]["added_at_solar_max"] * activity
-	if d == int(spe["scripted_major_day"]) or rng.random() < major / 365.25:
+	var sk := float(ext.get("storm_k", 1.0))                 # 난이도 (기본 1 · 0이면 정해진 폭풍도 없다)
+	if (d == int(spe["scripted_major_day"]) and sk > 0.0) or rng.random() < major * sk / 365.25:
 		_incoming_storm(float(spe["major_dose_msv"]), "major")
-	elif rng.random() < minor / 365.25:
+	elif rng.random() < minor * sk / 365.25:
 		_incoming_storm(float(spe["minor_dose_msv"]), "minor")
 
 

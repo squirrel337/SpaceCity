@@ -1,0 +1,29 @@
+{
+  "_meta": {
+    "about": "난이도와 샌드박스 (game/ui/difficulty.gd) — 새 게임에서 고르고 메뉴에서 바꿀 수 있다 (저장된다). 시뮬레이션 밖의 규칙이다. 보통은 규칙이 비어 있다 — 시뮬레이션은 파이썬 밸런스 시뮬레이터와 같은 셈을 한다. 시나리오를 하는 동안은 늘 보통이다",
+    "hazard_k": "위치가 있는 재난(운석·지진·누출 …)의 빈도 배율 — CityHazards.rate_k (시나리오 규칙과 곱한다)",
+    "storm_k": "태양 양성자 폭풍의 빈도 배율 — 0이면 41일째의 대형 폭풍도 오지 않는다 (CitySim.ext)",
+    "break_k": "건물·로봇 고장 빈도 배율 (CitySim.ext)",
+    "cost_k": "짓는 값(부품·금속) 배율 — CitySim.cost_of. 헐 때 돌려받는 값도 따른다",
+    "support_k": "지구가 달마다 주는 지원 점수 배율 (CitySim.ext)",
+    "build_k · rp_k · morale": "로봇 작업량 배율 · 연구 배율 · 사기 더하기 (CityExt의 difficulty 몫 — 모든 도시)",
+    "start_parts_k · start_support_k": "고향의 처음 부품·지원 점수 배율 (새 게임 때 한 번)",
+    "trust_days": "신뢰가 10 아래로 이만큼 이어지면 평의회가 시드를 끈다 (맨 위의 값이 보통). 0이면 끄지 않는다",
+    "topup": "샌드박스: 날마다 이만큼 아래면 채운다 — parts(부품)·metal_t·regolith_t·support(지원 점수), 모든 도시",
+    "reserve_days": "샌드박스: 산소·물·식량이 정착민 이 날수치 아래면 지구가 저장 한도까지 채운다",
+    "no_fail · relief": "샌드박스: 지지 않는다 — 시드가 꺼지지 않고, 정착민이 다 사라지면 relief명이 새로 내린다"
+  },
+  "default": "normal",
+  "trust_days": 365,
+  "levels": [
+    {"id": "easy", "name": "쉬움", "text": "재난·고장·태양 폭풍이 드물고, 짓는 값이 싸고, 시작 자원과 지구의 지원이 넉넉하다. 신뢰가 바닥이어도 2년을 기다려 준다",
+     "rules": {"hazard_k": 0.5, "storm_k": 0.6, "break_k": 0.7, "cost_k": 0.8, "support_k": 1.25, "start_parts_k": 1.5, "start_support_k": 1.5, "morale": 3.0, "trust_days": 730}},
+    {"id": "normal", "name": "보통", "text": "디자인 문서·밸런스 시뮬레이터의 규칙 그대로 — 첫 3년은 빠듯하지만 버틸 수 있다",
+     "rules": {}},
+    {"id": "hard", "name": "어려움", "text": "재난·고장·태양 폭풍이 잦고, 짓는 값이 비싸고, 시작 자원과 지구의 지원이 적다. 신뢰가 10 아래로 반년이면 시드가 꺼진다",
+     "rules": {"hazard_k": 2.0, "storm_k": 1.6, "break_k": 1.5, "cost_k": 1.4, "support_k": 0.7, "start_parts_k": 0.6, "start_support_k": 0.5, "morale": -5.0, "trust_days": 180}},
+    {"id": "sandbox", "name": "샌드박스", "text": "자원 제한 없이 자유롭게 짓는다 — 부품·금속·레골리스·지원 점수가 날마다 채워지고, 산소·물·식량이 모자라면 지구가 채운다. 짓기 3배·연구 2배, 재난과 태양 폭풍이 없고, 지지 않는다",
+     "rules": {"hazard_k": 0.0, "storm_k": 0.0, "break_k": 0.5, "build_k": 3.0, "rp_k": 2.0, "topup": {"parts": 1000, "metal_t": 50, "regolith_t": 500, "support": 3000},
+       "reserve_days": 20, "no_fail": true, "relief": 30, "trust_days": 0}}
+  ]
+}

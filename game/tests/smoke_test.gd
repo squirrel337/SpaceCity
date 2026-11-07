@@ -1718,6 +1718,7 @@ func _transport_check(col: Colonies) -> void:
 	_orbital_check(col)
 	_probe_check(col)
 	_gens_check(col)
+	_difficulty_check(col)
 
 
 ## 함대·항로 지도: 로켓 방정식(문서의 예), 저궤도 사이 Δv, 3년 동안 항로마다 배가 있다, 부두에 배가 있어야 떠나고 보내는 도시가
@@ -2307,6 +2308,110 @@ func _probe_check(col: Colonies) -> void:
 		"개척 탭에 성간 탐사 칸이 없다")
 	print("smoke: probes — 이웃 별 %d곳, 프록시마 %.2f년 + 소식 %.2f년, 행성 %d (%s)" % [tg.size(), fly_h / Probes.HOURS_PER_YEAR, 4.25, planets.size(),
 		Probes.planet_text(planets[0]) if not planets.is_empty() else ""])
+
+
+## 난이도와 샌드박스: 넷 (보통은 규칙이 없다 — 파이썬과 같은 셈), 쉬움의 시작 자원·짓는 값(빠지는 값까지)·재난 빈도·사기,
+## 어려움의 지구 지원·고장·신뢰 기한, 샌드박스의 태양 폭풍 없음·채우기·새 정착민·지지 않음, 게임 중에 바꾸기, 시나리오 동안은 보통,
+## 저장 왕복, 새 게임·메뉴의 난이도 창
+func _difficulty_check(col: Colonies) -> void:
+	_check(Difficulty.levels().size() == 4 and (Difficulty.find("normal").get("rules", {}) as Dictionary).is_empty()
+		and Difficulty.trust_days(Colonies.new()) == 365, "난이도가 넷이 아니거나 보통에 규칙이 있다")
+	var mk := func(id: String) -> Colonies:
+		var s := CitySim.new(2061, 40.0, "")
+		var c := Colonies.new()
+		c.list = [{"sim": s, "plan": CityPlan.create(s, BaseLayout.new("ridge")), "site": s.site_id, "name": "시험 고향", "mode": ""}]
+		c.hour = s.hour
+		Difficulty.begin(c, id)
+		return c
+	var hab: Dictionary = GameData.MODULES["hab_module"]["cost"]
+	var normal: Colonies = mk.call("normal")
+	var ns: CitySim = normal.list[0]["sim"]
+	_check(is_equal_approx(CityHazards.rate_k, 1.0) and float(ns.ext.get("cost_k", 1.0)) == 1.0 and ns.cost_of("hab_module") == hab
+		and float(ns.ext.get("break_k", 1.0)) == 1.0, "보통인데 난이도 규칙이 걸렸다")
+	# 쉬움
+	var easy: Colonies = mk.call("easy")
+	var es: CitySim = easy.list[0]["sim"]
+	_check(absf(float(es.stock["parts"]) - float(ns.stock["parts"]) * 1.5) < 0.01 and absf(es.support - ns.support * 1.5) < 0.01,
+		"쉬움의 시작 자원이 넉넉하지 않다 (부품 %.0f · 지원 %.0f)" % [float(es.stock["parts"]), es.support])
+	var want := float(hab["parts"]) * 0.8
+	_check(is_equal_approx(CityHazards.rate_k, 0.5) and absf(float(es.cost_of("hab_module")["parts"]) - want) < 0.01
+		and absf(float(es.ext["morale"]) - 3.0) < 0.01, "쉬움의 재난 빈도·짓는 값·사기가 맞지 않다")
+	var p0 := float(es.stock["parts"])
+	_check(es.enqueue("hab_module", "", 0.0) and absf(p0 - float(es.stock["parts"]) - want) < 0.01
+		and absf(float((es.queue.back() as Dictionary)["cost"]["parts"]) - want) < 0.01, "쉬움에서 짓는 값만큼 빠지지 않았다")
+	_check(CityExt.text(es.ext).contains("짓는 값 ×0.80") and Difficulty.summary(easy).begins_with("쉬움 — 재난 ×0.5"),
+		"쉬움의 보정 글이 맞지 않다: %s / %s" % [CityExt.text(es.ext), Difficulty.summary(easy)])
+	var easy_txt := Difficulty.summary(easy)
+	# 어려움: 지구가 달마다 주는 지원·고장 배율·신뢰 바닥 기한 (자료의 값)
+	var hr: Dictionary = Difficulty.find("hard")["rules"]
+	var hard: Colonies = mk.call("hard")
+	var hs: CitySim = hard.list[0]["sim"]
+	var a := hs.support
+	hs.earth(1)
+	var b := ns.support
+	ns.earth(1)
+	_check(absf((hs.support - a) - (ns.support - b) * float(hr["support_k"])) < 1e-6 and float(hr["support_k"]) < 1.0
+		and float(hs.ext["break_k"]) == float(hr["break_k"]) and float(hr["break_k"]) > 1.0
+		and Difficulty.trust_days(hard) == int(hr["trust_days"]) and int(hr["trust_days"]) < 365
+		and not Difficulty.no_fail(hard), "어려움의 지구 지원·고장·신뢰 기한이 맞지 않다")
+	# 샌드박스: 태양 폭풍이 없다 (41일째의 대형 폭풍도), 날마다 채운다, 다 사라지면 새로 온다, 지지 않는다
+	var sb: Colonies = mk.call("sandbox")
+	var ss: CitySim = sb.list[0]["sim"]
+	var day := int(ss.C["spe"]["scripted_major_day"])
+	ss.interactive = true
+	ss.space_weather(day)
+	ns.interactive = true
+	ns.space_weather(day)
+	_check(ss.pending_storm.is_empty() and not ns.pending_storm.is_empty(), "샌드박스에 태양 폭풍이 오거나 보통에 오지 않았다")
+	ns.pending_storm = {}
+	ns.interactive = false
+	ss.interactive = false
+	ss.stock["parts"] = 0.0
+	ss.stock["metal_t"] = 0.0
+	ss.support = 0.0
+	ss.stock["food_kg"] = 0.0
+	Difficulty.step_day(sb)
+	var food_want := minf(ss.population() * float(ss.PER["food_kg"]) * 20.0, float(ss.caps["food_kg"]))
+	_check(float(ss.stock["parts"]) >= 1000.0 and float(ss.stock["metal_t"]) >= 50.0 and ss.support >= 3000.0
+		and float(ss.stock["food_kg"]) >= food_want - 0.01, "샌드박스가 자원을 채우지 않았다")
+	ss.cohorts = []
+	Difficulty.step_day(sb)
+	_check(int(ss.population()) == 30 and Difficulty.no_fail(sb) and Difficulty.trust_days(sb) == 0
+		and is_equal_approx(CityHazards.rate_k, 0.0) and float(ss.ext["build_k"]) == 3.0, "샌드박스의 새 정착민·지지 않음·짓기가 맞지 않다")
+	# 게임 중에 바꾸기 (시작 자원은 그대로) · 다시 보통이면 보정이 빠진다
+	var parts_n := float(ns.stock["parts"])
+	_check(Difficulty.change(normal, "sandbox") and float(ns.ext["build_k"]) == 3.0 and float(ns.stock["parts"]) == parts_n
+		and Difficulty.change(normal, "normal") and float(ns.ext["build_k"]) == 1.0 and float(ns.ext["storm_k"]) == 1.0
+		and not Difficulty.change(normal, "nope"), "게임 중에 난이도를 바꾸지 못했다")
+	# 시나리오 동안은 보통 — 바꿀 수 없다
+	Scenario.records_path = "user://records_smoke.json"
+	Scenario.begin(easy, "first_year")
+	_check(easy.difficulty == "normal" and Difficulty.id_of(easy) == "normal" and float(es.ext["cost_k"]) == 1.0
+		and not Difficulty.change(easy, "hard"), "시나리오인데 난이도가 걸려 있거나 바꿀 수 있다")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Scenario.records_path))
+	Scenario.records_path = "user://records.json"
+	# 저장 왕복: 불러오면 모든 도시에 다시 건다
+	var saved := col.to_save()
+	_check(String(saved.get("difficulty", "")) == "normal", "저장에 난이도가 없다")
+	saved["difficulty"] = "hard"
+	var back := Colonies.new()
+	_check(back.load_save(JSON.parse_string(JSON.stringify(saved, "", false, true))) and back.difficulty == "hard"
+		and float((back.list[back.list.size() - 1]["sim"] as CitySim).ext.get("cost_k", 1.0)) == float(hr["cost_k"])
+		and is_equal_approx(CityHazards.rate_k, float(hr["hazard_k"])), "불러온 난이도가 도시에 걸리지 않았다")
+	Scenario.apply_rules(col)                 # 이 판(보통)의 재난 빈도로
+	_check(is_equal_approx(CityHazards.rate_k, 1.0) and Difficulty.id_of(col) == "normal", "시험 뒤에 재난 빈도가 돌아오지 않았다")
+	# 새 게임 → 난이도 창 (돌아가기) · 메뉴 → 난이도 바꾸기 창
+	main._on_modal_choice("start", "new")
+	_check(main.modal.visible and main.modal.context == "difficulty" and main.modal._choices.get_child_count() == 5,
+		"새 게임의 난이도 창이 뜨지 않았다")
+	main._on_modal_choice("difficulty", "back")
+	_check(main.modal.visible and main.modal.context == "start", "난이도 창에서 돌아가지 못했다")
+	main.modal.visible = false
+	main._on_modal_choice("menu", "difficulty")
+	_check(main.modal.visible and main.modal.context == "difficulty_change", "메뉴의 난이도 바꾸기 창이 뜨지 않았다")
+	main.modal.visible = false
+	print("smoke: difficulty — %s / %s / 샌드박스 새 정착민 %d명, 부품 %d" % [easy_txt, Difficulty.summary(hard),
+		int(ss.population()), int(ss.stock["parts"])])
 
 
 ## 세대: 3년 동안 고향에 아이가 태어났다 (시대 1부터, 정착민에 더한다), 열여덟 살이 되면 2세대 어른 — 첫 2세대 알림,

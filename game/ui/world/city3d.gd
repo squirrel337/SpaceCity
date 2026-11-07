@@ -24,7 +24,7 @@ var hovered_pos := Vector3.ZERO
 var title := "섀클턴 시드 시티"     # 왼쪽 위 이름 (식민지 이름)
 var era_text := ""                 # 이름 옆의 시대 (CityProgress)
 var colony: Dictionary = {}        # 이 도시의 식민지 항목 (Colonies.list — 둘레 탐사 상태). main이 정한다
-var goal_text := ""                # 시나리오 목표 한 줄 (Scenario.summary — 없으면 그리지 않는다)
+var goal_text := ""                # 왼쪽 위 한 줄 — 시나리오 목표("목표 · …") 또는 난이도 (main이 채운다 — 없으면 그리지 않는다)
 
 var _items: Array = []
 var _sig := ""
@@ -1073,7 +1073,7 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 	_events.draw_overlay(view, ov, font, plan, colony, _local)
 	var ly := 140.0
 	if goal_text != "":
-		_shadow_text(ov, bold, Vector2(16, 142), "목표 · " + goal_text, 13, Palette.GREEN.lightened(0.25))
+		_shadow_text(ov, bold, Vector2(16, 142), goal_text, 13, Palette.GREEN.lightened(0.25))
 		ly += 22.0
 	if cover_on:
 		var cv: Dictionary = CityServices.data().get("cover", {})

@@ -9,7 +9,7 @@ extends RefCounted
 
 const KEEP_SCARS := 12
 
-static var rate_k := 1.0           # 재난 횟수 배 (시나리오 규칙 hazard_k — Scenario.apply_rules)
+static var rate_k := 1.0           # 재난 횟수 배 (시나리오 규칙 hazard_k × 난이도 hazard_k — Scenario.apply_rules)
 
 
 static var _data: Dictionary = {}

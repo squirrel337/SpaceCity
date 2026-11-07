@@ -42,17 +42,18 @@ static func begin(col: Colonies, id: String) -> void:
 	if s.is_empty():
 		return
 	col.scenario = {"id": id, "start": col.hour, "done": {}, "result": "", "why": "", "score": 0, "end": -1}
+	col.difficulty = "normal"                 # 시나리오는 보통으로 (기록을 견준다)
 	var home: CitySim = col.list[0]["sim"]
 	var rules: Dictionary = s.get("rules", {})
 	home.stock["parts"] = float(home.stock["parts"]) * float(rules.get("start_parts_k", 1.0))
 	home.support *= float(rules.get("start_support_k", 1.0))
-	apply_rules(col)
+	Difficulty.apply(col)                     # 시나리오 동안은 보통 — difficulty 몫을 비우고 apply_rules
 	home.note("시나리오 — %s: %s" % [String(s["name"]), String(s.get("text", ""))], "good")
 
 
-## 규칙 가운데 다른 규칙이 읽는 것을 건다 (새 게임·불러오기 — 시나리오가 없으면 기본으로 돌린다)
+## 규칙 가운데 다른 규칙이 읽는 것을 건다 (새 게임·불러오기 — 시나리오가 없으면 기본으로 돌린다). 재난 빈도는 난이도와 곱한다
 static func apply_rules(col: Colonies) -> void:
-	CityHazards.rate_k = float(rule(col, "hazard_k", 1.0))
+	CityHazards.rate_k = float(rule(col, "hazard_k", 1.0)) * float(Difficulty.rule(col, "hazard_k", 1.0))
 
 
 ## 날마다 (Colonies.step): 목표를 살피고 이기거나 지면 result를 정한다. 막 정해졌으면 그 결과
@@ -91,7 +92,7 @@ static func _end(col: Colonies, result: String, why: String) -> String:
 	if result == "won":
 		col.scenario["score"] = score(col)
 		_record(col)
-	apply_rules(col)                          # 끝나면 규칙을 푼다 (계속 자유롭게)
+	Difficulty.apply(col)                     # 끝나면 규칙을 푼다 (계속 자유롭게 — apply_rules)
 	return result
 
 

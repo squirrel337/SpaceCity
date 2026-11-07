@@ -235,7 +235,7 @@ func _entry(mid: String) -> Control:
 	info.add_theme_constant_override("separation", 1)
 	var title := Label.new()
 	info.add_child(title)
-	var cost := _cost_text(m["cost"])
+	var cost := _cost_text(sim.cost_of(mid))                 # 난이도의 짓는 값
 	var power := float(m["power_kw"])
 	var line := "%s · %s 로봇·일%s" % [cost, Fmt.n(float(m["build_rd"])), (" · %s kW" % Fmt.n(power)) if power > 0 else ""]
 	var base := line + "\n" + describe(m)

@@ -649,7 +649,7 @@ func check(kind: String, at: Vector2, rot: int, sim: CitySim) -> Dictionary:
 		var m: Dictionary = sim.M[kind]
 		if m["tech"] != null and not sim.techs.has(m["tech"]):
 			return {"reason": "연구 필요: " + String(sim.T[m["tech"]]["name"]), "tile": tile}
-		if not sim.can_afford(m["cost"], 0.0):
+		if not sim.can_afford(sim.cost_of(kind), 0.0):
 			return {"reason": "자재 부족", "tile": tile}
 		if tile != "" and int(sim.tiles.get(tile, 0)) >= int(sim.C["illumination"]["tiles"][tile]):
 			return {"reason": "%s 구역이 다 찼다 (%d기)" % [layout.tile_name(tile), int(sim.C["illumination"]["tiles"][tile])],

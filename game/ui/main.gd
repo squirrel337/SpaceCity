@@ -35,6 +35,7 @@ var _hidden_i := 0                     # 배치를 맞출 다음 보이지 않�
 var _ui_clock := 0.0
 var _report_shown := false
 var _game_over := false
+var _pending_seed := 2061             # 난이도 창에서 고르면 이 시드로 새 게임
 var _alarm_day := -100
 var _dirty := true
 
@@ -836,11 +837,12 @@ func _build_side() -> Control:
 
 
 # ── 새 게임·저장 ─────────────────────────────────────────────────
-func _new_game(seed_value: int, autopilot: bool) -> void:
+func _new_game(seed_value: int, autopilot: bool, difficulty: String = "normal") -> void:
 	_boot_save()                                     # 미리 풀어 둔 저장은 쓰지 않으니 놓는다
 	tutorial.cancel()
 	var s := CitySim.new(seed_value, 40.0, "good" if autopilot else "")
 	colonies.start(s, CityPlan.create(s, world.ground_for(s.site_id).layout))
+	Difficulty.begin(colonies, difficulty)           # 시작 자원 · 모든 도시의 difficulty 몫 · 재난 빈도
 	_begin_session(0)
 	sim.note("관리 기록 — 가동 확인. 정착민 120명. 시드 %d." % seed_value, "info")
 	if autopilot:
@@ -1067,8 +1069,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_ESCAPE:
-		if modal.visible and modal.context in ["menu", "help", "module"]:
+		if modal.visible and modal.context in ["menu", "help", "module", "difficulty_change"]:
 			modal.visible = false
+		elif modal.visible and modal.context in ["difficulty", "scenarios"]:
+			_show_start()                                  # 새 게임의 난이도·시나리오 고르기 — 처음 화면으로
 		elif not modal.visible:
 			_show_menu()
 		get_viewport().set_input_as_handled()
@@ -1464,12 +1468,16 @@ func _on_new_day(day: int) -> void:
 		var cs: CitySim = c["sim"]
 		var why := ""
 		var text := ""
-		if cs.population() <= 0:
+		var limit := Difficulty.trust_days(colonies)       # 난이도 — 보통 365일, 0이면 끄지 않는다
+		if Difficulty.no_fail(colonies):
+			pass                                          # 샌드박스 — 지지 않는다 (정착민은 Difficulty.step_day가 새로)
+		elif cs.population() <= 0:
 			why = "절멸"
 			text = "시드가 돌보던 정착민이 모두 사라졌다."
-		elif cs.trust_low_days >= 365:
+		elif limit > 0 and cs.trust_low_days >= limit:
 			why = "시드 정지"
-			text = "신뢰가 10 아래로 1년이 지났다. 평의회가 시드를 끄기로 했다."
+			text = ("신뢰가 10 아래로 1년이 지났다. 평의회가 시드를 끄기로 했다." if limit == 365
+				else "신뢰가 10 아래로 %d일이 지났다. 평의회가 시드를 끄기로 했다." % limit)
 		if why == "":
 			continue
 		if String(c["site"]) == GameData.HOME_SITE or colonies.list.size() == 1:
@@ -1573,7 +1581,12 @@ func _refresh_live() -> void:
 	_set_chip("trust", str(int(round(sim.trust))), "신뢰", Palette.level_color(sim.trust, 40, 30))
 	if world.city != null and active >= 0 and active < colonies.list.size():
 		world.city.era_text = String(CityProgress.data()["eras"][CityProgress.era_of(colonies.list[active])].get("short", ""))
-		world.city.goal_text = Scenario.summary(colonies)
+		var goal := Scenario.summary(colonies)            # 왼쪽 위 한 줄: 시나리오 목표, 없으면 보통이 아닌 난이도
+		if goal != "":
+			goal = "목표 · " + goal
+		elif Difficulty.id_of(colonies) != "normal":
+			goal = "난이도 · %s" % Difficulty.name_of(Difficulty.id_of(colonies))
+		world.city.goal_text = goal
 	city_view.queue_redraw()
 	forecast.queue_redraw()
 	if dv_map.visible:
@@ -1760,6 +1773,28 @@ func _show_scenarios() -> void:
 		"남은 날, 정착민, 신뢰가 많고 사망이 적을수록 높다. 끝난 뒤에도 그 도시로 계속할 수 있다.", choices)
 
 
+## 새 게임의 난이도 고르기 (새로 시작 · 다른 운으로) — 지난번에 고른 것에 표시. 메뉴에서 바꿀 때는 change (지금 것에 표시)
+func _show_difficulty(seed_value: int, change: bool = false) -> void:
+	_pending_seed = seed_value
+	var mark := Difficulty.id_of(colonies) if change else String(Settings.value("game/difficulty", "normal"))
+	var choices := []
+	for l in Difficulty.levels():
+		var id := String(l["id"])
+		var parts := Difficulty.rule_parts(id)
+		var desc := String(l.get("text", ""))
+		if not parts.is_empty():
+			desc += "\n" + " · ".join(parts)
+		choices.append([id, String(l["name"]) + (("  ·  지금" if change else "  ·  지난번") if id == mark else ""), desc])
+	choices.append(["back", "돌아가기", ""])
+	if change:
+		modal.open("difficulty_change", "메뉴 · 난이도", "난이도 바꾸기",
+			"시작 자원 말고는 모두 바로 바뀐다 — 재난·고장·태양 폭풍의 빈도, 짓는 값, 지구의 지원, 패배. 모든 도시에 걸린다.", choices)
+	else:
+		modal.open("difficulty", "새 게임 · 난이도", "얼마나 어렵게 할까",
+			"난이도는 재난·고장·태양 폭풍의 빈도, 짓는 값, 시작 자원, 지구의 지원과 패배 조건을 바꾼다. " +
+			"샌드박스는 자원 걱정 없이 마음대로 짓는 판이다. 게임 중에도 메뉴에서 바꿀 수 있다 (시작 자원은 처음 한 번).", choices)
+
+
 func _start_scenario(id: String) -> void:
 	var s := Scenario.find(id)
 	if s.is_empty():
@@ -1794,6 +1829,8 @@ func _show_menu() -> void:
 		["resume", "계속", ""],
 		["save", "지금 저장", ""],
 		["settings", "설정", "그래픽 품질 (GPU에 맞춰 자동) · 지도에 보일 것"],
+		["difficulty", "난이도 — " + Difficulty.name_of(Difficulty.id_of(colonies)),
+			"시나리오를 하는 동안은 보통으로 고정" if Difficulty.in_scenario(colonies) else "재난·고장·비용·지원을 바꾼다 (샌드박스도)"],
 		["help", "도움말", ""],
 		["tutorial", "튜토리얼", "첫 한 시간을 열한 단계로 다시 짚는다 (지금 도시에서)"],
 		["restart", "처음부터 다시", "저장한 게임을 덮어쓴다"],
@@ -1900,7 +1937,7 @@ func _on_module_tapped(mid: String) -> void:
 	var reason := sim.build_block_reason(mid, 0.0)
 	var choices := [["close", "닫기", ""]]
 	choices.push_front(["section:" + mid, "단면 보기", "방마다 사람 · 들고 나는 공기·물·전력 (1970년대 우주 식민지 그림풍)"])
-	choices.push_front(["build:" + mid, "1기 더 짓기 — 자리 고르기", reason if reason != "" else BuildPanel._cost_text(m["cost"])])
+	choices.push_front(["build:" + mid, "1기 더 짓기 — 자리 고르기", reason if reason != "" else BuildPanel._cost_text(sim.cost_of(mid))])
 	modal.open("module", Palette.CATEGORY_KO[m["category"]], m["name"], body, choices, Palette.CATEGORY[m["category"]])
 
 
@@ -1912,13 +1949,15 @@ func _on_modal_choice(context: String, choice: String) -> void:
 					if not _load_save():
 						_new_game(2061, false)
 				"new":
-					_new_game(2061, false)
+					_show_difficulty(2061)
+					return
 				"tutorial":
 					_new_game(2061, false)
 					_set_speed(0)
 					tutorial.start()
 				"random":
-					_new_game(randi_range(1, 999999), false)
+					_show_difficulty(randi_range(1, 999999))
+					return
 				"auto":
 					_new_game(2061, true)
 					_set_speed(3)
@@ -1930,6 +1969,18 @@ func _on_modal_choice(context: String, choice: String) -> void:
 				_show_start()
 				return
 			_start_scenario(choice)
+		"difficulty":
+			if choice == "back":
+				_show_start()
+				return
+			Settings.set_value("game/difficulty", choice)
+			_new_game(_pending_seed, false, choice)
+			if choice != "normal":
+				_toast("난이도 — " + Difficulty.name_of(choice), "good")
+		"difficulty_change":
+			if choice != "back" and Difficulty.change(colonies, choice):
+				_toast("난이도 — " + Difficulty.name_of(choice), "good")
+				_refresh_tab()
 		"scenario_end":
 			match choice:
 				"scenarios":
@@ -1967,6 +2018,10 @@ func _on_modal_choice(context: String, choice: String) -> void:
 					tutorial.start()
 				"settings":
 					settings_panel.open()
+				"difficulty":
+					if not Difficulty.in_scenario(colonies):
+						_show_difficulty(colonies.seed_value, true)
+						return
 				"restart":
 					_show_start()
 				"quit":

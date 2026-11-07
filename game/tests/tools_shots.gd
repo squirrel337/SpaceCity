@@ -42,6 +42,7 @@ func _process(_delta: float) -> bool:
 	var w: WorldView = main.world if main else null
 	if frame == 4:
 		main._on_modal_choice("start", "new")
+		main._on_modal_choice("difficulty", "normal")   # 난이도 창 — 보통
 		main.modal.visible = false
 		main._set_speed(0)
 		main._set_view("world")

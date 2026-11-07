@@ -35,12 +35,14 @@ var fleet := {}                    # 함대 (Fleet — 행성간 항로를 오�
 var contracts := {}                # 항로 계약과 지구 협상 (Contracts)
 var orbital := {}                  # 매스 드라이버와 L5 궤도 도시 (Orbital)
 var probes := {}                   # 성간 탐사선 (Probes)
+var difficulty := "normal"         # 난이도 (Difficulty — easy·normal·hard·sandbox)
 
 
 ## 새 게임: 고향 도시와 천체마다의 기본 도시로 시작한다
 func start(sim: CitySim, plan: CityPlan) -> void:
 	scenario = {}
 	scenario_news = ""
+	difficulty = "normal"
 	Scenario.apply_rules(self)
 	list = [_entry(sim, plan, 0)]
 	expeditions = []
@@ -97,6 +99,7 @@ func _found_at(site_id: String, at_hour: int, seed: int) -> Dictionary:
 	var plan := CityPlan.create(s, BaseLayout.new(_layout_of(site_id)))
 	var c := _entry(s, plan, at_hour)
 	list.append(c)
+	Difficulty.apply_city(self, c)
 	return c
 
 
@@ -196,6 +199,7 @@ func step() -> Array:
 		Contracts.step_day(self)                   # 항로 계약 · 지구 협상
 		Orbital.step_day(self)                     # 매스 드라이버 · L5 궤도 도시
 		Probes.step_day(self)                      # 성간 탐사선
+		Difficulty.step_day(self)                  # 샌드박스 — 자원 채우기 · 정착민이 다 사라지면 새로
 		share_techs()
 		metro_fn.step_day(self)
 		var r := Scenario.step(self)               # 시나리오 목표 (이기거나 지면 main이 결과 창을 띄운다)
@@ -493,7 +497,8 @@ func to_save() -> Dictionary:
 			"oplog": (c.get("oplog", []) as Array).slice(-120)})
 	return {"version": SAVE_VERSION, "hour": hour, "start_unix": start_unix, "seed": seed_value,
 		"colonies": cols, "expeditions": expeditions, "defaults": 1, "transport": transport.to_save(),
-		"metro_fn": metro_fn.to_save(), "scenario": scenario, "routes": routes, "fleet": fleet, "contracts": contracts, "orbital": orbital, "probes": probes}
+		"metro_fn": metro_fn.to_save(), "scenario": scenario, "routes": routes, "fleet": fleet, "contracts": contracts, "orbital": orbital, "probes": probes,
+		"difficulty": difficulty}
 
 
 ## 저장을 읽는다 (판 1 = 도시 하나뿐이던 저장, 판 2 = 교통이 없던 저장). 기본 도시가 없던 저장이면 지금 시각에 세운다.
@@ -520,7 +525,8 @@ func load_save(data: Dictionary) -> bool:
 		Probes.start(self)
 		scenario = {}
 		scenario_news = ""
-		Scenario.apply_rules(self)
+		difficulty = "normal"
+		Difficulty.apply(self)
 		return true
 	if (v != SAVE_VERSION and v != 2) or not data.get("colonies") is Array or (data["colonies"] as Array).is_empty():
 		return false
@@ -620,7 +626,8 @@ func load_save(data: Dictionary) -> bool:
 		scenario["end"] = int(scenario.get("end", -1))
 		scenario["done"] = scenario.get("done", {}) if scenario.get("done") is Dictionary else {}
 	scenario_news = ""
-	Scenario.apply_rules(self)
+	difficulty = String(data.get("difficulty", "normal"))
+	Difficulty.apply(self)                   # 모든 도시의 difficulty 몫 · 재난 빈도 (Scenario.apply_rules)
 	return true
 
 
