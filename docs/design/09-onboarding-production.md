@@ -63,7 +63,7 @@
 | 평의회 | 창립 5인, 신뢰 지수, 위임 1단계 |
 | 시뮬레이션 | [city_balance.py](sim/city_balance.py)의 규칙을 GDScript로 옮긴 엔진 독립 코어 ([game/sim](../../game/sim)) — 이미 옮겼다 |
 | 화면 | 도시 뷰(아이소메트릭 간이판), 생명유지 대시보드, 절전 정책, 건설 대기열, 이벤트 카드, 평의회 — PC(마우스·키보드)와 Android(터치) 모두 |
-| 플랫폼 | Windows 10/11 x86_64 exe, Android 7.0+ APK (arm64-v8a·armeabi-v7a). 한 Godot 프로젝트에서 GitHub Actions로 내보낸다 |
+| 플랫폼 | Windows 10/11 x86_64 exe, macOS 11+ 앱 (universal — Intel·Apple Silicon, ad-hoc 서명), Android 7.0+ APK (arm64-v8a·armeabi-v7a). 한 Godot 프로젝트에서 GitHub Actions로 내보낸다 |
 
 ### 성공 기준
 

@@ -1,20 +1,22 @@
 # SpaceCity — 시대 0 프로토타입 (Godot)
 
 달 남극 섀클턴 시드 시티를 직접 운영하고, 원정대를 보내 화성·수성·세레스·칼리스토·타이탄에도 도시를 세우는 첫 실행 가능한 빌드다.
-**Windows(.exe)** 와 **Android(.apk)** 로 내보낸다.
+**Windows(.exe)**, **macOS(.app)**, **Android(.apk)** 로 내보낸다.
 규칙은 [상세 디자인 03 도시 레이어](../docs/design/03-city-layer.md)와 [밸런스 시뮬레이터](../docs/design/sim/city_balance.py)를 그대로 옮겼다.
 다른 천체의 부지 보정은 [city_sites.json](../docs/design/data/city_sites.json)에 있다.
 
 ## 받아서 실행하기
 
-빌드는 GitHub Actions의 **Game builds (Windows · Android)** 워크플로가 만든다.
+빌드는 GitHub Actions의 **Game builds (Windows · Android · macOS)** 워크플로가 만든다.
 
 | 플랫폼 | 받는 곳 | 실행 |
 |---|---|---|
 | Windows 10/11 (64비트) | 실행 결과의 Artifacts → `SpaceCity-windows-x86_64`, 또는 `prototype-latest` 프리릴리스 | zip을 풀고 `SpaceCity.exe`를 실행한다 (파일 하나, 설치 없음). OpenGL 3.3을 못 쓰는 PC에서는 엔진이 Direct3D 11 경로(ANGLE, 실행 파일에 내장)로 바꿔 돈다. 코드 서명이 없어서 SmartScreen이 막으면 '추가 정보 → 실행'. F11은 전체 화면 |
+| macOS 11 이상 (Intel·Apple Silicon 공용 universal, Apple Silicon은 13 이상) | Artifacts → `SpaceCity-macos-universal`, 또는 `prototype-latest` 프리릴리스 | zip을 풀어 `SpaceCity.app`을 응용 프로그램 폴더로 옮긴다. Linux CI에서 Godot 내장 서명기로 ad-hoc 서명만 하고 공증은 하지 않아서, 처음 한 번은 터미널에서 `xattr -dr com.apple.quarantine /Applications/SpaceCity.app`를 실행하거나, 한 번 열어 본 뒤 시스템 설정 → 개인정보 보호 및 보안 → '그래도 열기'. OpenGL(Compatibility 렌더러)로 돈다 |
 | Android 7.0 이상 | Artifacts → `SpaceCity-android`, 또는 `prototype-latest` 프리릴리스의 APK | 휴대폰에서 APK를 열어 설치 ('출처를 알 수 없는 앱' 허용). 디버그 서명이라 스토어 배포용은 아니다 |
 
-워크플로를 수동으로 실행할 때 `publish`를 켜면 `prototype-latest` 프리릴리스에 두 파일이 올라간다. 휴대폰 브라우저로 그 페이지를 열면 APK를 바로 받을 수 있다.
+워크플로를 수동으로 실행할 때 `publish`를 켜면 `prototype-latest` 프리릴리스에 세 파일이 올라간다. 휴대폰 브라우저로 그 페이지를 열면 APK를 바로 받을 수 있다.
+Mac이 없는 CI라 `tools/macos_check.py`가 내보낸 zip을 대신 살핀다 — 앱 묶음의 파일, 실행 권한, universal(x86_64 + arm64) 두 조각의 서명.
 
 ## 하는 일
 
@@ -170,7 +172,7 @@
 | `data/` | `docs/design/data/`(밝은 별·은하 좌표 `sky.json` 포함)와 근거리 항성(`docs/concept/examples/nearby_stars.json`)의 JSON 사본. 단일 출처는 문서 쪽이다 |
 | `fonts/` | Pretendard (SIL Open Font License 1.1, `Pretendard-LICENSE.txt`) |
 | `tests/` | `parity_dump.gd`(파이썬과 비교할 일별 상태, `--site`로 부지), `smoke_test.gd`(화면을 띄워 자동 운영으로 3년 보고서까지 돌리기, 배치·탈것·3D 카메라·고정점·자리 고르기·길 종류·곡선·구획·땅 파기·침수 점검, 화성 원정·도착·식민지 고르기·대도시 시설·시가지 지도(거리의 자투리·한강)·운영 방식(자동 증설·동맹 기술·비상편·쉬기)·상업·금융(펀드 기대 수익 < 채권 이자)·첨단 산업 지역·카드·저장 왕복), `perf_probe.gd`(장면마다 프레임 CPU 시간·그리기 호출·삼각형 수), `device_shots.gd`(해상도 하나에서 두 언어로 위 막대·옆 패널 폭, 잘린 탭 이름, 터치(`--touch`)에서 44 px보다 작은 단추를 재고 스크린숏 — 크기마다 `--resolution`으로 띄운다), `i18n_shots.gd`·`i18n_misses.gd`(영어 화면 캡처, 영어로 몇백 일을 돌리며 한글이 남은 글 모으기), `screenshots.gd`·`world_shots.gd`·`types_shots.gd`·`colony_shots.gd`·`body_shots.gd`·`transport_shots.gd`·`anchor_shots.gd`·`city_shots.gd`(화면 캡처 — 3D는 기지에서 이웃 별까지, 자리 고르기와 길, 새 종류 116종, 식민지 점·화성으로 날아가 내려앉기·개척 탭, 천체마다 행성 전체·지역·지형 조각·도시, 지구의 항공편·셔틀·수송선·교통 탭·서울·뉴욕·파리·도쿄 시가지와 물가·다리·운영·경제 카드·운영 방식 단지·평택·신주·애슈번·상하이 장장 단지·활주로의 여객기·달 셔틀, 고정점마다의 화면, 길 격자·교차로·길·구획·땅 도구·화성 구덩이·지구의 침수·서울의 우주 시설) |
-| `tools/` | `parity_check.py`, `sync_data.py`, `art/`(그림 생성기, `earth_coast.py`: Natural Earth에서 지구 해안 거리 지도와 대도시의 해안·강·공원 지도 만들기 — 내려받기가 필요해 CI에서는 다시 만들지 않는다) |
+| `tools/` | `parity_check.py`, `sync_data.py`, `macos_check.py`(macOS zip의 앱 묶음·실행 권한·두 조각의 서명), `i18n_extract.py`(번역 목록), `art/`(그림 생성기, `earth_coast.py`: Natural Earth에서 지구 해안 거리 지도와 대도시의 해안·강·공원 지도 만들기 — 내려받기가 필요해 CI에서는 다시 만들지 않는다) |
 
 ## 시험
 
@@ -225,6 +227,9 @@ Godot 4.7.2와 같은 버전의 내보내기 템플릿이 필요하다.
 
 ```bash
 godot --headless --path game --export-release "Windows Desktop" "$PWD/build/windows/SpaceCity.exe"
+# macOS: Linux·Windows에서도 된다 (내장 서명기로 ad-hoc 서명, 공증 없음). 템플릿은 macos.zip
+godot --headless --path game --export-release "macOS" "$PWD/build/macos/SpaceCity.zip"
+python3 game/tools/macos_check.py build/macos/SpaceCity.zip
 # Android: ANDROID_HOME(빌드 도구 28 이상, platform-tools)과 JAVA_HOME(JDK 17 이상), 디버그 키스토어가 필요하다
 export GODOT_ANDROID_KEYSTORE_DEBUG_PATH=~/debug.keystore GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android
 godot --headless --path game --export-debug "Android" "$PWD/build/android/SpaceCity.apk"

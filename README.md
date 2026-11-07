@@ -8,9 +8,9 @@
 
 ## 실행해 보기 — 시대 0 프로토타입
 
-달 남극 기지의 첫 3년을 직접 운영하고 다른 천체에도 도시를 세우는 [Godot 프로토타입](game/README.md)이 있다. **Windows(.exe)와 Android(.apk)** 로 내보낸다.
+달 남극 기지의 첫 3년을 직접 운영하고 다른 천체에도 도시를 세우는 [Godot 프로토타입](game/README.md)이 있다. **Windows(.exe)·macOS(.app)·Android(.apk)** 로 내보낸다.
 
-- 빌드 받기: GitHub Actions의 **Game builds (Windows · Android)** 실행 결과 → Artifacts, 또는 `prototype-latest` 프리릴리스
+- 빌드 받기: GitHub Actions의 **Game builds (Windows · Android · macOS)** 실행 결과 → Artifacts, 또는 `prototype-latest` 프리릴리스
 - 소스에서 실행: Godot 4.7.2로 `game/` 폴더를 연다
 - 규칙은 디자인 문서의 밸런스 시뮬레이터와 같다 — `python3 game/tools/parity_check.py`가 하루 단위로 확인한다
 - 3D 세계: 도시가 구 모양의 달 남극에 서 있다. 구글 어스처럼 돌려 보고, 줌아웃하면 달 전체 → 지구와 달 → 태양계 → 이웃 별까지 이어진다. 천체는 실제 궤도 요소로 게임 날짜의 자리에 있다
