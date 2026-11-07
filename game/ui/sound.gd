@@ -7,7 +7,7 @@ extends Node
 ##   우주(항로 지도의 낮은 울림). 사인파의 주파수는 1/6 Hz의 배수라 고리가 이어지고, 잡음은 끝과 처음을 겹쳐 잇는다.
 ## 처음에 프레임마다 나눠 만든다 (한 프레임에 MAX_US까지) — 다 만들기 전에는 그 소리를 건너뛴다.
 ## 고른 도시가 절전하면(축전 20% 아래) 환경음을 9 dB 낮춘다 (main).
-## 음량: 설정의 소리 (전체·효과음·환경음, 끄기 — user://settings.cfg) → 버스 Master · SFX · Ambient
+## 음량: 설정의 소리 (전체·효과음·환경음·음악, 끄기 — user://settings.cfg) → 버스 Master · SFX · Ambient · Music (음악은 Music)
 
 const RATE := 22050                 # 효과음
 const AMB_RATE := 16000             # 환경음
@@ -84,7 +84,8 @@ static func _bus(bus_name: String) -> int:
 ## 설정의 음량을 버스에 (0~1 → dB)
 static func apply_volumes() -> void:
 	var mute := bool(Settings.value("audio/mute", false))
-	for spec in [["Master", "audio/master", 0.8], ["SFX", "audio/sfx", 0.8], ["Ambient", "audio/ambient", 0.5]]:
+	for spec in [["Master", "audio/master", 0.8], ["SFX", "audio/sfx", 0.8], ["Ambient", "audio/ambient", 0.5],
+			["Music", "audio/music", 0.45]]:
 		var i := _bus(String(spec[0]))
 		var v := clampf(float(Settings.value(String(spec[1]), spec[2])), 0.0, 1.0)
 		AudioServer.set_bus_volume_db(i, linear_to_db(maxf(v, 0.0001)))

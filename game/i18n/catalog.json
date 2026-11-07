@@ -3286,6 +3286,7 @@
  "소리": "ui/settings_panel.gd",
  "소리 끄기": "ui/settings_panel.gd",
  "언어 · Language": "ui/settings_panel.gd",
+ "음악": "ui/settings_panel.gd",
  "자동 — 느려지면 한 단계씩 낮춘다)": "ui/settings_panel.gd",
  "전체": "ui/settings_panel.gd",
  "지금 '%s'%s — 3D 화면 %s만 화소 · 안티앨리어싱 %s · 그림자 %s · 대도시 건물 %s채. 지형 격자와 굽기 해상도는 다음에 도시를 열 때 적용된다.": "ui/settings_panel.gd",

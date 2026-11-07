@@ -42,6 +42,7 @@ var city_view: CityView
 var world: WorldView
 var dv_map: DvMapView                # 항로 지도 (왼쪽 큰 화면의 '항로')
 var sound: Sound                     # 효과음·환경음 (코드로 합성)
+var music: Music                     # 배경 음악 (코드로 합성 — 도시·항로 지도·긴장)
 var tutorial: Tutorial               # 첫 한 시간 안내 (새 게임 카드·메뉴의 '튜토리얼')
 var _amb_wait := 0.0
 var plan: CityPlan
@@ -123,6 +124,8 @@ func _build() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	sound = Sound.new()                  # 먼저 — 뒤에 만드는 단추마다 딸깍 소리가 붙는다
 	add_child(sound)
+	music = Music.new()
+	add_child(music)
 	var bg := ColorRect.new()
 	bg.color = Palette.BG
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -1177,6 +1180,20 @@ func _update_ambient() -> void:
 	Sound.ambient("space" if far else body)
 	var cap := sim.bat_cap + sim.rfc_cap
 	Sound.level(-9.0 if not far and cap > 0.0 and (sim.battery + sim.rfc) / cap < 0.2 else 0.0)
+	Music.set_mood(music_mood(far))
+
+
+## 배경 음악의 곡: 위급(대피소 추첨 · 축전 15% 아래 · 산소나 식량 3일 아래 · 먼지 폭풍)이면 긴장, 항로 지도·먼 우주면 항로 지도, 아니면 도시
+func music_mood(far: bool) -> String:
+	var pop := sim.population()
+	var per: Dictionary = sim.PER
+	var cap := sim.bat_cap + sim.rfc_cap
+	var low_power := cap > 0.0 and (sim.battery + sim.rfc) / cap < 0.15
+	var low_o2 := pop > 0.0 and not sim.open_air and float(sim.stock["o2_kg"]) / (pop * float(per["o2_kg"])) < 3.0
+	var low_food := pop > 0.0 and float(sim.stock["food_kg"]) / (pop * float(per["food_kg"])) < 3.0
+	if not sim.pending_storm.is_empty() or low_power or low_o2 or low_food or sim.in_dust_storm():
+		return "tension"
+	return "map" if far else "city"
 
 
 func _start_jump() -> void:

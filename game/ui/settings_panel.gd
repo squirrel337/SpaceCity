@@ -94,7 +94,7 @@ func _init() -> void:
 		v.add_child(c)
 		_checks[spec[0]] = [c, spec[2]]
 	v.add_child(_section("소리"))
-	for spec in [["audio/master", "전체", 0.8], ["audio/sfx", "효과음", 0.8], ["audio/ambient", "환경음", 0.5]]:
+	for spec in [["audio/master", "전체", 0.8], ["audio/sfx", "효과음", 0.8], ["audio/ambient", "환경음", 0.5], ["audio/music", "음악", 0.45]]:
 		var row2 := HBoxContainer.new()
 		row2.add_theme_constant_override("separation", 10)
 		var lab := Label.new()

@@ -2376,7 +2376,29 @@ func _sound_check() -> void:
 	main._update_ambient()
 	_check(snd._want_amb == "space" and snd._amb_name == "space", "항로 지도에서 우주의 울림이 아니다 (%s)" % snd._amb_name)
 	main._set_view("world")
-	print("smoke: sound %d streams, played %s" % [snd.ready_count(), str(snd.played)])
+	# 배경 음악: 곡 셋을 뒤 스레드에서 만든다 — 고리 길이(마디 × 박), 분위기에 따라 곡이 바뀐다
+	var mu: Music = main.music
+	_check(mu != null and Music.inst == mu, "배경 음악이 없다")
+	if mu != null:
+		mu.finish_all()
+		var lens := {"city": 8 * 4 * 60.0 / 72.0, "map": 8 * 4 * 60.0 / 104.0, "tension": 8 * 4 * 60.0 / 84.0}
+		for k2 in lens:
+			var tr: AudioStreamWAV = mu.tracks.get(k2)
+			_check(tr != null and tr.loop_mode == AudioStreamWAV.LOOP_FORWARD and absi(tr.loop_end - int(float(lens[k2]) * Music.RATE)) <= 1,
+				"배경 음악 '%s'의 고리가 맞지 않다" % k2)
+		var st0: Dictionary = main.sim.pending_storm
+		main.sim.pending_storm = {"seats": 1, "pop": 2, "dose": 100}
+		_check(main.music_mood(false) == "tension", "대피소 추첨 중인데 긴장 음악이 아니다")
+		main.sim.pending_storm = st0
+		var calm: String = main.music_mood(true)
+		_check(calm == "map" or calm == "tension", "항로 지도에서 신스 음악이 아니다 (%s)" % calm)
+		Music.set_mood("map")
+		mu._process(0.0)
+		_check(mu.mood == "map", "음악이 항로 지도 곡으로 바뀌지 않았다")
+		Music.set_mood("city")
+		mu._process(0.0)
+	print("smoke: sound %d streams, played %s, music %s" % [snd.ready_count(), str(snd.played),
+		str(main.music.tracks.keys()) if main.music != null else "-"])
 
 
 ## 튜토리얼: 열한 단계 — 읽기 단계는 '다음', 할 일 단계는 그 일을 하면 넘어간다 (반나절 흘리기·화면 돌리기·짓기·연구·개척 탭·
