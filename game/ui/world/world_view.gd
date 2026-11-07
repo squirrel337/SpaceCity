@@ -57,6 +57,13 @@ var ground: SiteGround               # 그 도시가 앉은 땅
 var grounds := {}                    # 부지 id → SiteGround (달 섀클턴은 늘, 다른 부지는 처음 고를 때 만든다)
 var colonies: Array = []             # [{name, site, body, dir: 몸체 고정 Vector3, pop, active, candidate?, transit?}] — 점과 이름표
 var _fine_sphere := {}               # 천체 id → 지형 조각과 맞닿게 구 메시를 곱게 바꿨나
+const HORIZON_PAD_KM := 40.0         # 대도시를 그리는 거리: 카메라의 지평선 + 이만큼 (높은 건물이 지평선 위로 보이는 몫)
+## 천체 구의 단계 (화면 위 반지름 화소): 1 아래는 숨기고 (점·이름표는 화면 위에 그린다), LOD_LOW 아래는 32×16, LOD_MID 아래는
+## 96×48, 그 위는 원래 구 (지형 조각과 맞닿는 256×128 · 구운 지도 192×96). 바꾸는 문턱은 20% 여유를 둔다 (오가지 않게)
+const LOD_LOW_PX := 40.0
+const LOD_MID_PX := 200.0
+static var _lod_low: SphereMesh
+static var _lod_mid: SphereMesh
 var _sphere_touched := {}            # ShaderMaterial → true: 고른 도시 둘레의 빛·연무·구멍을 넣은 천체 구
 var _descent := {}                   # 식민지로 날아간 뒤 내려앉기
 var _enter_cool := 0.0
@@ -666,6 +673,8 @@ func _place_all() -> void:
 		var node: MeshInstance3D = e["node"]
 		var rad: float = info["radius"]
 		node.global_transform = Transform3D(g_basis(info["frame"]).scaled(Vector3.ONE * rad * s), to_render(c))
+		if id != "sun" and not e.has("hab"):
+			_body_lod(e, node, _apparent_px(c, rad), id == near_id)
 		if e.has("hab"):
 			_sync_habitat(e["hab"])
 		var mat: ShaderMaterial = e["mat"]
@@ -846,6 +855,16 @@ func _update_metros() -> void:
 	if sig != _ahead_sig:
 		_ahead_sig = sig
 		PlanetLook.coast_prefetch(ahead)
+	# 지평선 너머의 대도시·지역은 만들지도 그리지도 않는다 — 카메라 아래 땅에서 가장자리까지가 지평선 거리 + HORIZON_PAD_KM보다
+	# 멀면 (나로에 내려앉으면 163 km 밖 부산의 땅 조각과 건물 6,000채가 보이지도 않으면서 그려졌다)
+	if alt < 1500.0 and on_earth:
+		var info_e := _info("earth")
+		var cdir: Vector3 = (info_e["frame"] as Basis).inverse() * Astro.vec(Astro.norm3(Astro.sub3(cam.pos, info_e["center"])))
+		var hz := sqrt(2.0 * 6371.0 * maxf(alt, 0.0) + alt * alt) + HORIZON_PAD_KM
+		if not m.is_empty() and Metros.km_between(cdir, m["dir"]) - float(m["radius_km"]) > hz:
+			m = {}
+		if not r.is_empty() and Metros.km_between(cdir, r["dir"]) - float(r["radius_km"]) > hz:
+			r = {}
 	# 고도 1,500 km 아래: 가장 가까운 대도시(250 km 안)나 지역(150 km 안)의 땅을 만든다
 	if alt < 1500.0:
 		var dm := INF
@@ -1498,6 +1517,7 @@ func _draw_overlay() -> void:
 	routes.draw_lines()
 	perf["routes_us"] = Time.get_ticks_usec() - t1
 	var placed: Array = []
+	var t2 := Time.get_ticks_usec()
 	# 태양계 천체
 	# 식민지: 행성 단위에서는 점과 이름만 (자세한 도시는 고른 식민지에 내려앉을 때)
 	for i in colonies.size():
@@ -1505,6 +1525,7 @@ func _draw_overlay() -> void:
 	routes.draw_metros(font, placed)
 	routes.draw_regions(font, placed)
 	_label_metro_facilities(font, placed)
+	perf["ov_places_us"] = Time.get_ticks_usec() - t2
 	var order := ["sun", "earth", "moon", "l5", "mars", "venus", "mercury", "jupiter", "saturn", "uranus", "neptune",
 		"pluto", "ceres", "io", "europa", "ganymede", "callisto", "titan", "triton", "phobos", "deimos", "charon"]
 	var inside := _inside_habitat()                 # 궤도 도시 안에서는 벽 너머 천체·별 이름을 감춘다
@@ -1518,9 +1539,13 @@ func _draw_overlay() -> void:
 			_label_star(s, font, placed)
 	if _galaxy_k > 0.3:
 		_label_galaxy(font, placed)
+	var t3 := Time.get_ticks_usec()
 	if city and city.visible_now():
 		city.draw_overlay(self, _overlay, font)
+	var t4 := Time.get_ticks_usec()
 	_draw_readout(font)
+	perf["ov_city_us"] = t4 - t3
+	perf["ov_readout_us"] = Time.get_ticks_usec() - t4
 	perf["overlay_us"] = Time.get_ticks_usec() - t0
 	if Settings.show_perf():
 		_draw_perf(font)
@@ -1568,6 +1593,43 @@ func _label_metro_facilities(font: Font, placed: Array) -> void:
 			_overlay.draw_string(font, rect.position + Vector2(10, 29), I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(11),
 				Color(0.85, 0.87, 0.9, 0.9 * a))
 			_overlay.draw_line(Vector2(s2.x, rect.end.y), s2 + Vector2(0, 10), Color(col, 0.7 * a), 1.5)
+
+
+## 천체 구의 단계를 화면 위 크기에 맞춘다 (원래 구는 e["mesh_hi"]에 — 다른 코드가 더 고운 구로 바꾸면 그것을 따른다).
+## 가장 가까운 천체는 늘 원래 구. 올라가려면 문턱의 1.2배, 내려가려면 1/1.2배를 넘어야 한다 (문턱에서 오가지 않게)
+func _body_lod(e: Dictionary, node: MeshInstance3D, px: float, nearest: bool) -> void:
+	if _lod_low == null:
+		_lod_low = SkyBuilder.sphere(32, 16)
+		_lod_mid = SkyBuilder.sphere(96, 48)
+	if node.mesh != _lod_low and node.mesh != _lod_mid and e.get("mesh_hi") != node.mesh:
+		e["mesh_hi"] = node.mesh                       # 다른 코드가 원래 구를 바꿨다 — 지금 단계를 다시 건다
+		if int(e.get("lod", 2)) != 2:
+			e.erase("lod")
+	var cur := int(e.get("lod", 2))
+	var want := 2
+	if not nearest:
+		var raw := _lod_level(px)
+		want = cur
+		if raw > cur:
+			want = maxi(cur, _lod_level(px / 1.2))
+		elif raw < cur:
+			want = mini(cur, _lod_level(px * 1.2))
+	if want == cur and e.has("lod"):
+		return
+	e["lod"] = want
+	node.visible = want >= 0
+	if want >= 0:
+		node.mesh = _lod_low if want == 0 else (_lod_mid if want == 1 else e.get("mesh_hi", node.mesh))
+
+
+static func _lod_level(px: float) -> int:
+	if px < 1.0:
+		return -1
+	if px < LOD_LOW_PX:
+		return 0
+	if px < LOD_MID_PX:
+		return 1
+	return 2
 
 
 func _apparent_px(center: PackedFloat64Array, radius_km: float) -> float:

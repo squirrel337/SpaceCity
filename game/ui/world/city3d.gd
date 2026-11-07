@@ -43,7 +43,9 @@ var _mega: MegaView               # 메가프로젝트 (짓는 것·다 지은 �
 var _events: EventsView           # 재난의 흔적·둘레 탐사 (탐사지 표지·탐사대)
 var _grow_t := 0.0
 var _agents_root: Node3D
-var _agent_nodes := {}            # uid → {node, plume, yaw}
+var _agent_nodes := {}            # uid → {plume, yaw, last, id(모형), slot(그 모형 멀티메시의 칸)}
+var _agent_mm := {}               # 탈것 모형 id → MultiMeshInstance3D
+var _agent_sig := ""              # 모형마다의 탈것 차례 (바뀌면 칸을 다시 나눈다)
 var _uid := 0
 var _roads: MeshInstance3D
 var _road_mat: ShaderMaterial
@@ -164,6 +166,12 @@ func _local(p: Vector2, above: float = 0.0) -> Vector3:
 	return Vector3(p.x, z, -p.y)
 
 
+## 길 윗면의 땅: 지형 조각(GPU)이 실제로 그리는 높이와 쌍선형 높이 가운데 높은 쪽 — 길이 땅에 묻히지 않게 (RoadMesh)
+func _road_local(p: Vector2, above: float = 0.0) -> Vector3:
+	var z := maxf(ground.local_height_m(p), ground.surface_height_m(p)) - ground.drop_m(p) + above
+	return Vector3(p.x, z, -p.y)
+
+
 # ── 매 프레임 ───────────────────────────────────────────────────
 func update(delta: float, speed_level: int) -> void:
 	if sim == null or plan == null:
@@ -179,7 +187,7 @@ func update(delta: float, speed_level: int) -> void:
 	else:
 		if plan.road_rev != _road_rev:
 			_road_rev = plan.road_rev
-			_road_job = RoadMesh.start(plan, _local)
+			_road_job = RoadMesh.start(plan, _road_local)
 		var dsig := "%d|%d|%d" % [plan.road_rev, plan.zone_rev, plan.terrain_rev]
 		if dsig != _district_sig and _districts:
 			_district_sig = dsig
@@ -521,18 +529,51 @@ static func _yaw(rot: int) -> Basis:
 
 # ── 탈것 ────────────────────────────────────────────────────────
 func _sync_agents(delta: float) -> void:
-	var seen := {}
+	# 모형마다 멀티메시 하나 (탈것마다 노드 하나이던 때는 큰 도시에서 그리기 호출이 탈것 수만큼 — 나로 31대에 55번이었다).
+	# 모형마다의 탈것 차례(uid 목록)가 바뀌면 칸을 다시 나누고 모두 다시 놓는다
+	var order := {}
 	for a in traffic.agents:
 		if not a.has("uid"):
 			_uid += 1
 			a["uid"] = _uid
+		var mid := String(a["id"])
+		if not order.has(mid):
+			order[mid] = []                  # Array — 사전에서 꺼내 붙여도 그 목록에 붙는다 (Packed 배열은 꺼낸 것이 복사본)
+		(order[mid] as Array).append(int(a["uid"]))
+	var parts := PackedStringArray()
+	for mid in order:
+		parts.append("%s:%s" % [mid, str(order[mid])])
+	var sig := "|".join(parts)
+	if sig != _agent_sig:
+		_agent_sig = sig
+		for mid in _agent_mm.keys():
+			if not order.has(mid):
+				(_agent_mm[mid] as Node).queue_free()
+				_agent_mm.erase(mid)
+		for mid in order:
+			var mmi: MultiMeshInstance3D = _agent_mm.get(mid)
+			if mmi == null:
+				mmi = MultiMeshInstance3D.new()
+				var mm := MultiMesh.new()
+				mm.transform_format = MultiMesh.TRANSFORM_3D
+				mm.mesh = ModelLib.mesh("vehicles", mid)
+				mmi.multimesh = mm
+				_agents_root.add_child(mmi)
+				_agent_mm[mid] = mmi
+			var uids: Array = order[mid]
+			mmi.multimesh.instance_count = uids.size()
+			for k in uids.size():
+				var e0: Dictionary = _agent_nodes.get(uids[k], {})
+				if not e0.is_empty():
+					e0["id"] = mid
+					e0["slot"] = k
+					e0.erase("at")                       # 새 칸에 다시 놓는다
+	var seen := {}
+	for a in traffic.agents:
 		var uid: int = a["uid"]
 		seen[uid] = true
 		var e: Dictionary = _agent_nodes.get(uid, {})
 		if e.is_empty():
-			var mi := MeshInstance3D.new()
-			mi.mesh = ModelLib.mesh("vehicles", a["id"])
-			_agents_root.add_child(mi)
 			var plume := MeshInstance3D.new()
 			var q := QuadMesh.new()
 			q.size = Vector2(2, 2)
@@ -543,8 +584,9 @@ func _sync_agents(delta: float) -> void:
 			plume.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			plume.visible = false
 			_agents_root.add_child(plume)
-			e = {"node": mi, "plume": plume, "yaw": deg_to_rad(HEADING_DEG.get(a["heading"], 0.0)),
-				"last": a["pos"]}
+			var mid := String(a["id"])
+			e = {"plume": plume, "yaw": deg_to_rad(HEADING_DEG.get(a["heading"], 0.0)), "last": a["pos"], "id": mid,
+				"slot": (order[mid] as Array).find(uid)}
 			_agent_nodes[uid] = e
 		var p: Vector3 = a["pos"]
 		var last: Vector3 = e["last"]
@@ -563,8 +605,10 @@ func _sync_agents(delta: float) -> void:
 		e["yaw"] = yaw
 		e["last"] = p
 		e["at"] = true
-		var node: MeshInstance3D = e["node"]
-		node.transform = Transform3D(Basis(Vector3.UP, yaw), pos)
+		var mmi2: MultiMeshInstance3D = _agent_mm.get(String(e["id"]))
+		var slot := int(e.get("slot", -1))
+		if mmi2 != null and slot >= 0 and slot < mmi2.multimesh.instance_count:
+			mmi2.multimesh.set_instance_transform(slot, Transform3D(Basis(Vector3.UP, yaw), pos))
 		var plume: MeshInstance3D = e["plume"]
 		plume.visible = thrust
 		if thrust:
@@ -573,7 +617,6 @@ func _sync_agents(delta: float) -> void:
 	for uid in _agent_nodes.keys():
 		if not seen.has(uid):
 			var e2: Dictionary = _agent_nodes[uid]
-			(e2["node"] as Node).queue_free()
 			(e2["plume"] as Node).queue_free()
 			_agent_nodes.erase(uid)
 
@@ -1069,8 +1112,12 @@ func draw_overlay(view: WorldView, ov: Control, font: Font) -> void:
 				var r := Rect2(s2 - Vector2(22, 0), Vector2(44, 5))
 				ov.draw_rect(r, Color(0, 0, 0, 0.6))
 				ov.draw_rect(Rect2(r.position, Vector2(44.0 * _progress_of(it), 5)), Palette.AMBER)
+	var t_ov := Time.get_ticks_usec()
 	_draw_district_labels(view, ov, font, bold)
+	var t_ov2 := Time.get_ticks_usec()
 	_events.draw_overlay(view, ov, font, plan, colony, _local)
+	view.perf["ov_district_us"] = t_ov2 - t_ov
+	view.perf["ov_events_us"] = Time.get_ticks_usec() - t_ov2
 	var ly := 140.0
 	if goal_text != "":
 		_shadow_text(ov, bold, Vector2(16, 142), goal_text, 13, Palette.GREEN.lightened(0.25))
@@ -1359,12 +1406,18 @@ func _count_districts() -> void:
 			_district_n[d] = int(_district_n.get(d, 0)) + 1
 
 
-## 구획 이름표: 기지를 내려다볼 때 (0.12~3.4 km) 구획마다 이름 · 지어진 건물 · 블록 · 필지 (가장 큰 블록 위)
-func _draw_district_labels(view: WorldView, ov: Control, font: Font, bold: Font) -> void:
-	var d := view.cam.dist
-	var a := smoothstep(0.12, 0.2, d) * (1.0 - smoothstep(2.2, 3.4, d))
-	if a < 0.03 or (tool != null and tool.active() and tool.mode != "zone"):
-		return
+## 구획 이름표의 내용 (자리·글·폭·색): 건물·길·구획·땅 높이·언어·글자 크기가 바뀔 때만 다시 셈한다 — 프레임마다 하던 블록 훑기·
+## 글 만들기·번역·글 폭 재기가 큰 도시(나로)에서 오버레이의 1.4 ms였다
+var _dlabel_sig := ""
+var _dlabels: Array = []
+
+
+func _district_label_list(font: Font, bold: Font) -> Array:
+	var sig := "%d|%d|%d|%d|%s|%s" % [plan.revision, plan.road_rev, plan.zone_rev, plan.terrain_rev, I18n.lang, str(Access.font_k)]
+	if sig == _dlabel_sig:
+		return _dlabels
+	_dlabel_sig = sig
+	_dlabels = []
 	_count_districts()
 	var where := {}
 	var nblocks := {}
@@ -1379,21 +1432,35 @@ func _draw_district_labels(view: WorldView, ov: Control, font: Font, bold: Font)
 		var r: Rect2 = layout.rects.get(name, Rect2())
 		if r.size != Vector2.ZERO:
 			where[name] = [r.get_center(), 0.0]
-	var placed: Array = []
 	for name in where:
 		var info: Array = BaseLayout.district_info(name)
-		var sp: Variant = view.screen_of(global_transform * _local(where[name][0], 10.0))
-		if sp == null:
-			continue
-		var s2: Vector2 = sp
-		var text: String = info[0]
-		var col: Color = info[1]
+		var text := I18n.t(String(info[0]))
 		var sub := "건물 %d · 필지 %d" % [int(_district_n.get(name, 0)), (layout.lots.get(name, []) as Array).size()]
 		if nblocks.has(name):
 			sub = "건물 %d · 블록 %d · 필지 %d" % [int(_district_n.get(name, 0)), int(nblocks[name]),
 				(layout.lots.get(name, []) as Array).size()]
+		sub = I18n.t(sub)
 		var w := maxf(bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(12)).x,
 			font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(10)).x) + 22.0
+		_dlabels.append([_local(where[name][0], 10.0), text, sub, w, info[1]])
+	return _dlabels
+
+
+## 구획 이름표: 기지를 내려다볼 때 (0.12~3.4 km) 구획마다 이름 · 지어진 건물 · 블록 · 필지 (가장 큰 블록 위)
+func _draw_district_labels(view: WorldView, ov: Control, font: Font, bold: Font) -> void:
+	var d := view.cam.dist
+	var a := smoothstep(0.12, 0.2, d) * (1.0 - smoothstep(2.2, 3.4, d))
+	if a < 0.03 or (tool != null and tool.active() and tool.mode != "zone"):
+		return
+	var placed: Array = []
+	for lb in _district_label_list(font, bold):
+		# lb = [3D 자리, 이름(번역), 아랫줄(번역), 폭, 색] — 건물·길·구획·언어·글자 크기가 바뀔 때만 다시 셈한다
+		var sp: Variant = view.screen_of(global_transform * (lb[0] as Vector3))
+		if sp == null:
+			continue
+		var s2: Vector2 = sp
+		var col: Color = lb[4]
+		var w: float = lb[3]
 		var rect := Rect2(s2 - Vector2(w * 0.5, 16.0), Vector2(w, 32.0))
 		if not Rect2(Vector2.ZERO, view.size).intersects(rect):
 			continue
@@ -1407,9 +1474,9 @@ func _draw_district_labels(view: WorldView, ov: Control, font: Font, bold: Font)
 		placed.append(rect)
 		ov.draw_rect(rect, Color(0.04, 0.05, 0.08, 0.45 * a))
 		ov.draw_rect(Rect2(rect.position, Vector2(3.0, rect.size.y)), Color(col, 0.95 * a))
-		ov.draw_string(bold, rect.position + Vector2(10, 14), I18n.t(text), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(12),
+		ov.draw_string(bold, rect.position + Vector2(10, 14), String(lb[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(12),
 			Color(col.lightened(0.45), a))
-		ov.draw_string(font, rect.position + Vector2(10, 27), I18n.t(sub), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(10),
+		ov.draw_string(font, rect.position + Vector2(10, 27), String(lb[2]), HORIZONTAL_ALIGNMENT_LEFT, -1, Access.fs(10),
 			Color(0.82, 0.84, 0.88, 0.85 * a))
 
 
@@ -1427,7 +1494,7 @@ func _update_ways() -> void:
 	highways.clear()
 	runway.clear()
 	bearings.clear()
-	var g := RoadMesh.new(_local)
+	var g := RoadMesh.new(_road_local)
 	var hub := Vector2(layout.hub.x, layout.hub.y)
 	if transport != null:
 		for l in transport.lines_of(site_key):

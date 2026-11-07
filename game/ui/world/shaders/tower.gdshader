@@ -1,15 +1,16 @@
 // 대도시의 건물: 단위 상자 하나를 MultiMesh로 늘려 쓴다. 셰이더가 층·창·유리 외벽·지붕을 그리고, 밤에는 창이 켜진다.
 // 인스턴스 색 = 외벽 색 (a = 유리 몫), INSTANCE_CUSTOM = (높이 m, 너비 m, 깊이 m, 씨앗).
 // UV = 면 안의 (가로 0~1, 세로 0~1), UV2.x = 면 (0 너비 쪽, 1 깊이 쪽, 2 지붕)
+// 인스턴스·면마다 같은 값은 flat으로 넘긴다 — 보간 오차가 창 불빛 해시(씨앗·면)를 화소마다 흔들지 않게
 shader_type spatial;
 render_mode cull_back;
 #include "res://ui/world/shaders/noise.gdshaderinc"
 
 uniform float night = 0.0;
 
-varying vec4 v_col;
-varying vec4 v_dim;
-varying float v_face;
+varying flat vec4 v_col;
+varying flat vec4 v_dim;
+varying flat float v_face;
 
 void vertex() {
 	v_col = COLOR;
@@ -43,7 +44,7 @@ void fragment() {
 		ROUGHNESS = mix(0.85, 0.25, wm * glass_k);
 		METALLIC = 0.0;
 		// 밤: 창마다 켜졌나 (층·칸의 해시)
-		float r = hash1(vec3(floor(g), seed * 131.0 + v_face * 17.0), 9.0);
+		float r = hash1(vec3(floor(g), seed * 131.0 + floor(v_face + 0.5) * 17.0), 9.0);
 		float lit = step(0.5 + 0.18 * (1.0 - glass_k), r) * win;
 		float far_lit = 0.36 * smoothstep(0.3, 0.9, aa);
 		vec3 lamp = mix(vec3(1.0, 0.74, 0.42), vec3(0.85, 0.92, 1.0), step(0.85, r));

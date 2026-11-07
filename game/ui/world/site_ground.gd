@@ -78,6 +78,51 @@ func local_height_m(_p: Vector2) -> float:
 	return 0.0
 
 
+## 지형 조각(GPU 메시)이 그리는 땅 높이 그대로 (m, 기지 평지 기준). 조각은 극좌표 격자의 꼭짓점 높이(셰이더가 읽는 값 —
+## _gpu_h)를 삼각형으로 잇는다 — 칸(고리 k-1 → k, 둘레 i → i+1)마다 (k-1, i)–(k, i+1) 대각선. 칸 안에서는 local_height_m
+## (고리·각의 쌍선형)과 다르다 (거친 땅에서 수십 cm) — 땅 위에 딱 붙어 묻히지 말아야 하는 것(길 윗면)이 쓴다
+func surface_height_m(p: Vector2) -> float:
+	if _hgrid.is_empty() or _segs <= 0 or _rings < 2:
+		return local_height_m(p)
+	var rk := clampf(_ring_of(p.length()), 0.0, _rings - 1.001)
+	var k0 := int(floor(rk))
+	var a := fposmod(atan2(p.y, p.x), TAU) / TAU * _segs
+	var i := int(floor(a)) % _segs
+	var j := (i + 1) % _segs
+	if k0 == 0:
+		# 가운데 부채꼴: 가운데 꼭짓점(높이 지도의 0번) — 고리 1의 j — 고리 1의 i
+		return _tri_h(p, Vector2.ZERO, _gpu_h(0), _vert_pos(1, j), _gpu_h(_segs + j), _vert_pos(1, i), _gpu_h(_segs + i))
+	var k1 := k0 + 1
+	var p00 := _vert_pos(k0, i)
+	var p01 := _vert_pos(k0, j)
+	var p11 := _vert_pos(k1, j)
+	var p10 := _vert_pos(k1, i)
+	var h00 := _gpu_h(k0 * _segs + i)
+	var h11 := _gpu_h(k1 * _segs + j)
+	var dg := p11 - p00
+	if signf(dg.cross(p - p00)) == signf(dg.cross(p01 - p00)):
+		return _tri_h(p, p00, h00, p01, _gpu_h(k0 * _segs + j), p11, h11)
+	return _tri_h(p, p00, h00, p11, h11, p10, _gpu_h(k1 * _segs + i))
+
+
+## 셰이더가 읽는 꼭짓점 높이 (하위 클래스: 높이 지도에 적는 값 — 달은 16비트로 맞춘 값, 다른 천체는 물에 잠긴 꼭짓점이 물낯)
+func _gpu_h(idx: int) -> float:
+	return _hgrid[idx]
+
+
+## 삼각형 abc 위의 p 높이 (무게중심 좌표 — 밖이면 늘여 잇는다)
+static func _tri_h(p: Vector2, a: Vector2, ha: float, b: Vector2, hb: float, c: Vector2, hc: float) -> float:
+	var v0 := b - a
+	var v1 := c - a
+	var den := v0.x * v1.y - v1.x * v0.y
+	if absf(den) < 1e-9:
+		return (ha + hb + hc) / 3.0
+	var v2 := p - a
+	var u := (v2.x * v1.y - v1.x * v2.y) / den
+	var w := (v0.x * v2.y - v2.x * v0.y) / den
+	return ha + u * (hb - ha) + w * (hc - ha)
+
+
 ## 천체의 곡률로 땅이 기지 평면 아래로 떨어지는 몫 (m) — 3D 도시가 건물·길을 놓을 때 뺀다 (궤도 도시는 위로 휘어 음수)
 func drop_m(p: Vector2) -> float:
 	return p.length_squared() / (2.0 * radius_m())

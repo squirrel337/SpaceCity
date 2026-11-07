@@ -47,19 +47,29 @@ static func step_day(c: Dictionary, index: int) -> void:
 		return
 	var id := String(c.get("mode", ""))
 	var m := LayoutData.dev_mode(id)
+	var prof := Colonies.profiling
+	var t := Time.get_ticks_usec() if prof else 0
 	if research:
 		_research(c, sim, m)
 	if build:
 		_build(c, sim, m, id)
+	if prof:
+		t = Colonies._p("dev.build", t)
 	if not land:
 		return
 	var day := sim.current_day()
 	if posmod(day + index, LAND_EVERY) == 0:
 		land_step(c, day)
+		if prof:
+			t = Colonies._p("dev.land", t)
 	var every := int(LayoutData.redevelop().get("every_days", 0))
 	if every > 0 and posmod(day + index, every) == 1:
 		redevelop(c)
+		if prof:
+			t = Colonies._p("dev.redevelop", t)
 	RoadWorks.step(c, day, index)
+	if prof:
+		Colonies._p("dev.roadworks", t)
 
 
 ## 연구: 맡긴 직접 운영 도시는 연구 차례를 추천 순서로 채워 두고, 발전 모드의 기술을 둘째 자리로 당긴다

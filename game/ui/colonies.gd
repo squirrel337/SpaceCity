@@ -163,27 +163,37 @@ func date_text(game_hour: float) -> String:
 
 # ── 시간 ────────────────────────────────────────────────────────
 ## 한 시간: 모든 도시가 함께 흐른다. 도착한 원정대는 새 도시가 된다 — 그 번호들을 돌려준다.
-## 교통은 도시가 흐른 뒤에 떠나고 닿는다
+## 교통은 도시가 흐른 뒤에 떠나고 닿는다. profiling이면 갈래마다 걸린 시간을 prof에 모은다 (성능 측정 — 기본은 끈다)
+static var profiling := false
+static var prof := {}                # 갈래 → [합 μs, 번, 가장 긴 μs]
+
+
+static func _p(key: String, t0: int) -> int:
+	var now := Time.get_ticks_usec()
+	var e: Array = prof.get(key, [0, 0, 0])
+	e[0] += now - t0
+	e[1] += 1
+	e[2] = maxi(int(e[2]), now - t0)
+	prof[key] = e
+	return now
+
+
 func step() -> Array:
 	hour += 1
 	for i in list.size():
 		var s: CitySim = list[i]["sim"]
 		var seq0 := s.seq
+		var t := Time.get_ticks_usec() if profiling else 0
 		(list[i]["plan"] as CityPlan).auto_land = CityAuto.on(list[i], "land")
 		s.advance_hour()
 		CityAuto.record_builds(list[i], seq0)            # 추천 운영(자동 운영·살림 건설 위임)이 넣은 건물 — 운영 기록
+		if profiling:
+			t = _p("hour:" + String(list[i]["site"]), t)
 		if s.hour % 24 == 0:
-			CityDev.step_day(list[i], i)          # 그 도시의 하루가 끝났다 — 발전 모드 (도시마다 다른 시간에)
-			CityServices.step(list[i], s.current_day(), i)   # 시설 영향 범위·통근·물류 (모든 도시)
-			CityProgress.step(list[i], s.current_day())      # 이정표·시대·메가프로젝트 (모든 도시)
-			CityResearch.step(list[i])                       # 연구 갈림길·돌파 카드 (모든 도시)
-			CityHazards.step(list[i], s.current_day())       # 위치가 있는 재난 (모든 도시)
-			CityExplore.step(list[i], s.current_day())       # 둘레 탐사 (모든 도시)
-			CityTrade.step(list[i], s.current_day(), self)   # 수출 계약 (모든 도시)
-			CityPeople.step(list[i], s.current_day(), self)  # 이름 있는 정착민·이야기 (모든 도시)
-			CityGens.step(list[i], s.current_day())          # 세대 — 태어나고 자라 2세대 어른이 된다 (모든 도시)
-			CityPolitics.step(list[i], s.current_day())      # 모임의 지지·평의회 정책·회기 (모든 도시)
-			_record_hist(list[i])                            # 통계: 날마다 지원 점수
+			if not profiling:
+				_day_end(list[i], i, s)
+			else:
+				_day_end_prof(list[i], i, s, String(list[i]["site"]))
 	var arrived := []
 	for e in expeditions.duplicate():
 		if hour >= int(e["arrive"]):
@@ -191,8 +201,13 @@ func step() -> Array:
 			arrived.append(_found(e))
 	if not arrived.is_empty():
 		transport.rebuild(self)
+	var tt := Time.get_ticks_usec() if profiling else 0
 	transport.step(self)
+	if profiling:
+		tt = _p("transport", tt)
 	metro_fn.step_hour(self)
+	if profiling:
+		tt = _p("metro_hour", tt)
 	if hour % 24 == 0:
 		CityRoutes.step(self)                      # 정기 교역 — 날이 된 것을 그 노선의 특별편으로
 		Fleet.step_day(self)                       # 함대 — 다 지은 배, 자동 운영
@@ -202,10 +217,57 @@ func step() -> Array:
 		Difficulty.step_day(self)                  # 샌드박스 — 자원 채우기 · 정착민이 다 사라지면 새로
 		share_techs()
 		metro_fn.step_day(self)
+		if profiling:
+			tt = _p("global_day", tt)
 		var r := Scenario.step(self)               # 시나리오 목표 (이기거나 지면 main이 결과 창을 띄운다)
 		if r != "":
 			scenario_news = r
 	return arrived
+
+
+## 그 도시의 하루가 끝났다 (도시마다 다른 시간에 — 시뮬레이션 밖의 규칙들)
+func _day_end(c: Dictionary, i: int, s: CitySim) -> void:
+	var d := s.current_day()
+	CityDev.step_day(c, i)          # 발전 모드
+	CityServices.step(c, d, i)      # 시설 영향 범위·통근·물류 (모든 도시)
+	CityProgress.step(c, d)         # 이정표·시대·메가프로젝트 (모든 도시)
+	CityResearch.step(c)            # 연구 갈림길·돌파 카드 (모든 도시)
+	CityHazards.step(c, d)          # 위치가 있는 재난 (모든 도시)
+	CityExplore.step(c, d)          # 둘레 탐사 (모든 도시)
+	CityTrade.step(c, d, self)      # 수출 계약 (모든 도시)
+	CityPeople.step(c, d, self)     # 이름 있는 정착민·이야기 (모든 도시)
+	CityGens.step(c, d)             # 세대 — 태어나고 자라 2세대 어른이 된다 (모든 도시)
+	CityPolitics.step(c, d)         # 모임의 지지·평의회 정책·회기 (모든 도시)
+	_record_hist(c)                 # 통계: 날마다 지원 점수
+
+
+## _day_end과 같은 차례를 갈래마다 재며 (profiling)
+func _day_end_prof(c: Dictionary, i: int, s: CitySim, site: String) -> void:
+	var d := s.current_day()
+	var t := Time.get_ticks_usec()
+	var t_all := t
+	CityDev.step_day(c, i)
+	t = _p("dev", t)
+	CityServices.step(c, d, i)
+	t = _p("services", t)
+	CityProgress.step(c, d)
+	t = _p("progress", t)
+	CityResearch.step(c)
+	t = _p("research", t)
+	CityHazards.step(c, d)
+	t = _p("hazards", t)
+	CityExplore.step(c, d)
+	t = _p("explore", t)
+	CityTrade.step(c, d, self)
+	t = _p("trade", t)
+	CityPeople.step(c, d, self)
+	t = _p("people", t)
+	CityGens.step(c, d)
+	t = _p("gens", t)
+	CityPolitics.step(c, d)
+	t = _p("politics", t)
+	_record_hist(c)
+	_p("day_end:" + site, t_all)
 
 
 ## 통계 (StatsView): 시뮬레이션의 날마다 기록에 없는 값을 도시마다 날마다 — 지원 점수 (게임의 날과 함께)

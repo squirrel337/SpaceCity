@@ -14,6 +14,9 @@ const GLOW := 2
 const LAMP_COLOR := Color(1.0, 0.95, 0.82)
 
 static var path := PATH              # 모형 파일 (미리보기 도구가 바꿀 수 있다)
+## 둥근 도형(원기둥·원뿔·타원체)의 둘레 조각 수 배율 — 그래픽 품질의 model_seg (낮음 0.5 · 중간 0.7 · 높음 1). 공원의 나무가 많은
+## 녹지 공원은 한 채에 1만 삼각형 가까이 되었다. 메시를 만들기 시작할 때(본 스레드) 읽어 둔다 — 바꾸면 새로 만드는 모형부터
+static var seg_k := 1.0
 static var _data: Dictionary = {}
 static var _data_task := -1
 static var _parsed: Variant = null
@@ -72,6 +75,7 @@ static func mesh(group: String, id: String, v: int = 0) -> ArrayMesh:
 	var key := "%s/%s/%d" % [group, id, v]
 	if _cache.has(key):
 		return _cache[key]
+	seg_k = float(Settings.q("model_seg"))
 	if _jobs.has(key):
 		WorkerThreadPool.wait_for_task_completion(_jobs[key])
 		_jobs.erase(key)
@@ -116,6 +120,7 @@ static func ready(group: String, id: String, v: int = 0) -> bool:
 	if _cache.has(key):
 		return true
 	if not _jobs.has(key):
+		seg_k = float(Settings.q("model_seg"))
 		_jobs[key] = WorkerThreadPool.add_task(_make.bind(key, _prims(group, id, v), materials()), false, "model " + key)
 	return false
 
@@ -382,7 +387,8 @@ class _Builder:
 		return [u, a.cross(u)]
 
 	static func _seg(r: float) -> int:
-		return clampi(int(r * 9.0) + 12, 12, 40)
+		var k := ModelLib.seg_k
+		return clampi(int((r * 9.0 + 12.0) * k), maxi(6, int(12.0 * k)), 40)
 
 	## 옆면 띠: 축 위치 s0~s1, 반지름 ra~rb (원뿔대 한 토막)
 	func _ring_side(si: int, p0: Vector3, axis: Vector3, u: Vector3, w: Vector3, s0: float, s1: float, ra: float,
@@ -460,7 +466,8 @@ class _Builder:
 		var lo := -PI * 0.5
 		if p[7] != null:
 			lo = asin(clampf((float(p[7]) - c.z) / maxf(rz, 1e-4), -1.0, 1.0))
-		var n_lon := clampi(int(maxf(rx, ry) * 7.0) + 14, 14, 40)
+		var sk := ModelLib.seg_k
+		var n_lon := clampi(int((maxf(rx, ry) * 7.0 + 14.0) * sk), maxi(6, int(14.0 * sk)), 40)
 		var n_lat := maxi(4, int(n_lon * (PI * 0.5 - lo) / TAU) + 2)
 		var base: int = (s[si] as _Surf).v.size()
 		for j in n_lat + 1:

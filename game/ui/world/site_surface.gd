@@ -632,6 +632,14 @@ static func _decode_grid(data: PackedByteArray, n: int) -> Array:
 	return [grid, data, fix]
 
 
+## 셰이더가 읽는 꼭짓점 높이: 24비트 (1/256 m), 물에 잠긴 꼭짓점은 물낯 (해수면) — _encode_heights와 같은 셈
+func _gpu_h(idx: int) -> float:
+	var h := _hgrid[idx]
+	if flooded.has(idx):
+		h = maxf(h, sea_z)
+	return clampi(int(round((h + 32768.0) * 256.0)), 0, 16777215) / 256.0 - 32768.0
+
+
 ## 고친 꼭짓점의 높이(RGB 24비트)와 물 몫(A)을 높이 지도에 다시 쓴다 (법선은 셰이더가 이웃 꼭짓점으로 셈한다).
 ## 물에 잠긴 땅은 물낯을 해수면에 그린다 (땅은 그 아래). 바다를 해수면 위로 메우면 뭍이 된다 (간척)
 func _encode_heights(changed: PackedInt32Array) -> void:

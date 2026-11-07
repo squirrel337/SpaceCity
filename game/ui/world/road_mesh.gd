@@ -5,9 +5,13 @@ extends RefCounted
 ## 가압 통로는 띠 위에 반원 껍질을 씌우고 만나는 곳에 둥근 연결 모듈을 둔다.
 ## 높은 길(고가·다리 — CityPlan.levels의 사슬)은 덱으로: 윗면, 판 두께의 옆면·밑면, 난간. 고가는 땅을 따라, 다리는 사슬 두 끝을
 ## 잇는 곧은 선 위로 뜨고 끝에서 비탈로 내려앉는다. 받침(교각·주탑·케이블·아치·트러스 …)은 RoadStructs가 단위 상자로 짓는다.
-## 높이는 h(p: Vector2, above: float) -> Vector3 (City3D._local — 땅 높이·곡률)로 얻는다.
+## 높이는 h(p: Vector2, above: float) -> Vector3 (City3D._road_local — 땅 조각이 그리는 높이·곡률)로 얻는다.
+## 윗면은 양쪽 가장자리만 잇는다 — 그 사이(넓은 길의 가운데)에서 땅이 그 선보다 높으면 두 가장자리를 그만큼 올리고, 교차로 판은
+## 가운데 꼭짓점을 올려 땅이 윗면을 뚫지 않게 한다 (ACROSS_M마다 땅을 재 본다 — 꼭짓점은 늘지 않는다)
 
 const STEP_M := 2.0
+const ACROSS_M := 2.5                    # 윗면 아래 땅을 재 보는 가로 간격 (m)
+const PROBE_MAX := 7                     # 한 걸음에 재 보는 점의 수 (가장자리 사이)
 const THICK := 0.18                      # 길의 두께 (땅 위로)
 const SKIRT := 0.7                       # 옆면이 땅 속으로 내려가는 깊이
 ## 덱 무늬 번호 (셰이더): UV2.x = 무늬 + PART × 부분 (0 길 띠, 1 교차로 판, 2 옆면, 3 통로 껍질, 4 덱 판(콘크리트), 5 난간)
@@ -75,6 +79,7 @@ func ribbon(a: Vector2, b: Vector2, hw: float, type: String, uv_y0 := 0.0, total
 	var dir := d / length
 	var side := Vector2(-dir.y, dir.x)
 	var steps := maxi(1, int(ceil(length / STEP_M)))
+	var probes := clampi(int(ceil(hw * 2.0 / ACROSS_M)) - 1, 1, PROBE_MAX)
 	var tot := length if total < 0.0 else total
 	var code := code_of(type, 0)
 	var base := v.size()
@@ -86,6 +91,14 @@ func ribbon(a: Vector2, b: Vector2, hw: float, type: String, uv_y0 := 0.0, total
 		var yy := uv_y0 + t * length
 		var gl: Vector3 = h.call(c - side * hw, 0.0)
 		var gr: Vector3 = h.call(c + side * hw, 0.0)
+		# 가장자리 사이의 땅이 두 가장자리를 이은 선보다 높으면 그만큼 올린다
+		var lift := 0.0
+		for q in range(1, probes + 1):
+			var u := float(q) / (probes + 1)
+			var gq: Vector3 = h.call(c + side * hw * (u * 2.0 - 1.0), 0.0)
+			lift = maxf(lift, gq.y - lerpf(gl.y, gr.y, u))
+		gl.y += lift
+		gr.y += lift
 		left.append(gl)
 		right.append(gr)
 		_vert_g(gl, THICK, Vector2(0.0, yy), code, tot)
@@ -139,16 +152,31 @@ func shell(a: Vector2, b: Vector2, r: float, uv_y0 := 0.0) -> void:
 ## 교차로 판: 꼭짓점 둘레의 다각형 (pts — 반시계)을 꼭짓점 가운데에서 부채꼴로
 func junction(center: Vector2, pts: PackedVector2Array, type: String) -> void:
 	var code := code_of(type, 1)
-	var c := _vert(center, THICK + 0.005, Vector2(0.5, 0.0), code, 0.0)
-	var first := v.size()
+	var cnt := pts.size()
+	var gc: Vector3 = h.call(center, 0.0)
 	var gs := PackedVector3Array()
 	for p in pts:
-		var g: Vector3 = h.call(p, 0.0)
-		gs.append(g)
+		gs.append(h.call(p, 0.0))
+	# 부채꼴 안(가운데와 둘레 두 점 사이)의 땅이 판보다 높으면 가운데 꼭짓점을 올린다 — 그 점에서 가운데의 몫(무게)만큼 판이 오른다
+	var lift := 0.0
+	for i in cnt:
+		var j := (i + 1) % cnt
+		var reach := maxf(center.distance_to(pts[i]), center.distance_to(pts[j]))
+		var n := clampi(int(ceil(reach / ACROSS_M)), 1, 4)
+		for s in range(1, n + 1):
+			var wc := 1.0 - float(s) / (n + 1)          # 가운데의 무게 (둘레로 갈수록 작다)
+			var q := center.lerp((pts[i] + pts[j]) * 0.5, 1.0 - wc)
+			var plane := gc.y * wc + (gs[i].y + gs[j].y) * 0.5 * (1.0 - wc)
+			var gq: Vector3 = h.call(q, 0.0)
+			lift = maxf(lift, (gq.y - plane) / wc)
+	gc.y += minf(lift, 1.5)
+	var c := _vert_g(gc, THICK + 0.005, Vector2(0.5, 0.0), code, 0.0)
+	var first := v.size()
+	for g in gs:
 		_vert_g(g, THICK + 0.005, Vector2(0.5, 0.0), code, 0.0)
-	for i in pts.size():
+	for i in cnt:
 		var a := first + i
-		var b := first + (i + 1) % pts.size()
+		var b := first + (i + 1) % cnt
 		idx.append_array(PackedInt32Array([c, b, a]))
 	# 옆면
 	for i in pts.size():

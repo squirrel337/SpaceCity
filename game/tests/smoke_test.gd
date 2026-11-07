@@ -8,6 +8,7 @@ var main: Control
 var frames := 0
 var failures: Array[String] = []
 var report_seen := false
+var render_wait := -1                 # 3단계: 고향 3D 화면이 길 그물·탈것을 다 띄울 때까지 센 프레임 (-1이면 아직)
 
 
 func _initialize() -> void:
@@ -18,6 +19,21 @@ func _initialize() -> void:
 
 func _process(_delta: float) -> bool:
 	frames += 1
+	if render_wait >= 0:
+		# 3단계: 고향 화면으로 날아가 땅 높이를 굽고 길 그물을 다 짓고 탈것이 뜨면 길 그리기·큰 도시 최적화를 본다
+		render_wait += 1
+		if main.modal.visible:
+			main.modal.visible = false
+		var c3: City3D = main.world.city
+		var ready: bool = c3 != null and c3._road_job == null and c3._roads != null and c3._roads.mesh != null \
+			and not c3.traffic.agents.is_empty() and c3.ground._rings >= 12 and not main.world.cam.flying() \
+			and (c3.ground.baked_heights() or not c3.ground.will_bake())
+		if (ready and render_wait > 30) or render_wait > 1200:
+			_check(ready, "고향 3D 화면이 1200프레임 안에 길 그물·탈것을 띄우지 않았다")
+			if ready:
+				_render_opt_check()
+			_finish()
+		return false
 	if frames == 2:
 		main._on_modal_choice("start", "auto")
 		_check(main.sim != null, "새 게임이 만들어지지 않았다")
@@ -93,14 +109,19 @@ func _process(_delta: float) -> bool:
 			_colony_check()
 			_layout_check()                   # 3년 뒤 (시대·메가프로젝트·도시 여덟) 화면 폭도
 			_access_check()                   # 접근성 — 큰 글자·UI 배율에서도 (3년 뒤 화면으로)
-			if failures.is_empty():
-				print("smoke: OK")
-				quit(0)
-			else:
-				for f in failures:
-					printerr("smoke: FAIL — " + f)
-				quit(1)
+			main._on_colony_view(0)           # 3단계: 길 그리기·큰 도시 최적화 (3년 뒤 고향 — 화면이 다 뜬 뒤)
+			render_wait = 0
 	return false
+
+
+func _finish() -> void:
+	if failures.is_empty():
+		print("smoke: OK")
+		quit(0)
+	else:
+		for f in failures:
+			printerr("smoke: FAIL — " + f)
+		quit(1)
 
 
 func _save_roundtrip() -> void:
@@ -2801,6 +2822,97 @@ func _access_check() -> void:
 	_check(is_equal_approx(Access.font_k, 1.0) and String(Settings.value("ui/font", "")) == "normal", "글자 크기가 보통으로 돌아오지 않았다")
 	print("smoke: access — 상태 넷 최소 ΔE %s (기본 녹색약 %.1f), 크게: %s, UI 배율 PC %.2f · 휴대폰 %.2f, 지표 %s" % [", ".join(worst),
 		base_deutan, ", ".join(lay), k_pc, k_phone, red_txt])
+
+
+## 길 그리기와 큰 도시 최적화: 길·고층 건물 셰이더가 무늬 번호를 flat으로 받아 반올림한다 (보간 오차로 흙길이 섞이던 줄무늬),
+## 지형 조각(GPU)의 높이(surface_height_m)가 격자 꼭짓점·삼각형과 맞는다, 고향의 길 윗면을 땅이 뚫지 않는다, 먼 천체는 숨기거나
+## 작은 구로, 탈것은 모형마다 멀티메시 하나 (칸 수 = 탈것 수), 품질 낮음의 모형은 둥근 도형을 덜 쪼갠다, 구획 이름표는 캐시
+func _render_opt_check() -> void:
+	var road_code: String = (load("res://ui/world/shaders/road.gdshader") as Shader).code
+	var tower_code: String = (load("res://ui/world/shaders/tower.gdshader") as Shader).code
+	_check(road_code.contains("varying flat float v_type") and road_code.contains("int(v_type + 0.5)")
+		and tower_code.contains("varying flat vec4 v_dim"), "길·건물 셰이더가 무늬 번호를 보간한다 (GPU에 따라 줄무늬)")
+	var wv: WorldView = main.world
+	# 먼 천체의 단계: 보는 천체는 원래 구, 먼 행성 다섯 넘게 숨기거나 작은 구
+	var far := 0
+	for id in wv._bodies:
+		var e: Dictionary = wv._bodies[id]
+		if e.has("lod") and int(e["lod"]) <= 0:
+			far += 1
+	var focus_lod := int((wv._bodies.get(wv.cam.focus, {}) as Dictionary).get("lod", 2))
+	_check(far >= 5 and focus_lod == 2, "먼 천체를 원래 구로 그린다 (작게 %d · 보는 천체 %d)" % [far, focus_lod])
+	var c3: City3D = wv.city
+	var g: SiteGround = c3.ground
+	# 지형 조각의 높이 (굽지 않은 격자 — 헤드리스는 높이를 굽지 않는다): 꼭짓점에서는 격자 값, 삼각형 가운데에서는 세 꼭짓점의
+	# 평균 — 칸마다 (k, i)–(k+1, i+1) 대각선으로 나눈 두 삼각형과 가운데 부채꼴 (GPU 메시와 같은 삼각형)
+	var sg := SiteGround.new()
+	sg._segs = 48
+	sg._grow = 1.0 + TAU / 48.0
+	var nk := 0
+	while sg.ring_m(nk) < 2000.0:
+		nk += 1
+	sg._rings = nk + 1
+	sg._hgrid = PackedFloat32Array()
+	sg._hgrid.resize(sg._rings * sg._segs)
+	for n in sg._hgrid.size():
+		sg._hgrid[n] = fmod(float(n) * 7.31, 5.0) - 2.5
+	var tri_err := 0.0
+	for tri in [[[10, 7], [10, 8], [11, 8]], [[10, 7], [11, 8], [11, 7]], [[0, 0], [1, 6], [1, 5]]]:
+		var at := Vector2.ZERO
+		var want := 0.0
+		for vk in tri:
+			at += sg._vert_pos(vk[0], vk[1]) / 3.0
+			want += sg._hgrid[int(vk[0]) * sg._segs + int(vk[1])] / 3.0
+		tri_err = maxf(tri_err, absf(sg.surface_height_m(at) - want))
+	var vert_err := absf(sg.surface_height_m(sg._vert_pos(10, 7)) - sg._hgrid[10 * sg._segs + 7])
+	sg.free()
+	_check(vert_err < 1e-3 and tri_err < 1e-3, "지형 조각의 높이가 GPU 메시의 삼각형과 다르다 (꼭짓점 %.4f · 가운데 %.4f m)" % [vert_err, tri_err])
+	# 고향 길 윗면의 삼각형 안 점마다 땅(지형 조각)이 3 cm 안까지 오지 않는다
+	var poke := 0
+	var pts := 0
+	if c3._roads != null and c3._roads.mesh != null:
+		var arr := c3._roads.mesh.surface_get_arrays(0)
+		var V: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var U2: PackedVector2Array = arr[Mesh.ARRAY_TEX_UV2]
+		var I: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
+		for t in range(0, I.size(), 3):
+			if int(floor((U2[I[t]].x + 0.5) / 100.0)) > 1 or absf(V[I[t]].y) > 50.0:
+				continue
+			for wts in [[1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0], [0.6, 0.2, 0.2], [0.2, 0.6, 0.2], [0.2, 0.2, 0.6]]:
+				var P: Vector3 = V[I[t]] * wts[0] + V[I[t + 1]] * wts[1] + V[I[t + 2]] * wts[2]
+				var q := Vector2(P.x, -P.z)
+				pts += 1
+				if g.surface_height_m(q) - g.drop_m(q) > P.y - 0.03:
+					poke += 1
+	_check(pts > 1000 and poke == 0, "고향 길 윗면을 땅이 뚫는다 (%d / %d점)" % [poke, pts])
+	# 탈것: 모형마다 멀티메시 하나, 칸 수 = 탈것 수
+	var inst := 0
+	for mid in c3._agent_mm:
+		inst += (c3._agent_mm[mid] as MultiMeshInstance3D).multimesh.instance_count
+	_check(inst == c3.traffic.agents.size() and c3._agent_nodes.size() == c3.traffic.agents.size(),
+		"탈것 멀티메시의 칸이 탈것 수와 다르다 (%d / %d)" % [inst, c3.traffic.agents.size()])
+	# 품질 낮음의 모형: 둥근 도형을 덜 쪼갠다 (녹지 공원 — 나무가 많다)
+	var tris := func(k: float) -> int:
+		ModelLib.seg_k = k
+		var b := ModelLib._Builder.new()
+		for pr in ModelLib._prims("buildings", "green_commons", 3):
+			b.prim(pr)
+		var m: ArrayMesh = b.commit(ModelLib.materials())
+		var n := 0
+		for si in m.get_surface_count():
+			n += (m.surface_get_arrays(si)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
+		return n
+	var t_hi: int = tris.call(1.0)
+	var t_lo: int = tris.call(0.5)
+	ModelLib.seg_k = float(Settings.q("model_seg"))
+	_check(t_lo < t_hi * 0.75 and float(Settings.PRESETS["low"]["model_seg"]) < float(Settings.PRESETS["high"]["model_seg"]),
+		"품질 낮음의 모형이 가벼워지지 않았다 (%d → %d)" % [t_hi, t_lo])
+	# 구획 이름표: 바뀐 것이 없으면 같은 목록
+	var l1: Array = c3._district_label_list(ThemeFactory.regular, ThemeFactory.bold)
+	var l2: Array = c3._district_label_list(ThemeFactory.regular, ThemeFactory.bold)
+	_check(is_same(l1, l2), "구획 이름표를 프레임마다 다시 셈한다")
+	print("smoke: render — 길 윗면 %d점 뚫림 %d, 먼 천체 %d개 작게, 탈것 %d대 (멀티메시 %d), 녹지 공원 삼각형 %d → %d (낮음)" % [pts, poke,
+		far, c3.traffic.agents.size(), c3._agent_mm.size(), t_hi, t_lo])
 
 
 ## 색각 시뮬레이션 (Machado, Oliveira & Fernandes 2009 · 심도 1, 선형 RGB) 뒤 OKLab 거리 ×100

@@ -4,6 +4,8 @@
 // UV.x = 가로(0~1), UV.y = 길이(m). UV2.x = 무늬 + 100 × 부분 (0 길 띠, 1 교차로 판, 2 옆면, 3 통로 껍질, 4 덱 판, 5 난간),
 // UV2.y = 그 띠의 길이 (끝에서 3 m 안은 건널목). 밤에는 가로등.
 // 꼭짓점을 카메라 쪽으로 조금 당겨(화면 위치는 그대로) 깊이에서 땅보다 앞서게 한다 — 길이 지형에 묻히지 않게.
+// 무늬 번호·길이는 flat으로 넘기고 반올림한다: 세 꼭짓점이 모두 1이어도 GPU에 따라 보간값이 0.9999…가 되어 int()가 0(흙길)으로
+// 자르면 아스팔트에 흙길·바퀴 자국이 화소마다 섞여 줄무늬로 보였다 (llvmpipe는 보간이 정확해 드러나지 않는다)
 shader_type spatial;
 render_mode cull_disabled, skip_vertex_transform;
 #include "res://ui/world/shaders/noise.gdshaderinc"
@@ -11,9 +13,9 @@ render_mode cull_disabled, skip_vertex_transform;
 uniform float night = 0.0;
 uniform float pull = 0.0012;           // 카메라 쪽으로 당기는 몫 (거리의 비율)
 
-varying float v_type;
-varying float v_part;
-varying float v_len;
+varying flat float v_type;
+varying flat float v_part;
+varying flat float v_len;
 
 void vertex() {
 	float code = UV2.x + 0.5;
@@ -38,7 +40,7 @@ void fragment() {
 	vec3 col;
 	float lamp = 0.0;
 	float glow = 0.0;
-	int t = int(v_type);
+	int t = int(v_type + 0.5);
 	if (v_part > 3.5 && v_part < 4.5) {
 		// 높은 길의 덱 판 (옆면·밑면): 콘크리트, 4 m마다 이음
 		col = vec3(0.6, 0.6, 0.58) * (0.82 + 0.18 * n) * (1.0 - 0.18 * line(fract(y / 4.0), 0.5, 0.03));

@@ -12,13 +12,13 @@ const LEVEL_NAMES := {"auto": "자동", "low": "낮음", "medium": "보통", "hi
 ## 건물 수), metro_keep(동시에 지어 두는 대도시), patch_segs(지형 조각 둘레 칸), bake(천체 겉모습 굽기), stars, aniso
 const PRESETS := {
 	"low": {"render_px": 0.9e6, "msaa": 0, "shadow_splits": 0, "shadow_size": 2048, "metro_budget": 6000, "metro_keep": 1,
-		"patch_segs": 128, "bake": 512, "stars": 3000, "aniso": 2},
+		"patch_segs": 128, "bake": 512, "stars": 3000, "aniso": 2, "model_seg": 0.5},
 	"medium": {"render_px": 1.4e6, "msaa": 0, "shadow_splits": 2, "shadow_size": 2048, "metro_budget": 12000,
-		"metro_keep": 1, "patch_segs": 160, "bake": 512, "stars": 4200, "aniso": 4},
+		"metro_keep": 1, "patch_segs": 160, "bake": 512, "stars": 4200, "aniso": 4, "model_seg": 0.7},
 	"high": {"render_px": 2.4e6, "msaa": 2, "shadow_splits": 4, "shadow_size": 4096, "metro_budget": 26000,
-		"metro_keep": 2, "patch_segs": 192, "bake": 1024, "stars": 5200, "aniso": 8},
+		"metro_keep": 2, "patch_segs": 192, "bake": 1024, "stars": 5200, "aniso": 8, "model_seg": 1.0},
 	"ultra": {"render_px": 4.2e6, "msaa": 4, "shadow_splits": 4, "shadow_size": 4096, "metro_budget": 52000,
-		"metro_keep": 3, "patch_segs": 256, "bake": 2048, "stars": 7000, "aniso": 16},
+		"metro_keep": 3, "patch_segs": 256, "bake": 2048, "stars": 7000, "aniso": 16, "model_seg": 1.0},
 }
 
 static var _cfg: ConfigFile

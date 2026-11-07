@@ -1,6 +1,6 @@
 extends SceneTree
 ## 성능 측정 — 장면마다 프레임의 CPU 시간(배치·도시·화면 위 그리기·노선)과 그리기 호출·물체·삼각형 수를 잰다.
-## 기본 도시로 시작해 며칠 흐른 뒤 (수송선이 날아가는 중이게) 기지, 지구, 지구-달, 태양계, 서울, 화성 도시를 차례로 본다.
+## 기본 도시로 시작해 며칠 흐른 뒤 (수송선이 날아가는 중이게) 기지, 나로(지구의 큰 도시), 지구, 지구-달, 태양계, 서울, 화성 도시를 차례로 본다.
 ## 화면이 필요하다:
 ##   xvfb-run -a -s "-screen 0 1600x900x24" godot --path game --rendering-driver opengl3 \
 ##     --script res://tests/perf_probe.gd -- [--days 400] [--frames 90] [--only seoul,mars]
@@ -70,6 +70,8 @@ func _process(_delta: float) -> bool:
 		_steps = [
 			["moon_base", func(): main._on_colony_view(main.colonies.index_of_site("moon_shackleton")), func(): return _settled(w)],
 			["moon_base_low", func(): w.cam.dist = 0.25; w.cam.tilt = deg_to_rad(70.0)],
+			["naro", func(): main._on_colony_view(main.colonies.index_of_site("earth_naro")), func(): return _settled(w)],
+			["naro_low", func(): w.cam.dist = 0.25; w.cam.tilt = deg_to_rad(70.0)],
 			["earth_globe", func(): w.cam.look_at_surface("earth", korea, 6371.0 * 1.2, 0.0, Vector3(0, 0, 1))],
 			["earth_moon", func(): w.show_earth_moon(), func(): return _settled(w)],
 			["solar", func(): w.cam.look_from_space("sun", 3.4e8, 0.9, 0.75)],

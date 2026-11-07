@@ -431,6 +431,11 @@ func _encode_heights(changed: PackedInt32Array) -> void:
 	_himg.set_data(_himg.get_width(), _himg.get_height(), false, _himg.get_format(), data)
 
 
+## 셰이더가 읽는 꼭짓점 높이: 높이 지도의 16비트 값 ((h + 6000) × 8.192 — 12 cm 단위)
+func _gpu_h(idx: int) -> float:
+	return clampi(int(round((_hgrid[idx] + 6000.0) * 8.192)), 0, 65535) / 8.192 - 6000.0
+
+
 ## 고친 높이 차(지금 높이 − 구운 높이)의 기울기 (모형 좌표 x·y, m/m)
 func _delta_grad(idx: int) -> Vector2:
 	@warning_ignore("integer_division")
