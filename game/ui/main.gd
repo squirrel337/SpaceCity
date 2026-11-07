@@ -659,7 +659,7 @@ func _build_top_bar() -> Control:
 		_start_jump())
 	row.add_child(jump)
 	auto_jump_button = Button.new()
-	auto_jump_button.text = "계속"
+	auto_jump_button.text = "연속"
 	auto_jump_button.toggle_mode = true
 	auto_jump_button.tooltip_text = "다음 사건을 계속 넘긴다 (Shift+F) — 사건마다 알림을 잠깐 보여 주고 다음 사건으로. " + \
 		"결정할 일(대피소 추첨 — 자동 운영이면 추첨으로 정한다)·위급(산소·식량 3일 아래)·사망이면 멈춘다"

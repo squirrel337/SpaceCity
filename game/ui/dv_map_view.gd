@@ -5,7 +5,8 @@ extends Control
 ## 지구–달 L1에서 행성마다의 전이로 선이 갈라진다 (가까운 행성의 선이 전이 줄에 가장 가깝게 — 선이 서로 엇갈리지 않는다).
 ## 선 곁의 숫자는 Δv(km/s — 내릴 때와 오를 때가 다르면 ↓·↑ 둘), 점선은 대기 제동·포획. 발사 창이 열린 항로는 청록, 고른 항로는 주황.
 ## 가는 중인 수송선은 길 위의 마름모, 부두에 머무는 배는 저궤도 곁의 작은 마름모. 노드·선을 누르면 오른쪽 카드에 자세히:
-## 항로는 Δv·전이·다음 출항·지난 창·배·등급마다 한 번 건너는 값과 주문, 표면은 그 천체의 도시들(누르면 그 도시로)
+## 항로는 Δv·전이·다음 출항·지난 창·배·등급마다 한 번 건너는 값과 주문, 표면은 그 천체의 도시들(누르면 그 도시로).
+## 연료 기지(L1·화성 저궤도·세레스 저궤도)는 노드 아래에 쌓인 양, 카드에 채우는 도시·하루 몫·닿는 비율과 짓기 단추
 
 signal colony_picked(index: int)
 signal changed
@@ -69,8 +70,11 @@ func refresh(force := false) -> void:
 		return
 	_last_ms = now
 	var st := Fleet.state(mgr)
-	var sig := "%s|%d|%d|%d|%d|%d" % [selected, (st["ships"] as Array).size(), (st["orders"] as Array).size(),
-		mgr.known_techs().size(), mgr.list.size(), mgr.transport.lines.size()]
+	var dsig := ""
+	for n in st["depots"]:
+		dsig += "%s:%s," % [n, String(st["depots"][n].get("state", ""))]
+	var sig := "%s|%d|%d|%d|%d|%d|%s" % [selected, (st["ships"] as Array).size(), (st["orders"] as Array).size(),
+		mgr.known_techs().size(), mgr.list.size(), mgr.transport.lines.size(), dsig]
 	if sig != _sig:
 		_sig = sig
 		_build_card()
@@ -281,7 +285,9 @@ func _draw() -> void:
 		var label := String(n["name"])
 		if kind == "hub":
 			draw_string(font, p2 + Vector2(-40, 26), I18n.t(label), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Palette.TEXT)
-			draw_string(font, p2 + Vector2(-40, 40), I18n.t("연료 기지 — 시대 1"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.DIM)
+			var dl := _depot_label(id)
+			draw_string(font, p2 + Vector2(-40, 40), I18n.t(String(dl[0]) if String(dl[0]) != "" else "연료 기지 — 시대 1"),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, dl[1] if String(dl[0]) != "" else Palette.DIM)
 			continue
 		draw_string(font, p2 + Vector2(12, 4), I18n.t(label), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Palette.TEXT if kind != "transfer" else Palette.MUTED)
 		if kind == "transfer":
@@ -292,9 +298,12 @@ func _draw() -> void:
 				draw_string(font, p2 + Vector2(10, -9), I18n.t(txt), HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
 					Palette.TEAL if bool(w2["open"]) else Palette.DIM)
 		elif kind == "orbit":
-			# 부두에 머무는 배 — 이름 뒤에 작은 마름모
+			# 부두에 머무는 배 — 이름 뒤에 작은 마름모 (그린 글 — 영어면 영어 — 의 폭 뒤에)
 			var here := (st["ships"] as Array).filter(func(sh): return String(sh["at"]) == body)
-			var x0 := p2.x + 12.0 + font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 9.0
+			var x0 := p2.x + 12.0 + font.get_string_size(I18n.t(label), HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 9.0
+			var dl2 := _depot_label(id)
+			if String(dl2[0]) != "":
+				draw_string(font, p2 + Vector2(12, 18), I18n.t(String(dl2[0])), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, dl2[1])
 			for i in mini(here.size(), 4):
 				_diamond(Vector2(x0 + 11.0 * i, p2.y), 4.5, Palette.BLUE if String(here[i]["route"]) != "" else Palette.MUTED)
 			if here.size() > 4:
@@ -315,6 +324,17 @@ func _draw() -> void:
 					HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Palette.TEXT if i == active else Palette.MUTED)
 				y += 14.0
 				shown += 1
+
+
+## 연료 기지 표시: [글, 색] — 없으면 ["", …]
+func _depot_label(n: String) -> Array:
+	var d := Fleet.depot(mgr, n)
+	if Fleet.depot_site(n).is_empty() or d.is_empty():
+		return ["", Palette.DIM]
+	if String(d.get("state", "")) == "building":
+		var left := int(ceil((float(d.get("ready", 0)) - mgr.hour) / 24.0))
+		return ["연료 기지 짓는 중 D-%d" % maxi(left, 0), Palette.AMBER]
+	return ["연료 기지 %s t" % Fmt.n(float(d.get("stock", 0.0))), Palette.TEAL]
 
 
 func _diamond(p: Vector2, r: float, c: Color) -> void:
@@ -471,8 +491,8 @@ func _route_card(r: String) -> void:
 			int(c["isp"]), int(c["dry_t"]), int(c["seats"]), String(c["prop"])], 13)
 		head.add_theme_font_override("font", ThemeFactory.bold)
 		_label("갈 때 추진제 %s t · 지원 %s%s / 올 때 %s t · 지원 %s%s · 전이 %s일" % [Fmt.n(float(a["prop_t"])), Fmt.n(float(a["cost"])),
-			" (현지)" if bool(a["local"]) else "", Fmt.n(float(b["prop_t"])), Fmt.n(float(b["cost"])), " (현지)" if bool(b["local"]) else "",
-			Fmt.n(Fleet.route_days(r, String(c_id)))], 12, Palette.MUTED)
+			_fuel_tag(a), Fmt.n(float(b["prop_t"])), Fmt.n(float(b["cost"])), _fuel_tag(b), Fmt.n(Fleet.route_days(r, String(c_id)))],
+			12, Palette.MUTED)
 		var why := Fleet.order_reason(mgr, String(c_id), r)
 		var btn := Button.new()
 		btn.text = "주문 — %s" % Fleet.cost_text(Fleet.order_cost(mgr, String(c_id), known))
@@ -491,15 +511,64 @@ func _route_card(r: String) -> void:
 		_box.add_child(btn)
 		if why != "" and why.ends_with("있어야 한다"):
 			_label(why, 11, Palette.AMBER)
+	if not Fleet.depot_site(Fleet.dock(r)).is_empty():
+		_depot_section(Fleet.dock(r))
 	_box.add_child(HSeparator.new())
 	var auto := CheckBox.new()
-	auto.text = "함대 자동 운영 — 항로마다 배 둘 (★ 등급으로 주문)"
+	auto.text = "함대 자동 운영 — 항로마다 배 둘 (★ 등급으로 주문), 지을 수 있으면 연료 기지도"
 	auto.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	auto.button_pressed = bool(Fleet.state(mgr).get("auto", true))
 	auto.toggled.connect(func(on: bool):
 		Fleet.state(mgr)["auto"] = on
 		changed.emit())
 	_box.add_child(auto)
+
+
+## 등급 줄의 꼬리: (현지) · (L1 연료 기지에서 다시 채움)
+static func _fuel_tag(tp: Dictionary) -> String:
+	var bits := PackedStringArray()
+	if bool(tp.get("local", false)) and ((tp.get("legs", []) as Array).is_empty() or String(tp["legs"][0][5]) == ""):
+		bits.append("현지")
+	for n in tp.get("depot", {}):
+		bits.append("%s에서 다시 채움" % Fleet.depot_name(String(n)))
+	return (" (" + ", ".join(bits) + ")") if not bits.is_empty() else ""
+
+
+## 연료 기지 칸: 쌓인 양·채우는 도시와 하루 몫·닿는 비율·누계, 없으면 짓기 단추 (값, 못 지으면 까닭)
+func _depot_section(n: String) -> void:
+	_box.add_child(HSeparator.new())
+	_box.add_child(ThemeFactory.heading(Fleet.depot_name(n), 14))
+	_label(String(Fleet.depot_site(n).get("text", "")), 12, Palette.MUTED)
+	var stat := _label("", 13)
+	var info := _label("", 12, Palette.MUTED)
+	var nn := n
+	_live.append(func():
+		stat.text = Fleet.depot_text(mgr, nn)
+		var d := Fleet.depot(mgr, nn)
+		var i := Fleet.depot_city(mgr, nn)
+		var who := String(mgr.list[i].get("short", mgr.list[i]["name"])) if i >= 0 else "—"
+		var dd := Fleet.depot_data()
+		info.text = "채우는 도시 %s — 기지에 딸린 얼음 채굴·전기분해 설비가 하루 %s t을 만들어 올린다. 표면에서 오르는 Δv %s km/s라 만든 것의 %s가 닿는다" % [
+			who, Fmt.n(float(dd.get("rate_t", 12))), Fmt.n(Fleet.depot_lift(nn), 1), Fmt.pct(Fleet.depot_eff(nn))] + \
+			((" · 쌓은 누계 %s t · 배에 넣은 누계 %s t" % [Fmt.n(float(d.get("made", 0.0))), Fmt.n(float(d.get("used", 0.0)))])
+				if not d.is_empty() else ""))
+	if Fleet.depot(mgr, n).is_empty():
+		var why := Fleet.depot_reason(mgr, n)
+		var btn := Button.new()
+		btn.text = "짓기 — %s" % Fleet.depot_cost_text()
+		btn.custom_minimum_size = Vector2(0, 40 if ThemeFactory.touch() else 32)
+		btn.add_theme_font_size_override("font_size", 12)
+		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		btn.disabled = why != ""
+		btn.tooltip_text = why if why != "" else String(Fleet.depot_site(n).get("text", ""))
+		btn.pressed.connect(func():
+			if Fleet.depot_build(mgr, nn) == "":
+				changed.emit()
+			_sig = ""
+			refresh(true))
+		_box.add_child(btn)
+		if why != "":
+			_label(why, 11, Palette.AMBER)
 
 
 func _node_card(id: String) -> void:
@@ -510,6 +579,8 @@ func _node_card(id: String) -> void:
 		"hub":
 			_label("지구와 달 사이의 균형점. 행성으로 가는 전이가 여기서 갈라진다 — 지구 가까이 내려가 엔진을 켜면 (오베르트 효과) 화성 전이까지 1.0 km/s. " +
 				"시대 1에 달의 물로 만든 추진제를 쌓는 연료 기지가 들어선다.", 13, Palette.MUTED)
+			if not Fleet.depot_site(id).is_empty():
+				_depot_section(id)
 		"orbit":
 			_label("%s의 저궤도 — 행성간 함선이 머무는 부두. 표면까지는 착륙선이 오간다 (오를 때 %s · 내릴 때 %s km/s)." % [Fleet.body_name(body),
 				Fmt.n(Fleet.edge_dv(Fleet.surface(body), id), 1), Fmt.n(Fleet.edge_dv(id, Fleet.surface(body)), 1)], 13, Palette.MUTED)

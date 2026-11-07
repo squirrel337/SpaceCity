@@ -1712,6 +1712,7 @@ func _transport_check(col: Colonies) -> void:
 	_metro_ui_check(col)
 	_routes_check(col)
 	_fleet_check(col)
+	_depot_check(col)
 
 
 ## 함대·항로 지도: 로켓 방정식(문서의 예), 저궤도 사이 Δv, 3년 동안 항로마다 배가 있다, 부두에 배가 있어야 떠나고 보내는 도시가
@@ -1754,14 +1755,18 @@ func _fleet_check(col: Colonies) -> void:
 	hel.stock["food_kg"] = 50.0
 	var sup0 := home.support
 	var n0 := col.transport.trips.size()
+	var dep0 := (st["depots"] as Dictionary).duplicate(true)          # 떠날 때 연료 기지에서 넣은 몫은 빠진다 — 값은 떠나기 전 재고로
 	col.transport._depart_ship(col, l, 0)
 	var trip: Dictionary = col.transport.trips[-1] if col.transport.trips.size() > n0 else {}
 	_check(not trip.is_empty() and trip.has("ship") and String(trip["to"]) == String(l["b"]), "화성 수송선이 배와 함께 떠나지 않았다")
 	if not trip.is_empty():
 		var sh := Fleet.ship(col, int(trip["ship"]))
 		var paid := sup0 - home.support
+		var dep1: Dictionary = st["depots"]
+		st["depots"] = dep0
 		var want := Fleet.trip(col, String(sh["cls"]), Fleet.port_body(col), "mars", Transport.cargo_t(trip["cargo"]),
 			Transport.count_people(trip["people"]), home)
+		st["depots"] = dep1
 		_check(String(sh["at"]) == "" and String(sh["to"]) == "mars" and absf(paid - float(want["cost"])) < 0.5,
 			"떠난 배의 자리·추진제 값이 맞지 않다 (낸 값 %.1f, 바람 %.1f)" % [paid, float(want["cost"])])
 		trip["arrive"] = col.hour + 1
@@ -1839,6 +1844,100 @@ func _fleet_check(col: Colonies) -> void:
 	_check(_texts(tp).any(func(x): return x.begins_with("함대 · 배")), "교통 탭에 함대 칸이 없다")
 	print("smoke: fleet %d ships, %d orders, mars Δv %.1f/%.1f, best %s" % [(st["ships"] as Array).size(), (st["orders"] as Array).size(),
 		Fleet.route_dv("moon", "mars"), Fleet.route_dv("mars", "moon"), ", ".join(PackedStringArray(routes.map(func(r): return "%s:%s" % [r, Fleet.best_class(col, r)])))])
+
+
+## 연료 기지: 셋 (L1·화성 궤도·세레스)과 오르는 몫, 기술·시대가 없으면 못 짓는다, 지으면 값을 내고 날이 차면 열린다,
+## 남는 물을 추진제로 바꿔 올려 쌓는다, 쌓인 기지에서 다시 채우면 화성 길이 싸고 가볍다 (전기 추진은 쓰지 않는다),
+## 다음 구간 몫이 모자라면 들르지 않는다, 떠날 때 뺀다, 저장 왕복, 항로 지도 카드
+func _depot_check(col: Colonies) -> void:
+	var st := Fleet.state(col)
+	_check(Fleet.depot_sites() == ["l1", "lmo", "ceres_lo"], "연료 기지 자리가 L1·화성 궤도·세레스가 아니다 %s" % str(Fleet.depot_sites()))
+	_check(absf(Fleet.depot_lift("l1") - 2.6) < 0.01 and absf(Fleet.depot_lift("lmo") - 4.1) < 0.01 and absf(Fleet.depot_lift("ceres_lo") - 0.4) < 0.01,
+		"연료 기지까지 오르는 Δv가 맞지 않다")
+	_check(Fleet.depot_eff("ceres_lo") > Fleet.depot_eff("l1") and Fleet.depot_eff("l1") > Fleet.depot_eff("lmo") and Fleet.depot_eff("lmo") > 0.2,
+		"얕은 우물일수록 추진제가 더 닿아야 한다 (%.2f / %.2f / %.2f)" % [Fleet.depot_eff("l1"), Fleet.depot_eff("lmo"), Fleet.depot_eff("ceres_lo")])
+	var hi := col.index_of_site(GameData.HOME_SITE)
+	var home_c: Dictionary = col.list[hi]
+	var home: CitySim = home_c["sim"]
+	_check(Fleet.depot_city(col, "l1") == hi, "L1 연료 기지를 채우는 도시가 고향이 아니다")
+	var keep_dep: Dictionary = (st["depots"] as Dictionary).duplicate(true)
+	st["depots"] = {}
+	# 시대가 모자라면 못 짓는다
+	var prog := CityProgress.state(home_c)
+	var era0 := int(prog["era"])
+	prog["era"] = 0
+	_check(Fleet.depot_reason(col, "l1") != "", "시대 0에 연료 기지를 지을 수 있다")
+	prog["era"] = maxi(era0, 1)
+	var added := []
+	for t in ["orbital_assembly", "cryogenic_propellant"]:
+		if not home.techs.has(t):
+			home.techs[t] = true
+			added.append(t)
+	home.support = maxf(home.support, 5000.0)
+	home.stock["parts"] = maxf(float(home.stock.get("parts", 0.0)), 1000.0)
+	home.stock["metal_t"] = maxf(float(home.stock.get("metal_t", 0.0)), 200.0)
+	var sup0 := home.support
+	var why := Fleet.depot_build(col, "l1")
+	_check(why == "" and String(Fleet.depot(col, "l1").get("state", "")) == "building"
+		and absf(sup0 - home.support - float(Fleet.depot_data()["build"]["support"])) < 0.01, "L1 연료 기지를 짓지 못했다: " + why)
+	_check(Fleet.depot_build(col, "l1") != "", "짓는 중인 기지를 또 지었다")
+	_check(Fleet.depot_stock(col, "l1") == 0.0, "짓는 중인 기지에서 추진제를 넣는다")
+	Fleet.depot(col, "l1")["ready"] = col.hour
+	Fleet._depot_day(col)
+	_check(Fleet.depot_ready(col, "l1"), "날이 찬 연료 기지가 열리지 않았다")
+	# 채우기: 딸린 설비가 날마다 만들어 올린다 (오르는 몫만큼 덜 닿는다, 도시 비축은 그대로), 한도에서 멈춘다
+	var w0 := float(home.stock.get("water_kg", 0.0))
+	var make_why := Fleet.depot_make_reason(col, "l1")
+	_check(make_why == "", "고향이 L1 연료 기지를 채우지 못한다: " + make_why)
+	var rate := float(Fleet.depot_data()["rate_t"])
+	Fleet._depot_day(col)
+	var d := Fleet.depot(col, "l1")
+	_check(absf(float(d["stock"]) - rate * Fleet.depot_eff("l1")) < 0.01 and float(home.stock.get("water_kg", 0.0)) == w0,
+		"연료 기지가 하루 몫을 쌓지 않았다 (%.2f t, %s)" % [float(d["stock"]), String(d["why"])])
+	d["stock"] = float(Fleet.depot_data()["cap_t"])
+	Fleet._depot_day(col)
+	_check(float(d["stock"]) == float(Fleet.depot_data()["cap_t"]) and String(d["why"]) == "가득 찼다", "가득 찬 기지에 더 쌓였다")
+	# 다시 채우기: 쌓인 L1에서 화성 길을 끊는다 — 가볍고 싸다
+	d["stock"] = 0.0
+	var plain := Fleet.trip(col, "chem", "moon", "mars", 10.0, 0, home)
+	d["stock"] = 500.0
+	var via := Fleet.trip(col, "chem", "moon", "mars", 10.0, 0, home)
+	_check((via["legs"] as Array).size() == 2 and String(via["legs"][1][5]) == "l1" and float(via["depot"].get("l1", 0.0)) > 0.0
+		and float(via["prop_t"]) < float(plain["prop_t"]) and float(via["cost"]) < float(plain["cost"]),
+		"L1 연료 기지에서 다시 채우지 않거나 싸지지 않았다 (%.1f t·%.0f → %.1f t·%.0f)" % [float(plain["prop_t"]), float(plain["cost"]),
+			float(via["prop_t"]), float(via["cost"])])
+	_check((Fleet.trip(col, "sep", "moon", "mars", 10.0, 0, home)["depot"] as Dictionary).is_empty(), "전기 추진이 연료 기지 추진제를 넣었다")
+	d["stock"] = 0.1
+	var poor := Fleet.trip(col, "chem", "moon", "mars", 10.0, 0, home)
+	_check((poor["depot"] as Dictionary).is_empty() and absf(float(poor["cost"]) - float(plain["cost"])) < 0.01,
+		"다음 구간 몫이 모자란 기지에 들렀다")
+	d["stock"] = 500.0
+	Fleet.draw_depots(col, via)
+	_check(absf(float(d["stock"]) - (500.0 - float(via["depot"]["l1"]))) < 0.01 and float(d["used"]) > 0.0, "떠날 때 기지에서 빼지 않았다")
+	# 저장 왕복
+	var saved: Variant = JSON.parse_string(JSON.stringify(st))
+	var before := JSON.stringify(st["depots"])
+	Fleet.load_state(col, saved)
+	_check(JSON.stringify(Fleet.state(col)["depots"]) == before, "연료 기지가 저장 왕복에서 달라졌다")
+	# 항로 지도 카드 (L1)
+	main._set_view("map")
+	var m: DvMapView = main.dv_map
+	m.selected = "n:l1"
+	m._sig = ""
+	m.refresh(true)
+	_check(_texts(m).any(func(x): return x == Fleet.depot_name("l1")), "L1 카드에 연료 기지 칸이 없다")
+	main._set_view("world")
+	var summary := "하루 %.1f t 쌓임, 화성 길 %.1f t·%.0f → %.1f t·%.0f" % [rate * Fleet.depot_eff("l1"), float(plain["prop_t"]),
+		float(plain["cost"]), float(via["prop_t"]), float(via["cost"])]
+	# 되돌린다 (3년 자동 운영이 지은 기지·기술·시대)
+	st["depots"] = keep_dep
+	for t in added:
+		home.techs.erase(t)
+	prog["era"] = era0
+	print("smoke: depots %s, 3년 뒤 %s" % [summary, ", ".join(PackedStringArray((keep_dep.keys() as Array).map(func(n):
+		return "%s:%s %.0f t (쌓음 %.0f · 넣음 %.0f%s)" % [n, String(keep_dep[n].get("state", "")), float(keep_dep[n].get("stock", 0.0)),
+			float(keep_dep[n].get("made", 0.0)), float(keep_dep[n].get("used", 0.0)),
+			(" · " + String(keep_dep[n].get("why", ""))) if String(keep_dep[n].get("why", "")) != "" else ""])))])
 
 
 ## 소리: 효과음·환경음을 모두 만든다 (길이·고리·크기), 단추를 누르면 딸깍, 기록 글에 맞는 소리(연구 완료)와 알림 종류의 소리,

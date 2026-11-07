@@ -11,8 +11,14 @@ extends RefCounted
 ##   전기 추진은 전이가 1.5배 걸리고 자리가 적다.
 ## 배는 지구 조선소에 주문한다 — 고향이 낸다 (궤도 조립을 알면 L1 조립장에서 지원 점수 절반에 금속으로). 핵열은 메가와트급 원자로가 있어야.
 ## 함대 자동 운영(처음엔 켜짐)은 항로마다 배를 둘로 맞춘다 — 고향 부두에 노는 배를 먼저 보내고, 없으면 그 항로에 가장 싼 등급을 주문한다.
+## 연료 기지 (시대 1 — 자료 depots): 지구–달 L1·화성 저궤도·세레스 저궤도. 그 천체의 가장 큰 도시(L1은 달의 고향)가 궤도 조립과
+##   시대 1이 되면 짓고, 극저온 추진제 생산과 얼음 채굴·전해조(화성은 사바티에·전해조)가 있으면 기지에 딸린 설비가 날마다 추진제 12 t을
+##   만들어 올려 쌓는다 — 표면에서 기지까지 오르는 Δv의 추진제만큼 덜 닿는다 (달 4할 반, 화성 3할, 세레스 9할). 도시의 비축과는 따로다. 화학·핵열 배는 길 위의 기지에서 다시 채운다:
+##   기지마다 구간을 끊어 구간마다 그 구간의 추진제만 싣고(로켓 방정식의 곱이 끊긴다), 기지에서 넣은 몫은 기지 값(1 t 1.0, 핵열 1.3)이다.
+##   함대 자동 운영은 지을 수 있고 그 도시의 지원 점수가 값 + 600을 넘으면 기지도 짓는다.
 ## 상태 Colonies.fleet: {ships: [{id, name, cls, route, at, to, trips, since}], orders: [{id, name, cls, route, ready}], serial, auto,
-##   status: {항로: [시, 글]} (지난 발사 창에 무슨 일이 있었나), log: [[시, 글]]} — 저장된다
+##   status: {항로: [시, 글]} (지난 발사 창에 무슨 일이 있었나), log: [[시, 글]],
+##   depots: {노드: {state(building · ready), ready(완공 시각), stock, made, used, day(어제 쌓은 t), why(못 쌓은 까닭)}}} — 저장된다
 
 const PATH := "res://data/system_map.json"
 const LOG_KEEP := 40
@@ -41,7 +47,9 @@ static func cls_short(id: String) -> String:
 
 static func state(col: Colonies) -> Dictionary:
 	if not col.fleet.get("ships") is Array:
-		col.fleet = {"ships": [], "orders": [], "serial": 0, "auto": true, "status": {}, "log": []}
+		col.fleet = {"ships": [], "orders": [], "serial": 0, "auto": true, "status": {}, "log": [], "depots": {}}
+	if not col.fleet.get("depots") is Dictionary:
+		col.fleet["depots"] = {}
 	return col.fleet
 
 
@@ -151,15 +159,77 @@ static func price(col: Colonies, c_id: String, body: String, sim: CitySim = null
 	return [imp, false]
 
 
-## 한 번 건너는 값: {dv, mass, prop_t, price, local, cost}
+## 한 번 건너는 값: {dv, mass, prop_t, price, local, cost, legs: [[구간 처음 노드, 끝 노드, Δv, t, 1 t 값, 기지 노드 또는 ""]],
+## depot: {기지 노드: 거기서 넣는 t}}. 길 위(떠나는 부두 포함)의 연료 기지에 다음 구간 몫이 쌓여 있으면 거기서 다시 채운다
 static func trip(col: Colonies, c_id: String, from_body: String, to_body: String, load_t: float, settlers: int,
 		sim: CitySim = null, known: Dictionary = {}) -> Dictionary:
 	var c := cls(c_id)
-	var dv := route_dv(from_body, to_body)
+	var p := path(dock(from_body), dock(to_body))
+	var dv := float(p["dv"])
 	var mass := float(c.get("dry_t", 50.0)) + load_t + float(settlers) * float(data().get("person_t", 0.5))
-	var pt := prop_t(float(c.get("isp", 360.0)), dv, mass)
+	var isp := float(c.get("isp", 360.0))
 	var pr := price(col, c_id, from_body, sim, known)
-	return {"dv": dv, "mass": mass, "prop_t": pt, "price": float(pr[0]), "local": bool(pr[1]), "cost": pt * float(pr[0])}
+	var nodes: Array = p["path"]
+	var out := {"dv": dv, "mass": mass, "prop_t": 0.0, "price": float(pr[0]), "local": bool(pr[1]), "cost": 0.0, "legs": [],
+		"depot": {}}
+	if nodes.size() < 2:
+		out["prop_t"] = prop_t(isp, dv, mass)
+		out["cost"] = float(out["prop_t"]) * float(pr[0])
+		return out
+	# 다시 채우는 자리: 쌓인 기지 (그 등급이 기지 추진제를 쓸 때). 다음 구간 몫이 모자란 기지는 빼고 다시 끊는다
+	var stops := {}
+	if col != null and c_id in depot_data().get("fuels", []):
+		for i in range(0, nodes.size() - 1):
+			if depot_stock(col, String(nodes[i])) > 0.0:
+				stops[i] = true
+	var dprice := float(depot_data().get("price", {}).get(c_id, 1.0))
+	var legs: Array = []
+	for _pass in 4:
+		legs = []
+		var start := 0
+		var acc := 0.0
+		for i in range(1, nodes.size()):
+			acc += maxf(0.0, edge_dv(String(nodes[i - 1]), String(nodes[i])))
+			if i == nodes.size() - 1 or stops.has(i):
+				var from_depot := stops.has(start)
+				legs.append([String(nodes[start]), String(nodes[i]), acc, prop_t(isp, acc, mass), dprice if from_depot else float(pr[0]),
+					String(nodes[start]) if from_depot else ""])
+				start = i
+				acc = 0.0
+		var short := -1
+		for lg in legs:
+			if String(lg[5]) != "" and float(lg[3]) > depot_stock(col, String(lg[5])) + 1e-6:
+				short = nodes.find(String(lg[5]))
+				break
+		if short < 0:
+			break
+		stops.erase(short)
+	for lg in legs:
+		out["prop_t"] = float(out["prop_t"]) + float(lg[3])
+		out["cost"] = float(out["cost"]) + float(lg[3]) * float(lg[4])
+		if String(lg[5]) != "":
+			out["depot"][String(lg[5])] = float(out["depot"].get(String(lg[5]), 0.0)) + float(lg[3])
+	out["legs"] = legs
+	return out
+
+
+## 기지에서 넣는 몫을 그 기지에서 뺀다 (떠날 때)
+static func draw_depots(col: Colonies, tp: Dictionary) -> void:
+	for n in tp.get("depot", {}):
+		var d := depot(col, String(n))
+		if d.is_empty():
+			continue
+		var t := float(tp["depot"][n])
+		d["stock"] = maxf(0.0, float(d.get("stock", 0.0)) - t)
+		d["used"] = float(d.get("used", 0.0)) + t
+
+
+## "L1 연료 기지에서 45 t" (기지에서 넣는 것이 없으면 "")
+static func refuel_text(tp: Dictionary) -> String:
+	var bits := PackedStringArray()
+	for n in tp.get("depot", {}):
+		bits.append("%s에서 %s t" % [depot_name(String(n)), Fmt.n(float(tp["depot"][n]), 1)])
+	return ", ".join(bits)
 
 
 ## 그 항로의 전이 일수 (그 등급으로)
@@ -176,6 +246,190 @@ static func requires_ok(c_id: String, known: Dictionary) -> bool:
 
 static func tech_name(t: String) -> String:
 	return String(GameData.TECHS[t]["name"]) if GameData.TECHS.has(t) else t
+
+
+# ── 연료 기지 ───────────────────────────────────────────────────
+static func depot_data() -> Dictionary:
+	return data().get("depots", {})
+
+
+## 기지를 둘 수 있는 노드들 (자료의 차례)
+static func depot_sites() -> Array:
+	return (depot_data().get("sites", {}) as Dictionary).keys()
+
+
+static func depot_site(n: String) -> Dictionary:
+	return depot_data().get("sites", {}).get(n, {})
+
+
+static func depot_name(n: String) -> String:
+	return String(depot_site(n).get("name", n))
+
+
+## 그 노드의 기지 상태 ({} = 짓지 않았다)
+static func depot(col: Colonies, n: String) -> Dictionary:
+	return (state(col)["depots"] as Dictionary).get(n, {})
+
+
+static func depot_ready(col: Colonies, n: String) -> bool:
+	return String(depot(col, n).get("state", "")) == "ready"
+
+
+static func depot_stock(col: Colonies, n: String) -> float:
+	return float(depot(col, n).get("stock", 0.0)) if depot_ready(col, n) else 0.0
+
+
+## 짓고 채우는 도시: 그 천체에서 사람이 가장 많은 도시 (달은 고향이 먼저) — 식민지 번호, 없으면 −1
+static func depot_city(col: Colonies, n: String) -> int:
+	var body := String(depot_site(n).get("body", ""))
+	if body == "":
+		return -1
+	if body == "moon":
+		var h := col.index_of_site(GameData.HOME_SITE)
+		if h >= 0:
+			return h
+	var best := -1
+	var best_pop := -1.0
+	for i in col.list.size():
+		var c: Dictionary = col.list[i]
+		if String(c["body"]) != body:
+			continue
+		var pop := (c["sim"] as CitySim).population()
+		if pop > best_pop:
+			best_pop = pop
+			best = i
+	return best
+
+
+## 표면에서 기지까지 오르는 Δv와, 만든 추진제 1 t 가운데 기지에 닿는 몫 (오르는 데 그만큼 쓴다)
+static func depot_lift(n: String) -> float:
+	var body := String(depot_site(n).get("body", ""))
+	return maxf(0.0, float(path(surface(body), n)["dv"])) if body != "" else 0.0
+
+
+static func depot_eff(n: String) -> float:
+	var lc := cls(String(depot_data().get("lift_class", "chem")))
+	return 1.0 / (1.0 + prop_t(float(lc.get("isp", 360.0)), depot_lift(n), 1.0))
+
+
+static func _city_short(c: Dictionary) -> String:
+	return String(c.get("short", c["name"]))
+
+
+## 지을 수 없으면 까닭
+static func depot_reason(col: Colonies, n: String) -> String:
+	var site := depot_site(n)
+	if site.is_empty():
+		return "여기에는 연료 기지를 두지 않는다"
+	var d := depot(col, n)
+	if not d.is_empty():
+		return "이미 있다" if String(d.get("state", "")) == "ready" else "짓는 중이다"
+	var i := depot_city(col, n)
+	if i < 0:
+		return "%s에 도시가 없다" % body_name(String(site["body"]))
+	var c: Dictionary = col.list[i]
+	var known := col.known_techs()
+	for t in depot_data().get("requires", []):
+		if not known.has(String(t)):
+			return "%s 기술이 있어야 한다" % tech_name(String(t))
+	var era := int(depot_data().get("era", 1))
+	if CityProgress.era_of(c) < era:
+		return "%s이(가) %s에 이르러야 한다" % [_city_short(c), CityProgress.era_name(era)]
+	var sim: CitySim = c["sim"]
+	var b: Dictionary = depot_data().get("build", {})
+	if sim.support < float(b.get("support", 0)):
+		return "%s의 지원 점수가 모자란다 (%s 필요)" % [_city_short(c), Fmt.n(float(b.get("support", 0)))]
+	if float(sim.stock.get("parts", 0.0)) < float(b.get("parts", 0)):
+		return "%s의 부품이 모자란다 (%s 필요)" % [_city_short(c), Fmt.n(float(b.get("parts", 0)))]
+	if float(sim.stock.get("metal_t", 0.0)) < float(b.get("metal_t", 0)):
+		return "%s의 금속이 모자란다 (%s t 필요)" % [_city_short(c), Fmt.n(float(b.get("metal_t", 0)))]
+	return ""
+
+
+static func depot_cost_text() -> String:
+	var b: Dictionary = depot_data().get("build", {})
+	return "지원 %s · 부품 %s · 금속 %s t · %d일" % [Fmt.n(float(b.get("support", 0))), Fmt.n(float(b.get("parts", 0))),
+		Fmt.n(float(b.get("metal_t", 0))), int(b.get("days", 90))]
+
+
+static func depot_build(col: Colonies, n: String, auto := false) -> String:
+	var why := depot_reason(col, n)
+	if why != "":
+		return why
+	var c: Dictionary = col.list[depot_city(col, n)]
+	var sim: CitySim = c["sim"]
+	var b: Dictionary = depot_data().get("build", {})
+	sim.support -= float(b.get("support", 0))
+	sim.stock["parts"] = float(sim.stock.get("parts", 0.0)) - float(b.get("parts", 0))
+	sim.stock["metal_t"] = float(sim.stock.get("metal_t", 0.0)) - float(b.get("metal_t", 0))
+	var ready := col.hour + int(float(b.get("days", 90)) * 24.0)
+	(state(col)["depots"] as Dictionary)[n] = {"state": "building", "ready": ready, "stock": 0.0, "made": 0.0, "used": 0.0,
+		"day": 0.0, "why": ""}
+	_log(col, "%s%s를 짓기 시작했다 — %s, %s 완공" % ["자동 운영: " if auto else "", depot_name(n), _city_short(c),
+		col.date_text(float(ready))])
+	sim.note("함대 — %s를 짓기 시작했다 (%s), %s 완공" % [depot_name(n), depot_cost_text(), col.date_text(float(ready))], "info")
+	return ""
+
+
+## 채우지 못하면 까닭 (기술·계열·도시)
+static func depot_make_reason(col: Colonies, n: String) -> String:
+	var i := depot_city(col, n)
+	if i < 0:
+		return "채울 도시가 없다"
+	var t := String(depot_data().get("make_tech", ""))
+	if t != "" and not col.known_techs().has(t):
+		return "%s 기술이 있어야 채운다" % tech_name(t)
+	var sim: CitySim = col.list[i]["sim"]
+	for f in depot_site(n).get("needs", depot_data().get("make_needs", [])):
+		if not sim.active.has(String(f)) or sim.fam_n(String(f)) <= 0:
+			return "%s에 %s 계열이 있어야 채운다" % [_city_short(col.list[i]), GameData.module_name(String(f))]
+	return ""
+
+
+## 하루: 다 지은 기지를 열고, 열린 기지는 딸린 설비가 만든 추진제를 올려 쌓는다 (오르는 몫만큼 덜 닿는다)
+static func _depot_day(col: Colonies) -> void:
+	var dd := depot_data()
+	for n in state(col)["depots"]:
+		var d: Dictionary = state(col)["depots"][n]
+		if String(d.get("state", "")) == "building":
+			if col.hour >= int(d.get("ready", 0)):
+				d["state"] = "ready"
+				_log(col, "%s 완공" % depot_name(String(n)))
+				var i0 := depot_city(col, String(n))
+				if i0 >= 0:
+					(col.list[i0]["sim"] as CitySim).note("함대 — %s 완공: 남는 물을 추진제로 바꿔 쌓는다. 화학·핵열 배가 여기서 다시 채운다" %
+						depot_name(String(n)), "good")
+			continue
+		d["day"] = 0.0
+		var why := depot_make_reason(col, String(n))
+		if why == "":
+			var room := maxf(0.0, float(dd.get("cap_t", 3000)) - float(d.get("stock", 0.0)))
+			var made := minf(float(dd.get("rate_t", 12)) * depot_eff(String(n)), room)
+			if made < 0.05:
+				why = "가득 찼다"
+			else:
+				d["stock"] = float(d.get("stock", 0.0)) + made
+				d["made"] = float(d.get("made", 0.0)) + made
+				d["day"] = made
+		d["why"] = why
+
+
+## 자동 운영이 지을 만한가: 그 길을 쓰는 항로가 있을 때 (L1은 모든 항로가 지난다)
+static func _depot_useful(col: Colonies, n: String) -> bool:
+	if n == "l1":
+		return not routes(col).is_empty()
+	return routes(col).has(String(depot_site(n).get("body", "")))
+
+
+static func depot_text(col: Colonies, n: String) -> String:
+	var d := depot(col, n)
+	if d.is_empty():
+		return "%s — 아직 없다" % depot_name(n)
+	if String(d.get("state", "")) == "building":
+		return "%s — 짓는 중, %s 완공" % [depot_name(n), col.date_text(float(d.get("ready", 0)))]
+	var tail := ("하루 +%s t" % Fmt.n(float(d.get("day", 0.0)), 1)) if float(d.get("day", 0.0)) > 0.0 else String(d.get("why", ""))
+	return "%s — %s / %s t%s" % [depot_name(n), Fmt.n(float(d.get("stock", 0.0))), Fmt.n(float(depot_data().get("cap_t", 3000))),
+		(" · " + tail) if tail != "" else ""]
 
 
 # ── 항로·배 찾기 ────────────────────────────────────────────────
@@ -334,6 +588,14 @@ static func load_state(col: Colonies, d: Variant) -> void:
 		for e in src["log"]:
 			if e is Array and (e as Array).size() >= 2:
 				st["log"].append([int(e[0]), String(e[1])])
+	st["depots"] = {}
+	if src.get("depots") is Dictionary:
+		for n in src["depots"]:
+			var v: Variant = src["depots"][n]
+			if v is Dictionary and not depot_site(String(n)).is_empty():
+				st["depots"][String(n)] = {"state": "ready" if String(v.get("state", "")) == "ready" else "building",
+					"ready": int(v.get("ready", 0)), "stock": maxf(0.0, float(v.get("stock", 0.0))), "made": float(v.get("made", 0.0)),
+					"used": float(v.get("used", 0.0)), "day": float(v.get("day", 0.0)), "why": String(v.get("why", ""))}
 	col.fleet = st
 	# 가는 중이라 적혀 있는데 탄 편이 없으면 (옛 저장·지운 편) 가던 곳의 부두에 둔다
 	for sh in st["ships"]:
@@ -529,6 +791,7 @@ static func step_day(col: Colonies) -> void:
 	for sh in st["ships"]:
 		if String(sh["route"]) != "" and not rs.has(String(sh["route"])) and String(sh["at"]) == pb:
 			sh["route"] = ""
+	_depot_day(col)
 	if bool(st.get("auto", true)):
 		_auto(col)
 
@@ -599,6 +862,16 @@ static func _auto(col: Colonies) -> void:
 			if not ordered:
 				break
 			have += 1
+	# 연료 기지: 지을 수 있고, 그 도시의 지원 점수가 값 + auto_reserve를 넘고, 그 길을 쓰는 항로가 있으면 (한 번에 하나)
+	var dd := depot_data()
+	for n in depot_sites():
+		if not depot(col, String(n)).is_empty() or depot_reason(col, String(n)) != "" or not _depot_useful(col, String(n)):
+			continue
+		var dsim: CitySim = col.list[depot_city(col, String(n))]["sim"]
+		if dsim.support < float(dd.get("build", {}).get("support", 0)) + float(dd.get("auto_reserve", 600)):
+			continue
+		depot_build(col, String(n), true)
+		break
 
 
 # ── 글 ──────────────────────────────────────────────────────────

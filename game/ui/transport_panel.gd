@@ -158,6 +158,8 @@ func _fleet_sig() -> String:
 	var bits := PackedStringArray()
 	for sh in st["ships"]:
 		bits.append("%d:%s:%s" % [int(sh["id"]), String(sh["route"]), "p" if String(sh["at"]) == pb else ("d" if String(sh["at"]) != "" else "t")])
+	for n in st["depots"]:
+		bits.append("%s:%s" % [n, String(st["depots"][n].get("state", ""))])
 	return "%s|%d|%d|%s" % [",".join(bits), (st["orders"] as Array).size(), mgr.known_techs().size(), str(st.get("auto", true))]
 
 
@@ -184,16 +186,27 @@ func _fleet_section() -> void:
 	box.add_child(ThemeFactory.muted("행성간 수송선은 떠나는 부두에 그 항로의 배가 있어야 발사 창에 떠나고, 실을 것이 없으면 쉰다. 떠날 때 " +
 		"보내는 도시가 추진제 값(지원 점수 — 로켓 방정식)을 낸다. 화학은 빠르지만 추진제를 많이 쓰고, 핵열은 메가와트급 원자로가 있어야 " +
 		"하며, 전기 추진은 싸지만 전이가 1.5배 걸리고 자리가 40이다. 극저온 추진제 생산을 알면 메탄·산소·수소를 만드는 도시는 현지 값으로 산다. " +
-		"함대 자동 운영은 항로마다 배를 둘로 맞추고, 모자라면 가장 알맞은 등급을 주문한다.", 12))
+		"함대 자동 운영은 항로마다 배를 둘로 맞추고, 모자라면 가장 알맞은 등급을 주문한다. 시대 1에는 L1·화성 궤도·세레스에 연료 기지를 " +
+		"지어 화학·핵열 배가 길 위에서 다시 채운다 — 자동 운영은 지을 수 있으면 짓는다.", 12))
 	var auto := CheckButton.new()
 	auto.text = "함대 자동 운영"
-	auto.tooltip_text = "항로마다 배 둘, 모자라면 가장 알맞은 등급을 주문"
+	auto.tooltip_text = "항로마다 배 둘, 모자라면 가장 알맞은 등급을 주문 · 지을 수 있으면 연료 기지도"
 	auto.button_pressed = bool(st.get("auto", true))
 	auto.custom_minimum_size.y = 44
 	auto.toggled.connect(func(on: bool):
 		st["auto"] = on
 		changed.emit())
 	box.add_child(auto)
+	# 연료 기지: 기지마다 한 줄 (자세히는 항로 지도)
+	for n in Fleet.depot_sites():
+		var dl := ThemeFactory.muted("", 12)
+		dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(dl)
+		var nn := String(n)
+		_live.append(func():
+			var d := Fleet.depot(mgr, nn)
+			var why := Fleet.depot_reason(mgr, nn) if d.is_empty() else ""
+			dl.text = "⛽ " + Fleet.depot_text(mgr, nn) + ((" · " + why) if why != "" else ""))
 	var route_ids: Array = Fleet.routes(mgr)
 	for r in route_ids:
 		var card := PanelContainer.new()

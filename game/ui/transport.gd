@@ -517,6 +517,7 @@ func _depart_ship(col: Colonies, l: Dictionary, dir: int) -> void:
 	go["cost"] = float(fin["cost"])
 	go["prop_t"] = float(fin["prop_t"])
 	s_sim.support -= float(go["cost"])
+	Fleet.draw_depots(col, fin)                 # 길 위의 연료 기지에서 넣는 몫
 	var t := {"line": l["id"], "from": src, "to": dst, "depart": col.hour,
 		"arrive": col.hour + maxi(1, int(round(float(l["trip_h"]) * float(go["time_k"])))), "cargo": cargo, "people": people,
 		"pax": settlers, "mode": l["mode"], "kind": l["kind"], "ship": int(sh["id"])}
@@ -528,7 +529,10 @@ func _depart_ship(col: Colonies, l: Dictionary, dir: int) -> void:
 		_flow(src, "out_t", tons)
 		_flow(src, "out_p", settlers)
 	_event("dep", src, dst, l)
-	var fuel := "추진제 %s t · 지원 %s%s" % [Fmt.n(float(go["prop_t"]), 1), Fmt.n(float(go["cost"])), " (현지 생산)" if bool(go["local"]) else ""]
+	var refuel := Fleet.refuel_text(fin)
+	var fuel := "추진제 %s t · 지원 %s%s%s" % [Fmt.n(float(go["prop_t"]), 1), Fmt.n(float(go["cost"])),
+		" (현지 생산)" if bool(go["local"]) and ((fin["legs"] as Array).is_empty() or String(fin["legs"][0][5]) == "") else "",
+		(" — " + refuel) if refuel != "" else ""]
 	var what := load_text(cargo, settlers) if tons > 0.0 or settlers > 0 else "빈 배 — 저쪽 부두에 배를 둔다"
 	s_sim.note("행성간 수송선 출발 — %s(%s) %s행 (%s). %s · %s 도착 예정" % [String(sh["name"]), Fleet.cls_short(String(sh["cls"])),
 		node_name(dst), what, fuel, col.date_text(float(t["arrive"]))], "info")
